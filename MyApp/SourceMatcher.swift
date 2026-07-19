@@ -8,7 +8,7 @@ import Foundation
 ///  - the ESPN broadcast network (e.g. "ESPN", "TNT") appearing in the channel name
 ///  - league / sport keywords
 ///  - a small bonus for channels sitting in a "sports" group
-enum SourceMatcher {
+nonisolated enum SourceMatcher {
 
     /// Words that carry no discriminating value when matching team/channel names.
     private static let stopWords: Set<String> = [

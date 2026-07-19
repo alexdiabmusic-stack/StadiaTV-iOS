@@ -13,6 +13,7 @@ struct OnboardingView: View {
     @State private var step: Step = .welcome
     @State private var selectedSports: Set<SportGroup> = []
     @State private var selectedLeagues: Set<League> = []
+    @State private var teamSearchText = ""
     @State private var showingAddPlaylist = false
     @StateObject private var teamsLoader = OnboardingTeamsLoader()
 
@@ -58,10 +59,12 @@ struct OnboardingView: View {
     private var welcomeStep: some View {
         VStack(spacing: 20) {
             Spacer()
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Theme.accent)
+            Image("BrandIcon")
+                .resizable()
+                .scaledToFill()
                 .frame(width: 96, height: 96)
-                .overlay(Image(systemName: "sportscourt.fill").font(.system(size: 44)).foregroundStyle(.white))
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Theme.hairline))
             BrandMark().scaleEffect(1.6)
             Text("Live matches, scores, and your playlists — all in one place.")
                 .font(.title3)
@@ -137,28 +140,64 @@ struct OnboardingView: View {
     }
 
     private var teamsList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 20, pinnedViews: [.sectionHeaders]) {
-                ForEach(orderedLeaguesWithTeams, id: \.id) { league in
-                    Section {
-                        ForEach(teamsLoader.teamsByLeague[league] ?? []) { team in
-                            TeamPickRow(team: team,
-                                        isFavorite: prefs.isFavorite(team, in: league)) {
-                                prefs.toggleFavorite(team, in: league)
+        VStack(spacing: 12) {
+            TeamSearchField(text: $teamSearchText)
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
+
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 20, pinnedViews: [.sectionHeaders]) {
+                    if isSearchingTeams {
+                        if matchingTeams.isEmpty {
+                            Text("No teams match your search.")
+                                .font(.callout)
+                                .foregroundStyle(Theme.textSecondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(14)
+                                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                        } else {
+                            Section {
+                                ForEach(matchingTeams) { result in
+                                    TeamPickRow(team: result.team,
+                                                leagueName: result.league.shortName,
+                                                isFavorite: prefs.isFavorite(result.team, in: result.league)) {
+                                        prefs.toggleFavorite(result.team, in: result.league)
+                                    }
+                                }
+                            } header: {
+                                Text("Search Results")
+                                    .font(.footnote.weight(.bold))
+                                    .foregroundStyle(Theme.accent)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 6)
+                                    .background(Theme.background)
                             }
                         }
-                    } header: {
-                        Text(league.name)
-                            .font(.footnote.weight(.bold))
-                            .foregroundStyle(Theme.accent)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 6)
-                            .background(Theme.background)
+                    } else {
+                        ForEach(orderedLeaguesWithTeams, id: \.id) { league in
+                            Section {
+                                ForEach(teamsLoader.teamsByLeague[league] ?? []) { team in
+                                    TeamPickRow(team: team,
+                                                leagueName: nil,
+                                                isFavorite: prefs.isFavorite(team, in: league)) {
+                                        prefs.toggleFavorite(team, in: league)
+                                    }
+                                }
+                            } header: {
+                                Text(league.name)
+                                    .font(.footnote.weight(.bold))
+                                    .foregroundStyle(Theme.accent)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 6)
+                                    .background(Theme.background)
+                            }
+                        }
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 20)
         }
     }
 
@@ -254,6 +293,23 @@ struct OnboardingView: View {
         League.all.filter { teamsLoader.teamsByLeague[$0] != nil }
     }
 
+    private var isSearchingTeams: Bool {
+        !teamSearchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var matchingTeams: [TeamSearchResult] {
+        let query = teamSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return [] }
+        return orderedLeaguesWithTeams.flatMap { league in
+            (teamsLoader.teamsByLeague[league] ?? [])
+                .filter { team in
+                    [team.displayName, team.shortDisplayName, team.abbreviation, league.name, league.shortName]
+                        .contains { $0.localizedCaseInsensitiveContains(query) }
+                }
+                .map { TeamSearchResult(league: league, team: $0) }
+        }
+    }
+
     private func toggle(_ sport: SportGroup) {
         if selectedSports.contains(sport) {
             selectedSports.remove(sport)
@@ -293,6 +349,12 @@ struct OnboardingView: View {
 }
 
 // MARK: - Teams loader
+
+private struct TeamSearchResult: Identifiable, Hashable {
+    let league: League
+    let team: Team
+    var id: String { league.id + "-" + team.id }
+}
 
 @MainActor
 final class OnboardingTeamsLoader: ObservableObject {
@@ -406,8 +468,36 @@ private struct FlowChips: View {
     }
 }
 
+private struct TeamSearchField: View {
+    @Binding var text: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(Theme.textSecondary)
+            TextField("Search teams", text: $text)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .foregroundStyle(Theme.textPrimary)
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(12)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+    }
+}
+
 private struct TeamPickRow: View {
     let team: Team
+    let leagueName: String?
     let isFavorite: Bool
     let action: () -> Void
 
@@ -422,9 +512,17 @@ private struct TeamPickRow: View {
                     }
                 }
                 .frame(width: 34, height: 34)
-                Text(team.displayName)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(Theme.textPrimary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(team.displayName)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
+                    if let leagueName {
+                        Text(leagueName)
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                }
                 Spacer()
                 Image(systemName: isFavorite ? "star.fill" : "star")
                     .foregroundStyle(isFavorite ? Theme.accent : Theme.textSecondary)
@@ -432,5 +530,6 @@ private struct TeamPickRow: View {
             .padding(.vertical, 8)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(isFavorite ? "Remove \(team.displayName) from favorites" : "Add \(team.displayName) to favorites")
     }
 }

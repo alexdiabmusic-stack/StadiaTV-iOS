@@ -13,7 +13,10 @@ struct ESPNService {
     private let session: URLSession = {
         let config = URLSessionConfiguration.default
         config.requestCachePolicy = .reloadRevalidatingCacheData
-        config.timeoutIntervalForRequest = 20
+        // Keep the timeout tight: Home fans out across many leagues and a
+        // single stalled request otherwise delays the slowest phase.
+        config.timeoutIntervalForRequest = 10
+        config.httpMaximumConnectionsPerHost = 8
         return URLSession(configuration: config)
     }()
 
@@ -32,6 +35,46 @@ struct ESPNService {
         }
         let decoded = try JSONDecoder().decode(ScoreboardResponse.self, from: data)
         return decoded.events?.compactMap { $0.toMatch(league: league) } ?? []
+    }
+
+    /// Fetches scoreboards for consecutive days using a single ranged request
+    /// (dates=YYYYMMDD-YYYYMMDD) and removes duplicate events.
+    func scoreboards(for league: League, starting startDate: Date, days: Int) async throws -> [Match] {
+        let calendar = Calendar.current
+        let endDate = calendar.date(byAdding: .day, value: max(0, days - 1), to: startDate) ?? startDate
+
+        var components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/scoreboard")!
+        components.queryItems = [
+            URLQueryItem(name: "dates", value: "\(Self.dateFormatter.string(from: startDate))-\(Self.dateFormatter.string(from: endDate))"),
+            URLQueryItem(name: "limit", value: "300"),
+        ]
+
+        let (data, response) = try await session.data(from: components.url!)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw ServiceError.badResponse
+        }
+        let decoded = try JSONDecoder().decode(ScoreboardResponse.self, from: data)
+
+        var seenIDs: Set<String> = []
+        var matches: [Match] = []
+        for match in decoded.events?.compactMap({ $0.toMatch(league: league) }) ?? [] where !seenIDs.contains(match.id) {
+            seenIDs.insert(match.id)
+            matches.append(match)
+        }
+        return matches.sorted { $0.date < $1.date }
+    }
+
+    /// Fetches recent ESPN articles for a league.
+    func news(for league: League, limit: Int = 10) async throws -> [ESPNArticle] {
+        var components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/news")!
+        components.queryItems = [URLQueryItem(name: "limit", value: "\(limit)")]
+
+        let (data, response) = try await session.data(from: components.url!)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw ServiceError.badResponse
+        }
+        let decoded = try JSONDecoder().decode(NewsResponse.self, from: data)
+        return decoded.articles?.compactMap { $0.toArticle(league: league) } ?? []
     }
 
     /// Fetches every team in a league (used by the onboarding team picker).
@@ -55,6 +98,52 @@ struct ESPNService {
         f.dateFormat = "yyyyMMdd"
         return f
     }()
+}
+
+// MARK: - News response models
+
+private struct NewsResponse: Decodable {
+    let articles: [ArticleDTO]?
+}
+
+private struct ArticleDTO: Decodable {
+    let id: Int?
+    let headline: String?
+    let description: String?
+    let published: String?
+    let links: ArticleLinksDTO?
+    let images: [ArticleImageDTO]?
+
+    func toArticle(league: League) -> ESPNArticle? {
+        guard let headline, !headline.isEmpty else { return nil }
+        let urlString = links?.web?.href ?? links?.mobile?.href
+        return ESPNArticle(
+            id: id.map(String.init) ?? "\(league.id)-\(headline)",
+            headline: headline,
+            description: description ?? "",
+            published: published.flatMap {
+                EventDTO.isoFormatter.date(from: $0)
+                    ?? EventDTO.minuteFormatter.date(from: $0)
+                    ?? EventDTO.isoFractionalFormatter.date(from: $0)
+            },
+            url: urlString.flatMap(URL.init(string:)),
+            imageURL: images?.first?.url.flatMap(URL.init(string:)),
+            league: league
+        )
+    }
+}
+
+private struct ArticleLinksDTO: Decodable {
+    let web: ArticleLinkDTO?
+    let mobile: ArticleLinkDTO?
+}
+
+private struct ArticleLinkDTO: Decodable {
+    let href: String?
+}
+
+private struct ArticleImageDTO: Decodable {
+    let url: String?
 }
 
 // MARK: - Teams response models
@@ -148,23 +237,56 @@ private struct EventDTO: Decodable {
 
     static func parseDate(_ string: String?) -> Date {
         guard let string else { return Date() }
-        return isoFormatter.date(from: string) ?? Date()
+        // ESPN usually omits seconds ("2026-07-18T23:00Z"), which ISO8601DateFormatter rejects.
+        return minuteFormatter.date(from: string)
+            ?? isoFormatter.date(from: string)
+            ?? isoFractionalFormatter.date(from: string)
+            ?? Date()
     }
 
     static func statusDetail(status: StatusDTO?, state: GameState, date: Date) -> String {
         if let detail = status?.type?.shortDetail, !detail.isEmpty, state != .pre {
             return detail
         }
-        // Upcoming: show local start time.
+        // Upcoming: show local day and start time, e.g. "Today · 7:00 PM" or "Sat, Jul 25 · 7:00 PM".
+        let calendar = Calendar.current
+        let time = timeFormatter.string(from: date)
+        if calendar.isDateInToday(date) { return "Today · \(time)" }
+        if calendar.isDateInTomorrow(date) { return "Tomorrow · \(time)" }
+        return "\(dayFormatter.string(from: date)) · \(time)"
+    }
+
+    static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateStyle = .none
         f.timeStyle = .short
-        return f.string(from: date)
-    }
+        return f
+    }()
+
+    static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("EEEMMMd")
+        return f
+    }()
 
     static let isoFormatter: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
+    static let isoFractionalFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    /// Handles ESPN's second-less timestamps, e.g. "2026-07-18T23:00Z".
+    static let minuteFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        f.dateFormat = "yyyy-MM-dd'T'HH:mmZZZZZ"
         return f
     }()
 }
@@ -203,12 +325,14 @@ private struct CompetitorDTO: Decodable {
             logoURL: team?.logo.flatMap(URL.init(string:)),
             score: score,
             record: records?.first(where: { $0.type == "total" })?.summary ?? records?.first?.summary,
-            isWinner: winner ?? false
+            isWinner: winner ?? false,
+            teamID: team?.id
         )
     }
 }
 
 private struct TeamDTO: Decodable {
+    let id: String?
     let displayName: String?
     let shortDisplayName: String?
     let name: String?

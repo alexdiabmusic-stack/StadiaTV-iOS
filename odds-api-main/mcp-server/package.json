@@ -1,0 +1,60 @@
+{
+  "name": "@odds-api/mcp",
+  "version": "0.1.0",
+  "description": "MCP server for an OpenAPI sports betting odds API for coding agents, with bookmaker comparison, arbitrage, positive EV, line movement, and mock mode tools.",
+  "license": "Apache-2.0",
+  "homepage": "https://odds-api.net",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/odds-api/odds-api.git",
+    "directory": "mcp-server"
+  },
+  "bugs": {
+    "url": "https://github.com/odds-api/odds-api/issues"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "odds-api",
+    "odds",
+    "sports-odds",
+    "betting-odds",
+    "bookmaker-odds",
+    "sports-betting",
+    "racing",
+    "openapi",
+    "ai-agents",
+    "coding-agents",
+    "arbitrage",
+    "positive-ev",
+    "line-movement",
+    "rest-api",
+    "agents"
+  ],
+  "type": "module",
+  "bin": {
+    "odds-api-mcp": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.0",
+    "@odds-api/client": "^0.1.0",
+    "ws": "^8.20.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -15,10 +15,8 @@ struct PlaylistsView: View {
                 }
             }
             .navigationTitle("Playlists")
-            .toolbarBackground(Theme.background, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .primaryAction) {
                     Button { showingAdd = true } label: {
                         Image(systemName: "plus")
                     }
@@ -40,7 +38,7 @@ struct PlaylistsView: View {
             }
             .onDelete { store.remove(at: $0) }
         }
-        .listStyle(.insetGrouped)
+        .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .refreshable { await store.refreshAll() }
     }
@@ -131,10 +129,9 @@ struct AddPlaylistView: View {
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
         switch mode {
         case .m3u:
-            return URL(string: m3uURL.trimmingCharacters(in: .whitespaces))?.scheme != nil
+            return isSupportedPlaylistURL(m3uURL)
         case .xtream:
-            return URL(string: host.trimmingCharacters(in: .whitespaces))?.scheme != nil
-                && !username.isEmpty && !password.isEmpty
+            return isSupportedPlaylistURL(host) && !username.isEmpty && !password.isEmpty
         }
     }
 
@@ -155,8 +152,7 @@ struct AddPlaylistView: View {
                 switch mode {
                 case .m3u:
                     Section("M3U URL") {
-                        TextField("https://example.com/playlist.m3u", text: $m3uURL)
-                            .textInputAutocapitalization(.never)
+                        TextField("http://example.com/playlist.m3u", text: $m3uURL)
                             .autocorrectionDisabled()
                             .keyboardType(.URL)
                     }
@@ -164,14 +160,12 @@ struct AddPlaylistView: View {
                 case .xtream:
                     Section("Server") {
                         TextField("http://server.com:8080", text: $host)
-                            .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .keyboardType(.URL)
                     }
                     .listRowBackground(Theme.surface)
                     Section("Credentials") {
                         TextField("Username", text: $username)
-                            .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                         SecureField("Password", text: $password)
                     }
@@ -181,7 +175,6 @@ struct AddPlaylistView: View {
             .scrollContentBackground(.hidden)
             .background(Theme.background)
             .navigationTitle("Add Playlist")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -192,6 +185,11 @@ struct AddPlaylistView: View {
             }
         }
         .tint(Theme.accent)
+    }
+
+    private func isSupportedPlaylistURL(_ value: String) -> Bool {
+        guard let scheme = URL(string: value.trimmingCharacters(in: .whitespaces))?.scheme?.lowercased() else { return false }
+        return scheme == "http" || scheme == "https"
     }
 
     private func add() {

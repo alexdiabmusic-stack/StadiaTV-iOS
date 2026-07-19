@@ -34,10 +34,32 @@ struct FavoriteTeam: Codable, Hashable, Identifiable {
 
 // MARK: - Persisted preferences
 
-struct UserPreferences: Codable {
+enum MatchReminderLeadTime: Int, Codable, CaseIterable, Identifiable {
+    case sixty = 60
+    case thirty = 30
+    case ten = 10
+    case five = 5
+
+    var id: Int { rawValue }
+    var minutes: Int { rawValue }
+
+    var label: String {
+        switch self {
+        case .sixty: return "1 hour before"
+        case .thirty: return "30 minutes before"
+        case .ten: return "10 minutes before"
+        case .five: return "5 minutes before"
+        }
+    }
+}
+
+struct UserPreferences: Codable, Equatable {
     var hasCompletedOnboarding = false
     var selectedLeagueIDs: Set<String> = []   // League.path values
     var favoriteTeams: [FavoriteTeam] = []
+    var matchNotificationsEnabled = false
+    var matchReminderLeadTime: MatchReminderLeadTime = .thirty
+    var cloudSyncEnabled = false
 }
 
 /// Owns the user's onboarding selections (sports/leagues/favorite teams) and
@@ -47,17 +69,44 @@ final class PreferencesStore: ObservableObject {
     @Published private(set) var prefs: UserPreferences
 
     private let defaultsKey = "stadiatv.preferences.v1"
+    private let favoriteTeamNotificationPromptKey = "stadiatv.favoriteTeamNotificationPromptAnswered.v1"
 
     init() {
+        CloudSyncService.shared.start()
         if let data = UserDefaults.standard.data(forKey: defaultsKey),
            let decoded = try? JSONDecoder().decode(UserPreferences.self, from: data) {
             prefs = decoded
+        } else if let cloud: UserPreferences = CloudSyncService.shared.load(UserPreferences.self, for: .preferences) {
+            prefs = cloud
         } else {
             prefs = UserPreferences()
+        }
+        CloudSyncService.shared.setEnabled(prefs.cloudSyncEnabled)
+        NotificationCenter.default.addObserver(
+            forName: .stadiatvCloudSyncDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let preferencesStore = self else { return }
+            Task { @MainActor in
+                preferencesStore.applyCloudPreferencesIfNeeded()
+            }
         }
     }
 
     private func persist() {
+        if let data = try? JSONEncoder().encode(prefs) {
+            UserDefaults.standard.set(data, forKey: defaultsKey)
+        }
+        UserDefaults.standard.set(prefs.cloudSyncEnabled, forKey: CloudSyncService.enabledDefaultsKey)
+        CloudSyncService.shared.save(prefs, for: .preferences)
+    }
+
+    private func applyCloudPreferencesIfNeeded() {
+        guard prefs.cloudSyncEnabled,
+              let cloud: UserPreferences = CloudSyncService.shared.load(UserPreferences.self, for: .preferences),
+              cloud != prefs else { return }
+        prefs = cloud
         if let data = try? JSONEncoder().encode(prefs) {
             UserDefaults.standard.set(data, forKey: defaultsKey)
         }
@@ -74,6 +123,36 @@ final class PreferencesStore: ObservableObject {
 
     func resetOnboarding() {
         prefs.hasCompletedOnboarding = false
+        persist()
+    }
+
+    var matchNotificationsEnabled: Bool { prefs.matchNotificationsEnabled }
+    var matchReminderLeadTime: MatchReminderLeadTime { prefs.matchReminderLeadTime }
+    var cloudSyncEnabled: Bool { prefs.cloudSyncEnabled }
+
+    var shouldPromptForFavoriteTeamNotifications: Bool {
+        !prefs.favoriteTeams.isEmpty
+            && !prefs.matchNotificationsEnabled
+            && !UserDefaults.standard.bool(forKey: favoriteTeamNotificationPromptKey)
+    }
+
+    func setMatchNotificationsEnabled(_ enabled: Bool) {
+        prefs.matchNotificationsEnabled = enabled
+        persist()
+    }
+
+    func markFavoriteTeamNotificationPromptAnswered() {
+        UserDefaults.standard.set(true, forKey: favoriteTeamNotificationPromptKey)
+    }
+
+    func setMatchReminderLeadTime(_ leadTime: MatchReminderLeadTime) {
+        prefs.matchReminderLeadTime = leadTime
+        persist()
+    }
+
+    func setCloudSyncEnabled(_ enabled: Bool) {
+        prefs.cloudSyncEnabled = enabled
+        CloudSyncService.shared.setEnabled(enabled)
         persist()
     }
 

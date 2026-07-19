@@ -1,10 +1,15 @@
 import SwiftUI
 import AVKit
+import UIKit
 
-/// Presents a channel's stream in the native AVPlayer UI.
+/// Presents a channel's stream full screen.
 struct PlayerView: View {
     let channel: Channel
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var watchStore: WatchStore
+    @State private var isLandscapeFullscreen = false
+    @State private var isChromeVisible = true
+    @State private var chromeHideTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
@@ -12,13 +17,54 @@ struct PlayerView: View {
             StreamTile(channel: channel, isPrimary: true, showsChrome: false)
                 .ignoresSafeArea()
         }
+        .contentShape(Rectangle())
+        .onTapGesture { revealChromeTemporarily() }
         .overlay(alignment: .topLeading) {
-            PlayerCloseButton { dismiss() }
+            if isChromeVisible {
+                PlayerCloseButton {
+                    PlayerOrientation.request(.portrait)
+                    dismiss()
+                }
                 .padding()
+                .transition(.opacity)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if isChromeVisible {
+                PlayerOrientationButton(isLandscape: isLandscapeFullscreen) {
+                    revealChromeTemporarily()
+                    isLandscapeFullscreen.toggle()
+                    PlayerOrientation.request(isLandscapeFullscreen ? .landscape : .portrait)
+                }
+                .padding()
+                .transition(.opacity)
+            }
         }
         .overlay(alignment: .bottom) {
-            PlayerSourceBar(channel: channel)
-                .padding(16)
+            if isChromeVisible && !isLandscapeFullscreen {
+                PlayerSourceBar(channel: channel)
+                    .padding(16)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.22), value: isChromeVisible)
+        .onAppear {
+            watchStore.recordWatch(channel)
+            revealChromeTemporarily()
+        }
+        .onDisappear {
+            chromeHideTask?.cancel()
+            PlayerOrientation.request(.portrait)
+        }
+    }
+
+    private func revealChromeTemporarily() {
+        chromeHideTask?.cancel()
+        isChromeVisible = true
+        chromeHideTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_500_000_000)
+            guard !Task.isCancelled else { return }
+            isChromeVisible = false
         }
     }
 }
@@ -27,6 +73,7 @@ struct PlayerView: View {
 struct MultiScreenPlayerView: View {
     let channels: [Channel]
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var watchStore: WatchStore
     @State private var layout: MultiScreenLayout = .two
     @State private var primaryChannelID: String?
 
@@ -55,6 +102,9 @@ struct MultiScreenPlayerView: View {
         .onAppear {
             layout = channels.count >= 4 ? .four : .two
             primaryChannelID = channels.first?.id
+            for channel in channels {
+                watchStore.recordWatch(channel)
+            }
         }
     }
 
@@ -166,7 +216,7 @@ private struct StreamTile: View {
             Color.black
 
             if let player {
-                VideoPlayer(player: player)
+                VideoSurface(player: player, showsPlaybackControls: !showsChrome, allowsPictureInPicture: !showsChrome)
             } else if failed {
                 VStack(spacing: 10) {
                     Image(systemName: "exclamationmark.triangle")
@@ -224,22 +274,25 @@ private struct StreamTile: View {
 
     private func start() {
         guard player == nil else { return }
+        #if os(iOS) || os(tvOS)
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
         try? AVAudioSession.sharedInstance().setActive(true)
+        #endif
 
         let asset = AVURLAsset(url: channel.streamURL)
         let item = AVPlayerItem(asset: asset)
         let player = AVPlayer(playerItem: item)
         player.allowsExternalPlayback = true
+        player.appliesMediaSelectionCriteriaAutomatically = true
         player.isMuted = !isPrimary
         self.player = player
+        // Start immediately; live HLS assets can be slow to report isPlayable.
+        player.play()
 
-        Task {
+        Task { @MainActor in
             do {
                 let playable = try await asset.load(.isPlayable)
-                if playable {
-                    player.play()
-                } else {
+                if !playable {
                     failed = true
                 }
             } catch {
@@ -254,8 +307,41 @@ private struct StreamTile: View {
     }
 }
 
+/// Renders an AVPlayer through AVPlayerLayer. SwiftUI's `VideoPlayer` is
+/// unreliable with live HLS streams (audio plays over a black frame), so we
+/// host the layer directly.
+private struct VideoSurface: UIViewControllerRepresentable {
+    let player: AVPlayer
+    let showsPlaybackControls: Bool
+    let allowsPictureInPicture: Bool
+
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let controller = AVPlayerViewController()
+        controller.player = player
+        controller.videoGravity = .resizeAspect
+        controller.showsPlaybackControls = showsPlaybackControls
+        controller.allowsPictureInPicturePlayback = allowsPictureInPicture
+        #if os(iOS)
+        controller.canStartPictureInPictureAutomaticallyFromInline = allowsPictureInPicture
+        #endif
+        return controller
+    }
+
+    func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
+        if controller.player !== player {
+            controller.player = player
+        }
+        controller.showsPlaybackControls = showsPlaybackControls
+        controller.allowsPictureInPicturePlayback = allowsPictureInPicture
+        #if os(iOS)
+        controller.canStartPictureInPictureAutomaticallyFromInline = allowsPictureInPicture
+        #endif
+    }
+}
+
 private struct PlayerSourceBar: View {
     let channel: Channel
+    @EnvironmentObject private var watchStore: WatchStore
 
     var body: some View {
         HStack(spacing: 12) {
@@ -276,6 +362,17 @@ private struct PlayerSourceBar: View {
                     .lineLimit(1)
             }
             Spacer()
+            Button {
+                watchStore.toggleFavorite(channel)
+            } label: {
+                Image(systemName: watchStore.isFavorite(channel) ? "heart.fill" : "heart")
+                    .font(.headline)
+                    .foregroundStyle(watchStore.isFavorite(channel) ? Theme.live : .white)
+                    .frame(width: 34, height: 34)
+                    .background(Theme.surfaceElevated, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(watchStore.isFavorite(channel) ? "Remove from favourites" : "Add to favourites")
             Text("LIVE")
                 .font(.caption2.weight(.heavy))
                 .foregroundStyle(.white)
@@ -289,18 +386,49 @@ private struct PlayerSourceBar: View {
     }
 }
 
+private enum PlayerOrientation {
+    static func request(_ orientations: UIInterfaceOrientationMask) {
+        guard let scene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive }) else { return }
+
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientations)) { _ in }
+    }
+}
+
+private struct PlayerOrientationButton: View {
+    let isLandscape: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(isLandscape ? "Portrait" : "Landscape", systemImage: isLandscape ? "rectangle.portrait.rotate" : "rectangle.landscape.rotate")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .frame(height: 42)
+                .background(.black.opacity(0.72), in: Capsule())
+                .overlay(Capsule().strokeBorder(Theme.hairline))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isLandscape ? "Return video to portrait" : "Rotate video fullscreen")
+    }
+}
+
 private struct PlayerCloseButton: View {
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "xmark")
-                .font(.headline)
+            Label("Close", systemImage: "xmark")
+                .font(.subheadline.weight(.bold))
                 .foregroundStyle(.white)
-                .frame(width: 42, height: 42)
-                .background(.black.opacity(0.66), in: Circle())
-                .overlay(Circle().strokeBorder(Theme.hairline))
+                .padding(.horizontal, 14)
+                .frame(height: 42)
+                .background(.black.opacity(0.72), in: Capsule())
+                .overlay(Capsule().strokeBorder(Theme.hairline))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Close player")
     }
 }

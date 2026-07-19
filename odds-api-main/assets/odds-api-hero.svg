@@ -1,0 +1,68 @@
+<svg width="1280" height="520" viewBox="0 0 1280 520" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Odds API developer package hero</title>
+  <desc id="desc">A stylized dark developer interface for accessing odds, betting, sports, racing, and market data through api.odds-api.net.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="520" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#07111F"/>
+      <stop offset="0.55" stop-color="#0B1728"/>
+      <stop offset="1" stop-color="#0E221A"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="206" y1="92" x2="1076" y2="457" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38BDF8"/>
+      <stop offset="0.52" stop-color="#22C55E"/>
+      <stop offset="1" stop-color="#FACC15"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#000000" flood-opacity="0.32"/>
+    </filter>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" stroke="#E5E7EB" stroke-opacity="0.055"/>
+    </pattern>
+  </defs>
+
+  <rect width="1280" height="520" rx="32" fill="url(#bg)"/>
+  <rect width="1280" height="520" rx="32" fill="url(#grid)"/>
+  <path d="M98 404C230 280 340 320 456 237C570 155 685 104 811 174C928 239 974 176 1136 95" stroke="url(#accent)" stroke-width="5" stroke-linecap="round"/>
+  <path d="M98 404C230 280 340 320 456 237C570 155 685 104 811 174C928 239 974 176 1136 95" stroke="url(#accent)" stroke-opacity="0.28" stroke-width="22" stroke-linecap="round"/>
+
+  <g filter="url(#shadow)">
+    <rect x="72" y="64" width="1110" height="356" rx="22" fill="#0B1220" fill-opacity="0.9" stroke="#263449"/>
+    <path d="M748 104V382" stroke="#263449" stroke-width="2"/>
+
+    <text x="112" y="138" fill="#F8FAFC" font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="72" font-weight="800" letter-spacing="0">Odds API</text>
+    <text x="116" y="188" fill="#CBD5E1" font-family="Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="24" font-weight="600">Collect a free API key from odds-api.net</text>
+
+    <rect x="112" y="226" width="374" height="48" rx="11" fill="#122033" stroke="#2E405B"/>
+    <circle cx="138" cy="250" r="7" fill="#22C55E"/>
+    <text x="158" y="257" fill="#E2E8F0" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="18">https://api.odds-api.net/v1</text>
+
+    <g fill="#0F1C2F" stroke="#2B3D56">
+      <rect x="112" y="318" width="126" height="56" rx="12"/>
+      <rect x="254" y="318" width="116" height="56" rx="12"/>
+      <rect x="386" y="318" width="116" height="56" rx="12"/>
+      <rect x="518" y="318" width="184" height="56" rx="12"/>
+    </g>
+    <g fill="#D8F3DC" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="17" font-weight="800">
+      <text x="141" y="352">OpenAPI</text>
+      <text x="292" y="352">SDKs</text>
+      <text x="425" y="352">MCP</text>
+      <text x="571" y="352">Examples</text>
+    </g>
+
+    <text x="790" y="124" fill="#94A3B8" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="16" font-weight="800">STREAMS</text>
+    <text x="790" y="182" fill="#F8FAFC" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="56" font-weight="850">SSE + WS</text>
+    <text x="794" y="218" fill="#CBD5E1" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="18">snapshots · deltas · history</text>
+
+    <g fill="#102138" stroke="#2C405A">
+      <rect x="790" y="252" width="174" height="70" rx="13"/>
+      <rect x="986" y="252" width="176" height="70" rx="13"/>
+    </g>
+    <g font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+      <text x="816" y="282" fill="#F8FAFC" font-size="22" font-weight="850">SSE</text>
+      <text x="816" y="306" fill="#CBD5E1" font-size="14" font-weight="600">Server-Sent Events</text>
+      <text x="1018" y="282" fill="#F8FAFC" font-size="22" font-weight="850">WS</text>
+      <text x="1018" y="306" fill="#CBD5E1" font-size="14" font-weight="600">WebSocket streams</text>
+    </g>
+    <text x="790" y="364" fill="#D8F3DC" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="16">event odds · racing odds · line movement</text>
+  </g>
+</svg>

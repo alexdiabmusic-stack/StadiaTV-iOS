@@ -34,27 +34,67 @@ final class PlaylistStore: ObservableObject {
     private func load() {
         guard let data = UserDefaults.standard.data(forKey: defaultsKey),
               let decoded = try? JSONDecoder().decode([Playlist].self, from: data) else { return }
-        playlists = decoded
+        playlists = decoded.map { migrateCredentialsIfNeeded(for: $0) }
+        persist()
     }
 
     private func persist() {
-        if let data = try? JSONEncoder().encode(playlists) {
+        let sanitized = playlists.map(\.sanitizedForPersistence)
+        if let data = try? JSONEncoder().encode(sanitized) {
             UserDefaults.standard.set(data, forKey: defaultsKey)
         }
+    }
+
+    private func migrateCredentialsIfNeeded(for playlist: Playlist) -> Playlist {
+        guard playlist.kind == .xtream,
+              let username = playlist.username, let password = playlist.password,
+              !username.isEmpty, !password.isEmpty else {
+            return playlist.sanitizedForPersistence
+        }
+        do {
+            try KeychainStore.saveXtreamCredentials(
+                XtreamCredentials(username: username, password: password),
+                for: playlist.credentialID
+            )
+        } catch {
+            lastError = "\(playlist.name): Couldn't secure saved credentials."
+        }
+        return playlist.sanitizedForPersistence
+    }
+
+    private func secureCredentialsIfNeeded(for playlist: Playlist) throws -> Playlist {
+        guard playlist.kind == .xtream,
+              let username = playlist.username, let password = playlist.password,
+              !username.isEmpty, !password.isEmpty else {
+            return playlist.sanitizedForPersistence
+        }
+        try KeychainStore.saveXtreamCredentials(
+            XtreamCredentials(username: username, password: password),
+            for: playlist.credentialID
+        )
+        return playlist.sanitizedForPersistence
     }
 
     // MARK: - Mutating
 
     func add(_ playlist: Playlist) {
-        playlists.append(playlist)
-        persist()
-        Task { await refresh(playlist) }
+        do {
+            let secured = try secureCredentialsIfNeeded(for: playlist)
+            playlists.append(secured)
+            persist()
+            Task { await refresh(secured) }
+        } catch {
+            lastError = "\(playlist.name): Couldn't save credentials securely."
+        }
     }
 
     func remove(at offsets: IndexSet) {
         for index in offsets {
-            let id = playlists[index].id
-            channelsByPlaylist[id] = nil
+            let playlist = playlists[index]
+            channelsByPlaylist[playlist.id] = nil
+            if playlist.kind == .xtream {
+                KeychainStore.deleteXtreamCredentials(for: playlist.credentialID)
+            }
         }
         playlists.remove(atOffsets: offsets)
         persist()
@@ -96,8 +136,8 @@ final class PlaylistStore: ObservableObject {
     // MARK: M3U
 
     private func loadM3U(_ playlist: Playlist) async throws -> [Channel] {
-        guard let urlString = playlist.m3uURL, let url = URL(string: urlString) else {
-            throw PlaylistError.invalidConfiguration
+        guard let urlString = playlist.m3uURL, let url = URL(string: urlString), Self.isSupportedPlaylistURL(url) else {
+            throw PlaylistError.unsupportedURL
         }
         let (data, response) = try await session.data(from: url)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
@@ -157,10 +197,14 @@ final class PlaylistStore: ObservableObject {
     // MARK: Xtream Codes
 
     private func loadXtream(_ playlist: Playlist) async throws -> [Channel] {
-        guard let host = playlist.host, var base = URLComponents(string: host),
-              let user = playlist.username, let pass = playlist.password else {
-            throw PlaylistError.invalidConfiguration
+        guard let host = playlist.host, var base = URLComponents(string: host), Self.isSupportedPlaylistScheme(base.scheme) else {
+            throw PlaylistError.unsupportedURL
         }
+        guard let credentials = try KeychainStore.xtreamCredentials(for: playlist.credentialID) else {
+            throw PlaylistError.missingCredentials
+        }
+        let user = credentials.username
+        let pass = credentials.password
         // Categories (for group names) then live streams.
         let categories = try await xtreamCategories(base: base, user: user, pass: pass)
 
@@ -216,12 +260,25 @@ final class PlaylistStore: ObservableObject {
         }
     }
 
+    private static func isSupportedPlaylistURL(_ url: URL) -> Bool {
+        isSupportedPlaylistScheme(url.scheme)
+    }
+
+    private static func isSupportedPlaylistScheme(_ scheme: String?) -> Bool {
+        guard let scheme = scheme?.lowercased() else { return false }
+        return scheme == "http" || scheme == "https"
+    }
+
     enum PlaylistError: LocalizedError {
         case invalidConfiguration
+        case unsupportedURL
+        case missingCredentials
         case badResponse
         var errorDescription: String? {
             switch self {
             case .invalidConfiguration: return "The playlist details are incomplete or invalid."
+            case .unsupportedURL: return "Playlist and Xtream API URLs must begin with http:// or https://."
+            case .missingCredentials: return "Xtream credentials are missing. Remove and re-add this playlist."
             case .badResponse: return "The server returned an unexpected response."
             }
         }

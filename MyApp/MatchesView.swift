@@ -5,7 +5,7 @@ struct MatchesView: View {
     @EnvironmentObject private var playlists: PlaylistStore
     @EnvironmentObject private var prefs: PreferencesStore
     @State private var favoritesOnly = false
-    @State private var showingPreferences = false
+    @State private var showingSearch = false
 
     var body: some View {
         NavigationStack {
@@ -16,10 +16,9 @@ struct MatchesView: View {
             .navigationDestination(for: Match.self) { match in
                 MatchDetailView(match: match)
             }
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) { BrandMark() }
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .navigation) {
                     if !prefs.favoriteTeams.isEmpty {
                         Button {
                             favoritesOnly.toggle()
@@ -29,22 +28,21 @@ struct MatchesView: View {
                         }
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingPreferences = true } label: {
-                        Image(systemName: "slider.horizontal.3")
+                ToolbarItem(placement: .primaryAction) {
+                    Button { showingSearch = true } label: {
+                        Image(systemName: "magnifyingglass")
                     }
+                    .accessibilityLabel("Search")
                 }
             }
-            .toolbarBackground(Theme.background, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .sheet(isPresented: $showingPreferences) {
-                PreferencesView()
+            .sheet(isPresented: $showingSearch) {
+                SearchView()
             }
         }
         .tint(Theme.accent)
         .task {
             syncSelectedLeague()
-            await viewModel.load()
+            await loadAndSyncNotifications()
         }
         .onAppear { viewModel.startAutoRefresh() }
         .onDisappear { viewModel.stopAutoRefresh() }
@@ -55,6 +53,13 @@ struct MatchesView: View {
         let followed = prefs.followedLeagues
         if let first = followed.first, !followed.contains(viewModel.selectedLeague) {
             viewModel.selectLeague(first)
+        }
+    }
+
+    private func loadAndSyncNotifications() async {
+        await viewModel.load()
+        if prefs.matchNotificationsEnabled {
+            await MatchNotificationService.shared.syncNotifications(matches: viewModel.matches, favorites: prefs.favoriteTeams, leadTime: prefs.matchReminderLeadTime)
         }
     }
 
@@ -101,7 +106,7 @@ struct MatchesView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 16)
         }
-        .refreshable { await viewModel.load() }
+        .refreshable { await loadAndSyncNotifications() }
     }
 
     @ViewBuilder
@@ -209,13 +214,23 @@ struct MatchRow: View {
     let match: Match
 
     var body: some View {
-        VStack(spacing: 12) {
-            teamRow(match.away)
-            teamRow(match.home)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Text(match.league.shortName)
+                    .font(.caption2.weight(.heavy))
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                statusBadge
+            }
+
+            VStack(spacing: 12) {
+                teamRow(match.away)
+                teamRow(match.home)
+            }
         }
         .padding(14)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(alignment: .topTrailing) { statusBadge }
     }
 
     private func teamRow(_ team: TeamSide) -> some View {
@@ -225,17 +240,22 @@ struct MatchRow: View {
                 Text(team.shortName)
                     .font(.headline)
                     .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
                 if let record = team.record, !record.isEmpty {
                     Text(record)
                         .font(.caption2)
                         .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
                 }
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
+
             if let score = team.score, match.state != .pre {
                 Text(score)
                     .font(.title3.weight(.bold).monospacedDigit())
                     .foregroundStyle(team.isWinner ? Theme.textPrimary : Theme.textSecondary)
+                    .frame(width: 42, alignment: .trailing)
             }
         }
     }
@@ -248,6 +268,8 @@ struct MatchRow: View {
                     .labelStyle(.titleAndIcon)
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                     .padding(.horizontal, 8).padding(.vertical, 4)
                     .background(Theme.live, in: Capsule())
             case .pre:
@@ -264,7 +286,6 @@ struct MatchRow: View {
                     .background(Theme.surfaceElevated, in: Capsule())
             }
         }
-        .padding(10)
     }
 }
 

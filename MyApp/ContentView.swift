@@ -53,20 +53,20 @@ struct RootView: View {
                 MatchesView()
             }
 
-            Tab("Stats", systemImage: "chart.bar.xaxis") {
-                StatsView()
+            Tab("Live", systemImage: "dot.radiowaves.left.and.right") {
+                LiveView()
             }
 
-            Tab("News", systemImage: "newspaper.fill") {
-                NewsView()
+            Tab("Discover", systemImage: "safari.fill") {
+                DiscoverView()
             }
 
-            Tab("Settings", systemImage: "gearshape.fill") {
-                SettingsView()
+            Tab("More", systemImage: "ellipsis.circle.fill") {
+                MoreView()
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .tint(Theme.accent)
+        .tint(Theme.live)
         .task { updateFavoriteNotificationPrompt() }
         .onChange(of: prefs.favoriteTeams) { updateFavoriteNotificationPrompt() }
         .onChange(of: prefs.matchNotificationsEnabled) { updateFavoriteNotificationPrompt() }

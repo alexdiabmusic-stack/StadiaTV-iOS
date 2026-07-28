@@ -1,20 +1,19 @@
 import SwiftUI
 import UIKit
 
-/// StadiaTV visual language — a bright blue accent over a backdrop that
-/// adapts to the user's chosen appearance (dark by default, light optional).
+/// StadiaTV visual language — neutral foundation with colour reserved for meaning.
 enum Theme {
-    static let background = dynamic(dark: 0x06070A, light: 0xF4F5F7)
-    static let surface = dynamic(dark: 0x12141A, light: 0xFFFFFF)
-    static let surfaceElevated = dynamic(dark: 0x1B1E27, light: 0xE8EAEF)
-    static let accent = Color(hex: 0x2F81F7)
-    static let live = Color(hex: 0xFF4D4F)
-    static let textPrimary = dynamic(dark: 0xF2F5F8, light: 0x15181D)
-    static let textSecondary = dynamic(dark: 0x8B929C, light: 0x5C6470)
-    static let hairline = dynamic(dark: 0xFFFFFF, light: 0x000000, darkAlpha: 0.08, lightAlpha: 0.08)
+    static let background       = dynamic(dark: 0x080A0F, light: 0xF4F5F7)
+    static let surface          = dynamic(dark: 0x12151C, light: 0xFFFFFF)
+    static let surfaceElevated  = dynamic(dark: 0x181C24, light: 0xE8EAEF)
+    static let accent           = Color(hex: 0x3B82F6)
+    static let live             = Color(hex: 0xFF4D5E)
+    static let starting         = Color(hex: 0xF5B942)
+    static let upcoming         = Color(hex: 0x31C978)
+    static let textPrimary      = dynamic(dark: 0xF7F8FA, light: 0x15181D)
+    static let textSecondary    = dynamic(dark: 0x9BA3B2, light: 0x5C6470)
+    static let hairline         = dynamic(dark: 0xFFFFFF, light: 0x000000, darkAlpha: 0.09, lightAlpha: 0.09)
 
-    /// Resolves to a different color per interface style so the whole app
-    /// follows the appearance picked in Settings.
     private static func dynamic(dark: UInt, light: UInt, darkAlpha: Double = 1, lightAlpha: Double = 1) -> Color {
         Color(UIColor { traits in
             traits.userInterfaceStyle == .light
@@ -23,10 +22,8 @@ enum Theme {
         })
     }
 
-    /// True on iPad, where text and icons render larger to suit the bigger screen.
     static let isPad = UIDevice.current.userInterfaceIdiom == .pad
 
-    /// Scales a fixed icon or logo dimension up on iPad.
     static func scaled(_ base: CGFloat) -> CGFloat {
         isPad ? base * 1.4 : base
     }
@@ -45,7 +42,6 @@ extension Color {
 }
 
 extension View {
-    /// `scrollContentBackground(.hidden)` where available; tvOS lacks the modifier.
     func hidesScrollContentBackground() -> some View {
         #if os(tvOS)
         self
@@ -54,7 +50,6 @@ extension View {
         #endif
     }
 
-    /// `navigationBarTitleDisplayMode(.inline)` where available; tvOS lacks the modifier.
     func inlineNavigationTitle() -> some View {
         #if os(tvOS)
         self
@@ -64,7 +59,6 @@ extension View {
     }
 }
 
-/// The "STADIA TV" wordmark used in navigation bars.
 struct BrandMark: View {
     var body: some View {
         HStack(spacing: 0) {

@@ -1,36 +1,82 @@
 import SwiftUI
 import Combine
 
+// MARK: - Home Filter
+
+enum HomeFilter: Hashable {
+    case forYou
+    case allSports
+    case sport(SportGroup)
+
+    var label: String {
+        switch self {
+        case .forYou: return "For You"
+        case .allSports: return "All Sports"
+        case .sport(let g): return g.rawValue
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .forYou: return "sparkles"
+        case .allSports: return "sportscourt"
+        case .sport(let g): return g.systemImage
+        }
+    }
+}
+
+// MARK: - Schedule Day
+
+enum ScheduleDay: String, CaseIterable, Identifiable {
+    case today = "Today"
+    case tomorrow = "Tomorrow"
+    case weekend = "Weekend"
+    var id: String { rawValue }
+}
+
+// MARK: - Home View
+
 struct HomeView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var watchStore: WatchStore
     @StateObject private var viewModel = HomeViewModel()
     @State private var playingChannel: Channel?
     @State private var selectedLiveSport: SportGroup?
+    @State private var selectedFilter: HomeFilter = .forYou
+    @State private var selectedScheduleDay: ScheduleDay = .today
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Theme.background.ignoresSafeArea()
-                content
+                mainContent
             }
-            .navigationDestination(for: Match.self) { match in
-                MatchDetailView(match: match)
-            }
-            .navigationTitle("Home")
-            .searchToolbar()
-            .sheet(item: $playingChannel) { channel in
-                PlayerView(channel: channel)
-            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { toolbarContent }
+            .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
+            .sheet(item: $playingChannel) { PlayerView(channel: $0) }
         }
         .tint(Theme.accent)
         .task(id: loadPreferencesKey) {
-            await viewModel.load(leagues: prefs.followedLeagues, favorites: prefs.favoriteTeams, notificationsEnabled: prefs.matchNotificationsEnabled, notificationLeadTime: prefs.matchReminderLeadTime, morningDigestEnabled: prefs.morningDigestEnabled)
+            await viewModel.load(
+                leagues: prefs.followedLeagues,
+                favorites: prefs.favoriteTeams,
+                notificationsEnabled: prefs.matchNotificationsEnabled,
+                notificationLeadTime: prefs.matchReminderLeadTime,
+                morningDigestEnabled: prefs.morningDigestEnabled
+            )
             viewModel.startAutoRefresh()
         }
         .onDisappear { viewModel.stopAutoRefresh() }
         .refreshable {
-            await viewModel.load(leagues: prefs.followedLeagues, favorites: prefs.favoriteTeams, notificationsEnabled: prefs.matchNotificationsEnabled, notificationLeadTime: prefs.matchReminderLeadTime, morningDigestEnabled: prefs.morningDigestEnabled, force: true)
+            await viewModel.load(
+                leagues: prefs.followedLeagues,
+                favorites: prefs.favoriteTeams,
+                notificationsEnabled: prefs.matchNotificationsEnabled,
+                notificationLeadTime: prefs.matchReminderLeadTime,
+                morningDigestEnabled: prefs.morningDigestEnabled,
+                force: true
+            )
         }
     }
 
@@ -38,59 +84,992 @@ struct HomeView: View {
         [
             prefs.followedLeagues.map(\.id).sorted().joined(separator: ","),
             prefs.favoriteTeams.map(\.id).sorted().joined(separator: ","),
-            prefs.matchNotificationsEnabled ? "notifications-on" : "notifications-off",
+            prefs.matchNotificationsEnabled ? "n1" : "n0",
             "lead-\(prefs.matchReminderLeadTime.rawValue)",
-            prefs.morningDigestEnabled ? "digest-on" : "digest-off"
+            prefs.morningDigestEnabled ? "d1" : "d0"
         ].joined(separator: "|")
     }
 
-    @ViewBuilder private var content: some View {
-        if viewModel.isLoading && viewModel.liveNow.isEmpty && viewModel.upcoming.isEmpty {
-            ProgressView().tint(Theme.accent)
-        } else if let message = viewModel.errorMessage, viewModel.liveNow.isEmpty && viewModel.upcoming.isEmpty {
-            VStack(spacing: 12) {
-                Image(systemName: "wifi.exclamationmark")
-                    .font(.system(size: Theme.scaled(42)))
-                    .foregroundStyle(Theme.textSecondary)
-                Text(message)
-                    .font(.callout)
-                    .foregroundStyle(Theme.textSecondary)
-                    .multilineTextAlignment(.center)
-                Button("Try Again") {
-                    Task { await viewModel.load(leagues: prefs.followedLeagues, favorites: prefs.favoriteTeams, notificationsEnabled: prefs.matchNotificationsEnabled) }
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.accent)
+    @ToolbarContentBuilder
+    private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .principal) { BrandMark() }
+        ToolbarItem(placement: .primaryAction) {
+            NavigationLink(destination: SearchView()) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(Theme.textPrimary)
             }
-            .padding(32)
+        }
+    }
+
+    @ViewBuilder
+    private var mainContent: some View {
+        if viewModel.isLoading && viewModel.liveNow.isEmpty && viewModel.upcoming.isEmpty {
+            VStack(spacing: 16) {
+                ProgressView().tint(Theme.accent)
+                Text("Loading your sports day…")
+                    .font(.callout).foregroundStyle(Theme.textSecondary)
+            }
+        } else if let msg = viewModel.errorMessage, viewModel.liveNow.isEmpty && viewModel.upcoming.isEmpty {
+            errorView(msg)
         } else {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 22) {
-                    HomeHeroSection(
-                        featuredPicks: viewModel.featuredPicks,
-                        featuredMatchesByPickID: viewModel.featuredMatchesByPickID,
-                        favoriteLiveMatches: viewModel.favoriteTeamLiveMatches,
-                        primeMatch: viewModel.primeMatch
-                    )
+            scrollContent
+        }
+    }
 
-                    HomeSection(title: "Your Teams Today", systemImage: "star.fill", tint: Theme.accent, matches: viewModel.favoriteTeamMatchesToday, emptyText: prefs.favoriteTeams.isEmpty ? "Favorite teams in setup or settings to see them here." : "No games today for your favorite teams.", limit: 5)
-                    LiveNowSection(matches: viewModel.liveNow, nextMatches: viewModel.nextMatchesAcrossSports, startingSoon: viewModel.startingSoon, selectedSport: $selectedLiveSport)
-                    if !viewModel.recentHighlights.isEmpty {
-                        RecentHighlightsSection(highlights: viewModel.recentHighlights)
+    private var scrollContent: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 28) {
+                greetingSection
+
+                heroSection
+
+                sportsDaySummaryCard
+
+                liveNowSection
+
+                if !viewModel.startingSoon.isEmpty {
+                    StartingSoonTimeline(matches: viewModel.startingSoon)
+                }
+
+                scheduleSection
+
+                if !viewModel.recentHighlights.isEmpty {
+                    TrendingSection(highlights: viewModel.recentHighlights)
+                }
+
+                if !watchStore.history.isEmpty {
+                    ContinueWatchingSection(entries: watchStore.history) { playingChannel = $0 }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 24)
+        }
+        .safeAreaInset(edge: .top) {
+            HomeFilterBar(selected: $selectedFilter, followedLeagues: prefs.followedLeagues)
+        }
+    }
+
+    // MARK: - Greeting
+
+    private var greetingSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(greetingText)
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(Theme.textPrimary)
+            Text("Here's what's happening")
+                .font(.subheadline)
+                .foregroundStyle(Theme.textSecondary)
+        }
+        .padding(.top, 8)
+    }
+
+    private var greetingText: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        if hour < 12 { return "Good morning" }
+        if hour < 17 { return "Good afternoon" }
+        return "Good evening"
+    }
+
+    // MARK: - Hero
+
+    @ViewBuilder
+    private var heroSection: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { ctx in
+            let pick = viewModel.featuredPicks.first { p in
+                guard let end = p.endDate else { return true }
+                return end > ctx.date
+            }
+            if let pick {
+                FeaturedHeroCard(pick: pick, match: viewModel.featuredMatchesByPickID[pick.id])
+            } else if let prime = viewModel.primeMatch {
+                PrimeHeroCard(match: prime)
+            }
+        }
+    }
+
+    // MARK: - Sports Day Summary
+
+    @ViewBuilder
+    private var sportsDaySummaryCard: some View {
+        let teamsToday = viewModel.favoriteTeamMatchesToday.count
+        let liveCount = viewModel.favoriteTeamLiveMatches.count
+
+        if teamsToday > 0 || liveCount > 0 {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("YOUR SPORTS DAY")
+                    .font(.caption.weight(.heavy))
+                    .foregroundStyle(Theme.textSecondary)
+
+                HStack(spacing: 0) {
+                    summaryPill("\(teamsToday)", "teams playing", Theme.upcoming)
+                    if liveCount > 0 {
+                        dividerDot
+                        summaryPill("\(liveCount)", liveCount == 1 ? "game live" : "games live", Theme.live)
                     }
-                    HomeSection(title: "Upcoming Games", systemImage: "calendar", tint: Color(hex: 0x3DBE6B), matches: viewModel.favoriteTeamUpcoming, emptyText: prefs.favoriteTeams.isEmpty ? "Favorite teams in setup or settings to see them here." : "No announced upcoming games for your favorite teams.", limit: 5)
+                    if prefs.matchNotificationsEnabled {
+                        dividerDot
+                        Label("Alerts on", systemImage: "bell.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+            .padding(16)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.hairline))
+        } else if !prefs.favoriteTeams.isEmpty {
+            noTeamsPlayingCard
+        }
+    }
 
-                    if !watchStore.history.isEmpty {
-                        ContinueWatchingSection(entries: watchStore.history) { channel in
-                            playingChannel = channel
+    private func summaryPill(_ value: String, _ label: String, _ color: Color) -> some View {
+        HStack(spacing: 4) {
+            Text(value).font(.subheadline.weight(.bold)).foregroundStyle(color)
+            Text(label).font(.subheadline).foregroundStyle(Theme.textPrimary)
+        }
+    }
+
+    private var dividerDot: some View {
+        Text(" · ").font(.subheadline).foregroundStyle(Theme.textSecondary)
+    }
+
+    private var noTeamsPlayingCard: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "calendar")
+                .font(.title3)
+                .foregroundStyle(Theme.textSecondary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("No followed teams play today")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                if let next = viewModel.favoriteTeamUpcoming.first {
+                    Text("Next: \(next.shortName) · \(next.date.formatted(.dateTime.weekday(.wide).hour().minute()))")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.hairline))
+    }
+
+    // MARK: - Live Now
+
+    private var liveNowSection: some View {
+        LiveNowCommandCenter(
+            matches: viewModel.liveNow,
+            startingSoon: viewModel.startingSoon,
+            nextMatches: viewModel.nextMatchesAcrossSports,
+            selectedSport: $selectedLiveSport
+        )
+    }
+
+    // MARK: - Schedule
+
+    private var scheduleSection: some View {
+        ScheduleSection(
+            upcoming: viewModel.upcoming,
+            selectedDay: $selectedScheduleDay
+        )
+    }
+
+    // MARK: - Error
+
+    private func errorView(_ message: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 44))
+                .foregroundStyle(Theme.textSecondary)
+            Text(message)
+                .font(.callout)
+                .foregroundStyle(Theme.textSecondary)
+                .multilineTextAlignment(.center)
+            Button("Try Again") {
+                Task {
+                    await viewModel.load(
+                        leagues: prefs.followedLeagues,
+                        favorites: prefs.favoriteTeams,
+                        notificationsEnabled: prefs.matchNotificationsEnabled
+                    )
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.accent)
+        }
+        .padding(32)
+    }
+}
+
+// MARK: - Home Filter Bar
+
+private struct HomeFilterBar: View {
+    @Binding var selected: HomeFilter
+    let followedLeagues: [League]
+
+    private var filters: [HomeFilter] {
+        var result: [HomeFilter] = [.forYou, .allSports]
+        var seenGroups: Set<String> = []
+        for league in followedLeagues {
+            let group = league.group
+            if seenGroups.insert(group.rawValue).inserted {
+                result.append(.sport(group))
+            }
+        }
+        return result
+    }
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(filters, id: \.self) { filter in
+                    filterChip(filter)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+        }
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.hairline).frame(height: 0.5)
+        }
+    }
+
+    private func filterChip(_ filter: HomeFilter) -> some View {
+        Button { withAnimation(.snappy) { selected = filter } } label: {
+            Label(filter.label, systemImage: filter.icon)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(selected == filter ? .white : Theme.textSecondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(selected == filter ? Theme.accent : Theme.surface, in: Capsule())
+                .overlay(Capsule().strokeBorder(selected == filter ? Theme.accent : Theme.hairline))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Featured Hero Card
+
+private struct FeaturedHeroCard: View {
+    let pick: FeaturedEventPick
+    let match: Match?
+
+    private var isLive: Bool { match?.state == .live }
+
+    var body: some View {
+        Group {
+            if let match {
+                NavigationLink(value: match) { card }
+                    .buttonStyle(.plain)
+            } else {
+                card
+            }
+        }
+    }
+
+    private var card: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { ctx in
+            cardContent(now: ctx.date)
+        }
+    }
+
+    private func cardContent(now: Date) -> some View {
+        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        return GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                // Background image
+                Image("FeaturedHeroBackground")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: proxy.size.width, height: 220)
+                    .accessibilityHidden(true)
+
+                // Cinematic gradient overlay
+                LinearGradient(
+                    stops: [
+                        .init(color: .black.opacity(0.88), location: 0),
+                        .init(color: .black.opacity(0.55), location: 0.5),
+                        .init(color: .black.opacity(0.2), location: 1)
+                    ],
+                    startPoint: .leading, endPoint: .trailing
+                )
+                .frame(width: proxy.size.width, height: 220)
+
+                // Live edge glow
+                if isLive {
+                    LinearGradient(
+                        colors: [Theme.live.opacity(0.35), .clear],
+                        startPoint: .leading, endPoint: .trailing
+                    )
+                    .frame(width: proxy.size.width, height: 220)
+                }
+
+                // Content
+                VStack(alignment: .leading, spacing: 12) {
+                    // League + state badge
+                    HStack(spacing: 8) {
+                        if isLive {
+                            HStack(spacing: 6) {
+                                PulsingLiveBadge()
+                                Text("LIVE")
+                                    .font(.caption.weight(.black))
+                                    .foregroundStyle(.white)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Theme.live, in: Capsule())
+                        } else {
+                            Text("FEATURED")
+                                .font(.caption.weight(.black))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(Theme.accent.opacity(0.9), in: Capsule())
+                        }
+                        Text(pick.league)
+                            .font(.caption2.weight(.heavy))
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+
+                    // Title or matchup
+                    if let match {
+                        HStack(spacing: 0) {
+                            heroTeam(match.away)
+                            Spacer()
+                            VStack(spacing: 4) {
+                                if match.state == .pre {
+                                    Text("VS")
+                                        .font(.system(size: 20, weight: .black))
+                                        .foregroundStyle(.white)
+                                    if let start = pick.startDate, start > now {
+                                        countdownText(to: start, now: now)
+                                    }
+                                } else {
+                                    Text("\(match.away.score ?? "-") – \(match.home.score ?? "-")")
+                                        .font(.system(size: 28, weight: .bold, design: .rounded).monospacedDigit())
+                                        .foregroundStyle(.white)
+                                    Text(match.statusDetail)
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(isLive ? Theme.live : .white.opacity(0.7))
+                                }
+                            }
+                            Spacer()
+                            heroTeam(match.home)
+                        }
+                        .frame(maxWidth: proxy.size.width - 40)
+                    } else {
+                        Text(pick.title)
+                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                            .frame(maxWidth: min(280, proxy.size.width - 32), alignment: .leading)
+                    }
+
+                    // Action buttons
+                    HStack(spacing: 10) {
+                        heroButton(isLive ? "Watch Live" : "Match Centre",
+                                   icon: isLive ? "play.fill" : "sportscourt",
+                                   primary: true)
+                        if match != nil {
+                            heroButton("Streams", icon: "tv", primary: false)
                         }
                     }
                 }
+                .padding(20)
+                .frame(width: proxy.size.width, height: 220, alignment: .leading)
+            }
+            .frame(width: proxy.size.width, height: 220)
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(.white.opacity(isLive ? 0 : 0.12)))
+            .overlay(alignment: .bottomLeading) {
+                if isLive {
+                    shape.strokeBorder(Theme.live.opacity(0.5), lineWidth: 1.5)
+                }
+            }
+        }
+        .frame(height: 220)
+        .frame(maxWidth: .infinity)
+    }
+
+    private func heroTeam(_ side: TeamSide) -> some View {
+        VStack(spacing: 6) {
+            TeamLogo(url: side.logoURL, size: 52)
+            Text(side.shortName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: 72)
+        }
+    }
+
+    private func countdownText(to date: Date, now: Date) -> some View {
+        let secs = max(0, Int(date.timeIntervalSince(now)))
+        let h = secs / 3600; let m = (secs % 3600) / 60
+        return Text(h > 0 ? "Starts in \(h)h \(m)m" : "Starts in \(m) min")
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.white.opacity(0.75))
+    }
+
+    private func heroButton(_ title: String, icon: String, primary: Bool) -> some View {
+        Label(title, systemImage: icon)
+            .font(.caption.weight(.bold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                primary ? Theme.accent.opacity(0.92) : Color.white.opacity(0.12),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(.white.opacity(primary ? 0.2 : 0.25))
+            )
+    }
+}
+
+// MARK: - Prime Hero Card (no featured pick)
+
+private struct PrimeHeroCard: View {
+    let match: Match
+
+    var body: some View {
+        NavigationLink(value: match) {
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        if match.state == .live {
+                            PulsingLiveBadge()
+                            Text("LIVE")
+                                .font(.caption2.weight(.black))
+                                .foregroundStyle(Theme.live)
+                        } else {
+                            Image(systemName: "sparkles")
+                                .font(.caption2)
+                                .foregroundStyle(Theme.accent)
+                            Text("TOP MATCH")
+                                .font(.caption2.weight(.heavy))
+                                .foregroundStyle(Theme.accent)
+                        }
+                        Spacer()
+                        Text(match.league.shortName)
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+
+                    HStack(spacing: 12) {
+                        teamColumn(match.away)
+                        VStack(spacing: 4) {
+                            Text(match.state == .pre
+                                 ? "VS"
+                                 : "\(match.away.score ?? "-") – \(match.home.score ?? "-")")
+                                .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
+                                .foregroundStyle(Theme.textPrimary)
+                            Text(match.statusDetail)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(match.state == .live ? Theme.live : Theme.textSecondary)
+                                .lineLimit(1)
+                        }
+                        .frame(minWidth: 80)
+                        teamColumn(match.home)
+                    }
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary.opacity(0.5))
+            }
+            .padding(20)
+            .background(
+                LinearGradient(
+                    colors: [Theme.surfaceElevated, Theme.surface],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(match.state == .live ? Theme.live.opacity(0.4) : Theme.hairline)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func teamColumn(_ side: TeamSide) -> some View {
+        VStack(spacing: 8) {
+            TeamLogo(url: side.logoURL, size: 44)
+            Text(side.shortName)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Live Now Command Center
+
+private struct LiveNowCommandCenter: View {
+    let matches: [Match]
+    let startingSoon: [Match]
+    let nextMatches: [Match]
+    @Binding var selectedSport: SportGroup?
+
+    private var activeSports: [SportGroup] {
+        var seen: [SportGroup] = []
+        for m in matches where !seen.contains(m.league.group) { seen.append(m.league.group) }
+        return seen
+    }
+
+    private var displayed: [Match] {
+        guard let s = selectedSport else { return matches }
+        return matches.filter { $0.league.group == s }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Section header
+            HStack(spacing: 8) {
+                PulsingLiveBadge()
+                Text("LIVE NOW")
+                    .font(.system(size: 15, weight: .heavy))
+                    .foregroundStyle(Theme.live)
+                Spacer()
+                if !matches.isEmpty {
+                    NavigationLink(destination: LiveView()) {
+                        Text("See All")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Theme.accent)
+                    }
+                }
+            }
+
+            // Sport chips
+            if !activeSports.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        sportChip(title: "All", icon: "sportscourt", selected: selectedSport == nil) {
+                            withAnimation(.snappy) { selectedSport = nil }
+                        }
+                        ForEach(activeSports) { sport in
+                            sportChip(title: sport.rawValue, icon: sport.systemImage, selected: selectedSport == sport) {
+                                withAnimation(.snappy) { selectedSport = selectedSport == sport ? nil : sport }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Content
+            if matches.isEmpty {
+                noLiveContent
+            } else if displayed.isEmpty {
+                Text("No live \(selectedSport?.rawValue ?? "games") right now.")
+                    .font(.callout)
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.hairline))
+            } else {
+                ForEach(displayed.prefix(4)) { match in
+                    NavigationLink(value: match) {
+                        LiveMatchCard(match: match)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var noLiveContent: some View {
+        if !startingSoon.isEmpty || !nextMatches.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                let soonMatches = startingSoon.isEmpty ? Array(nextMatches.prefix(3)) : startingSoon
+                HStack(spacing: 6) {
+                    Image(systemName: "clock.badge.fill")
+                    Text("Nothing live right now — starting soon")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(Theme.starting)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(soonMatches) { match in
+                            NavigationLink(value: match) {
+                                SoonTimelineCard(match: match)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        } else {
+            HStack(spacing: 12) {
+                Image(systemName: "moon.zzz.fill")
+                    .foregroundStyle(Theme.textSecondary)
+                Text("Nothing is live right now.")
+                    .font(.callout)
+                    .foregroundStyle(Theme.textSecondary)
+                Spacer()
+            }
+            .padding(16)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.hairline))
+        }
+    }
+
+    private func sportChip(title: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(selected ? .white : Theme.textSecondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(selected ? Theme.live : Theme.surface, in: Capsule())
+                .overlay(Capsule().strokeBorder(selected ? Theme.live : Theme.hairline))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Starting Soon Timeline
+
+struct StartingSoonTimeline: View {
+    let matches: [Match]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "clock.badge.fill")
+                Text("STARTING SOON")
+                    .font(.system(size: 15, weight: .heavy))
+                    .foregroundStyle(Theme.starting)
+                Spacer()
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(matches.prefix(8)) { match in
+                        NavigationLink(value: match) {
+                            SoonTimelineCard(match: match)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.viewAligned)
+        }
+    }
+}
+
+private struct SoonTimelineCard: View {
+    let match: Match
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { ctx in
+            let secs = max(0, Int(match.date.timeIntervalSince(ctx.date)))
+            let h = secs / 3600; let m = (secs % 3600) / 60
+
+            VStack(spacing: 10) {
+                Text(match.date, style: .time)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(Theme.textSecondary)
+
+                HStack(spacing: 6) {
+                    TeamLogo(url: match.away.logoURL, size: 30)
+                    Text("vs")
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(Theme.textSecondary)
+                    TeamLogo(url: match.home.logoURL, size: 30)
+                }
+
+                Text(match.shortName)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(width: 118)
+
+                VStack(spacing: 2) {
+                    Text(h > 0 ? "\(h)h \(m)m" : "\(m) min")
+                        .font(.system(size: 14, weight: .black, design: .rounded).monospacedDigit())
+                        .foregroundStyle(m < 10 && h == 0 ? Theme.live : Theme.starting)
+                    Text(match.league.shortName)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+
+                if !match.broadcasts.isEmpty {
+                    Label(match.broadcasts.first!, systemImage: "tv")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
+                        .frame(width: 118)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+            .frame(width: 140)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(m < 10 && h == 0 ? Theme.starting.opacity(0.5) : Theme.hairline)
+            )
+        }
+    }
+}
+
+// MARK: - Schedule Section
+
+private struct ScheduleSection: View {
+    let upcoming: [Match]
+    @Binding var selectedDay: ScheduleDay
+
+    private let calendar = Calendar.current
+
+    private var todayMatches: [Match] {
+        upcoming.filter { calendar.isDateInToday($0.date) }
+    }
+
+    private var tomorrowMatches: [Match] {
+        upcoming.filter { calendar.isDateInTomorrow($0.date) }
+    }
+
+    private var weekendMatches: [Match] {
+        let weekend: Set<Int> = [1, 7] // Sunday=1, Saturday=7 in Calendar
+        return upcoming.filter {
+            let weekday = calendar.component(.weekday, from: $0.date)
+            return weekend.contains(weekday) && !calendar.isDateInToday($0.date)
+        }
+    }
+
+    private var displayedMatches: [Match] {
+        switch selectedDay {
+        case .today: return todayMatches
+        case .tomorrow: return tomorrowMatches
+        case .weekend: return weekendMatches
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("YOUR SCHEDULE")
+                .font(.system(size: 15, weight: .heavy))
+                .foregroundStyle(Theme.textSecondary)
+
+            // Day picker
+            HStack(spacing: 0) {
+                ForEach(ScheduleDay.allCases) { day in
+                    let isSelected = selectedDay == day
+                    Button { withAnimation(.snappy) { selectedDay = day } } label: {
+                        Text(day.rawValue)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(isSelected ? Theme.accent : Theme.textSecondary)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                GeometryReader { proxy in
+                    let idx = ScheduleDay.allCases.firstIndex(of: selectedDay) ?? 0
+                    let w = proxy.size.width / CGFloat(ScheduleDay.allCases.count)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Theme.accent.opacity(0.15))
+                        .frame(width: w, height: proxy.size.height)
+                        .offset(x: w * CGFloat(idx))
+                        .animation(.snappy, value: selectedDay)
+                }
+            )
+
+            // Matches
+            if displayedMatches.isEmpty {
+                HStack(spacing: 12) {
+                    Image(systemName: "calendar.badge.checkmark")
+                        .foregroundStyle(Theme.textSecondary)
+                    Text(emptyText)
+                        .font(.callout)
+                        .foregroundStyle(Theme.textSecondary)
+                    Spacer()
+                }
                 .padding(16)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.hairline))
+            } else {
+                // Group by time of day (morning, afternoon, evening)
+                ForEach(displayedMatches) { match in
+                    NavigationLink(value: match) {
+                        ScheduleRow(match: match)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var emptyText: String {
+        switch selectedDay {
+        case .today: return "No games for your followed leagues today."
+        case .tomorrow: return "No announced games for tomorrow yet."
+        case .weekend: return "No weekend games found for your leagues."
+        }
+    }
+}
+
+private struct ScheduleRow: View {
+    let match: Match
+
+    var body: some View {
+        HStack(spacing: 14) {
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(match.date, style: .time)
+                    .font(.system(size: 14, weight: .bold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(Theme.textPrimary)
+                Text(match.league.shortName)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            .frame(width: 56, alignment: .trailing)
+
+            Rectangle()
+                .fill(Theme.hairline)
+                .frame(width: 1, height: 36)
+
+            HStack(spacing: 10) {
+                TeamLogo(url: match.away.logoURL, size: 28)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(match.shortName)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
+                    if !match.broadcasts.isEmpty {
+                        Text(match.broadcasts.prefix(2).joined(separator: " · "))
+                            .font(.caption2)
+                            .foregroundStyle(Theme.textSecondary)
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                TeamLogo(url: match.home.logoURL, size: 28)
+            }
+
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Theme.textSecondary.opacity(0.4))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline))
+    }
+}
+
+// MARK: - Trending Section
+
+private struct TrendingSection: View {
+    let highlights: [MatchHighlight]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "play.circle.fill")
+                Text("RECENT HIGHLIGHTS")
+                    .font(.system(size: 15, weight: .heavy))
+            }
+            .foregroundStyle(Theme.accent)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(highlights) { clip in
+                        HighlightCard(clip: clip)
+                    }
+                }
             }
         }
     }
 }
+
+// MARK: - Continue Watching Section
+
+struct ContinueWatchingSection: View {
+    let entries: [WatchHistoryEntry]
+    let onPlay: (Channel) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "clock.arrow.circlepath")
+                Text("CONTINUE WATCHING")
+                    .font(.system(size: 15, weight: .heavy))
+            }
+            .foregroundStyle(Theme.accent)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(entries) { entry in
+                        if let channel = entry.saved.channel {
+                            Button { onPlay(channel) } label: {
+                                ContinueWatchingCard(entry: entry)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ContinueWatchingCard: View {
+    let entry: WatchHistoryEntry
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack {
+                Theme.surfaceElevated
+                AsyncImage(url: entry.saved.channel?.logoURL) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().scaledToFit().padding(10)
+                    } else {
+                        Image(systemName: "play.tv.fill")
+                            .font(.title2)
+                            .foregroundStyle(Theme.accent)
+                    }
+                }
+            }
+            .frame(width: 150, height: 84)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(alignment: .bottomTrailing) {
+                Image(systemName: "play.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(Theme.accent)
+                    .padding(6)
+            }
+
+            Text(entry.saved.name)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+            Text(entry.lastWatched.formatted(.relative(presentation: .named)))
+                .font(.caption2)
+                .foregroundStyle(Theme.textSecondary)
+                .lineLimit(1)
+        }
+        .frame(width: 150)
+    }
+}
+
+// MARK: - Home View Model (unchanged)
 
 @MainActor
 final class HomeViewModel: ObservableObject {
@@ -111,13 +1090,10 @@ final class HomeViewModel: ObservableObject {
     private let service = ESPNService()
     private let featuredCalendar = FeaturedEventCalendar.shared
 
-    // Cache bookkeeping so revisiting the tab doesn't refetch everything.
     private var lastLoadedLeagueIDs: Set<String> = []
     private var lastLoadedAt: Date?
     private let cacheLifetime: TimeInterval = 120
 
-    // eventDemandScore is string-heavy, so reuse results across the
-    // progressive section rebuilds within a load pass.
     private var demandScoreCache: [String: Int] = [:]
 
     private var refreshTask: Task<Void, Never>?
@@ -157,9 +1133,6 @@ final class HomeViewModel: ObservableObject {
         let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
         var matchesByLeague: [String: [Match]] = [:]
 
-        // Phase 1: followed leagues get a full week (for Upcoming / Your Teams).
-        // Sections render as each league's response lands instead of waiting
-        // for the slowest request.
         await withTaskGroup(of: (String, [Match]).self) { group in
             for league in leagues {
                 group.addTask {
@@ -173,9 +1146,6 @@ final class HomeViewModel: ObservableObject {
             }
         }
 
-        // Phase 2: sweep the rest of the catalog with a short window so Live
-        // Right Now spans all sports without waiting on long schedule fetches.
-        // Three days is enough for live games plus the next-games fallback.
         await withTaskGroup(of: (String, [Match]).self) { group in
             for league in League.all where !leagueIDs.contains(league.id) {
                 group.addTask {
@@ -194,8 +1164,6 @@ final class HomeViewModel: ObservableObject {
             errorMessage = "ESPN did not return games for your followed leagues."
         }
 
-        // Phase 3: favorite-team leagues get a long schedule sweep so the home
-        // page can show the next announced games even if they are months away.
         let favoriteLeagueIDs = Set(favorites.map(\.leaguePath))
         await withTaskGroup(of: (String, [Match]).self) { group in
             for league in League.all where favoriteLeagueIDs.contains(league.id) {
@@ -223,8 +1191,6 @@ final class HomeViewModel: ObservableObject {
             }
         }
 
-        // Phase 4: fetch video highlights from the 3 most recently finished games
-        // in the user's followed leagues. Runs after main content is visible.
         let recentlyFinished = matchesByLeague
             .filter { leagueIDs.contains($0.key) }
             .values.flatMap { $0 }
@@ -254,7 +1220,6 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
-    /// Recomputes the published sections from everything fetched so far.
     private func rebuildSections(matchesByLeague: [String: [Match]], followedIDs: Set<String>, favoriteIDs: Set<String>, favoriteNames: Set<String>) {
         let now = Date()
         let calendar = Calendar.current
@@ -263,8 +1228,6 @@ final class HomeViewModel: ObservableObject {
             .filter { followedIDs.contains($0.key) }
             .values.flatMap { $0 })
 
-        // Score every match once up front; sorting with primeScore inside the
-        // comparator recomputes it O(n log n) times and dominated load time.
         var scores: [String: Int] = [:]
         scores.reserveCapacity(allMatches.count)
         for match in allMatches {
@@ -366,758 +1329,6 @@ final class HomeViewModel: ObservableObject {
                 return true
             }
             return favoriteNames.contains(side.displayName.lowercased())
-        }
-    }
-}
-
-private struct HomeHeroSection: View {
-    let featuredPicks: [FeaturedEventPick]
-    let featuredMatchesByPickID: [String: Match]
-    let favoriteLiveMatches: [Match]
-    let primeMatch: Match?
-
-    private var favoriteLivePages: [Match] {
-        let featuredMatchIDs = Set(featuredMatchesByPickID.values.map(\.id))
-        return favoriteLiveMatches.filter { !featuredMatchIDs.contains($0.id) }
-    }
-
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 60)) { context in
-            let featuredPick = currentFeaturedPick(now: context.date)
-            if let featuredPick {
-                FeaturedEventCard(pick: featuredPick, match: featuredMatchesByPickID[featuredPick.id])
-            } else if favoriteLivePages.count > 1 {
-                TabView {
-                    ForEach(favoriteLivePages) { match in
-                        FavoriteLiveHeroCard(match: match)
-                            .padding(.horizontal, 1)
-                    }
-                }
-                .tabViewStyle(.page(indexDisplayMode: .automatic))
-                .frame(height: 172)
-            } else if let favoriteMatch = favoriteLivePages.first {
-                FavoriteLiveHeroCard(match: favoriteMatch)
-            } else if let primeMatch {
-                PrimeMatchCard(match: primeMatch)
-            }
-        }
-    }
-
-    private func currentFeaturedPick(now: Date) -> FeaturedEventPick? {
-        featuredPicks.first { pick in
-            guard let endDate = pick.endDate else { return true }
-            return endDate > now
-        }
-    }
-}
-
-private struct FeaturedEventCard: View {
-    let pick: FeaturedEventPick
-    let match: Match?
-
-    private var isLive: Bool { match?.state == .live }
-    private var accentColor: Color { isLive ? Theme.live : Theme.accent }
-    private var sourceURL: URL? { URL(string: pick.source) }
-
-    var body: some View {
-        Group {
-            if let match {
-                NavigationLink(value: match) {
-                    timelineContent
-                }
-                .buttonStyle(.plain)
-            } else {
-                timelineContent
-            }
-        }
-    }
-
-    private var timelineContent: some View {
-        TimelineView(.periodic(from: .now, by: 60)) { context in
-            cardContent(now: context.date)
-        }
-    }
-
-    private func cardContent(now: Date) -> some View {
-        let cardHeight: CGFloat = 172
-        let cardShape = RoundedRectangle(cornerRadius: 12, style: .continuous)
-
-        return GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Image("FeaturedHeroBackground")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: proxy.size.width, height: cardHeight)
-                    .accessibilityHidden(true)
-
-                LinearGradient(
-                    colors: [
-                        .black.opacity(0.82),
-                        .black.opacity(0.56),
-                        .black.opacity(0.14)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .frame(width: proxy.size.width, height: cardHeight)
-
-                LinearGradient(
-                    colors: [.black.opacity(0.38), .clear, .black.opacity(0.34)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(width: proxy.size.width, height: cardHeight)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 8) {
-                        Text("Featured")
-                            .font(.caption.weight(.black))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(accentColor.opacity(0.9), in: Capsule())
-                        Text(pick.league)
-                            .font(.caption2.weight(.heavy))
-                            .foregroundStyle(.white.opacity(0.78))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                    }
-
-                    Text(pick.title)
-                        .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.7)
-                        .shadow(color: .black.opacity(0.65), radius: 8, x: 0, y: 2)
-                        .frame(maxWidth: min(285, proxy.size.width - 32), alignment: .leading)
-
-                    HStack(spacing: 10) {
-                        countdown(now: now)
-                        action
-                    }
-                    .frame(maxWidth: proxy.size.width - 32, alignment: .leading)
-                }
-                .padding(16)
-                .frame(width: proxy.size.width, height: cardHeight, alignment: .leading)
-            }
-            .frame(width: proxy.size.width, height: cardHeight)
-            .clipShape(cardShape)
-            .overlay(cardShape.strokeBorder(.white.opacity(0.18)))
-        }
-        .frame(height: cardHeight)
-        .frame(maxWidth: .infinity)
-    }
-
-    // MARK: Countdown
-
-    @ViewBuilder private func countdown(now: Date) -> some View {
-        if isLive, let match {
-            HStack(spacing: 7) {
-                PulsingLiveDot()
-                Text(match.statusDetail)
-                    .font(.caption.weight(.black))
-                    .lineLimit(1)
-                Text("\(match.away.score ?? "-")-\(match.home.score ?? "-")")
-                    .font(.caption.weight(.black).monospacedDigit())
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Theme.live, in: Capsule())
-        } else if let startDate = pick.startDate, startDate > now {
-            let seconds = Int(startDate.timeIntervalSince(now))
-            let days = seconds / 86_400
-            let hours = (seconds % 86_400) / 3_600
-            let minutes = (seconds % 3_600) / 60
-
-            premiumCountdown(firstValue: days > 0 ? days : hours,
-                             firstUnit: days > 0 ? (days == 1 ? "DAY" : "DAYS") : "HR",
-                             secondValue: days > 0 ? hours : minutes,
-                             secondUnit: days > 0 ? "HR" : "MIN")
-        } else {
-            Label(pick.hasKnownStartTime ? timeText : pick.scheduleStatus, systemImage: "bolt.fill")
-                .font(.caption.weight(.black))
-                .foregroundStyle(.white)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(accentColor, in: Capsule())
-        }
-    }
-
-    private func premiumCountdown(firstValue: Int, firstUnit: String, secondValue: Int, secondUnit: String) -> some View {
-        HStack(spacing: 7) {
-            PulsingClockIcon(color: accentColor)
-
-            Text("STARTS IN")
-                .font(.system(size: 8, weight: .black))
-                .foregroundStyle(.white.opacity(0.72))
-                .lineLimit(1)
-
-            VStack(spacing: 1) {
-                HStack(alignment: .firstTextBaseline, spacing: 5) {
-                    Text(String(format: "%02d", firstValue))
-                    Text(":")
-                        .foregroundStyle(accentColor)
-                    Text(String(format: "%02d", secondValue))
-                }
-                .font(.system(size: 16, weight: .black, design: .rounded).monospacedDigit())
-                .foregroundStyle(.white)
-
-                HStack(spacing: 18) {
-                    Text(firstUnit)
-                    Text(secondUnit)
-                }
-                .font(.system(size: 7, weight: .black))
-                .foregroundStyle(.white.opacity(0.55))
-            }
-        }
-        .padding(.horizontal, 10)
-        .frame(height: 40)
-        .background(Color(hex: 0x07101E, alpha: 0.82), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(accentColor.opacity(0.42)))
-        .shadow(color: accentColor.opacity(0.22), radius: 8, x: 0, y: 0)
-    }
-
-    @ViewBuilder private var action: some View {
-        if match != nil {
-            actionLabel("Streams", systemImage: isLive ? "play.fill" : "arrow.right")
-        } else if let sourceURL {
-            Link(destination: sourceURL) {
-                actionLabel("Info", systemImage: "safari.fill")
-            }
-        }
-    }
-
-    private func actionLabel(_ title: String, systemImage: String) -> some View {
-        Label(title, systemImage: systemImage)
-            .font(.caption.weight(.black))
-            .foregroundStyle(.white)
-            .lineLimit(1)
-            .padding(.horizontal, 12)
-            .frame(height: 40)
-            .background(accentColor.opacity(0.92), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.white.opacity(0.22)))
-            .shadow(color: accentColor.opacity(0.28), radius: 10, x: 0, y: 0)
-    }
-
-    private var timeText: String {
-        pick.hasKnownStartTime ? "\(pick.torontoTime) ET" : pick.scheduleStatus
-    }
-}
-
-private struct PulsingClockIcon: View {
-    let color: Color
-    @State private var pulsing = false
-
-    var body: some View {
-        Image(systemName: "clock.fill")
-            .font(.system(size: 11, weight: .black))
-            .foregroundStyle(color)
-            .scaleEffect(pulsing ? 1.08 : 0.94)
-            .opacity(pulsing ? 1 : 0.62)
-            .animation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: pulsing)
-            .onAppear { pulsing = true }
-    }
-}
-
-/// Small red dot that softly pulses to signal a live event.
-private struct PulsingLiveDot: View {
-    @State private var pulsing = false
-
-    var body: some View {
-        Circle()
-            .fill(Theme.live)
-            .frame(width: 10, height: 10)
-            .opacity(pulsing ? 0.35 : 1)
-            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulsing)
-            .onAppear { pulsing = true }
-    }
-}
-
-private struct FavoriteLiveHeroCard: View {
-    let match: Match
-
-    var body: some View {
-        NavigationLink(value: match) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .firstTextBaseline) {
-                    Label("Favorite Team Live", systemImage: "star.fill")
-                        .font(.caption.weight(.heavy))
-                        .foregroundStyle(Theme.live)
-                    Spacer()
-                    Text(match.league.shortName)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Theme.textSecondary)
-                }
-
-                HStack(spacing: 14) {
-                    team(match.away)
-                    Text("\(match.away.score ?? "-") - \(match.home.score ?? "-")")
-                        .font(.title2.weight(.heavy).monospacedDigit())
-                        .foregroundStyle(Theme.textPrimary)
-                        .frame(minWidth: 68)
-                    team(match.home)
-                }
-
-                FlowLayout(spacing: 8) {
-                    metadataPill(match.statusDetail, systemImage: "play.fill")
-                    if !match.broadcasts.isEmpty {
-                        metadataPill(match.broadcasts.prefix(2).joined(separator: ", "), systemImage: "tv")
-                    }
-                    if let venue = match.venue, !venue.isEmpty {
-                        metadataPill(venue, systemImage: "mappin.and.ellipse")
-                    }
-                }
-            }
-            .padding(16)
-            .background(
-                LinearGradient(colors: [Theme.surfaceElevated, Theme.surface, Color(hex: 0x101A2A)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-            )
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.live.opacity(0.45)))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func team(_ side: TeamSide) -> some View {
-        VStack(spacing: 8) {
-            TeamLogo(url: side.logoURL, size: 44)
-            Text(side.shortName)
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(Theme.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func metadataPill(_ text: String, systemImage: String) -> some View {
-        Label(text, systemImage: systemImage)
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(Theme.textSecondary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 6)
-            .background(Theme.surface, in: Capsule())
-            .overlay(Capsule().strokeBorder(Theme.hairline))
-    }
-}
-
-private struct PrimeMatchCard: View {
-    let match: Match
-
-    var body: some View {
-        NavigationLink(value: match) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Label(match.state == .live ? "Prime Live Match" : "Prime Upcoming Match", systemImage: match.state == .live ? "dot.radiowaves.left.and.right" : "sparkles.tv")
-                        .font(.caption.weight(.heavy))
-                        .foregroundStyle(match.state == .live ? Theme.live : Theme.accent)
-                    Spacer()
-                    Text(match.league.shortName)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Theme.textSecondary)
-                }
-
-                HStack(spacing: 14) {
-                    team(match.away)
-                    Text(match.state == .pre ? "VS" : "\(match.away.score ?? "-") - \(match.home.score ?? "-")")
-                        .font(.title2.weight(.heavy).monospacedDigit())
-                        .foregroundStyle(Theme.textPrimary)
-                        .frame(minWidth: 68)
-                    team(match.home)
-                }
-
-                HStack(spacing: 8) {
-                    Text(match.statusDetail)
-                    if !match.broadcasts.isEmpty {
-                        Text("•")
-                        Text(match.broadcasts.prefix(2).joined(separator: ", "))
-                    }
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Theme.textSecondary)
-            }
-            .padding(16)
-            .background(
-                LinearGradient(colors: [Theme.surfaceElevated, Theme.surface, Color(hex: 0x101A2A)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-            )
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func team(_ side: TeamSide) -> some View {
-        VStack(spacing: 8) {
-            TeamLogo(url: side.logoURL, size: 44)
-            Text(side.shortName)
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(Theme.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-/// Horizontal strip of recently watched channels.
-struct ContinueWatchingSection: View {
-    let entries: [WatchHistoryEntry]
-    let onPlay: (Channel) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "clock.arrow.circlepath")
-                Text("Continue Watching")
-                Spacer()
-            }
-            .font(.headline.weight(.bold))
-            .foregroundStyle(Theme.accent)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(entries) { entry in
-                        if let channel = entry.saved.channel {
-                            Button {
-                                onPlay(channel)
-                            } label: {
-                                ContinueWatchingCard(entry: entry)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-private struct ContinueWatchingCard: View {
-    let entry: WatchHistoryEntry
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack {
-                Theme.surfaceElevated
-                AsyncImage(url: entry.saved.channel?.logoURL) { phase in
-                    if case .success(let image) = phase {
-                        image.resizable().scaledToFit().padding(10)
-                    } else {
-                        Image(systemName: "play.tv.fill")
-                            .font(.title2)
-                            .foregroundStyle(Theme.accent)
-                    }
-                }
-            }
-            .frame(width: 150, height: 84)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(alignment: .bottomTrailing) {
-                Image(systemName: "play.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(Theme.accent)
-                    .padding(6)
-            }
-
-            Text(entry.saved.name)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Theme.textPrimary)
-                .lineLimit(1)
-            Text(entry.lastWatched.formatted(.relative(presentation: .named)))
-                .font(.caption2)
-                .foregroundStyle(Theme.textSecondary)
-                .lineLimit(1)
-        }
-        .frame(width: 150)
-    }
-}
-
-private struct LiveNowSection: View {
-    let matches: [Match]
-    let nextMatches: [Match]
-    let startingSoon: [Match]
-    @Binding var selectedSport: SportGroup?
-
-    private var sports: [SportGroup] {
-        SportGroup.allCases.filter { sport in
-            matches.contains { $0.league.group == sport }
-        }
-    }
-
-    private var displayedMatches: [Match] {
-        guard let selectedSport else { return matches }
-        return matches.filter { $0.league.group == selectedSport }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "dot.radiowaves.left.and.right")
-                Text("Live Right Now")
-                Spacer()
-                if !matches.isEmpty {
-                    Text("\(displayedMatches.count)")
-                        .font(.caption.weight(.bold).monospacedDigit())
-                        .foregroundStyle(Theme.textSecondary)
-                }
-            }
-            .font(.headline.weight(.bold))
-            .foregroundStyle(Theme.live)
-
-            if !sports.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        sportChip(title: "All", systemImage: "sportscourt", isSelected: selectedSport == nil) {
-                            withAnimation(.snappy) { selectedSport = nil }
-                        }
-                        ForEach(sports) { sport in
-                            sportChip(title: sport.rawValue, systemImage: sport.systemImage, isSelected: selectedSport == sport) {
-                                withAnimation(.snappy) { selectedSport = sport }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if matches.isEmpty {
-                if nextMatches.isEmpty {
-                    Text("No games are live across ESPN right now.")
-                        .font(.callout)
-                        .foregroundStyle(Theme.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(14)
-                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-                } else {
-                    startingSoonStrip(matches: startingSoon.isEmpty ? Array(nextMatches.prefix(3)) : startingSoon,
-                                      title: "Starting Soon")
-                }
-            } else if displayedMatches.isEmpty {
-                Text("No live games for this sport right now.")
-                    .font(.callout)
-                    .foregroundStyle(Theme.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-            } else {
-                ForEach(displayedMatches) { match in
-                    NavigationLink(value: match) {
-                        MatchRow(match: match)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                if !startingSoon.isEmpty {
-                    startingSoonStrip(matches: startingSoon, title: "Starting Soon")
-                        .padding(.top, 2)
-                }
-            }
-        }
-    }
-
-    private func startingSoonStrip(matches: [Match], title: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Image(systemName: "clock.badge.fill")
-                Text(title.uppercased())
-                Spacer()
-            }
-            .font(.caption.weight(.heavy))
-            .foregroundStyle(Color(hex: 0xE0A83D))
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(matches) { match in
-                        NavigationLink(value: match) {
-                            StartingSoonCard(match: match)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
-
-    private func sportChip(title: String, systemImage: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(isSelected ? .white : Theme.textSecondary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(isSelected ? Theme.accent : Theme.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(isSelected ? Theme.accent : Theme.hairline))
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Starting Soon
-
-private struct StartingSoonSection: View {
-    let matches: [Match]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "clock.badge.fill")
-                Text("Starting Soon")
-                Spacer()
-            }
-            .font(.headline.weight(.bold))
-            .foregroundStyle(Color(hex: 0xE0A83D))
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(matches) { match in
-                        NavigationLink(value: match) {
-                            StartingSoonCard(match: match)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
-}
-
-private struct StartingSoonCard: View {
-    let match: Match
-
-    var body: some View {
-        TimelineView(.periodic(from: .now, by: 30)) { context in
-            cardContent(now: context.date)
-        }
-    }
-
-    private func cardContent(now: Date) -> some View {
-        let seconds = max(0, Int(match.date.timeIntervalSince(now)))
-        let hours = seconds / 3600
-        let minutes = (seconds % 3600) / 60
-        let secs = seconds % 60
-
-        return VStack(spacing: 10) {
-            HStack(spacing: 0) {
-                TeamLogo(url: match.away.logoURL, size: 30)
-                Text("vs")
-                    .font(.caption2.weight(.heavy))
-                    .foregroundStyle(Theme.textSecondary)
-                    .padding(.horizontal, 5)
-                TeamLogo(url: match.home.logoURL, size: 30)
-            }
-
-            Text(match.shortName)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Theme.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(width: 108)
-
-            VStack(spacing: 2) {
-                if hours > 0 {
-                    Text(String(format: "%dh %02dm", hours, minutes))
-                        .font(.system(size: 14, weight: .black, design: .rounded).monospacedDigit())
-                        .foregroundStyle(Color(hex: 0xE0A83D))
-                } else if minutes > 0 {
-                    Text(String(format: "%d:%02d", minutes, secs))
-                        .font(.system(size: 14, weight: .black, design: .rounded).monospacedDigit())
-                        .foregroundStyle(minutes < 10 ? Theme.live : Color(hex: 0xE0A83D))
-                } else {
-                    Text("SOON")
-                        .font(.system(size: 14, weight: .black).monospacedDigit())
-                        .foregroundStyle(Theme.live)
-                }
-
-                Text(match.league.shortName.uppercased())
-                    .font(.caption2.weight(.heavy))
-                    .foregroundStyle(Theme.textSecondary)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .frame(width: 132)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(seconds < 600 ? Color(hex: 0xE0A83D).opacity(0.5) : Theme.hairline))
-    }
-}
-
-// MARK: - Recent highlights strip
-
-private struct RecentHighlightsSection: View {
-    let highlights: [MatchHighlight]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "play.circle.fill")
-                Text("Recent Highlights")
-                    .font(.headline.weight(.bold))
-                Spacer()
-            }
-            .foregroundStyle(Theme.accent)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(highlights) { clip in
-                        HighlightCard(clip: clip)
-                    }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Home section list
-
-private struct HomeSection: View {
-    let title: String
-    let systemImage: String
-    let tint: Color
-    let matches: [Match]
-    let emptyText: String
-    /// Maximum rows to show; nil shows every match.
-    var limit: Int? = 5
-
-    private var displayedMatches: [Match] {
-        limit.map { Array(matches.prefix($0)) } ?? matches
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: systemImage)
-                Text(title)
-                Spacer()
-                if !matches.isEmpty {
-                    Text("\(matches.count)")
-                        .font(.caption.weight(.bold).monospacedDigit())
-                        .foregroundStyle(Theme.textSecondary)
-                }
-            }
-            .font(.headline.weight(.bold))
-            .foregroundStyle(tint)
-
-            if matches.isEmpty {
-                Text(emptyText)
-                    .font(.callout)
-                    .foregroundStyle(Theme.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-            } else {
-                ForEach(displayedMatches) { match in
-                    NavigationLink(value: match) {
-                        MatchRow(match: match)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
         }
     }
 }

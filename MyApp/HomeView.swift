@@ -332,7 +332,7 @@ private struct HomeFilterBar: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
         }
-        .background(.ultraThinMaterial)
+        .background(Theme.background)
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.hairline).frame(height: 0.5)
         }
@@ -843,11 +843,30 @@ private struct ScheduleSection: View {
         upcoming.filter { calendar.isDateInTomorrow($0.date) }
     }
 
+    // Only the actual upcoming Sat+Sun (or today if Sat/Sun).
     private var weekendMatches: [Match] {
-        let weekend: Set<Int> = [1, 7] // Sunday=1, Saturday=7 in Calendar
+        let today = calendar.startOfDay(for: Date())
+        let weekday = calendar.component(.weekday, from: today) // 1=Sun … 7=Sat
+
+        let startDate: Date
+        let endDate: Date
+
+        switch weekday {
+        case 7: // Saturday — show Sat + Sun
+            startDate = today
+            endDate = calendar.date(byAdding: .day, value: 2, to: today)!
+        case 1: // Sunday — show just today
+            startDate = today
+            endDate = calendar.date(byAdding: .day, value: 1, to: today)!
+        default: // Mon–Fri: find next Saturday
+            let daysToSat = 7 - weekday // Mon(2)→5, Tue(3)→4, …, Fri(6)→1
+            startDate = calendar.date(byAdding: .day, value: daysToSat, to: today)!
+            endDate   = calendar.date(byAdding: .day, value: daysToSat + 2, to: today)!
+        }
+
         return upcoming.filter {
-            let weekday = calendar.component(.weekday, from: $0.date)
-            return weekend.contains(weekday) && !calendar.isDateInToday($0.date)
+            let d = calendar.startOfDay(for: $0.date)
+            return d >= startDate && d < endDate
         }
     }
 
@@ -856,6 +875,22 @@ private struct ScheduleSection: View {
         case .today: return todayMatches
         case .tomorrow: return tomorrowMatches
         case .weekend: return weekendMatches
+        }
+    }
+
+    // Groups matches by calendar day, preserving order.
+    private func groupByDay(_ matches: [Match]) -> [(label: String, matches: [Match])] {
+        var order: [Date] = []
+        var groups: [Date: [Match]] = [:]
+        for match in matches {
+            let day = calendar.startOfDay(for: match.date)
+            if groups[day] == nil { order.append(day) }
+            groups[day, default: []].append(match)
+        }
+        let fmt = DateFormatter()
+        fmt.dateFormat = "EEEE, MMMM d"
+        return order.map { day in
+            (label: fmt.string(from: day), matches: groups[day]!)
         }
     }
 
@@ -892,7 +927,7 @@ private struct ScheduleSection: View {
                 }
             )
 
-            // Matches
+            // Matches — grouped by date for Tomorrow/Weekend
             if displayedMatches.isEmpty {
                 HStack(spacing: 12) {
                     Image(systemName: "calendar.badge.checkmark")
@@ -905,13 +940,22 @@ private struct ScheduleSection: View {
                 .padding(16)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.hairline))
-            } else {
-                // Group by time of day (morning, afternoon, evening)
+            } else if selectedDay == .today {
                 ForEach(displayedMatches) { match in
-                    NavigationLink(value: match) {
-                        ScheduleRow(match: match)
+                    NavigationLink(value: match) { ScheduleRow(match: match) }
+                        .buttonStyle(.plain)
+                }
+            } else {
+                let groups = groupByDay(displayedMatches)
+                ForEach(groups, id: \.label) { group in
+                    Text(group.label)
+                        .font(.caption.weight(.heavy))
+                        .foregroundStyle(Theme.textSecondary)
+                        .padding(.top, 4)
+                    ForEach(group.matches) { match in
+                        NavigationLink(value: match) { ScheduleRow(match: match) }
+                            .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }

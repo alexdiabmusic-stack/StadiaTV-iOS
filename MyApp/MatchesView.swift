@@ -225,12 +225,14 @@ struct MatchesView: View {
             } header: {
                 HStack(spacing: 6) {
                     Image(systemName: systemImage)
-                    Text(title).textCase(.uppercase)
+                        .font(.caption.weight(.bold))
+                    Text(title.uppercased())
+                        .font(.system(size: 15, weight: .heavy))
                     Spacer()
                 }
-                .font(.footnote.weight(.bold))
                 .foregroundStyle(tint)
-                .padding(.vertical, 6)
+                .padding(.vertical, 8)
+                .padding(.top, 4)
                 .background(Theme.background)
             }
         }

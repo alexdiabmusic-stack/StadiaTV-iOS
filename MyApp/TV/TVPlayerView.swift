@@ -40,9 +40,22 @@ struct TVPlayerView: View {
             }
             if let match = liveScoreMatch, prefs.showLiveScoreBadge, !isScoreDismissed {
                 VStack {
-                    LiveScoreBadge(match: match, isExpanded: $isScoreExpanded) {
-                        withAnimation(.spring(duration: 0.28)) { isScoreDismissed = true }
+                    HStack(spacing: 10) {
+                        TVLiveBadge()
+                        Text("\(match.away.abbreviation) \(match.away.score ?? "0") – \(match.home.score ?? "0") \(match.home.abbreviation)")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(.white)
+                        Button {
+                            withAnimation(.spring(duration: 0.28)) { isScoreDismissed = true }
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(.white.opacity(0.7))
+                        }
+                        .buttonStyle(.plain)
                     }
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .background(.black.opacity(0.72), in: Capsule())
                     .padding(.top, 60)
                     Spacer()
                 }

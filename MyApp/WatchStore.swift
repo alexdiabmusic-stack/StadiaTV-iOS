@@ -75,7 +75,8 @@ final class WatchStore: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in self?.applyCloudStateIfNeeded() }
+            guard let self else { return }
+            Task { @MainActor in self.applyCloudStateIfNeeded() }
         }
     }
 

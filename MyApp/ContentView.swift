@@ -11,18 +11,28 @@ struct MyApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
+                #if os(tvOS)
+                if preferences.hasCompletedOnboarding {
+                    TVRootView()
+                } else {
+                    TVOnboardingView()
+                }
+                #else
                 if preferences.hasCompletedOnboarding {
                     RootView()
                 } else {
                     OnboardingView()
                 }
+                #endif
             }
             .environmentObject(playlistStore)
             .environmentObject(preferences)
             .environmentObject(watchStore)
             .environmentObject(entitlements)
             .environmentObject(predictions)
+            #if !os(tvOS)
             .dynamicTypeSize(Theme.isPad ? DynamicTypeSize.xLarge... : DynamicTypeSize.xSmall...)
+            #endif
             .preferredColorScheme(preferences.appearance.colorScheme)
             .task { await playlistStore.refreshAll() }
         }

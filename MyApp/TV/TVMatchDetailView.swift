@@ -11,7 +11,7 @@ struct TVMatchDetailView: View {
         SourceMatcher.rank(
             match: match,
             channels: playlistStore.allChannels,
-            preferredLanguages: Array(prefs.preferredStreamLanguages)
+            preferredLanguages: prefs.preferredStreamLanguages
         )
     }
 
@@ -24,7 +24,7 @@ struct TVMatchDetailView: View {
                     if !rankedSources.isEmpty {
                         TVShelfRow(title: "Stream Sources", systemImage: "play.tv.fill") {
                             ForEach(rankedSources) { source in
-                                TVSourceTile(channel: source.channel) {
+                                TVSourceTile(channel: source.channel, score: source.score) {
                                     playingChannel = source.channel
                                 }
                             }

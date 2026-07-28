@@ -1,5 +1,6 @@
 #if os(tvOS)
 import SwiftUI
+import Combine
 
 struct TVOnboardingView: View {
     @EnvironmentObject private var prefs: PreferencesStore

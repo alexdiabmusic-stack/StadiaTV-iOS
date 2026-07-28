@@ -19,7 +19,9 @@ struct PickMatchDetailSheet: View {
             if let match {
                 NavigationStack {
                     MatchDetailView(match: match)
+                        #if !os(tvOS)
                         .navigationBarTitleDisplayMode(.inline)
+                        #endif
                         .toolbar {
                             ToolbarItem(placement: .cancellationAction) {
                                 Button("Done") { dismiss() }

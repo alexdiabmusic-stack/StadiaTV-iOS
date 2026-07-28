@@ -167,8 +167,4 @@ private struct TVArticleDetailView: View {
     }
 }
 
-extension ESPNArticle: Hashable {
-    public static func == (lhs: ESPNArticle, rhs: ESPNArticle) -> Bool { lhs.id == rhs.id }
-    public func hash(into hasher: inout Hasher) { hasher.combine(id) }
-}
 #endif

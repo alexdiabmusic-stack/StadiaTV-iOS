@@ -108,12 +108,15 @@ final class EntitlementStore: ObservableObject {
 
     // ⚠️ TESTFLIGHT ONLY — Remove this before App Store submission.
     private static var isTestFlight: Bool {
-        Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        get async {
+            guard case .verified(let tx) = try? await AppTransaction.shared else { return false }
+            return tx.environment == .sandbox
+        }
     }
 
     private func refreshEntitlements() async {
         // ⚠️ TESTFLIGHT ONLY — Remove this block before App Store submission.
-        if Self.isTestFlight {
+        if await Self.isTestFlight {
             isPremium = true
             UserDefaults.standard.set(true, forKey: Self.cacheKey)
             return

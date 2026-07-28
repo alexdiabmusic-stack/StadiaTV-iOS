@@ -1075,7 +1075,9 @@ private struct PlayerMultiscreenPicker: View {
                 }
             }
             .navigationTitle("Add to Multiscreen")
+            #if !os(tvOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .searchable(text: $query, prompt: "Search channels")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

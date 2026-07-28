@@ -8,8 +8,14 @@ final class MatchesViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
 
+    @Published var favoriteMatches: [Match] = []
+    @Published var isLoadingFavorites = false
+    @Published private(set) var allFollowedMatches: [Match] = []
+    @Published private(set) var isLoadingFollowing = false
+
     private let service = ESPNService()
     private var refreshTask: Task<Void, Never>?
+    private var lastFollowingArgs: (leagues: [League], favorites: [FavoriteTeam])?
 
     var liveMatches: [Match] { matches.filter { $0.state == .live } }
     var upcomingMatches: [Match] {
@@ -35,11 +41,46 @@ final class MatchesViewModel: ObservableObject {
         isLoading = false
     }
 
+    /// Loads the personalized Following feed across followed leagues plus the
+    /// longer announced schedule for favorite-team leagues.
+    func loadFollowing(leagues: [League], favorites: [FavoriteTeam]) async {
+        lastFollowingArgs = (leagues, favorites)
+        isLoadingFollowing = allFollowedMatches.isEmpty
+        errorMessage = nil
+
+        let favoriteLeagueIDs = Set(favorites.map(\.leaguePath))
+        let followedLeagueIDs = Set(leagues.map(\.id))
+        var leaguesToLoad = leagues
+        let missingFavoriteLeagues = League.all.filter { favoriteLeagueIDs.contains($0.id) && !followedLeagueIDs.contains($0.id) }
+        leaguesToLoad.append(contentsOf: missingFavoriteLeagues)
+
+        var loaded: [Match] = []
+        await withTaskGroup(of: [Match].self) { group in
+            for league in leaguesToLoad {
+                let days = favoriteLeagueIDs.contains(league.id) ? 365 : 14
+                group.addTask { [service] in
+                    (try? await service.scoreboards(for: league, starting: Date(), days: days)) ?? []
+                }
+            }
+            for await matches in group {
+                loaded.append(contentsOf: matches)
+            }
+        }
+
+        let favoriteFiltered = filterForFavorites(loaded, favorites: favorites)
+        let followedFiltered = loaded.filter { followedLeagueIDs.contains($0.league.id) }
+        allFollowedMatches = reconcileFixtures(favoriteFiltered + followedFiltered)
+            .sorted { $0.date < $1.date }
+        favoriteMatches = reconcileFixtures(favoriteFiltered).sorted { $0.date < $1.date }
+        isLoadingFollowing = false
+
+        if allFollowedMatches.isEmpty && !favorites.isEmpty {
+            errorMessage = "No followed games were returned right now."
+        }
+    }
+
     /// All announced games over the next 365 days for the user's favorite teams,
     /// fetched across every league those teams belong to.
-    @Published var favoriteMatches: [Match] = []
-    @Published var isLoadingFavorites = false
-
     func loadFavoriteSchedule(favorites: [FavoriteTeam]) async {
         guard !favorites.isEmpty else {
             favoriteMatches = []
@@ -61,18 +102,8 @@ final class MatchesViewModel: ObservableObject {
             }
         }
 
-        let favoriteIDs = Set(favorites.map(\.id))
-        let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
-        favoriteMatches = loaded.filter { match in
-            let sides = [match.home, match.away]
-            return sides.contains { side in
-                if let teamID = side.teamID, favoriteIDs.contains("\(match.league.path)-\(teamID)") {
-                    return true
-                }
-                return favoriteNames.contains(side.displayName.lowercased())
-            }
-        }
-        .sorted { $0.date < $1.date }
+        favoriteMatches = reconcileFixtures(filterForFavorites(loaded, favorites: favorites))
+            .sorted { $0.date < $1.date }
         isLoadingFavorites = false
     }
 
@@ -88,9 +119,13 @@ final class MatchesViewModel: ObservableObject {
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 30 * 1_000_000_000) // 30s
-                guard !Task.isCancelled else { break }
-                await self?.load()
+                try? await Task.sleep(nanoseconds: 30 * 1_000_000_000)
+                guard !Task.isCancelled, let self else { break }
+                if let args = self.lastFollowingArgs {
+                    await self.loadFollowing(leagues: args.leagues, favorites: args.favorites)
+                } else {
+                    await self.load()
+                }
             }
         }
     }
@@ -98,5 +133,53 @@ final class MatchesViewModel: ObservableObject {
     func stopAutoRefresh() {
         refreshTask?.cancel()
         refreshTask = nil
+    }
+
+    private func filterForFavorites(_ matches: [Match], favorites: [FavoriteTeam]) -> [Match] {
+        guard !favorites.isEmpty else { return [] }
+        let favoriteIDs = Set(favorites.map(\.id))
+        let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
+        return matches.filter { match in
+            [match.home, match.away].contains { side in
+                if let teamID = side.teamID, favoriteIDs.contains("\(match.league.path)-\(teamID)") {
+                    return true
+                }
+                return favoriteNames.contains(side.displayName.lowercased())
+            }
+        }
+    }
+
+    /// ESPN can return the same event through multiple windows, and some feeds
+    /// expose reversed duplicate fixtures. Keep the richest/latest event per key.
+    private func reconcileFixtures(_ matches: [Match]) -> [Match] {
+        var order: [String] = []
+        var byKey: [String: Match] = [:]
+        for match in matches.sorted(by: { $0.date < $1.date }) {
+            let key = fixtureKey(for: match)
+            if byKey[key] == nil {
+                order.append(key)
+                byKey[key] = match
+                continue
+            }
+            if shouldReplace(existing: byKey[key]!, with: match) {
+                byKey[key] = match
+            }
+        }
+        return order.compactMap { byKey[$0] }
+    }
+
+    private func fixtureKey(for match: Match) -> String {
+        let calendar = Calendar.current
+        let day = ESPNService.dateFormatter.string(from: match.date)
+        let teams = [match.home.displayName.lowercased(), match.away.displayName.lowercased()].sorted().joined(separator: "-")
+        let minuteBucket = calendar.component(.hour, from: match.date) * 60 + calendar.component(.minute, from: match.date)
+        return "\(match.league.id)-\(day)-\(minuteBucket)-\(teams)"
+    }
+
+    private func shouldReplace(existing: Match, with candidate: Match) -> Bool {
+        if existing.state != .live && candidate.state == .live { return true }
+        if existing.broadcasts.isEmpty && !candidate.broadcasts.isEmpty { return true }
+        if existing.venue == nil && candidate.venue != nil { return true }
+        return existing.id == candidate.id
     }
 }

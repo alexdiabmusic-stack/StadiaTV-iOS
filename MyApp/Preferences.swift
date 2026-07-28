@@ -53,13 +53,67 @@ enum MatchReminderLeadTime: Int, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum AppAppearance: String, Codable, CaseIterable, Identifiable {
+    case system
+    case dark
+    case light
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .system: return "System"
+        case .dark: return "Dark"
+        case .light: return "Light"
+        }
+    }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .dark: return .dark
+        case .light: return .light
+        }
+    }
+}
+
 struct UserPreferences: Codable, Equatable {
     var hasCompletedOnboarding = false
     var selectedLeagueIDs: Set<String> = []   // League.path values
     var favoriteTeams: [FavoriteTeam] = []
     var matchNotificationsEnabled = false
     var matchReminderLeadTime: MatchReminderLeadTime = .thirty
+    var morningDigestEnabled = false
     var cloudSyncEnabled = false
+    var appearance: AppAppearance = .dark
+    var preferredStreamLanguages: Set<String> = ["en"]   // StreamLanguage.code values
+    var spoilerFreeMode = false
+    var showLiveScoreBadge = true
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case hasCompletedOnboarding, selectedLeagueIDs, favoriteTeams
+        case matchNotificationsEnabled, matchReminderLeadTime, morningDigestEnabled, cloudSyncEnabled
+        case appearance, preferredStreamLanguages, spoilerFreeMode, showLiveScoreBadge
+    }
+
+    /// Decodes leniently so preferences saved by older app versions
+    /// (missing newly added keys) still load.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        hasCompletedOnboarding = try container.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding) ?? false
+        selectedLeagueIDs = try container.decodeIfPresent(Set<String>.self, forKey: .selectedLeagueIDs) ?? []
+        favoriteTeams = try container.decodeIfPresent([FavoriteTeam].self, forKey: .favoriteTeams) ?? []
+        matchNotificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .matchNotificationsEnabled) ?? false
+        matchReminderLeadTime = try container.decodeIfPresent(MatchReminderLeadTime.self, forKey: .matchReminderLeadTime) ?? .thirty
+        morningDigestEnabled = try container.decodeIfPresent(Bool.self, forKey: .morningDigestEnabled) ?? false
+        cloudSyncEnabled = try container.decodeIfPresent(Bool.self, forKey: .cloudSyncEnabled) ?? false
+        appearance = try container.decodeIfPresent(AppAppearance.self, forKey: .appearance) ?? .dark
+        preferredStreamLanguages = try container.decodeIfPresent(Set<String>.self, forKey: .preferredStreamLanguages) ?? ["en"]
+        spoilerFreeMode = try container.decodeIfPresent(Bool.self, forKey: .spoilerFreeMode) ?? false
+        showLiveScoreBadge = try container.decodeIfPresent(Bool.self, forKey: .showLiveScoreBadge) ?? true
+    }
 }
 
 /// Owns the user's onboarding selections (sports/leagues/favorite teams) and
@@ -80,6 +134,10 @@ final class PreferencesStore: ObservableObject {
             prefs = cloud
         } else {
             prefs = UserPreferences()
+        }
+        if prefs.preferredStreamLanguages.isEmpty {
+            prefs.preferredStreamLanguages = ["en"]
+            persist()
         }
         CloudSyncService.shared.setEnabled(prefs.cloudSyncEnabled)
         NotificationCenter.default.addObserver(
@@ -128,6 +186,7 @@ final class PreferencesStore: ObservableObject {
 
     var matchNotificationsEnabled: Bool { prefs.matchNotificationsEnabled }
     var matchReminderLeadTime: MatchReminderLeadTime { prefs.matchReminderLeadTime }
+    var morningDigestEnabled: Bool { prefs.morningDigestEnabled }
     var cloudSyncEnabled: Bool { prefs.cloudSyncEnabled }
 
     var shouldPromptForFavoriteTeamNotifications: Bool {
@@ -150,9 +209,63 @@ final class PreferencesStore: ObservableObject {
         persist()
     }
 
+    func setMorningDigestEnabled(_ enabled: Bool) {
+        prefs.morningDigestEnabled = enabled
+        persist()
+    }
+
     func setCloudSyncEnabled(_ enabled: Bool) {
         prefs.cloudSyncEnabled = enabled
         CloudSyncService.shared.setEnabled(enabled)
+        persist()
+    }
+
+    // MARK: Appearance
+
+    var appearance: AppAppearance { prefs.appearance }
+
+    func setAppearance(_ appearance: AppAppearance) {
+        prefs.appearance = appearance
+        persist()
+    }
+
+    // MARK: Stream languages
+
+    var preferredStreamLanguages: Set<String> { prefs.preferredStreamLanguages }
+
+    func isStreamLanguageSelected(_ language: StreamLanguage) -> Bool {
+        prefs.preferredStreamLanguages.contains(language.code)
+    }
+
+    func toggleStreamLanguage(_ language: StreamLanguage) {
+        if prefs.preferredStreamLanguages.contains(language.code) {
+            prefs.preferredStreamLanguages.remove(language.code)
+        } else {
+            prefs.preferredStreamLanguages.insert(language.code)
+        }
+        persist()
+    }
+
+    func setDefaultStreamLanguage(_ language: StreamLanguage) {
+        prefs.preferredStreamLanguages = [language.code]
+        persist()
+    }
+
+    // MARK: Spoiler-Free Mode
+
+    var spoilerFreeMode: Bool { prefs.spoilerFreeMode }
+
+    func setSpoilerFreeMode(_ enabled: Bool) {
+        prefs.spoilerFreeMode = enabled
+        persist()
+    }
+
+    // MARK: Live Score Badge
+
+    var showLiveScoreBadge: Bool { prefs.showLiveScoreBadge }
+
+    func setShowLiveScoreBadge(_ enabled: Bool) {
+        prefs.showLiveScoreBadge = enabled
         persist()
     }
 

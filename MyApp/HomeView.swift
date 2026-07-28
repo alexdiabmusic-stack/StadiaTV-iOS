@@ -25,10 +25,12 @@ struct HomeView: View {
         }
         .tint(Theme.accent)
         .task(id: loadPreferencesKey) {
-            await viewModel.load(leagues: prefs.followedLeagues, favorites: prefs.favoriteTeams, notificationsEnabled: prefs.matchNotificationsEnabled, notificationLeadTime: prefs.matchReminderLeadTime)
+            await viewModel.load(leagues: prefs.followedLeagues, favorites: prefs.favoriteTeams, notificationsEnabled: prefs.matchNotificationsEnabled, notificationLeadTime: prefs.matchReminderLeadTime, morningDigestEnabled: prefs.morningDigestEnabled)
+            viewModel.startAutoRefresh()
         }
+        .onDisappear { viewModel.stopAutoRefresh() }
         .refreshable {
-            await viewModel.load(leagues: prefs.followedLeagues, favorites: prefs.favoriteTeams, notificationsEnabled: prefs.matchNotificationsEnabled, notificationLeadTime: prefs.matchReminderLeadTime, force: true)
+            await viewModel.load(leagues: prefs.followedLeagues, favorites: prefs.favoriteTeams, notificationsEnabled: prefs.matchNotificationsEnabled, notificationLeadTime: prefs.matchReminderLeadTime, morningDigestEnabled: prefs.morningDigestEnabled, force: true)
         }
     }
 
@@ -37,7 +39,8 @@ struct HomeView: View {
             prefs.followedLeagues.map(\.id).sorted().joined(separator: ","),
             prefs.favoriteTeams.map(\.id).sorted().joined(separator: ","),
             prefs.matchNotificationsEnabled ? "notifications-on" : "notifications-off",
-            "lead-\(prefs.matchReminderLeadTime.rawValue)"
+            "lead-\(prefs.matchReminderLeadTime.rawValue)",
+            prefs.morningDigestEnabled ? "digest-on" : "digest-off"
         ].joined(separator: "|")
     }
 
@@ -47,7 +50,7 @@ struct HomeView: View {
         } else if let message = viewModel.errorMessage, viewModel.liveNow.isEmpty && viewModel.upcoming.isEmpty {
             VStack(spacing: 12) {
                 Image(systemName: "wifi.exclamationmark")
-                    .font(.system(size: 42))
+                    .font(.system(size: Theme.scaled(42)))
                     .foregroundStyle(Theme.textSecondary)
                 Text(message)
                     .font(.callout)
@@ -64,15 +67,18 @@ struct HomeView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 22) {
                     HomeHeroSection(
-                        featuredPick: viewModel.featuredPick,
-                        featuredMatch: viewModel.featuredMatch,
+                        featuredPicks: viewModel.featuredPicks,
+                        featuredMatchesByPickID: viewModel.featuredMatchesByPickID,
                         favoriteLiveMatches: viewModel.favoriteTeamLiveMatches,
                         primeMatch: viewModel.primeMatch
                     )
 
-                    HomeSection(title: "Your Teams Today", systemImage: "star.fill", tint: Theme.accent, matches: viewModel.favoriteTeamMatchesToday, emptyText: prefs.favoriteTeams.isEmpty ? "Favorite teams in setup or settings to see them here." : "No games today for your favorite teams.")
-                    LiveNowSection(matches: viewModel.liveNow, selectedSport: $selectedLiveSport)
-                    HomeSection(title: "Upcoming Games", systemImage: "calendar", tint: Color(hex: 0x3DBE6B), matches: viewModel.upcoming, emptyText: "No upcoming games found for your followed leagues.")
+                    HomeSection(title: "Your Teams Today", systemImage: "star.fill", tint: Theme.accent, matches: viewModel.favoriteTeamMatchesToday, emptyText: prefs.favoriteTeams.isEmpty ? "Favorite teams in setup or settings to see them here." : "No games today for your favorite teams.", limit: 5)
+                    LiveNowSection(matches: viewModel.liveNow, nextMatches: viewModel.nextMatchesAcrossSports, startingSoon: viewModel.startingSoon, selectedSport: $selectedLiveSport)
+                    if !viewModel.recentHighlights.isEmpty {
+                        RecentHighlightsSection(highlights: viewModel.recentHighlights)
+                    }
+                    HomeSection(title: "Upcoming Games", systemImage: "calendar", tint: Color(hex: 0x3DBE6B), matches: viewModel.favoriteTeamUpcoming, emptyText: prefs.favoriteTeams.isEmpty ? "Favorite teams in setup or settings to see them here." : "No announced upcoming games for your favorite teams.", limit: 5)
 
                     if !watchStore.history.isEmpty {
                         ContinueWatchingSection(entries: watchStore.history) { channel in
@@ -91,10 +97,14 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var liveNow: [Match] = []
     @Published private(set) var favoriteTeamLiveMatches: [Match] = []
     @Published private(set) var favoriteTeamMatchesToday: [Match] = []
+    @Published private(set) var favoriteTeamUpcoming: [Match] = []
+    @Published private(set) var nextMatchesAcrossSports: [Match] = []
+    @Published private(set) var startingSoon: [Match] = []
     @Published private(set) var upcoming: [Match] = []
-    @Published private(set) var featuredPick: FeaturedEventPick?
-    @Published private(set) var featuredMatch: Match?
+    @Published private(set) var featuredPicks: [FeaturedEventPick] = []
+    @Published private(set) var featuredMatchesByPickID: [String: Match] = [:]
     @Published private(set) var primeMatch: Match?
+    @Published private(set) var recentHighlights: [MatchHighlight] = []
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
 
@@ -106,10 +116,34 @@ final class HomeViewModel: ObservableObject {
     private var lastLoadedAt: Date?
     private let cacheLifetime: TimeInterval = 120
 
-    func load(leagues: [League], favorites: [FavoriteTeam], notificationsEnabled: Bool = false, notificationLeadTime: MatchReminderLeadTime = .thirty, force: Bool = false) async {
+    // eventDemandScore is string-heavy, so reuse results across the
+    // progressive section rebuilds within a load pass.
+    private var demandScoreCache: [String: Int] = [:]
+
+    private var refreshTask: Task<Void, Never>?
+    private var lastLoadArgs: (leagues: [League], favorites: [FavoriteTeam], notificationsEnabled: Bool, notificationLeadTime: MatchReminderLeadTime, morningDigestEnabled: Bool)?
+
+    func startAutoRefresh() {
+        refreshTask?.cancel()
+        refreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 60 * 1_000_000_000)
+                guard !Task.isCancelled, let self, let args = self.lastLoadArgs else { continue }
+                await self.load(leagues: args.leagues, favorites: args.favorites, notificationsEnabled: args.notificationsEnabled, notificationLeadTime: args.notificationLeadTime, morningDigestEnabled: args.morningDigestEnabled)
+            }
+        }
+    }
+
+    func stopAutoRefresh() {
+        refreshTask?.cancel()
+        refreshTask = nil
+    }
+
+    func load(leagues: [League], favorites: [FavoriteTeam], notificationsEnabled: Bool = false, notificationLeadTime: MatchReminderLeadTime = .thirty, morningDigestEnabled: Bool = false, force: Bool = false) async {
+        lastLoadArgs = (leagues, favorites, notificationsEnabled, notificationLeadTime, morningDigestEnabled)
         let leagueIDs = Set(leagues.map(\.id))
-        featuredPick = featuredCalendar.pick()
-        let hasData = !(liveNow.isEmpty && upcoming.isEmpty && favoriteTeamMatchesToday.isEmpty)
+        featuredPicks = featuredCalendar.picks()
+        let hasData = !(liveNow.isEmpty && upcoming.isEmpty && favoriteTeamUpcoming.isEmpty)
         if !force, hasData, leagueIDs == lastLoadedLeagueIDs,
            let lastLoadedAt, Date().timeIntervalSince(lastLoadedAt) < cacheLifetime {
             return
@@ -118,6 +152,8 @@ final class HomeViewModel: ObservableObject {
 
         isLoading = true
         errorMessage = nil
+        demandScoreCache.removeAll(keepingCapacity: true)
+        let favoriteIDs = Set(favorites.map(\.id))
         let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
         var matchesByLeague: [String: [Match]] = [:]
 
@@ -133,7 +169,23 @@ final class HomeViewModel: ObservableObject {
             for await (id, matches) in group {
                 guard !matches.isEmpty else { continue }
                 matchesByLeague[id] = matches
-                rebuildSections(matchesByLeague: matchesByLeague, followedIDs: leagueIDs, favoriteNames: favoriteNames)
+                rebuildSections(matchesByLeague: matchesByLeague, followedIDs: leagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+            }
+        }
+
+        // Phase 2: sweep the rest of the catalog with a short window so Live
+        // Right Now spans all sports without waiting on long schedule fetches.
+        // Three days is enough for live games plus the next-games fallback.
+        await withTaskGroup(of: (String, [Match]).self) { group in
+            for league in League.all where !leagueIDs.contains(league.id) {
+                group.addTask {
+                    (league.id, (try? await self.service.scoreboards(for: league, starting: Date(), days: 3)) ?? [])
+                }
+            }
+            for await (id, matches) in group {
+                guard !matches.isEmpty else { continue }
+                matchesByLeague[id] = matches
+                rebuildSections(matchesByLeague: matchesByLeague, followedIDs: leagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
             }
         }
 
@@ -142,27 +194,57 @@ final class HomeViewModel: ObservableObject {
             errorMessage = "ESPN did not return games for your followed leagues."
         }
 
-        // Phase 2: sweep the rest of the catalog for today's games in the
-        // background so Live Right Now spans all sports.
+        // Phase 3: favorite-team leagues get a long schedule sweep so the home
+        // page can show the next announced games even if they are months away.
+        let favoriteLeagueIDs = Set(favorites.map(\.leaguePath))
         await withTaskGroup(of: (String, [Match]).self) { group in
-            for league in League.all where !leagueIDs.contains(league.id) {
+            for league in League.all where favoriteLeagueIDs.contains(league.id) {
                 group.addTask {
-                    (league.id, (try? await self.service.scoreboard(for: league, on: Date())) ?? [])
+                    (league.id, (try? await self.service.scoreboards(for: league, starting: Date(), days: 365)) ?? [])
                 }
             }
             for await (id, matches) in group {
                 guard !matches.isEmpty else { continue }
-                matchesByLeague[id] = matches
-                rebuildSections(matchesByLeague: matchesByLeague, followedIDs: leagueIDs, favoriteNames: favoriteNames)
+                let existing = matchesByLeague[id] ?? []
+                matchesByLeague[id] = mergeMatches(existing + matches)
+                rebuildSections(matchesByLeague: matchesByLeague, followedIDs: leagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
             }
         }
 
         if notificationsEnabled {
+            let allMatchesFlat = matchesByLeague.values.flatMap { $0 }
             await MatchNotificationService.shared.syncNotifications(
-                matches: matchesByLeague.values.flatMap { $0 },
+                matches: allMatchesFlat,
                 favorites: favorites,
                 leadTime: notificationLeadTime
             )
+            if morningDigestEnabled {
+                await MatchNotificationService.shared.scheduleMorningDigest(matches: allMatchesFlat)
+            }
+        }
+
+        // Phase 4: fetch video highlights from the 3 most recently finished games
+        // in the user's followed leagues. Runs after main content is visible.
+        let recentlyFinished = matchesByLeague
+            .filter { leagueIDs.contains($0.key) }
+            .values.flatMap { $0 }
+            .filter { $0.state == .final }
+            .sorted { $0.date > $1.date }
+            .prefix(3)
+
+        if !recentlyFinished.isEmpty {
+            var clips: [MatchHighlight] = []
+            await withTaskGroup(of: [MatchHighlight].self) { group in
+                for match in recentlyFinished {
+                    group.addTask { [service] in
+                        (try? await service.gameSummary(for: match.league, eventID: match.id))?.highlights ?? []
+                    }
+                }
+                for await matchClips in group {
+                    clips.append(contentsOf: matchClips)
+                }
+            }
+            recentHighlights = Array(clips.prefix(8))
         }
 
         if !Task.isCancelled, !matchesByLeague.isEmpty {
@@ -173,43 +255,83 @@ final class HomeViewModel: ObservableObject {
     }
 
     /// Recomputes the published sections from everything fetched so far.
-    private func rebuildSections(matchesByLeague: [String: [Match]], followedIDs: Set<String>, favoriteNames: Set<String>) {
+    private func rebuildSections(matchesByLeague: [String: [Match]], followedIDs: Set<String>, favoriteIDs: Set<String>, favoriteNames: Set<String>) {
+        let now = Date()
         let calendar = Calendar.current
-        let allMatches = matchesByLeague.values.flatMap { $0 }
-        let followedMatches = matchesByLeague
+        let allMatches = mergeMatches(matchesByLeague.values.flatMap { $0 })
+        let followedMatches = mergeMatches(matchesByLeague
             .filter { followedIDs.contains($0.key) }
-            .values.flatMap { $0 }
+            .values.flatMap { $0 })
+
+        // Score every match once up front; sorting with primeScore inside the
+        // comparator recomputes it O(n log n) times and dominated load time.
+        var scores: [String: Int] = [:]
+        scores.reserveCapacity(allMatches.count)
+        for match in allMatches {
+            scores[match.id] = primeScore(match, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+        }
+        func score(_ match: Match) -> Int { scores[match.id] ?? 0 }
 
         liveNow = allMatches
             .filter { $0.state == .live }
-            .sorted { primeScore($0, favoriteNames: favoriteNames) > primeScore($1, favoriteNames: favoriteNames) }
+            .sorted { score($0) > score($1) }
         favoriteTeamLiveMatches = liveNow
-            .filter { involvesFavorite($0, favoriteNames: favoriteNames) }
-        favoriteTeamMatchesToday = followedMatches
-            .filter { match in
-                calendar.isDateInToday(match.date) && involvesFavorite(match, favoriteNames: favoriteNames)
-            }
+            .filter { involvesFavorite($0, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames) }
+        favoriteTeamMatchesToday = allMatches
+            .filter { calendar.isDateInToday($0.date) && involvesFavorite($0, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames) }
             .sorted { $0.date < $1.date }
+        favoriteTeamUpcoming = allMatches
+            .filter { $0.state == .pre && $0.date >= now && involvesFavorite($0, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames) }
+            .sorted { $0.date < $1.date }
+        nextMatchesAcrossSports = allMatches
+            .filter { $0.state == .pre && $0.date >= now }
+            .sorted { $0.date < $1.date }
+            .prefix(3)
+            .map { $0 }
+        let soonWindow = now.addingTimeInterval(6 * 60 * 60)
+        startingSoon = allMatches
+            .filter { $0.state == .pre && $0.date > now && $0.date <= soonWindow }
+            .sorted { $0.date < $1.date }
+            .prefix(8)
+            .map { $0 }
         upcoming = followedMatches
-            .filter { $0.state == .pre && $0.date >= Date() }
-            .sorted { primeScore($0, favoriteNames: favoriteNames) > primeScore($1, favoriteNames: favoriteNames) }
+            .filter { $0.state == .pre && $0.date >= now }
+            .sorted { $0.date < $1.date }
             .prefix(12)
             .map { $0 }
-        featuredMatch = allMatches
-            .filter { featuredCalendar.matchingPick(for: $0) != nil }
-            .sorted { primeScore($0, favoriteNames: favoriteNames) > primeScore($1, favoriteNames: favoriteNames) }
-            .first
-        primeMatch = (liveNow + favoriteTeamMatchesToday + upcoming)
-            .sorted { primeScore($0, favoriteNames: favoriteNames) > primeScore($1, favoriteNames: favoriteNames) }
-            .first
+        var syncedFeaturedMatches = Dictionary(uniqueKeysWithValues: featuredPicks.map { ($0.id, $0.streamMatch) })
+        for match in allMatches.sorted(by: { score($0) > score($1) }) {
+            for pick in featuredCalendar.matchingPicks(for: match) {
+                syncedFeaturedMatches[pick.id] = match
+            }
+        }
+        featuredMatchesByPickID = syncedFeaturedMatches
+        primeMatch = (liveNow + favoriteTeamUpcoming + upcoming)
+            .max { score($0) < score($1) }
     }
 
-    private func primeScore(_ match: Match, favoriteNames: Set<String> = []) -> Int {
-        var score = eventDemandScore(match)
+    private func mergeMatches(_ matches: [Match]) -> [Match] {
+        var seenIDs: Set<String> = []
+        var unique: [Match] = []
+        for match in matches.sorted(by: { $0.date < $1.date }) where seenIDs.insert(match.id).inserted {
+            unique.append(match)
+        }
+        return unique
+    }
+
+    private func primeScore(_ match: Match, favoriteIDs: Set<String> = [], favoriteNames: Set<String> = []) -> Int {
+        var score = cachedDemandScore(match)
         if match.state == .live { score += 100 }
-        if involvesFavorite(match, favoriteNames: favoriteNames) { score += 50 }
+        if involvesFavorite(match, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames) { score += 50 }
         if !match.broadcasts.isEmpty { score += 20 }
         score -= max(0, Int(match.date.timeIntervalSinceNow / 3600))
+        return score
+    }
+
+    private func cachedDemandScore(_ match: Match) -> Int {
+        if let cached = demandScoreCache[match.id] { return cached }
+        let score = eventDemandScore(match)
+        demandScoreCache[match.id] = score
         return score
     }
 
@@ -236,45 +358,55 @@ final class HomeViewModel: ObservableObject {
         return score
     }
 
-    private func involvesFavorite(_ match: Match, favoriteNames: Set<String>) -> Bool {
-        guard !favoriteNames.isEmpty else { return false }
-        return favoriteNames.contains(match.home.displayName.lowercased()) || favoriteNames.contains(match.away.displayName.lowercased())
+    private func involvesFavorite(_ match: Match, favoriteIDs: Set<String>, favoriteNames: Set<String>) -> Bool {
+        guard !favoriteIDs.isEmpty || !favoriteNames.isEmpty else { return false }
+        let sides = [match.home, match.away]
+        return sides.contains { side in
+            if let teamID = side.teamID, favoriteIDs.contains("\(match.league.path)-\(teamID)") {
+                return true
+            }
+            return favoriteNames.contains(side.displayName.lowercased())
+        }
     }
 }
 
 private struct HomeHeroSection: View {
-    let featuredPick: FeaturedEventPick?
-    let featuredMatch: Match?
+    let featuredPicks: [FeaturedEventPick]
+    let featuredMatchesByPickID: [String: Match]
     let favoriteLiveMatches: [Match]
     let primeMatch: Match?
 
     private var favoriteLivePages: [Match] {
-        favoriteLiveMatches.filter { $0.id != featuredMatch?.id }
+        let featuredMatchIDs = Set(featuredMatchesByPickID.values.map(\.id))
+        return favoriteLiveMatches.filter { !featuredMatchIDs.contains($0.id) }
     }
 
     var body: some View {
-        let pageCount = (featuredPick == nil ? 0 : 1) + favoriteLivePages.count
-
-        if pageCount > 1 {
-            TabView {
-                if let featuredPick {
-                    FeaturedEventCard(pick: featuredPick, match: featuredMatch)
-                        .padding(.horizontal, 1)
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            let featuredPick = currentFeaturedPick(now: context.date)
+            if let featuredPick {
+                FeaturedEventCard(pick: featuredPick, match: featuredMatchesByPickID[featuredPick.id])
+            } else if favoriteLivePages.count > 1 {
+                TabView {
+                    ForEach(favoriteLivePages) { match in
+                        FavoriteLiveHeroCard(match: match)
+                            .padding(.horizontal, 1)
+                    }
                 }
-
-                ForEach(favoriteLivePages) { match in
-                    FavoriteLiveHeroCard(match: match)
-                        .padding(.horizontal, 1)
-                }
+                .tabViewStyle(.page(indexDisplayMode: .automatic))
+                .frame(height: 172)
+            } else if let favoriteMatch = favoriteLivePages.first {
+                FavoriteLiveHeroCard(match: favoriteMatch)
+            } else if let primeMatch {
+                PrimeMatchCard(match: primeMatch)
             }
-            .tabViewStyle(.page(indexDisplayMode: .automatic))
-            .frame(height: 172)
-        } else if let featuredPick {
-            FeaturedEventCard(pick: featuredPick, match: featuredMatch)
-        } else if let favoriteMatch = favoriteLivePages.first {
-            FavoriteLiveHeroCard(match: favoriteMatch)
-        } else if let primeMatch {
-            PrimeMatchCard(match: primeMatch)
+        }
+    }
+
+    private func currentFeaturedPick(now: Date) -> FeaturedEventPick? {
+        featuredPicks.first { pick in
+            guard let endDate = pick.endDate else { return true }
+            return endDate > now
         }
     }
 }
@@ -398,13 +530,10 @@ private struct FeaturedEventCard: View {
             let hours = (seconds % 86_400) / 3_600
             let minutes = (seconds % 3_600) / 60
 
-            HStack(spacing: 5) {
-                if days > 0 {
-                    countdownBlock(days, days == 1 ? "DAY" : "DAYS", color: Color(hex: 0xF5B84B))
-                }
-                countdownBlock(hours, "HR", color: accentColor)
-                countdownBlock(minutes, "MIN", color: Color(hex: 0x37C871))
-            }
+            premiumCountdown(firstValue: days > 0 ? days : hours,
+                             firstUnit: days > 0 ? (days == 1 ? "DAY" : "DAYS") : "HR",
+                             secondValue: days > 0 ? hours : minutes,
+                             secondUnit: days > 0 ? "HR" : "MIN")
         } else {
             Label(pick.hasKnownStartTime ? timeText : pick.scheduleStatus, systemImage: "bolt.fill")
                 .font(.caption.weight(.black))
@@ -417,18 +546,38 @@ private struct FeaturedEventCard: View {
         }
     }
 
-    private func countdownBlock(_ value: Int, _ unit: String, color: Color) -> some View {
-        HStack(spacing: 3) {
-            Text(String(format: "%02d", value))
-                .font(.system(size: 15, weight: .black, design: .rounded).monospacedDigit())
-            Text(unit)
+    private func premiumCountdown(firstValue: Int, firstUnit: String, secondValue: Int, secondUnit: String) -> some View {
+        HStack(spacing: 7) {
+            PulsingClockIcon(color: accentColor)
+
+            Text("STARTS IN")
                 .font(.system(size: 8, weight: .black))
-                .baselineOffset(1)
+                .foregroundStyle(.white.opacity(0.72))
+                .lineLimit(1)
+
+            VStack(spacing: 1) {
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text(String(format: "%02d", firstValue))
+                    Text(":")
+                        .foregroundStyle(accentColor)
+                    Text(String(format: "%02d", secondValue))
+                }
+                .font(.system(size: 16, weight: .black, design: .rounded).monospacedDigit())
+                .foregroundStyle(.white)
+
+                HStack(spacing: 18) {
+                    Text(firstUnit)
+                    Text(secondUnit)
+                }
+                .font(.system(size: 7, weight: .black))
+                .foregroundStyle(.white.opacity(0.55))
+            }
         }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .background(color, in: Capsule())
+        .padding(.horizontal, 10)
+        .frame(height: 40)
+        .background(Color(hex: 0x07101E, alpha: 0.82), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(accentColor.opacity(0.42)))
+        .shadow(color: accentColor.opacity(0.22), radius: 8, x: 0, y: 0)
     }
 
     @ViewBuilder private var action: some View {
@@ -444,16 +593,32 @@ private struct FeaturedEventCard: View {
     private func actionLabel(_ title: String, systemImage: String) -> some View {
         Label(title, systemImage: systemImage)
             .font(.caption.weight(.black))
-            .foregroundStyle(accentColor)
+            .foregroundStyle(.white)
             .lineLimit(1)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Color.white.opacity(0.08), in: Capsule())
-            .overlay(Capsule().strokeBorder(accentColor.opacity(0.3)))
+            .padding(.horizontal, 12)
+            .frame(height: 40)
+            .background(accentColor.opacity(0.92), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.white.opacity(0.22)))
+            .shadow(color: accentColor.opacity(0.28), radius: 10, x: 0, y: 0)
     }
 
     private var timeText: String {
         pick.hasKnownStartTime ? "\(pick.torontoTime) ET" : pick.scheduleStatus
+    }
+}
+
+private struct PulsingClockIcon: View {
+    let color: Color
+    @State private var pulsing = false
+
+    var body: some View {
+        Image(systemName: "clock.fill")
+            .font(.system(size: 11, weight: .black))
+            .foregroundStyle(color)
+            .scaleEffect(pulsing ? 1.08 : 0.94)
+            .opacity(pulsing ? 1 : 0.62)
+            .animation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: pulsing)
+            .onAppear { pulsing = true }
     }
 }
 
@@ -673,6 +838,8 @@ private struct ContinueWatchingCard: View {
 
 private struct LiveNowSection: View {
     let matches: [Match]
+    let nextMatches: [Match]
+    let startingSoon: [Match]
     @Binding var selectedSport: SportGroup?
 
     private var sports: [SportGroup] {
@@ -717,13 +884,18 @@ private struct LiveNowSection: View {
             }
 
             if matches.isEmpty {
-                Text("No games are live across ESPN right now.")
-                    .font(.callout)
-                    .foregroundStyle(Theme.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                if nextMatches.isEmpty {
+                    Text("No games are live across ESPN right now.")
+                        .font(.callout)
+                        .foregroundStyle(Theme.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                } else {
+                    startingSoonStrip(matches: startingSoon.isEmpty ? Array(nextMatches.prefix(3)) : startingSoon,
+                                      title: "Starting Soon")
+                }
             } else if displayedMatches.isEmpty {
                 Text("No live games for this sport right now.")
                     .font(.callout)
@@ -738,6 +910,34 @@ private struct LiveNowSection: View {
                         MatchRow(match: match)
                     }
                     .buttonStyle(.plain)
+                }
+
+                if !startingSoon.isEmpty {
+                    startingSoonStrip(matches: startingSoon, title: "Starting Soon")
+                        .padding(.top, 2)
+                }
+            }
+        }
+    }
+
+    private func startingSoonStrip(matches: [Match], title: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "clock.badge.fill")
+                Text(title.uppercased())
+                Spacer()
+            }
+            .font(.caption.weight(.heavy))
+            .foregroundStyle(Color(hex: 0xE0A83D))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(matches) { match in
+                        NavigationLink(value: match) {
+                            StartingSoonCard(match: match)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
         }
@@ -756,6 +956,123 @@ private struct LiveNowSection: View {
         .buttonStyle(.plain)
     }
 }
+
+// MARK: - Starting Soon
+
+private struct StartingSoonSection: View {
+    let matches: [Match]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "clock.badge.fill")
+                Text("Starting Soon")
+                Spacer()
+            }
+            .font(.headline.weight(.bold))
+            .foregroundStyle(Color(hex: 0xE0A83D))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(matches) { match in
+                        NavigationLink(value: match) {
+                            StartingSoonCard(match: match)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct StartingSoonCard: View {
+    let match: Match
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            cardContent(now: context.date)
+        }
+    }
+
+    private func cardContent(now: Date) -> some View {
+        let seconds = max(0, Int(match.date.timeIntervalSince(now)))
+        let hours = seconds / 3600
+        let minutes = (seconds % 3600) / 60
+        let secs = seconds % 60
+
+        return VStack(spacing: 10) {
+            HStack(spacing: 0) {
+                TeamLogo(url: match.away.logoURL, size: 30)
+                Text("vs")
+                    .font(.caption2.weight(.heavy))
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(.horizontal, 5)
+                TeamLogo(url: match.home.logoURL, size: 30)
+            }
+
+            Text(match.shortName)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(width: 108)
+
+            VStack(spacing: 2) {
+                if hours > 0 {
+                    Text(String(format: "%dh %02dm", hours, minutes))
+                        .font(.system(size: 14, weight: .black, design: .rounded).monospacedDigit())
+                        .foregroundStyle(Color(hex: 0xE0A83D))
+                } else if minutes > 0 {
+                    Text(String(format: "%d:%02d", minutes, secs))
+                        .font(.system(size: 14, weight: .black, design: .rounded).monospacedDigit())
+                        .foregroundStyle(minutes < 10 ? Theme.live : Color(hex: 0xE0A83D))
+                } else {
+                    Text("SOON")
+                        .font(.system(size: 14, weight: .black).monospacedDigit())
+                        .foregroundStyle(Theme.live)
+                }
+
+                Text(match.league.shortName.uppercased())
+                    .font(.caption2.weight(.heavy))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
+        .frame(width: 132)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(seconds < 600 ? Color(hex: 0xE0A83D).opacity(0.5) : Theme.hairline))
+    }
+}
+
+// MARK: - Recent highlights strip
+
+private struct RecentHighlightsSection: View {
+    let highlights: [MatchHighlight]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "play.circle.fill")
+                Text("Recent Highlights")
+                    .font(.headline.weight(.bold))
+                Spacer()
+            }
+            .foregroundStyle(Theme.accent)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(highlights) { clip in
+                        HighlightCard(clip: clip)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Home section list
 
 private struct HomeSection: View {
     let title: String

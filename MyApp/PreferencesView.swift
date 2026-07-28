@@ -15,7 +15,7 @@ struct PreferencesView: View {
                     onboardingSection
                 }
                 .listStyle(.plain)
-                .scrollContentBackground(.hidden)
+                .hidesScrollContentBackground()
             }
             .navigationTitle("Preferences")
             .toolbar {

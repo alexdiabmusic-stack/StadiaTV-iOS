@@ -34,19 +34,21 @@ struct PlaylistsView: View {
             ForEach(store.playlists) { playlist in
                 PlaylistRow(playlist: playlist)
                     .listRowBackground(Theme.surface)
+                    #if !os(tvOS)
                     .listRowSeparatorTint(Theme.hairline)
+                    #endif
             }
             .onDelete { store.remove(at: $0) }
         }
         .listStyle(.plain)
-        .scrollContentBackground(.hidden)
+        .hidesScrollContentBackground()
         .refreshable { await store.refreshAll() }
     }
 
     private var emptyState: some View {
         VStack(spacing: 16) {
             Image(systemName: "list.and.film")
-                .font(.system(size: 50))
+                .font(.system(size: Theme.scaled(50)))
                 .foregroundStyle(Theme.accent)
             Text("No Playlists Yet")
                 .font(.title2.weight(.bold))
@@ -172,7 +174,7 @@ struct AddPlaylistView: View {
                     .listRowBackground(Theme.surface)
                 }
             }
-            .scrollContentBackground(.hidden)
+            .hidesScrollContentBackground()
             .background(Theme.background)
             .navigationTitle("Add Playlist")
             .toolbar {

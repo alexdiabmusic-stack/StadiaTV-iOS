@@ -9,6 +9,8 @@ enum SportGroup: String, CaseIterable, Identifiable {
     case baseball = "Baseball"
     case hockey = "Hockey"
     case soccer = "Soccer"
+    case golf = "Golf"
+    case racing = "Racing"
 
     var id: String { rawValue }
 
@@ -19,6 +21,8 @@ enum SportGroup: String, CaseIterable, Identifiable {
         case .baseball: return "baseball.fill"
         case .hockey: return "hockey.puck.fill"
         case .soccer: return "soccerball"
+        case .golf: return "figure.golf"
+        case .racing: return "flag.checkered"
         }
     }
 }
@@ -113,6 +117,26 @@ struct League: Identifiable, Hashable {
                keywords: ["world cup", "fifa", "soccer"]),
         League(name: "Women's World Cup", shortName: "WWC", path: "soccer/fifa.wwc", group: .soccer,
                keywords: ["women's world cup", "fifa", "soccer"]),
+        // Golf
+        League(name: "PGA Tour", shortName: "PGA", path: "golf/pga", group: .golf,
+               keywords: ["pga", "pga tour", "golf", "open championship", "masters", "us open", "pga championship"]),
+        League(name: "LPGA", shortName: "LPGA", path: "golf/lpga", group: .golf,
+               keywords: ["lpga", "women's golf", "golf"]),
+        League(name: "PGA Tour Champions", shortName: "Champions", path: "golf/champions-tour", group: .golf,
+               keywords: ["pga tour champions", "senior open", "champions tour", "golf"]),
+        League(name: "European Tour", shortName: "DP World", path: "golf/eur", group: .golf,
+               keywords: ["european tour", "dp world tour", "golf"]),
+        // Racing
+        League(name: "Formula 1", shortName: "F1", path: "racing/f1", group: .racing,
+               keywords: ["f1", "formula 1", "formula one", "grand prix", "racing"]),
+        League(name: "NASCAR Cup Series", shortName: "NASCAR", path: "racing/nascar-premier", group: .racing,
+               keywords: ["nascar", "cup series", "stock car", "racing"]),
+        League(name: "NASCAR Truck Series", shortName: "Trucks", path: "racing/nascar-truck", group: .racing,
+               keywords: ["nascar truck", "truck series", "craftsman truck", "racing"]),
+        League(name: "IndyCar Series", shortName: "IndyCar", path: "racing/irl", group: .racing,
+               keywords: ["indycar", "indy car", "irl", "indianapolis", "racing"]),
+        League(name: "NHRA", shortName: "NHRA", path: "racing/nhra", group: .racing,
+               keywords: ["nhra", "drag racing", "racing"]),
     ]
 
     static func leagues(in group: SportGroup) -> [League] {
@@ -161,6 +185,65 @@ struct Match: Identifiable, Hashable {
 
     static func == (lhs: Match, rhs: Match) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+// MARK: - Racing
+
+/// A single entrant in a racing event (e.g. an F1 driver) with constructor/team info,
+/// synced from the ESPN scoreboard.
+struct Racer: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let shortName: String
+    let teamName: String
+    let place: Int?
+    let flagURL: URL?
+    let isWinner: Bool
+}
+
+// MARK: - Stream languages
+
+/// A language a stream can be tagged with in playlist channel names (e.g. "EN: Sky Sports").
+struct StreamLanguage: Identifiable, Hashable {
+    let code: String   // lowercase tag used in channel names, e.g. "en"
+    let name: String
+
+    var id: String { code }
+
+    nonisolated static let all: [StreamLanguage] = [
+        StreamLanguage(code: "en", name: "English"),
+        StreamLanguage(code: "es", name: "Spanish"),
+        StreamLanguage(code: "fr", name: "French"),
+        StreamLanguage(code: "de", name: "German"),
+        StreamLanguage(code: "it", name: "Italian"),
+        StreamLanguage(code: "pt", name: "Portuguese"),
+        StreamLanguage(code: "nl", name: "Dutch"),
+        StreamLanguage(code: "ar", name: "Arabic"),
+        StreamLanguage(code: "tr", name: "Turkish"),
+        StreamLanguage(code: "pl", name: "Polish"),
+        StreamLanguage(code: "ru", name: "Russian"),
+        StreamLanguage(code: "el", name: "Greek"),
+    ]
+
+    /// Other whole-word tokens that identify this language in channel names,
+    /// including common country prefixes ("US:", "UK|") used by playlists.
+    nonisolated var aliases: [String] {
+        switch code {
+        case "en": return ["english", "eng", "uk", "us", "usa", "ca", "au"]
+        case "es": return ["spanish", "espanol", "esp", "mx", "latino"]
+        case "fr": return ["french", "francais", "fra"]
+        case "de": return ["german", "deutsch", "ger"]
+        case "it": return ["italian", "italiano", "ita"]
+        case "pt": return ["portuguese", "portugues", "br", "brazil"]
+        case "nl": return ["dutch", "nederlands"]
+        case "ar": return ["arabic", "arab"]
+        case "tr": return ["turkish", "turk"]
+        case "pl": return ["polish", "polska"]
+        case "ru": return ["russian"]
+        case "el": return ["greek", "gr"]
+        default: return []
+        }
+    }
 }
 
 // MARK: - Playlists

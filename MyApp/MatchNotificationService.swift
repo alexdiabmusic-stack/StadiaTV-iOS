@@ -1,6 +1,20 @@
 import Foundation
 import UserNotifications
 
+#if os(tvOS)
+/// tvOS notifications support badges only, so match reminders are a no-op there.
+@MainActor
+final class MatchNotificationService {
+    static let shared = MatchNotificationService()
+
+    private init() {}
+
+    func requestAuthorization() async -> Bool { false }
+    func syncNotifications(matches: [Match], favorites: [FavoriteTeam], leadTime: MatchReminderLeadTime) async {}
+    func scheduleMorningDigest(matches: [Match]) async {}
+    func removeAllMatchNotifications() {}
+}
+#else
 @MainActor
 final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate {
     static let shared = MatchNotificationService()
@@ -48,6 +62,34 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
             await scheduleLiveNotificationIfNeeded(for: match)
             await scheduleCloseGameNotificationIfNeeded(for: match)
         }
+    }
+
+    func scheduleMorningDigest(matches: [Match]) async {
+        let settings = await center.notificationSettings()
+        guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+
+        center.removePendingNotificationRequests(withIdentifiers: ["stadiatv.morning.digest"])
+
+        let calendar = Calendar.current
+        let todayMatches = matches
+            .filter { calendar.isDateInToday($0.date) && $0.state != .final }
+            .sorted { $0.date < $1.date }
+
+        guard !todayMatches.isEmpty else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Today in Sports"
+        let names = todayMatches.prefix(3).map(\.shortName).joined(separator: "  ·  ")
+        let count = todayMatches.count
+        content.body = "\(count) game\(count == 1 ? "" : "s") today: \(names)"
+        content.sound = .default
+
+        var dateComponents = DateComponents()
+        dateComponents.hour = 8
+        dateComponents.minute = 0
+        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
+        let request = UNNotificationRequest(identifier: "stadiatv.morning.digest", content: content, trigger: trigger)
+        try? await center.add(request)
     }
 
     func removeAllMatchNotifications() {
@@ -112,6 +154,7 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
         case .football: return spread <= 8
         case .basketball: return spread <= 5
         case .baseball, .hockey, .soccer: return spread <= 1
+        case .golf, .racing: return false
         }
     }
 
@@ -126,3 +169,4 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
         return formatter.string(from: date)
     }
 }
+#endif

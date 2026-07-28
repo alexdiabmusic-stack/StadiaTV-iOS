@@ -1,14 +1,27 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+import SafariServices
+#endif
 
 struct MatchDetailView: View {
     let match: Match
     @EnvironmentObject private var playlists: PlaylistStore
+    @EnvironmentObject private var prefs: PreferencesStore
+    @EnvironmentObject private var entitlements: EntitlementStore
+    @EnvironmentObject private var predictions: PredictionsStore
     @State private var showingAllChannels = false
+    @State private var spoilerRevealed = false
     @State private var playingChannel: Channel?
     @State private var isPickingMultiscreen = false
-    @State private var selectedMultiChannelIDs: Set<String> = []
+    @State private var multiscreenSlots: [MultiscreenSlot] = []
+    @State private var liveMatchesForMultiscreen: [LiveGameOption] = []
+    @State private var isLoadingLiveGames = false
+    @State private var multiscreenShowAllSports = false
+    @State private var multiscreenSportFilter: SportGroup? = nil
     @State private var multiscreenSession: MultiscreenSession?
     @State private var gameSummary: GameSummary?
+    @State private var showPaywall = false
     // Ranking a big playlist is expensive, so it runs once off the main thread
     // instead of inside every body evaluation.
     @State private var rankedSources: [RankedSource] = []
@@ -20,6 +33,7 @@ struct MatchDetailView: View {
     @State private var isShowingFullRosterPreview = false
     @State private var odds: MatchOddsDisplay?
     @State private var isLoadingOdds = false
+    @State private var showPickCelebration = false
 
     private var filteredMatchedSources: [RankedSource] {
         guard showingAllChannels else { return Array(rankedSources.prefix(3)) }
@@ -39,8 +53,8 @@ struct MatchDetailView: View {
         (selectedGameCenterTeam == .away ? match.away : match.home).teamID
     }
 
-    private var selectedMultiScreenChannels: [Channel] {
-        displayedChannels.filter { selectedMultiChannelIDs.contains($0.id) }
+    private var selectedMultiscreenChannels: [Channel] {
+        multiscreenSlots.compactMap { $0.channel }
     }
 
     var body: some View {
@@ -49,9 +63,28 @@ struct MatchDetailView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     scoreboard
-                    sourcesSection
-                    gameCenterSection
-                    inGameStatsSection
+                    picksSection
+                    headToHeadSection
+                    if match.state == .final {
+                        highlightsSection
+                        scoringSummarySection
+                        inGameStatsSection
+                    }
+                    if match.state != .final {
+                        sourcesSection
+                    }
+                    if match.league.group == .racing {
+                        RacersSection(league: match.league)
+                    } else {
+                        gameCenterSection
+                    }
+                    if match.state != .final {
+                        inGameStatsSection
+                    }
+                    playByPlaySection
+                    if match.state != .final {
+                        highlightsSection
+                    }
                 }
                 .padding(16)
                 .padding(.bottom, isPickingMultiscreen ? 92 : 0)
@@ -65,8 +98,13 @@ struct MatchDetailView: View {
         .sheet(item: $playingChannel) { channel in
             PlayerView(channel: channel)
         }
-        .sheet(item: $multiscreenSession) { session in
+        .fullScreenCover(item: $multiscreenSession) { session in
             MultiScreenPlayerView(channels: session.channels)
+        }
+        .sheet(isPresented: $showPaywall) {
+            PaywallView()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         .task(id: match.id) {
             await loadGameSummary()
@@ -74,7 +112,7 @@ struct MatchDetailView: View {
         .task(id: match.id) {
             await loadOdds()
         }
-        .task(id: playlists.allChannels.count) {
+        .task(id: "\(playlists.allChannels.count)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))") {
             await rankSources()
         }
         .task(id: selectedTeamID) {
@@ -86,10 +124,17 @@ struct MatchDetailView: View {
 
     /// Scores the playlist channels against this match off the main thread.
     private func rankSources() async {
+        guard match.state != .final else {
+            rankedSources = []
+            isRankingSources = false
+            return
+        }
+
         let channels = playlists.allChannels
         let match = self.match
+        let preferredLanguages = prefs.preferredStreamLanguages
         let ranked = await Task.detached(priority: .userInitiated) {
-            SourceMatcher.rank(match: match, channels: channels)
+            SourceMatcher.rank(match: match, channels: channels, preferredLanguages: preferredLanguages)
         }.value
         rankedSources = Array(ranked.prefix(30))
         isRankingSources = false
@@ -134,6 +179,17 @@ struct MatchDetailView: View {
                 VStack(spacing: 4) {
                     if match.state == .pre {
                         Text("VS").font(.headline).foregroundStyle(Theme.textSecondary)
+                    } else if prefs.spoilerFreeMode && match.state == .final && !spoilerRevealed {
+                        VStack(spacing: 6) {
+                            Text("? – ?")
+                                .font(.title.weight(.heavy).monospacedDigit())
+                                .foregroundStyle(Theme.textSecondary)
+                            Button("Reveal Score") {
+                                withAnimation(.snappy) { spoilerRevealed = true }
+                            }
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Theme.accent)
+                        }
                     } else {
                         Text("\(match.away.score ?? "-")  –  \(match.home.score ?? "-")")
                             .font(.title.weight(.heavy).monospacedDigit())
@@ -282,30 +338,49 @@ struct MatchDetailView: View {
 
     @ViewBuilder private var inGameStatsSection: some View {
         if let summary = gameSummary, match.state != .pre, !summary.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "chart.bar.xaxis")
-                    Text(match.state == .live ? "In-Game Stats" : "Game Stats")
-                    Spacer()
-                    if match.state == .live {
-                        Text("LIVE")
-                            .font(.caption2.weight(.heavy))
-                            .foregroundStyle(Theme.live)
-                    }
+            if entitlements.isPremium {
+                inGameStatsBody(summary: summary)
+            } else {
+                ZStack {
+                    inGameStatsBody(summary: summary)
+                        .blur(radius: 8)
+                        .allowsHitTesting(false)
+                    PremiumGateOverlay(
+                        icon: "chart.bar.xaxis",
+                        title: "Game Stats",
+                        description: "Live boxscore comparison, game leaders and in-game analytics.",
+                        showPaywall: $showPaywall
+                    )
                 }
-                .font(.headline.weight(.bold))
-                .foregroundStyle(Theme.accent)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+        }
+    }
 
-                let awayBox = teamBox(for: match.away, fallbackIndex: 0)
-                let homeBox = teamBox(for: match.home, fallbackIndex: 1)
-
-                if let awayBox, let homeBox, !awayBox.stats.isEmpty {
-                    statComparison(away: awayBox, home: homeBox)
+    @ViewBuilder private func inGameStatsBody(summary: GameSummary) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "chart.bar.xaxis")
+                Text(match.state == .live ? "In-Game Stats" : "Game Stats")
+                Spacer()
+                if match.state == .live {
+                    Text("LIVE")
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(Theme.live)
                 }
+            }
+            .font(.headline.weight(.bold))
+            .foregroundStyle(Theme.accent)
 
-                if !summary.leaders.isEmpty {
-                    gameLeaders(summary.leaders)
-                }
+            let awayBox = teamBox(for: match.away, fallbackIndex: 0)
+            let homeBox = teamBox(for: match.home, fallbackIndex: 1)
+
+            if let awayBox, let homeBox, !awayBox.stats.isEmpty {
+                statComparison(away: awayBox, home: homeBox)
+            }
+
+            if !summary.leaders.isEmpty {
+                gameLeaders(summary.leaders)
             }
         }
     }
@@ -390,9 +465,266 @@ struct MatchDetailView: View {
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
     }
 
+    // MARK: Scoring / Play by Play
+
+    private var scoringPlays: [PlayByPlayEntry] {
+        gameSummary?.plays.filter(\.isScoringPlay) ?? []
+    }
+
+    @ViewBuilder private var scoringSummarySection: some View {
+        if match.state == .final, !scoringPlays.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "sportscourt.fill")
+                    Text("Scoring Summary")
+                    Spacer()
+                }
+                .font(.headline.weight(.bold))
+                .foregroundStyle(Theme.accent)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(scoringPlays.prefix(12).enumerated()), id: \.element.id) { index, play in
+                        ScoringPlayRow(play: play, match: match)
+                        if index < min(scoringPlays.count, 12) - 1 {
+                            Divider().overlay(Theme.hairline)
+                        }
+                    }
+                }
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+            }
+        }
+    }
+
+    @ViewBuilder private var playByPlaySection: some View {
+        if let summary = gameSummary, match.state != .pre, !summary.plays.isEmpty {
+            if entitlements.isPremium {
+                PlayByPlaySectionView(plays: summary.plays, match: match)
+            } else {
+                ZStack {
+                    PlayByPlaySectionView(plays: Array(summary.plays.prefix(4)), match: match)
+                        .blur(radius: 7)
+                        .allowsHitTesting(false)
+                    PremiumGateOverlay(
+                        icon: "list.bullet.clipboard.fill",
+                        title: "Play by Play",
+                        description: "Real-time feed of every key moment as it happens.",
+                        showPaywall: $showPaywall
+                    )
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+        }
+    }
+
+    // MARK: Picks & Predictions
+
+    @ViewBuilder private var picksSection: some View {
+        if match.state == .pre || predictions.hasPrediction(for: match.id) {
+            let existing = predictions.prediction(for: match.id)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "trophy.fill")
+                    Text(existing == nil ? "Make Your Pick" : "Your Pick")
+                    Spacer()
+                    if let p = existing, let correct = p.isCorrect {
+                        Label(correct ? "Correct" : "Incorrect",
+                              systemImage: correct ? "checkmark.circle.fill" : "xmark.circle.fill")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(correct ? Color(hex: 0x3DBE6B) : Theme.live)
+                    }
+                }
+                .font(.headline.weight(.bold))
+                .foregroundStyle(Theme.accent)
+
+                if let p = existing {
+                    HStack(spacing: 8) {
+                        Image(systemName: p.pick.systemImage)
+                        Text(p.pick.label(away: match.away.shortName, home: match.home.shortName))
+                            .fontWeight(.semibold)
+                        Spacer()
+                        if !p.isResolved {
+                            Text("Pending result")
+                                .font(.caption)
+                                .foregroundStyle(Theme.textSecondary)
+                        } else if let pts = p.pointsEarned {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                if pts > 0 {
+                                    Text("+\(pts) pts")
+                                        .font(.subheadline.weight(.heavy))
+                                        .foregroundStyle(Color(hex: 0x3DBE6B))
+                                }
+                                if let streak = p.streakAtTime, streak >= 2 {
+                                    Text("🔥 \(streak) streak")
+                                        .font(.caption2.weight(.bold))
+                                        .foregroundStyle(Color(hex: 0xFF6B35))
+                                }
+                            }
+                        }
+                    }
+                    .foregroundStyle(Theme.accent)
+                } else {
+                    HStack(spacing: 10) {
+                        pickButton(.away, label: match.away.shortName)
+                        if match.league.group == .soccer {
+                            pickButton(.draw, label: "Draw")
+                        }
+                        pickButton(.home, label: match.home.shortName)
+                    }
+                }
+            }
+            .padding(16)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+            .overlay(alignment: .top) {
+                if showPickCelebration, let pts = existing?.pointsEarned, pts > 0 {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                        Text("You called it! +\(pts) pts")
+                        if let streak = existing?.streakAtTime, streak >= 2 {
+                            Text("🔥 \(streak)")
+                        }
+                    }
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(hex: 0x3DBE6B), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .padding(.top, -8)
+                }
+            }
+            .clipped()
+            .animation(.spring(response: 0.4), value: showPickCelebration)
+            .sensoryFeedback(.success, trigger: showPickCelebration) { _, new in new }
+            .task(id: match.id) {
+                predictions.resolveIfNeeded(for: match)
+            }
+            .onChange(of: predictions.prediction(for: match.id)?.isCorrect) { _, newValue in
+                if newValue == true {
+                    withAnimation { showPickCelebration = true }
+                    Task {
+                        try? await Task.sleep(nanoseconds: 2_500_000_000)
+                        withAnimation { showPickCelebration = false }
+                    }
+                }
+            }
+        }
+    }
+
+    private func pickButton(_ outcome: PickOutcome, label: String) -> some View {
+        Button {
+            predictions.place(pick: outcome, for: match)
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: outcome.systemImage)
+                    .font(.title3)
+                Text(label)
+                    .font(.caption.weight(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(match.state != .pre)
+    }
+
+    // MARK: Head-to-Head
+
+    @ViewBuilder private var headToHeadSection: some View {
+        if let h2h = gameSummary?.headToHead {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.left.arrow.right.circle.fill")
+                    Text("Head to Head")
+                    Spacer()
+                    Text(h2h.label)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                .font(.headline.weight(.bold))
+                .foregroundStyle(Theme.accent)
+
+                HStack(spacing: 0) {
+                    h2hStatColumn(value: "\(h2h.awayWins)", label: match.away.shortName)
+                    if h2h.draws > 0 {
+                        h2hStatColumn(value: "\(h2h.draws)", label: "Draws")
+                    }
+                    h2hStatColumn(value: "\(h2h.homeWins)", label: match.home.shortName)
+                }
+                .padding(.horizontal, 8)
+            }
+            .padding(16)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+        }
+    }
+
+    private func h2hStatColumn(value: String, label: String) -> some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(.title2.weight(.heavy).monospacedDigit())
+                .foregroundStyle(Theme.textPrimary)
+            Text(label)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Theme.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: Highlights
+
+    @ViewBuilder private var highlightsSection: some View {
+        if let highlights = gameSummary?.highlights, !highlights.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "play.circle.fill")
+                    Text("Highlights")
+                    Spacer()
+                }
+                .font(.headline.weight(.bold))
+                .foregroundStyle(Theme.accent)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(highlights) { clip in
+                            HighlightCard(clip: clip)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: Game Center (premium ESPN data)
 
-    private var gameCenterSection: some View {
+    @ViewBuilder private var gameCenterSection: some View {
+        if entitlements.isPremium {
+            gameCenterContent
+        } else {
+            ZStack {
+                gameCenterContent
+                    .blur(radius: 8)
+                    .allowsHitTesting(false)
+                PremiumGateOverlay(
+                    icon: "sparkles",
+                    title: "Game Center",
+                    description: "Roster, live leaders, standings preview and deep team stats.",
+                    showPaywall: $showPaywall
+                )
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+    }
+
+    private var gameCenterContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "sparkles")
@@ -411,7 +743,7 @@ struct MatchDetailView: View {
             selectedTeamHub
             MatchStandingsPreview(league: match.league, highlightedTeamIDs: Set([match.away.teamID, match.home.teamID].compactMap { $0 }))
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 10)], spacing: 10) {
                 gameCenterTile(title: "Leaders", subtitle: match.league.shortName, systemImage: "chart.bar.fill") {
                     LeadersView(league: match.league)
                 }
@@ -449,7 +781,7 @@ struct MatchDetailView: View {
                                   selectedPosition: $selectedRosterPosition,
                                   isShowingAll: $isShowingFullRosterPreview)
 
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 10)], spacing: 10) {
                     gameCenterTile(title: "Players", subtitle: "Roster", systemImage: "person.3.fill") {
                         TeamRosterView(league: match.league, teamID: teamID, teamName: team.shortName)
                     }
@@ -663,7 +995,7 @@ struct MatchDetailView: View {
             switch sport {
             case .basketball, .hockey: return 1.58
             case .baseball: return 1.05
-            case .football: return 1.9
+            case .football, .golf, .racing: return 1.9
             case .soccer: return 1.52
             }
         }
@@ -706,6 +1038,8 @@ struct MatchDetailView: View {
             case .basketball: return Color(hex: 0x5A3520)
             case .baseball: return Color(hex: 0x234329)
             case .hockey: return Color(hex: 0xD7E4EF)
+            case .golf: return Color(hex: 0x1B3B2A)
+            case .racing: return Color(hex: 0x2A2C31)
             }
         }
 
@@ -721,6 +1055,8 @@ struct MatchDetailView: View {
                 BaseballDiamondLines()
             case .hockey:
                 HockeyRinkLines()
+            case .golf, .racing:
+                EmptyView()
             }
         }
     }
@@ -778,6 +1114,7 @@ struct MatchDetailView: View {
             case .basketball: mapped = basketballPoint(for: key)
             case .baseball: mapped = baseballPoint(for: key)
             case .hockey: mapped = hockeyPoint(for: key)
+            case .golf, .racing: mapped = nil
             }
             return jitter(mapped ?? fallbackPoint(for: fallbackIndex), index: fallbackIndex)
         }
@@ -1014,7 +1351,13 @@ struct MatchDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             sourcesHeader
 
-            if playlists.allChannels.isEmpty {
+            if playlists.allChannels.count >= 2 && !isPickingMultiscreen {
+                splitScreenButton
+            }
+
+            if isPickingMultiscreen {
+                multiscreenPickerContent
+            } else if playlists.allChannels.isEmpty {
                 noPlaylistsHint
             } else if showingAllChannels {
                 channelSearchField
@@ -1033,8 +1376,8 @@ struct MatchDetailView: View {
                                       subtitle: source.channel.group ?? source.channel.playlistName,
                                       logoURL: source.channel.logoURL,
                                       score: source.score,
-                                      isPicking: isPickingMultiscreen,
-                                      isSelected: selectedMultiChannelIDs.contains(source.channel.id)) {
+                                      isPicking: false,
+                                      isSelected: false) {
                                 handleSourceTap(source.channel)
                             }
                         }
@@ -1060,8 +1403,8 @@ struct MatchDetailView: View {
                                   subtitle: source.channel.group ?? source.channel.playlistName,
                                   logoURL: source.channel.logoURL,
                                   score: source.score,
-                                  isPicking: isPickingMultiscreen,
-                                  isSelected: selectedMultiChannelIDs.contains(source.channel.id)) {
+                                  isPicking: false,
+                                  isSelected: false) {
                             handleSourceTap(source.channel)
                         }
                     }
@@ -1088,6 +1431,297 @@ struct MatchDetailView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: Multiscreen game picker
+
+    @ViewBuilder private var multiscreenPickerContent: some View {
+        // Slot 1: This game
+        multiscreenGameSlot(
+            label: "\(match.shortName) — This Game",
+            leagueShortName: match.league.shortName,
+            sources: Array(rankedSources.prefix(3)),
+            matchID: match.id,
+            canRemove: false
+        )
+
+        // Additional live games section
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Circle().fill(Theme.live).frame(width: 7, height: 7)
+                Text("Add Live Games")
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(Theme.textPrimary)
+                Spacer()
+                Text("\(multiscreenSlots.count)/4 slots")
+                    .font(.caption.weight(.bold).monospacedDigit())
+                    .foregroundStyle(Theme.textSecondary)
+            }
+
+            Picker("Sport filter", selection: $multiscreenShowAllSports) {
+                Text("My Favorites").tag(false)
+                Text("All Sports").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: multiscreenShowAllSports) { _, _ in
+                liveMatchesForMultiscreen = []
+                multiscreenSportFilter = nil
+                Task { await loadLiveGamesForMultiscreen() }
+            }
+
+            if isLoadingLiveGames {
+                HStack(spacing: 10) {
+                    ProgressView().tint(Theme.accent)
+                    Text("Finding live games in your leagues…")
+                        .font(.callout)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(16)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+            } else if liveMatchesForMultiscreen.isEmpty {
+                Text("No other live games found right now.")
+                    .font(.callout)
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+            } else {
+                // Sport filter chips
+                let availableSports = SportGroup.allCases.filter { sport in
+                    liveMatchesForMultiscreen.contains { $0.match.league.group == sport }
+                }
+                if availableSports.count > 1 {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            multiscreenSportChip(title: "All", systemImage: "sportscourt", sport: nil)
+                            ForEach(availableSports) { sport in
+                                multiscreenSportChip(title: sport.rawValue, systemImage: sport.systemImage, sport: sport)
+                            }
+                        }
+                    }
+                }
+
+                let filtered = multiscreenSportFilter == nil
+                    ? liveMatchesForMultiscreen
+                    : liveMatchesForMultiscreen.filter { $0.match.league.group == multiscreenSportFilter }
+
+                if filtered.isEmpty {
+                    Text("No live games for this sport right now.")
+                        .font(.callout)
+                        .foregroundStyle(Theme.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                } else {
+                    LazyVStack(spacing: 10) {
+                        ForEach(filtered) { option in
+                            let isAdded = multiscreenSlots.contains { $0.matchID == option.match.id }
+                            multiscreenLiveGameCard(option: option, isAdded: isAdded)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func multiscreenGameSlot(label: String, leagueShortName: String, sources: [RankedSource], matchID: String, canRemove: Bool) -> some View {
+        let selectedChannelID = multiscreenSlots.first { $0.matchID == matchID }?.channel?.id
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
+                    Text(leagueShortName)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                Spacer()
+                if canRemove {
+                    Button {
+                        withAnimation(.snappy) {
+                            multiscreenSlots.removeAll { $0.matchID == matchID }
+                        }
+                        #if os(iOS)
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        #endif
+                    } label: {
+                        Image(systemName: "minus.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(Theme.live)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if sources.isEmpty {
+                Text("No matching sources found for this game.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(sources) { source in
+                            let isSelected = selectedChannelID == source.channel.id
+                            Button {
+                                multiscreenSelectChannel(source.channel, forMatchID: matchID)
+                            } label: {
+                                Text(source.channel.name)
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(1)
+                                    .foregroundStyle(isSelected ? .white : Theme.textPrimary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(isSelected ? Theme.accent : Theme.surfaceElevated, in: Capsule())
+                                    .overlay(Capsule().strokeBorder(isSelected ? Theme.accent : Theme.hairline))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .strokeBorder(selectedChannelID != nil ? Theme.accent.opacity(0.45) : Theme.hairline))
+    }
+
+    @ViewBuilder private func multiscreenLiveGameCard(option: LiveGameOption, isAdded: Bool) -> some View {
+        let canAddMore = multiscreenSlots.count < 4
+        let selectedChannelID = multiscreenSlots.first { $0.matchID == option.match.id }?.channel?.id
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 10) {
+                // MatchRow-style match info
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Text(option.match.league.shortName)
+                            .font(.caption2.weight(.heavy))
+                            .foregroundStyle(Theme.textSecondary)
+                        Spacer(minLength: 0)
+                        Label(option.match.statusDetail, systemImage: "dot.radiowaves.left.and.right")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                            .padding(.horizontal, 8).padding(.vertical, 4)
+                            .background(Theme.live, in: Capsule())
+                    }
+                    VStack(spacing: 8) {
+                        multiscreenTeamRow(option.match.away)
+                        multiscreenTeamRow(option.match.home)
+                    }
+                }
+
+                Button {
+                    withAnimation(.snappy) { toggleMultiscreenLiveGame(option) }
+                    #if os(iOS)
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    #endif
+                } label: {
+                    Image(systemName: isAdded ? "minus.circle.fill" : "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(isAdded ? Theme.live : (canAddMore ? Theme.accent : Theme.textSecondary.opacity(0.4)))
+                }
+                .buttonStyle(.plain)
+                .disabled(!isAdded && !canAddMore)
+                .padding(.top, 2)
+            }
+            .padding(14)
+
+            if isAdded {
+                Divider().overlay(Theme.hairline).padding(.horizontal, 14)
+                if option.topSources.isEmpty {
+                    Text("No matching sources found.")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                        .padding(14)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(option.topSources) { source in
+                                let isSelected = selectedChannelID == source.channel.id
+                                Button {
+                                    multiscreenSelectChannel(source.channel, forMatchID: option.match.id)
+                                } label: {
+                                    Text(source.channel.name)
+                                        .font(.caption.weight(.semibold))
+                                        .lineLimit(1)
+                                        .foregroundStyle(isSelected ? .white : Theme.textPrimary)
+                                        .padding(.horizontal, 12).padding(.vertical, 7)
+                                        .background(isSelected ? Theme.accent : Theme.surfaceElevated, in: Capsule())
+                                        .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Theme.hairline))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                    }
+                    .padding(.vertical, 10)
+                }
+            }
+        }
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .strokeBorder(isAdded ? Theme.accent.opacity(0.45) : Theme.hairline))
+    }
+
+    private func multiscreenTeamRow(_ team: TeamSide) -> some View {
+        HStack(spacing: 10) {
+            TeamLogo(url: team.logoURL, size: 28)
+            Text(team.shortName)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+            Spacer()
+            if let score = team.score {
+                Text(score)
+                    .font(.subheadline.weight(.bold).monospacedDigit())
+                    .foregroundStyle(team.isWinner ? Theme.textPrimary : Theme.textSecondary)
+            }
+        }
+    }
+
+    private func multiscreenSportChip(title: String, systemImage: String, sport: SportGroup?) -> some View {
+        let isSelected = multiscreenSportFilter == sport
+        return Button {
+            withAnimation(.snappy) { multiscreenSportFilter = sport }
+        } label: {
+            Label(title, systemImage: systemImage)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(isSelected ? .white : Theme.textSecondary)
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .background(isSelected ? Theme.accent : Theme.surface, in: Capsule())
+                .overlay(Capsule().strokeBorder(isSelected ? Theme.accent : Theme.hairline))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func multiscreenSelectChannel(_ channel: Channel, forMatchID matchID: String) {
+        if let idx = multiscreenSlots.firstIndex(where: { $0.matchID == matchID }) {
+            multiscreenSlots[idx].channel = channel
+        }
+        #if os(iOS)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
+    }
+
+    private func toggleMultiscreenLiveGame(_ option: LiveGameOption) {
+        if let idx = multiscreenSlots.firstIndex(where: { $0.matchID == option.match.id }) {
+            multiscreenSlots.remove(at: idx)
+        } else {
+            guard multiscreenSlots.count < 4 else { return }
+            multiscreenSlots.append(MultiscreenSlot(
+                matchID: option.match.id,
+                matchShortName: option.match.shortName,
+                channel: option.topSources.first?.channel
+            ))
         }
     }
 
@@ -1124,20 +1758,6 @@ struct MatchDetailView: View {
                     .foregroundStyle(Theme.textSecondary)
             }
             Spacer()
-            if playlists.allChannels.count >= 2 {
-                Button {
-                    toggleMultiscreenPicking()
-                } label: {
-                    Image(systemName: isPickingMultiscreen ? "checkmark.rectangle.stack" : "rectangle.grid.2x2")
-                        .font(.headline)
-                        .foregroundStyle(isPickingMultiscreen ? .white : Theme.accent)
-                        .frame(width: 38, height: 34)
-                        .background(isPickingMultiscreen ? Theme.accent : Theme.surfaceElevated,
-                                    in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(isPickingMultiscreen ? "Finish multiscreen selection" : "Select multiscreen sources")
-            }
             if rankedSources.count > 3 {
                 Button(showingAllChannels ? "Top" : "More") {
                     withAnimation {
@@ -1152,13 +1772,41 @@ struct MatchDetailView: View {
         }
     }
 
+    /// Prominent entry point into multiscreen so split screen is easy to find.
+    private var splitScreenButton: some View {
+        Button {
+            toggleMultiscreenPicking()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "rectangle.split.2x1.fill")
+                    .font(.headline)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Split Screen")
+                        .font(.subheadline.weight(.bold))
+                    Text("Watch up to 4 sources at once")
+                        .font(.caption2.weight(.semibold))
+                        .opacity(0.85)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Start split screen selection")
+    }
+
     private var multiscreenFooter: some View {
         VStack(spacing: 10) {
             HStack(spacing: 10) {
-                Label("\(selectedMultiScreenChannels.count)/4", systemImage: "rectangle.grid.2x2")
+                Label("\(multiscreenSlots.count) game\(multiscreenSlots.count == 1 ? "" : "s")", systemImage: "rectangle.grid.2x2")
                     .font(.footnote.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
-                Text("Select at least two sources")
+                Text(canStartMultiscreen ? "Tap Watch to begin" : "Select a source for each game")
                     .font(.caption)
                     .foregroundStyle(Theme.textSecondary)
                 Spacer()
@@ -1196,38 +1844,42 @@ struct MatchDetailView: View {
     }
 
     private var canStartMultiscreen: Bool {
-        selectedMultiScreenChannels.count >= 2
+        selectedMultiscreenChannels.count >= 2
     }
 
     private func toggleMultiscreenPicking() {
+        guard entitlements.isPremium else {
+            showPaywall = true
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            #endif
+            return
+        }
         withAnimation {
             if isPickingMultiscreen {
                 resetMultiscreenSelection()
             } else {
                 isPickingMultiscreen = true
-                selectedMultiChannelIDs = Set(displayedChannels.prefix(2).map(\.id))
+                multiscreenSportFilter = nil
+                multiscreenSlots = [MultiscreenSlot(
+                    matchID: match.id,
+                    matchShortName: match.shortName,
+                    channel: rankedSources.first?.channel
+                )]
+                Task { await loadLiveGamesForMultiscreen() }
             }
         }
     }
 
     private func handleSourceTap(_ channel: Channel) {
-        if isPickingMultiscreen {
-            toggleSelected(channel)
-        } else {
-            playingChannel = channel
-        }
-    }
-
-    private func toggleSelected(_ channel: Channel) {
-        if selectedMultiChannelIDs.contains(channel.id) {
-            selectedMultiChannelIDs.remove(channel.id)
-        } else if selectedMultiChannelIDs.count < 4 {
-            selectedMultiChannelIDs.insert(channel.id)
-        }
+        #if os(iOS)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #endif
+        playingChannel = channel
     }
 
     private func startMultiscreen() {
-        let channels = Array(selectedMultiScreenChannels.prefix(4))
+        let channels = Array(selectedMultiscreenChannels.prefix(4))
         guard channels.count >= 2 else { return }
         multiscreenSession = MultiscreenSession(channels: channels)
         resetMultiscreenSelection()
@@ -1235,7 +1887,54 @@ struct MatchDetailView: View {
 
     private func resetMultiscreenSelection() {
         isPickingMultiscreen = false
-        selectedMultiChannelIDs.removeAll()
+        multiscreenSlots = []
+        liveMatchesForMultiscreen = []
+    }
+
+    private func loadLiveGamesForMultiscreen() async {
+        guard !isLoadingLiveGames else { return }
+        isLoadingLiveGames = true
+        defer { isLoadingLiveGames = false }
+
+        let service = ESPNService()
+        let leagues = multiscreenShowAllSports ? League.all : prefs.followedLeagues
+        let allChannels = playlists.allChannels
+        let preferredLanguages = prefs.preferredStreamLanguages
+        let currentMatchID = match.id
+
+        // Phase 1: fetch all league scoreboards in parallel
+        var liveMatches: [Match] = []
+        await withTaskGroup(of: [Match].self) { group in
+            for league in leagues {
+                group.addTask {
+                    guard let matches = try? await service.scoreboard(for: league) else { return [] }
+                    return Array(matches.filter { $0.state == .live && $0.id != currentMatchID }.prefix(2))
+                }
+            }
+            for await matches in group {
+                liveMatches.append(contentsOf: matches)
+            }
+        }
+
+        guard !Task.isCancelled else { return }
+
+        // Phase 2: rank channels for every live match in parallel
+        var options: [LiveGameOption] = []
+        await withTaskGroup(of: LiveGameOption.self) { group in
+            for liveMatch in liveMatches {
+                group.addTask {
+                    let ranked = await Task.detached(priority: .background) {
+                        SourceMatcher.rank(match: liveMatch, channels: allChannels, preferredLanguages: preferredLanguages)
+                    }.value
+                    return LiveGameOption(match: liveMatch, topSources: Array(ranked.prefix(3)))
+                }
+            }
+            for await option in group {
+                options.append(option)
+            }
+        }
+
+        liveMatchesForMultiscreen = options
     }
 
     private var noPlaylistsHint: some View {
@@ -1271,6 +1970,25 @@ struct MatchDetailView: View {
     }
 }
 
+private struct MultiscreenSlot: Identifiable {
+    let id = UUID()
+    let matchID: String
+    let matchShortName: String
+    var channel: Channel?
+}
+
+private struct LiveGameOption: Identifiable {
+    let id: String
+    let match: Match
+    let topSources: [RankedSource]
+
+    nonisolated init(match: Match, topSources: [RankedSource]) {
+        self.id = match.id
+        self.match = match
+        self.topSources = topSources
+    }
+}
+
 private enum GameCenterTeam: String, Hashable {
     case away
     case home
@@ -1284,7 +2002,7 @@ private struct MatchStandingsPreview: View {
     private let service = ESPNService()
 
     private var previewRows: [StandingRow] {
-        let allRows = groups.flatMap(\.rows)
+        let allRows = uniqueRows(from: groups)
         let highlighted = allRows.filter { highlightedTeamIDs.contains($0.teamID) }
         let topRows = allRows.prefix(5).filter { !highlightedTeamIDs.contains($0.teamID) }
         return Array((highlighted + topRows).prefix(6))
@@ -1340,13 +2058,17 @@ private struct MatchStandingsPreview: View {
     }
 
     private var standingsHeader: some View {
-        HStack {
-            Text("TEAM")
-            Spacer()
-            Text("W-L")
+        HStack(spacing: 8) {
+            Text("#")
+                .frame(width: 24, alignment: .center)
+            Text("Team")
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text("Record")
                 .frame(width: 58, alignment: .trailing)
-            Text("PCT")
-                .frame(width: 50, alignment: .trailing)
+            Text("PCT/GB")
+                .frame(width: 54, alignment: .trailing)
+            Text("Strk")
+                .frame(width: 38, alignment: .trailing)
         }
         .font(.caption2.weight(.heavy))
         .foregroundStyle(Theme.textSecondary)
@@ -1356,9 +2078,16 @@ private struct MatchStandingsPreview: View {
     }
 
     private func rank(for row: StandingRow) -> Int {
-        let allRows = groups.flatMap(\.rows)
+        let allRows = uniqueRows(from: groups)
         guard let index = allRows.firstIndex(where: { $0.teamID == row.teamID }) else { return 0 }
         return index + 1
+    }
+
+    private func uniqueRows(from groups: [StandingsGroup]) -> [StandingRow] {
+        var seen: Set<String> = []
+        return groups.flatMap(\.rows).filter { row in
+            seen.insert(row.teamID).inserted
+        }
     }
 
     private func load() async {
@@ -1374,36 +2103,46 @@ private struct MatchStandingPreviewRow: View {
     let isHighlighted: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Text(rank > 0 ? "\(rank)" : "-")
                 .font(.caption.weight(.bold).monospacedDigit())
                 .foregroundStyle(isHighlighted ? Theme.accent : Theme.textSecondary)
-                .frame(width: 22, alignment: .trailing)
+                .frame(width: 24, alignment: .center)
             TeamLogo(url: row.logoURL, size: 26)
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.abbreviation.isEmpty ? row.displayName : row.abbreviation)
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
-                if let streak = row.streak, !streak.isEmpty {
-                    Text(streak)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(Theme.textSecondary)
-                }
+                Text(row.displayName)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
             }
-            Spacer()
+            .frame(maxWidth: .infinity, alignment: .leading)
             Text(row.record)
                 .font(.subheadline.weight(.bold).monospacedDigit())
                 .foregroundStyle(Theme.textPrimary)
                 .frame(width: 58, alignment: .trailing)
-            Text(row.winPercent ?? row.gamesBack ?? "-")
+            Text(row.gamesBack ?? row.winPercent ?? "-")
                 .font(.caption.weight(.semibold).monospacedDigit())
                 .foregroundStyle(Theme.textSecondary)
-                .frame(width: 50, alignment: .trailing)
+                .frame(width: 54, alignment: .trailing)
+            Text(row.streak?.isEmpty == false ? row.streak! : "-")
+                .font(.caption.weight(.bold).monospacedDigit())
+                .foregroundStyle(streakColor)
+                .frame(width: 38, alignment: .trailing)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
         .background(isHighlighted ? Theme.accent.opacity(0.12) : Color.clear)
+    }
+
+    private var streakColor: Color {
+        guard let streak = row.streak?.lowercased() else { return Theme.textSecondary }
+        if streak.hasPrefix("w") { return Color(hex: 0x37C871) }
+        if streak.hasPrefix("l") { return Theme.live }
+        return Theme.textSecondary
     }
 }
 
@@ -1510,3 +2249,261 @@ private struct MatchStrengthBadge: View {
             .background(color.opacity(0.15), in: Capsule())
     }
 }
+
+// MARK: - Play by play view
+
+private struct ScoringPlayRow: View {
+    let play: PlayByPlayEntry
+    let match: Match
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(spacing: 2) {
+                Text(play.period ?? "Game")
+                    .font(.caption2.weight(.heavy))
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+                if let clock = play.clock {
+                    Text(clock)
+                        .font(.caption2.weight(.bold).monospacedDigit())
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+            .frame(width: 58, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(play.text)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let away = play.awayScore, let home = play.homeScore {
+                    Text("\(match.away.abbreviation) \(away) – \(home) \(match.home.abbreviation)")
+                        .font(.caption.weight(.heavy).monospacedDigit())
+                        .foregroundStyle(Theme.accent)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+    }
+}
+
+private struct PlayByPlaySectionView: View {
+    let plays: [PlayByPlayEntry]
+    let match: Match
+
+    @State private var isExpanded = true
+    @State private var showAll = false
+
+    private var periods: [(String, [PlayByPlayEntry])] {
+        var buckets: [(String, [PlayByPlayEntry])] = []
+        var seen: [String: Int] = [:]
+        for play in plays {
+            let key = play.period ?? "Game"
+            if let idx = seen[key] {
+                buckets[idx].1.append(play)
+            } else {
+                seen[key] = buckets.count
+                buckets.append((key, [play]))
+            }
+        }
+        return buckets
+    }
+
+    private var displayedPlays: [PlayByPlayEntry] {
+        showAll ? plays : Array(plays.prefix(20))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                withAnimation(.snappy) { isExpanded.toggle() }
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "list.bullet.clipboard")
+                    Text("Play by Play")
+                    Spacer()
+                    if match.state == .live {
+                        Text("LIVE")
+                            .font(.caption2.weight(.heavy))
+                            .foregroundStyle(Theme.live)
+                    }
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                .font(.headline.weight(.bold))
+                .foregroundStyle(Theme.accent)
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                VStack(spacing: 0) {
+                    ForEach(Array(displayedPlays.enumerated()), id: \.element.id) { index, play in
+                        PlayRowView(play: play, match: match)
+                        if index < displayedPlays.count - 1 {
+                            Divider().overlay(Theme.hairline).padding(.leading, 42)
+                        }
+                    }
+                }
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+
+                if plays.count > 20 {
+                    Button {
+                        withAnimation(.snappy) { showAll.toggle() }
+                    } label: {
+                        HStack {
+                            Text(showAll ? "Show less" : "Show all \(plays.count) plays")
+                                .font(.subheadline.weight(.bold))
+                            Spacer()
+                            Image(systemName: showAll ? "chevron.up" : "chevron.down")
+                                .font(.caption.weight(.bold))
+                        }
+                        .foregroundStyle(Theme.accent)
+                        .padding(12)
+                        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+}
+
+private struct PlayRowView: View {
+    let play: PlayByPlayEntry
+    let match: Match
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            // Period + clock badge
+            VStack(spacing: 2) {
+                if let clock = play.clock {
+                    Text(clock)
+                        .font(.caption2.weight(.heavy).monospacedDigit())
+                        .foregroundStyle(play.isScoringPlay ? Theme.textPrimary : Theme.textSecondary)
+                }
+            }
+            .frame(width: 32, alignment: .center)
+
+            // Optional team dot
+            Circle()
+                .fill(teamColor(abbreviation: play.teamAbbreviation))
+                .frame(width: 7, height: 7)
+                .padding(.top, 4)
+
+            // Play text
+            VStack(alignment: .leading, spacing: 2) {
+                Text(play.text)
+                    .font(.footnote.weight(play.isScoringPlay ? .semibold : .regular))
+                    .foregroundStyle(play.isScoringPlay ? Theme.textPrimary : Theme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if play.isScoringPlay, let away = play.awayScore, let home = play.homeScore {
+                    Text("\(match.away.abbreviation) \(away) – \(home) \(match.home.abbreviation)")
+                        .font(.caption2.weight(.heavy).monospacedDigit())
+                        .foregroundStyle(Theme.accent)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(play.isScoringPlay ? Theme.accent.opacity(0.06) : Color.clear)
+    }
+
+    private func teamColor(abbreviation: String?) -> Color {
+        guard let abbr = abbreviation, !abbr.isEmpty else { return Color.clear }
+        if abbr.localizedCaseInsensitiveCompare(match.away.abbreviation) == .orderedSame {
+            return Color(hex: 0x4A90E2)
+        }
+        if abbr.localizedCaseInsensitiveCompare(match.home.abbreviation) == .orderedSame {
+            return Color(hex: 0xE24A6B)
+        }
+        return Theme.textSecondary.opacity(0.5)
+    }
+}
+
+// MARK: - Highlight card
+
+struct HighlightCard: View {
+    let clip: MatchHighlight
+    @State private var showSafari = false
+
+    var body: some View {
+        Button {
+            if clip.webURL != nil { showSafari = true }
+        } label: {
+            cardContent
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showSafari) {
+            if let url = clip.webURL {
+                #if os(iOS)
+                SafariSheet(url: url).ignoresSafeArea()
+                #endif
+            }
+        }
+    }
+
+    private var cardContent: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ZStack {
+                Theme.surfaceElevated
+                AsyncImage(url: clip.thumbnailURL) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().scaledToFill()
+                    } else {
+                        Image(systemName: "play.rectangle.fill")
+                            .font(.title2)
+                            .foregroundStyle(Theme.accent)
+                    }
+                }
+            }
+            .frame(width: 200, height: 112)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(alignment: .bottomTrailing) {
+                Image(systemName: "play.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(.white)
+                    .shadow(radius: 4)
+                    .padding(8)
+            }
+            .overlay(alignment: .bottomLeading) {
+                if let dur = clip.formattedDuration {
+                    Text(dur)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(.black.opacity(0.6), in: RoundedRectangle(cornerRadius: 4))
+                        .padding(6)
+                }
+            }
+
+            Text(clip.title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+        }
+        .frame(width: 200)
+    }
+}
+
+// MARK: - In-app Safari browser
+
+#if os(iOS)
+struct SafariSheet: UIViewControllerRepresentable {
+    let url: URL
+    func makeUIViewController(context: Context) -> SFSafariViewController { SFSafariViewController(url: url) }
+    func updateUIViewController(_ vc: SFSafariViewController, context: Context) {}
+}
+#endif

@@ -1,3 +1,5 @@
+// EventKit does not exist on tvOS; calendar export is iOS/macOS/visionOS only.
+#if canImport(EventKit)
 import EventKit
 import Foundation
 
@@ -53,6 +55,8 @@ final class MatchCalendarService {
         case .baseball: return 3.5 * 60 * 60
         case .football: return 3.25 * 60 * 60
         case .basketball, .hockey, .soccer: return 2.5 * 60 * 60
+        case .golf: return 4 * 60 * 60
+        case .racing: return 2 * 60 * 60
         }
     }
 
@@ -76,3 +80,4 @@ final class MatchCalendarService {
         }
     }
 }
+#endif

@@ -5,6 +5,8 @@ struct MyApp: App {
     @StateObject private var playlistStore = PlaylistStore()
     @StateObject private var preferences = PreferencesStore()
     @StateObject private var watchStore = WatchStore()
+    @StateObject private var entitlements = EntitlementStore()
+    @StateObject private var predictions = PredictionsStore()
 
     var body: some Scene {
         WindowGroup {
@@ -18,7 +20,10 @@ struct MyApp: App {
             .environmentObject(playlistStore)
             .environmentObject(preferences)
             .environmentObject(watchStore)
-            .preferredColorScheme(.dark)
+            .environmentObject(entitlements)
+            .environmentObject(predictions)
+            .dynamicTypeSize(Theme.isPad ? DynamicTypeSize.xLarge... : DynamicTypeSize.xSmall...)
+            .preferredColorScheme(preferences.appearance.colorScheme)
             .task { await playlistStore.refreshAll() }
         }
     }
@@ -30,21 +35,27 @@ struct RootView: View {
 
     var body: some View {
         TabView {
-            HomeView()
-                .tabItem { Label("Home", systemImage: "house.fill") }
+            Tab("Home", systemImage: "house.fill") {
+                HomeView()
+            }
 
-            LiveTVView()
-                .tabItem { Label("Live TV", systemImage: "play.tv.fill") }
+            Tab("Following", systemImage: "star.circle.fill") {
+                MatchesView()
+            }
 
-            MatchesView()
-                .tabItem { Label("Sports", systemImage: "sportscourt.fill") }
+            Tab("Stats", systemImage: "chart.bar.xaxis") {
+                StatsView()
+            }
 
-            NewsView()
-                .tabItem { Label("News", systemImage: "newspaper.fill") }
+            Tab("News", systemImage: "newspaper.fill") {
+                NewsView()
+            }
 
-            SettingsView()
-                .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+            Tab("Settings", systemImage: "gearshape.fill") {
+                SettingsView()
+            }
         }
+        .tabViewStyle(.sidebarAdaptable)
         .tint(Theme.accent)
         .task { updateFavoriteNotificationPrompt() }
         .onChange(of: prefs.favoriteTeams) { updateFavoriteNotificationPrompt() }
@@ -62,7 +73,11 @@ struct RootView: View {
     }
 
     private func updateFavoriteNotificationPrompt() {
+        #if os(tvOS)
+        showingFavoriteNotificationPrompt = false
+        #else
         showingFavoriteNotificationPrompt = prefs.shouldPromptForFavoriteTeamNotifications
+        #endif
     }
 
     private func enableFavoriteTeamNotifications() async {
@@ -77,5 +92,7 @@ struct RootView: View {
         .environmentObject(PlaylistStore())
         .environmentObject(PreferencesStore())
         .environmentObject(WatchStore())
+        .environmentObject(EntitlementStore())
+        .environmentObject(PredictionsStore())
         .preferredColorScheme(.dark)
 }

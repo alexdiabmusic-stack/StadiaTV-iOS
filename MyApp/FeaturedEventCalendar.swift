@@ -1,9 +1,9 @@
 import Foundation
 
-/// A single daily featured event from the demand calendar workbook.
+/// A single featured event from the demand calendar workbook.
 struct FeaturedEventPick: Identifiable, Hashable {
     let dateKey: String
-    let torontoTime: String
+    let timeWindow: String
     let sport: String
     let league: String
     let title: String
@@ -18,27 +18,118 @@ struct FeaturedEventPick: Identifiable, Hashable {
     let recheckRule: String
     let source: String
 
-    var id: String { dateKey }
-    var hasKnownStartTime: Bool { !torontoTime.isEmpty && !torontoTime.localizedCaseInsensitiveContains("TBD") }
-    var startDate: Date? { FeaturedEventCalendar.startDate(dateKey: dateKey, torontoTime: torontoTime) }
+    var id: String { "\(dateKey)-\(timeWindow)-\(league)-\(title)" }
+    var torontoTime: String { timeWindow }
+    var hasKnownStartTime: Bool { !timeWindow.isEmpty && !timeWindow.localizedCaseInsensitiveContains("TBD") }
+    nonisolated var startDate: Date? { FeaturedEventCalendar.dateRange(dateKey: dateKey, timeWindow: timeWindow)?.start }
+    nonisolated var endDate: Date? { FeaturedEventCalendar.dateRange(dateKey: dateKey, timeWindow: timeWindow)?.end }
+
+    var streamMatch: Match {
+        let league = matchedLeague ?? fallbackLeague
+        let sides = parsedSides
+        return Match(
+            id: "featured-\(id)",
+            league: league,
+            date: startDate ?? FeaturedEventCalendar.date(dateKey: dateKey) ?? Date(),
+            name: title,
+            shortName: league.shortName,
+            state: currentState,
+            statusDetail: statusDetail,
+            home: sides.home,
+            away: sides.away,
+            broadcasts: [],
+            venue: nil
+        )
+    }
+
+    private var matchedLeague: League? {
+        let normalizedLeague = normalized(league)
+        return League.all.first { existing in
+            normalized(existing.name) == normalizedLeague || normalized(existing.shortName) == normalizedLeague
+        }
+    }
+
+    private var fallbackLeague: League {
+        League(name: league, shortName: league, path: "featured/\(normalized(league).replacingOccurrences(of: " ", with: "-"))", group: sportGroup, keywords: fallbackKeywords)
+    }
+
+    private var sportGroup: SportGroup {
+        let value = normalized(sport)
+        if value.contains("football") { return .football }
+        if value.contains("basketball") { return .basketball }
+        if value.contains("baseball") { return .baseball }
+        if value.contains("hockey") { return .hockey }
+        if value.contains("soccer") { return .soccer }
+        if value.contains("golf") { return .golf }
+        return .racing
+    }
+
+    private var fallbackKeywords: [String] {
+        [sport, league]
+            .map { normalized($0) }
+            .filter { !$0.isEmpty }
+    }
+
+    private var parsedSides: (home: TeamSide, away: TeamSide) {
+        let separators = [" at ", " vs ", " v "]
+        let normalizedTitle = title.replacingOccurrences(of: " - ", with: " ")
+        for separator in separators {
+            let pieces = normalizedTitle.components(separatedBy: separator)
+            guard pieces.count == 2 else { continue }
+            let awayName = pieces[0].trimmingCharacters(in: .whitespacesAndNewlines)
+            let homeName = pieces[1].trimmingCharacters(in: .whitespacesAndNewlines)
+            if !awayName.isEmpty && !homeName.isEmpty {
+                return (side(named: homeName), side(named: awayName))
+            }
+        }
+        return (side(named: "TBD"), side(named: "TBD"))
+    }
+
+    private var currentState: GameState {
+        guard let startDate else { return .pre }
+        let now = Date()
+        if let endDate, now >= endDate { return .final }
+        return now >= startDate ? .live : .pre
+    }
+
+    private var statusDetail: String {
+        switch currentState {
+        case .live: return "Live"
+        case .final: return "Final"
+        case .pre: return hasKnownStartTime ? "\(torontoTime) ET" : scheduleStatus
+        }
+    }
+
+    private func side(named name: String) -> TeamSide {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return TeamSide(displayName: trimmed, shortName: trimmed, abbreviation: "", logoURL: nil, score: nil, record: nil, isWinner: false)
+    }
+
+    private func normalized(_ value: String) -> String {
+        String(value
+            .folding(options: .diacriticInsensitive, locale: .current)
+            .lowercased()
+            .map { $0.isLetter || $0.isNumber ? $0 : " " })
+            .split(separator: " ")
+            .joined(separator: " ")
+    }
 }
 
-/// In-app projection of `365_day_sports_demand_calendar_expanded.xlsx`.
-/// Replace the embedded rows when the workbook is refreshed weekly.
+/// In-app projection of the Daily Picks sheet from the sports demand workbook.
 struct FeaturedEventCalendar {
     static let shared = FeaturedEventCalendar()
 
-    private let picksByDate: [String: FeaturedEventPick]
+    private let picksByDate: [String: [FeaturedEventPick]]
     private let orderedPicks: [FeaturedEventPick]
 
     private init() {
-        var parsed: [String: FeaturedEventPick] = [:]
+        var parsed: [String: [FeaturedEventPick]] = [:]
         for line in Self.rawData.split(separator: "\n", omittingEmptySubsequences: true) {
             let fields = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
             guard fields.count == 15, let demandScore = Double(fields[5]) else { continue }
             let pick = FeaturedEventPick(
                 dateKey: fields[0],
-                torontoTime: fields[1],
+                timeWindow: fields[1],
                 sport: fields[2],
                 league: fields[3],
                 title: fields[4],
@@ -53,43 +144,139 @@ struct FeaturedEventCalendar {
                 recheckRule: fields[13],
                 source: fields[14]
             )
-            parsed[pick.dateKey] = pick
+            parsed[pick.dateKey, default: []].append(pick)
         }
-        picksByDate = parsed
-        orderedPicks = parsed.values.sorted { $0.dateKey < $1.dateKey }
+        picksByDate = parsed.mapValues(Self.nonOverlapping)
+        orderedPicks = picksByDate.values.flatMap { $0 }.sorted { lhs, rhs in
+            (lhs.startDate ?? .distantFuture) < (rhs.startDate ?? .distantFuture)
+        }
     }
 
     func pick(for date: Date = Date()) -> FeaturedEventPick? {
+        picks(for: date).first
+    }
+
+    func picks(for date: Date = Date()) -> [FeaturedEventPick] {
         let dateKey = Self.dateKeyFormatter.string(from: date)
-        if let pick = picksByDate[dateKey] {
-            return pick
+        if let picks = picksByDate[dateKey], !picks.isEmpty {
+            return picks
         }
-        return orderedPicks.first { pick in
-            guard pick.dateKey >= dateKey else { return false }
-            guard let startDate = pick.startDate else { return true }
-            return startDate >= date
-        }
+        guard let nextDateKey = picksByDate.keys.sorted().first(where: { $0 >= dateKey }) else { return [] }
+        return picksByDate[nextDateKey] ?? []
     }
 
     func matchingPick(for match: Match) -> FeaturedEventPick? {
-        guard let pick = picksByDate[Self.dateKeyFormatter.string(from: match.date)], pick.matches(match) else { return nil }
-        return pick
+        matchingPicks(for: match).first
+    }
+
+    func matchingPicks(for match: Match) -> [FeaturedEventPick] {
+        let dateKey = Self.dateKeyFormatter.string(from: match.date)
+        return (picksByDate[dateKey] ?? []).filter { $0.matches(match) }
     }
 
     func demandBoost(for match: Match) -> Int {
-        guard let pick = picksByDate[Self.dateKeyFormatter.string(from: match.date)] else { return 0 }
-        if pick.matches(match) { return 1_000 + Int(pick.demandScore.rounded()) }
-        if pick.isSameLeague(as: match) { return Int(pick.demandScore.rounded()) }
+        let dateKey = Self.dateKeyFormatter.string(from: match.date)
+        guard let picks = picksByDate[dateKey] else { return 0 }
+        if let exact = picks.first(where: { $0.matches(match) }) {
+            return 1_000 + Int(exact.demandScore.rounded())
+        }
+        if let sameLeague = picks.first(where: { $0.isSameLeague(as: match) }) {
+            return Int(sameLeague.demandScore.rounded())
+        }
         return 0
     }
 
-    static func startDate(dateKey: String, torontoTime: String) -> Date? {
-        let time = torontoTime.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !time.isEmpty, !time.localizedCaseInsensitiveContains("TBD") else { return nil }
-        return dateTimeFormatter.date(from: "\(dateKey) \(time)")
+    nonisolated static func date(dateKey: String) -> Date? {
+        let dateParts = dateKey.split(separator: "-").compactMap { Int(String($0)) }
+        guard dateParts.count == 3 else { return nil }
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.timeZone = torontoTimeZone
+        components.year = dateParts[0]
+        components.month = dateParts[1]
+        components.day = dateParts[2]
+        return components.date
     }
 
-    static let torontoTimeZone = TimeZone(identifier: "America/Toronto") ?? .current
+    nonisolated static func dateRange(dateKey: String, timeWindow: String) -> (start: Date, end: Date)? {
+        let cleaned = timeWindow.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty, !cleaned.localizedCaseInsensitiveContains("TBD") else { return nil }
+        let parts = cleaned.components(separatedBy: "-").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        guard let start = parseTime(parts.first ?? cleaned, dateKey: dateKey, fallbackMeridiem: meridiem(in: parts.dropFirst().first)) else { return nil }
+        guard parts.count > 1, let end = parseTime(parts[1], dateKey: dateKey, fallbackMeridiem: meridiem(in: parts.first)) else {
+            return (start, start.addingTimeInterval(3 * 60 * 60))
+        }
+        let adjustedEnd = end <= start ? end.addingTimeInterval(24 * 60 * 60) : end
+        return (start, adjustedEnd)
+    }
+
+    nonisolated private static func nonOverlapping(_ picks: [FeaturedEventPick]) -> [FeaturedEventPick] {
+        let sorted = picks.sorted { lhs, rhs in
+            (lhs.startDate ?? .distantFuture) < (rhs.startDate ?? .distantFuture)
+        }
+        var selected: [FeaturedEventPick] = []
+        for pick in sorted {
+            guard let range = dateRange(dateKey: pick.dateKey, timeWindow: pick.timeWindow) else {
+                selected.append(pick)
+                continue
+            }
+            while let last = selected.last,
+                  let lastRange = dateRange(dateKey: last.dateKey, timeWindow: last.timeWindow),
+                  range.start < lastRange.end && range.end > lastRange.start {
+                if pick.demandScore > last.demandScore {
+                    selected.removeLast()
+                } else {
+                    break
+                }
+            }
+            if let last = selected.last,
+               let lastRange = dateRange(dateKey: last.dateKey, timeWindow: last.timeWindow),
+               range.start < lastRange.end && range.end > lastRange.start {
+                continue
+            }
+            selected.append(pick)
+        }
+        return selected
+    }
+
+    nonisolated private static func parseTime(_ value: String, dateKey: String, fallbackMeridiem: String?) -> Date? {
+        var text = value.replacingOccurrences(of: ".", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if meridiem(in: text) == nil, let fallbackMeridiem {
+            text += " \(fallbackMeridiem)"
+        }
+
+        let dateParts = dateKey.split(separator: "-").compactMap { Int(String($0)) }
+        let timeParts = text.split(separator: " ")
+        guard dateParts.count == 3,
+              let clock = timeParts.first,
+              let marker = timeParts.last?.uppercased(),
+              marker == "AM" || marker == "PM" else { return nil }
+
+        let clockParts = clock.split(separator: ":").compactMap { Int(String($0)) }
+        guard clockParts.count == 2 else { return nil }
+        var hour = clockParts[0] % 12
+        if marker == "PM" { hour += 12 }
+
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.timeZone = TimeZone(identifier: "America/Toronto") ?? .current
+        components.year = dateParts[0]
+        components.month = dateParts[1]
+        components.day = dateParts[2]
+        components.hour = hour
+        components.minute = clockParts[1]
+        return components.date
+    }
+
+    nonisolated private static func meridiem(in value: String?) -> String? {
+        guard let uppercased = value?.uppercased() else { return nil }
+        if uppercased.contains("AM") { return "AM" }
+        if uppercased.contains("PM") { return "PM" }
+        return nil
+    }
+
+    nonisolated static let torontoTimeZone = TimeZone(identifier: "America/Toronto") ?? .current
+    private static let defaultDuration: TimeInterval = 3 * 60 * 60
 
     private static let dateKeyFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -108,51 +295,129 @@ struct FeaturedEventCalendar {
     }()
 
     private static let rawData = """
-2026-07-19	3:00 PM	Soccer	FIFA World Cup	Argentina vs Spain - FIFA World Cup Final	100	S	High	Confirmed time and matchup	The largest global sports match in the window.	7:20 PM	MLB	Los Angeles Dodgers at New York Yankees		https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026
-2026-07-20	7:10 PM	Baseball	MLB	Los Angeles Dodgers at Philadelphia Phillies	67	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-07-21	6:40 PM	Baseball	MLB	Los Angeles Dodgers at Philadelphia Phillies	67	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-07-22	6:40 PM	Baseball	MLB	Los Angeles Dodgers at Philadelphia Phillies	67	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.	7:30 PM	MLS / Leagues Cup	Inter Miami CF vs Chicago Fire FC		https://www.mlb.com/schedule/2026-07-19
-2026-07-23	3:07 PM	Baseball	MLB	Tampa Bay Rays at Toronto Blue Jays	60	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-07-24	7:10 PM	Baseball	MLB	Los Angeles Dodgers at New York Mets	68	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-07-25	7:15 PM	Baseball	MLB	Los Angeles Dodgers at New York Mets	68	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.	7:30 PM	MLS / Leagues Cup	CF Montreal vs Inter Miami CF		https://www.mlb.com/schedule/2026-07-19
-2026-07-26	9:00 AM	Motorsport	Formula 1	Hungarian Grand Prix	82	A	High	Confirmed race date/time	A globally watched F1 race with a concentrated live audience.	7:20 PM	MLB	New York Yankees at Philadelphia Phillies		https://www.formula1.com/en/racing/2026
-2026-07-27	7:45 PM	Baseball	MLB	Chicago Cubs at St. Louis Cardinals	71	B	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-07-28	10:10 PM	Baseball	MLB	Seattle Mariners at Los Angeles Dodgers	65	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-07-29	10:10 PM	Baseball	MLB	Seattle Mariners at Los Angeles Dodgers	65	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-07-30	10:10 PM	Baseball	MLB	Seattle Mariners at Los Angeles Dodgers	65	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-07-31	10:10 PM	Baseball	MLB	Boston Red Sox at Los Angeles Dodgers	69	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-01	9:10 PM	Baseball	MLB	Boston Red Sox at Los Angeles Dodgers	69	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.	7:30 PM	MLS / Leagues Cup	Inter Miami CF vs Columbus Crew		https://www.mlb.com/schedule/2026-07-19
-2026-08-02	7:20 PM	Baseball	MLB	Boston Red Sox at Los Angeles Dodgers	69	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-03	8:05 PM	Baseball	MLB	Los Angeles Dodgers at Chicago Cubs	68	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-04	8:05 PM	Baseball	MLB	Los Angeles Dodgers at Chicago Cubs	68	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-05	7:05 PM	Baseball	MLB	St. Louis Cardinals at New York Yankees	67	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.	7:30 PM	MLS / Leagues Cup	Inter Miami CF vs Atletico San Luis		https://www.mlb.com/schedule/2026-07-19
-2026-08-06	2:20 PM	Baseball	MLB	Toronto Blue Jays at Chicago Cubs	65	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-07	7:05 PM	Baseball	MLB	Atlanta Braves at New York Yankees	67	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-08	3:05 PM	Baseball	MLB	Atlanta Braves at New York Yankees	67	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.	8:00 PM	MLS / Leagues Cup	Inter Miami CF vs CF Monterrey		https://www.mlb.com/schedule/2026-07-19
-2026-08-09	1:35 PM	Baseball	MLB	Atlanta Braves at New York Yankees	67	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-10	7:07 PM	Baseball	MLB	Boston Red Sox at Toronto Blue Jays	66	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-11	7:05 PM	Baseball	MLB	Seattle Mariners at New York Yankees	65	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-12	7:05 PM	Baseball	MLB	Seattle Mariners at New York Yankees	65	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.	7:30 PM	MLS / Leagues Cup	Inter Miami CF vs Club Leon		https://www.mlb.com/schedule/2026-07-19
-2026-08-13	1:35 PM	Baseball	MLB	Seattle Mariners at New York Yankees	65	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-14	7:07 PM	Baseball	MLB	New York Yankees at Toronto Blue Jays	73	B	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-15	3:07 PM	Baseball	MLB	New York Yankees at Toronto Blue Jays	73	B	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.	7:30 PM	MLS / Leagues Cup	Nashville SC vs Inter Miami CF		https://www.mlb.com/schedule/2026-07-19
-2026-08-16	1:37 PM	Baseball	MLB	New York Yankees at Toronto Blue Jays	73	B	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-17	8:05 PM	Baseball	MLB	Chicago White Sox at Chicago Cubs	60	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-18	6:35 PM	Baseball	MLB	New York Yankees at Baltimore Orioles	63	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-19	7:30 PM	Soccer	MLS / Leagues Cup	Philadelphia Union vs Inter Miami CF	65.3	C	High	Confirmed time	Inter Miami provides MLS's strongest current demand signal; secondary-market entry price is used as an additional proxy.	6:35 PM	MLB	New York Yankees at Baltimore Orioles	Confirm star availability and playoff implications near matchday.	https://www.intermiamicf.com/schedule/matches
-2026-08-20	6:35 PM	Baseball	MLB	New York Yankees at Baltimore Orioles	63	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-21	3:00 PM	Soccer	Premier League	Arsenal vs Coventry City	77	B	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	7:05 PM	MLB	Toronto Blue Jays at New York Yankees	Premier League kickoff times can move for television; refresh when broadcast selections are announced.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
-2026-08-22	7:30 AM	Soccer	Premier League	Hull City vs Manchester United	78	B	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	1:35 PM	MLB	Toronto Blue Jays at New York Yankees	Premier League kickoff times can move for television; refresh when broadcast selections are announced.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
-2026-08-23	9:00 AM	Motorsport	Formula 1	Dutch Grand Prix	84	A	High	Confirmed race date/time	Final Zandvoort-era race and a major Verstappen home event.	11:30 AM	Premier League	Newcastle United vs Liverpool		https://www.formula1.com/en/racing/2026
-2026-08-24	3:00 PM	Soccer	Premier League	Fulham vs Chelsea	76	B	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	9:40 PM	MLB	Philadelphia Phillies at Seattle Mariners	Premier League kickoff times can move for television; refresh when broadcast selections are announced.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
-2026-08-25	7:15 PM	Baseball	MLB	Los Angeles Dodgers at Atlanta Braves	67	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-26	7:15 PM	Baseball	MLB	Los Angeles Dodgers at Atlanta Braves	67	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-27	7:15 PM	Baseball	MLB	Los Angeles Dodgers at Atlanta Braves	67	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
-2026-08-28	7:05 PM	Baseball	MLB	Boston Red Sox at New York Yankees	79	B	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.	3:00 PM	Premier League	Crystal Palace vs Manchester City		https://www.mlb.com/schedule/2026-07-19
-2026-08-29	7:15 PM	Baseball	MLB	Boston Red Sox at New York Yankees	79	B	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.	12:30 PM	Premier League	Newcastle United vs Tottenham Hotspur		https://www.mlb.com/schedule/2026-07-19
-2026-08-30	1:35 PM	Baseball	MLB	Boston Red Sox at New York Yankees	79	B	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.	11:30 AM	Premier League	Manchester United vs Ipswich Town		https://www.mlb.com/schedule/2026-07-19
-2026-08-31	3:00 PM	Soccer	Premier League	Aston Villa vs Arsenal	79	B	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	9:38 PM	MLB	New York Yankees at Los Angeles Angels	Premier League kickoff times can move for television; refresh when broadcast selections are announced.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
-2026-09-01	10:10 PM	Baseball	MLB	St. Louis Cardinals at Los Angeles Dodgers	67	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
+2026-07-19	7:00-9:15 AM	Motorsport	Formula 1	Belgian Grand Prix	84	A	High	Confirmed session time	Formula 1 race offers a high-demand international viewing window.	6:30-11:45 AM	Tour de France	Tour de France - Stage 15: Champagnole to Plateau de Solaison	Check for weather delays or session stoppages.	https://www.formula1.com/en/racing/2026
+2026-07-19	9:15 AM-2:30 PM	Golf	The Open Championship	The Open Championship - final-round featured coverage	86	A	Medium	Confirmed final day; coverage window estimated	A men's golf major final provides a globally significant lead-in to the World Cup Final.	6:30-11:45 AM	Tour de France	Tour de France - Stage 15: Champagnole to Plateau de Solaison	Confirm the final pairing times and broadcast window.	https://www.theopen.com/
+2026-07-19	3:00-5:15 PM	Soccer	FIFA World Cup	Argentina vs Spain - FIFA World Cup Final	100	S	High	Confirmed time and matchup	The largest global sports match in the window.	12:15-3:30 PM	MLB	Chicago White Sox at Toronto Blue Jays		https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026
+2026-07-19	7:20-10:35 PM	Baseball	MLB	Los Angeles Dodgers at New York Yankees	79	B	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-10:30 PM	NASCAR Cup Series	NASCAR Cup - North Wilkesboro race	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-07-20	3:00-5:30 PM	Motorsport	INDYCAR	Music City Grand Prix	72	B	High	Confirmed race start; end time estimated	INDYCAR provides a strong North American motorsport window.				Check for weather, cautions and revised broadcast start.	https://www.indycar.com/Schedule
+2026-07-20	7:10-10:25 PM	Baseball	MLB	Los Angeles Dodgers at Philadelphia Phillies	69	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:05-10:20 PM	MLB	Pittsburgh Pirates at New York Yankees	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-07-21	7:00-11:50 AM	Cycling	Tour de France	Tour de France - Stage 16 individual time trial	78	B	Medium	Confirmed stage date; Toronto coverage window estimated	The Tour's decisive final-week stage provides a high-demand daytime viewing window.				Refresh start and expected finish after the official daily timetable is published.	https://www.letour.fr/en/overall-route
+2026-07-21	6:40-9:55 PM	Baseball	MLB	Los Angeles Dodgers at Philadelphia Phillies	69	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:05-10:20 PM	MLB	Pittsburgh Pirates at New York Yankees	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-07-22	6:45-11:30 AM	Cycling	Tour de France	Tour de France - Stage 17: Chambéry to Voiron	72	B	Medium	Confirmed stage date; Toronto coverage window estimated	The Tour's decisive final-week stage provides a high-demand daytime viewing window.				Refresh start and expected finish after the official daily timetable is published.	https://www.letour.fr/en/overall-route
+2026-07-22	1:35-4:50 PM	Baseball	MLB	Pittsburgh Pirates at New York Yankees	67	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.				Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-07-22	6:40-9:55 PM	Baseball	MLB	Los Angeles Dodgers at Philadelphia Phillies	69	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:07-10:22 PM	MLB	Tampa Bay Rays at Toronto Blue Jays	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-07-23	6:30-11:30 AM	Cycling	Tour de France	Tour de France - Stage 18 mountain finish at Orcières-Merlette	80	A	Medium	Confirmed stage date; Toronto coverage window estimated	The Tour's decisive final-week stage provides a high-demand daytime viewing window.				Refresh start and expected finish after the official daily timetable is published.	https://www.letour.fr/en/overall-route
+2026-07-23	3:07-6:22 PM	Baseball	MLB	Tampa Bay Rays at Toronto Blue Jays	65	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	3:00-6:00 PM	PGA Tour	3M Open - featured weekday coverage	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-07-23	9:00 PM-12:00 AM	Canadian Football	CFL	Edmonton Elks at Saskatchewan Roughriders	62	C	High	Confirmed kickoff; end time estimated	A nationally relevant Canadian football matchup fills this viewing window.				Check weather delays and broadcast changes.	https://www.cfl.ca/schedule/2026/
+2026-07-24	5:30-6:30 AM	Motorsport	Formula 1	Hungarian Grand Prix - Practice 1	58	C	High	Confirmed session time	Formula 1 practice offers a high-demand international viewing window.				Check for weather delays or session stoppages.	https://www.formula1.com/en/racing/2026
+2026-07-24	8:00-11:45 AM	Cycling	Tour de France	Tour de France - Stage 19: Gap to Alpe d'Huez	84	A	Medium	Confirmed stage date; Toronto coverage window estimated	The Tour's decisive final-week stage provides a high-demand daytime viewing window.	9:00-10:00 AM	Formula 1	Hungarian Grand Prix - Practice 2	Refresh start and expected finish after the official daily timetable is published.	https://www.letour.fr/en/overall-route
+2026-07-24	3:00-6:00 PM	Golf	PGA Tour	3M Open - featured weekday coverage	58	C	Medium	Confirmed tournament date; broadcast window estimated	Featured golf coverage fills the afternoon with the tournament's most consequential play.				Replace the coverage window with the official broadcaster schedule when released.	https://www.pgatour.com/schedule/2026
+2026-07-24	6:45-10:00 PM	Baseball	MLB	New York Yankees at Philadelphia Phillies	70	B	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:10-10:25 PM	MLB	Los Angeles Dodgers at New York Mets	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-07-25	4:30-5:30 AM	Motorsport	Formula 1	Hungarian Grand Prix - Practice 3	58	C	High	Confirmed session time	Formula 1 practice offers a high-demand international viewing window.				Check for weather delays or session stoppages.	https://www.formula1.com/en/racing/2026
+2026-07-25	7:00-11:30 AM	Cycling	Tour de France	Tour de France - Stage 20: Alpe d'Huez mountain showdown	86	A	Medium	Confirmed stage date; Toronto coverage window estimated	The Tour's decisive final-week stage provides a high-demand daytime viewing window.	8:00-9:15 AM	Formula 1	Hungarian Grand Prix - Qualifying	Refresh start and expected finish after the official daily timetable is published.	https://www.letour.fr/en/overall-route
+2026-07-25	4:10-7:25 PM	Baseball	MLB	Toronto Blue Jays at Boston Red Sox	69	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	6:05-9:20 PM	MLB	New York Yankees at Philadelphia Phillies	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-07-25	8:30-10:30 PM	Basketball	WNBA	2026 WNBA All-Star Game	80	A	High	Confirmed game time	The WNBA's midseason showcase is the day's strongest basketball event.	7:15-10:30 PM	MLB	Los Angeles Dodgers at New York Mets	Confirm roster availability close to tipoff.	https://www.wnba.com/allstar/2026
+2026-07-26	9:00-11:15 AM	Motorsport	Formula 1	Hungarian Grand Prix	84	A	High	Confirmed session time	Formula 1 race offers a high-demand international viewing window.	10:00 AM-1:30 PM	Tour de France	Tour de France - Stage 21 finish on the Champs-Élysées	Check for weather delays or session stoppages.	https://www.formula1.com/en/racing/2026
+2026-07-26	2:00-5:30 PM	Motorsport	NASCAR Cup Series	Brickyard 400	80	A	High	Confirmed race start; end time estimated	A national NASCAR Cup race provides a high-demand standalone viewing block.	1:40-4:55 PM	MLB	Los Angeles Dodgers at New York Mets	Check for weather delays and overtime finishes.	https://www.nascar.com/nascar-cup-series/2026/schedule/
+2026-07-26	7:20-10:35 PM	Baseball	MLB	New York Yankees at Philadelphia Phillies	70	B	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.				Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-07-27	11:00 AM-5:00 PM	Tennis	Washington Open	Washington Open - featured day session (early rounds; players TBD)	66	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.				Replace with the highest-demand confirmed match from the daily order of play.	https://www.mubadalacitidcopen.com/en/tournament/schedule
+2026-07-27	7:45-11:00 PM	Baseball	MLB	Chicago Cubs at St. Louis Cardinals	71	B	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.	7:00-11:00 PM	Washington Open	Washington Open - featured night session (early rounds; players TBD)		https://www.mlb.com/schedule/2026-07-19
+2026-07-28	11:00 AM-5:00 PM	Tennis	Washington Open	Washington Open - featured day session (early rounds; players TBD)	66	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.				Replace with the highest-demand confirmed match from the daily order of play.	https://www.mubadalacitidcopen.com/en/tournament/schedule
+2026-07-28	6:45-10:00 PM	Baseball	MLB	Toronto Blue Jays at Washington Nationals	65	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	Washington Open	Washington Open - featured night session (early rounds; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-07-28	10:10 PM-1:25 AM	Baseball	MLB	Seattle Mariners at Los Angeles Dodgers	66	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	Washington Open	Washington Open - featured night session (early rounds; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-07-29	11:00 AM-5:00 PM	Tennis	Washington Open	Washington Open - featured day session (early rounds; players TBD)	66	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.	1:05-4:20 PM	MLB	Toronto Blue Jays at Washington Nationals	Replace with the highest-demand confirmed match from the daily order of play.	https://www.mubadalacitidcopen.com/en/tournament/schedule
+2026-07-29	8:00-10:15 PM	Soccer	MLS All-Star	MLS All-Stars vs Liga MX All-Stars	78	B	High	Confirmed kickoff	A cross-league all-star match creates a strong standalone soccer window.	7:00-11:00 PM	Washington Open	Washington Open - featured night session (early rounds; players TBD)	Confirm final rosters.	https://www.mlssoccer.com/all-star/
+2026-07-29	10:10 PM-1:25 AM	Baseball	MLB	Seattle Mariners at Los Angeles Dodgers	66	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	Washington Open	Washington Open - featured night session (early rounds; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-07-30	2:10-5:25 PM	Baseball	MLB	New York Yankees at Chicago White Sox	67	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	11:00 AM-5:00 PM	Washington Open	Washington Open - featured day session (early rounds; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-07-30	7:00-11:00 PM	Tennis	Washington Open	Washington Open - featured night session (early rounds; players TBD)	69	C	Medium	Confirmed tournament date; daily order of play TBD	The top night-session match provides a reliable prime-time tennis option.	10:10 PM-1:25 AM	MLB	Seattle Mariners at Los Angeles Dodgers	Replace with the highest-demand confirmed night-session match.	https://www.mubadalacitidcopen.com/en/tournament/schedule
+2026-07-31	11:00 AM-5:00 PM	Tennis	Washington Open	Washington Open - featured day session (quarterfinals; players TBD)	72	B	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.	2:20-5:35 PM	MLB	New York Yankees at Chicago Cubs	Replace with the highest-demand confirmed match from the daily order of play.	https://www.mubadalacitidcopen.com/en/tournament/schedule
+2026-07-31	7:07-10:22 PM	Baseball	MLB	St. Louis Cardinals at Toronto Blue Jays	65	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	Washington Open	Washington Open - featured night session (quarterfinals; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-07-31	10:10 PM-1:25 AM	Baseball	MLB	Boston Red Sox at Los Angeles Dodgers	72	B	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	Washington Open	Washington Open - featured night session (quarterfinals; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-01	11:00 AM-5:00 PM	Tennis	Washington Open	Washington Open - featured day session (semifinals; players TBD)	76	B	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.	3:07-6:22 PM	MLB	St. Louis Cardinals at Toronto Blue Jays	Replace with the highest-demand confirmed match from the daily order of play.	https://www.mubadalacitidcopen.com/en/tournament/schedule
+2026-08-01	6:00-10:00 PM	Pro Wrestling	WWE	WWE SummerSlam - Night 1	82	A	High	Confirmed event start; end estimated	One of WWE's largest annual events provides a major prime-time entertainment block.	7:00-11:00 PM	Washington Open	Washington Open - featured night session (semifinals; players TBD)	Confirm final card and runtime.	https://www.wwe.com/shows/summerslam
+2026-08-02	1:00-5:00 PM	Tennis	Washington Open	Washington Open - championship final (players TBD)	82	A	Medium	Confirmed tournament date; finalists and exact time TBD	The tournament final is the strongest tennis event in the day's schedule.	2:20-5:35 PM	MLB	New York Yankees at Chicago Cubs	Replace with the confirmed finalists and exact start time.	https://www.mubadalacitidcopen.com/en/tournament/schedule
+2026-08-02	6:00-10:00 PM	Pro Wrestling	WWE	WWE SummerSlam - Night 2	84	A	High	Confirmed event start; end estimated	The closing night of SummerSlam is a high-demand Sunday evening event.	7:20-10:35 PM	MLB	Boston Red Sox at Los Angeles Dodgers	Confirm final card and runtime.	https://www.wwe.com/shows/summerslam
+2026-08-03	11:00 AM-5:00 PM	Tennis	National Bank Open	National Bank Open - featured day session (early rounds; players TBD)	66	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.				Replace with the highest-demand confirmed match from the daily order of play.	https://nationalbankopen.com/
+2026-08-03	7:00-11:00 PM	Tennis	National Bank Open	National Bank Open - featured night session (early rounds; players TBD)	69	C	Medium	Confirmed tournament date; daily order of play TBD	The top night-session match provides a reliable prime-time tennis option.	7:05-10:20 PM	MLB	St. Louis Cardinals at New York Yankees	Replace with the highest-demand confirmed night-session match.	https://nationalbankopen.com/
+2026-08-04	11:00 AM-5:00 PM	Tennis	National Bank Open	National Bank Open - featured day session (early rounds; players TBD)	66	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.				Replace with the highest-demand confirmed match from the daily order of play.	https://nationalbankopen.com/
+2026-08-04	7:00-11:00 PM	Tennis	National Bank Open	National Bank Open - featured night session (early rounds; players TBD)	69	C	Medium	Confirmed tournament date; daily order of play TBD	The top night-session match provides a reliable prime-time tennis option.	7:05-10:20 PM	MLB	St. Louis Cardinals at New York Yankees	Replace with the highest-demand confirmed night-session match.	https://nationalbankopen.com/
+2026-08-05	11:00 AM-5:00 PM	Tennis	National Bank Open	National Bank Open - featured day session (early rounds; players TBD)	66	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.	2:20-5:35 PM	MLB	Los Angeles Dodgers at Chicago Cubs	Replace with the highest-demand confirmed match from the daily order of play.	https://nationalbankopen.com/
+2026-08-05	7:00-11:00 PM	Tennis	National Bank Open	National Bank Open - featured night session (early rounds; players TBD)	69	C	Medium	Confirmed tournament date; daily order of play TBD	The top night-session match provides a reliable prime-time tennis option.	7:05-10:20 PM	MLB	St. Louis Cardinals at New York Yankees	Replace with the highest-demand confirmed night-session match.	https://nationalbankopen.com/
+2026-08-06	11:00 AM-5:00 PM	Tennis	National Bank Open	National Bank Open - featured day session (early rounds; players TBD)	66	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.	2:20-5:35 PM	MLB	Toronto Blue Jays at Chicago Cubs	Replace with the highest-demand confirmed match from the daily order of play.	https://nationalbankopen.com/
+2026-08-06	8:00-11:15 PM	American Football	NFL Preseason	Carolina Panthers vs Arizona Cardinals - Hall of Fame Game	72	B	High	Confirmed preseason start; end time estimated	The strongest available preseason matchup in its time slot.	7:00-11:00 PM	National Bank Open	National Bank Open - featured night session (early rounds; players TBD)	Confirm local blackouts and any late schedule changes.	https://www.nfl.com/news/2026-nfl-preseason-schedule-released
+2026-08-07	11:00 AM-5:00 PM	Tennis	National Bank Open	National Bank Open - featured day session (early rounds; players TBD)	66	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.	3:00-6:00 PM	PGA Tour	Wyndham Championship - featured weekday coverage	Replace with the highest-demand confirmed match from the daily order of play.	https://nationalbankopen.com/
+2026-08-07	6:40-9:55 PM	Baseball	MLB	Toronto Blue Jays at Philadelphia Phillies	65	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	National Bank Open	National Bank Open - featured night session (early rounds; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-07	9:40 PM-12:55 AM	Baseball	MLB	Los Angeles Dodgers at Arizona Diamondbacks	66	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:05-10:20 PM	MLB	Atlanta Braves at New York Yankees	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-08	3:05-6:20 PM	Baseball	MLB	Atlanta Braves at New York Yankees	69	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	11:00 AM-5:00 PM	National Bank Open	National Bank Open - featured day session (early rounds; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-08	7:00-11:00 PM	Tennis	National Bank Open	National Bank Open - featured night session (early rounds; players TBD)	69	C	Medium	Confirmed tournament date; daily order of play TBD	The top night-session match provides a reliable prime-time tennis option.	8:10-11:25 PM	MLB	Los Angeles Dodgers at Arizona Diamondbacks	Replace with the highest-demand confirmed night-session match.	https://nationalbankopen.com/
+2026-08-09	3:30-7:00 PM	Motorsport	NASCAR Cup Series	Iowa Corn 350	76	B	High	Confirmed race start; end time estimated	A national NASCAR Cup race provides a high-demand standalone viewing block.	2:30-5:00 PM	INDYCAR	Grand Prix of Portland	Check for weather delays and overtime finishes.	https://www.nascar.com/nascar-cup-series/2026/schedule/
+2026-08-09	7:00-11:00 PM	Tennis	National Bank Open	National Bank Open - featured night session (early rounds; players TBD)	69	C	Medium	Confirmed tournament date; daily order of play TBD	The top night-session match provides a reliable prime-time tennis option.	4:10-7:25 PM	MLB	Los Angeles Dodgers at Arizona Diamondbacks	Replace with the highest-demand confirmed night-session match.	https://nationalbankopen.com/
+2026-08-10	11:00 AM-5:00 PM	Tennis	National Bank Open	National Bank Open - featured day session (round of 16; players TBD)	69	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.				Replace with the highest-demand confirmed match from the daily order of play.	https://nationalbankopen.com/
+2026-08-10	7:07-10:22 PM	Baseball	MLB	Boston Red Sox at Toronto Blue Jays	69	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	National Bank Open	National Bank Open - featured night session (round of 16; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-10	10:10 PM-1:25 AM	Baseball	MLB	Kansas City Royals at Los Angeles Dodgers	66	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	National Bank Open	National Bank Open - featured night session (round of 16; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-11	11:00 AM-5:00 PM	Tennis	National Bank Open	National Bank Open - featured day session (quarterfinals; players TBD)	72	B	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.				Replace with the highest-demand confirmed match from the daily order of play.	https://nationalbankopen.com/
+2026-08-11	7:07-10:22 PM	Baseball	MLB	Boston Red Sox at Toronto Blue Jays	69	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	National Bank Open	National Bank Open - featured night session (quarterfinals; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-11	10:10 PM-1:25 AM	Baseball	MLB	Kansas City Royals at Los Angeles Dodgers	66	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	National Bank Open	National Bank Open - featured night session (quarterfinals; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-12	3:00-5:15 PM	Soccer	UEFA Super Cup	Paris Saint-Germain vs Aston Villa - UEFA Super Cup	86	A	High	Confirmed kickoff	A European trophy match between major clubs is the day's leading afternoon event.	11:00 AM-5:00 PM	National Bank Open	National Bank Open - featured day session (semifinals; players TBD)	Confirm lineups and any venue-time changes.	https://www.uefa.com/uefasupercup/
+2026-08-12	7:07-10:22 PM	Baseball	MLB	Boston Red Sox at Toronto Blue Jays	69	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	National Bank Open	National Bank Open - featured night session (semifinals; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-12	10:10 PM-1:25 AM	Baseball	MLB	Kansas City Royals at Los Angeles Dodgers	66	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	National Bank Open	National Bank Open - featured night session (semifinals; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-13	1:00-5:00 PM	Tennis	National Bank Open	National Bank Open - championship final (players TBD)	82	A	Medium	Confirmed tournament date; finalists and exact time TBD	The tournament final is the strongest tennis event in the day's schedule.	3:07-6:22 PM	MLB	Boston Red Sox at Toronto Blue Jays	Replace with the confirmed finalists and exact start time.	https://nationalbankopen.com/
+2026-08-13	7:00-10:15 PM	American Football	NFL Preseason	Green Bay Packers at Pittsburgh Steelers	74	B	High	Confirmed preseason start; end time estimated	The strongest available preseason matchup in its time slot.	7:00-11:00 PM	Cincinnati Open	Cincinnati Open - featured night session (early rounds; players TBD)	Confirm local blackouts and any late schedule changes.	https://www.nfl.com/news/2026-nfl-preseason-schedule-released
+2026-08-13	10:10 PM-1:25 AM	Baseball	MLB	Milwaukee Brewers at Los Angeles Dodgers	66	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	Cincinnati Open	Cincinnati Open - featured night session (early rounds; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-14	11:00 AM-5:00 PM	Tennis	Cincinnati Open	Cincinnati Open - featured day session (early rounds; players TBD)	66	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.	3:00-6:00 PM	PGA Tour	FedEx St. Jude Championship - featured weekday coverage	Replace with the highest-demand confirmed match from the daily order of play.	https://cincinnatiopen.com/tournament/schedule/
+2026-08-14	7:07-10:22 PM	Baseball	MLB	New York Yankees at Toronto Blue Jays	74	B	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-10:15 PM	NFL Preseason	Tampa Bay Buccaneers at New York Jets	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-14	10:10 PM-1:25 AM	Baseball	MLB	Milwaukee Brewers at Los Angeles Dodgers	66	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-10:15 PM	NFL Preseason	Tampa Bay Buccaneers at New York Jets	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-15	1:00-4:15 PM	American Football	NFL Preseason	Carolina Panthers at Buffalo Bills	68	C	High	Confirmed preseason start; end time estimated	The strongest available preseason matchup in its time slot.	3:07-6:22 PM	MLB	New York Yankees at Toronto Blue Jays	Confirm local blackouts and any late schedule changes.	https://www.nfl.com/news/2026-nfl-preseason-schedule-released
+2026-08-15	4:00-7:15 PM	American Football	NFL Preseason	Los Angeles Rams at Kansas City Chiefs	74	B	High	Confirmed preseason start; end time estimated	The strongest available preseason matchup in its time slot.	3:07-6:22 PM	MLB	New York Yankees at Toronto Blue Jays	Confirm local blackouts and any late schedule changes.	https://www.nfl.com/news/2026-nfl-preseason-schedule-released
+2026-08-15	7:00-10:30 PM	Motorsport	NASCAR Cup Series	Cook Out 400 at Richmond	76	B	High	Confirmed race start; end time estimated	A national NASCAR Cup race provides a high-demand standalone viewing block.	8:00-11:15 PM	NFL Preseason	Dallas Cowboys at Seattle Seahawks	Check for weather delays and overtime finishes.	https://www.nascar.com/nascar-cup-series/2026/schedule/
+2026-08-16	12:00-2:30 PM	Motorsport	INDYCAR	Ontario Honda Dealers Indy at Markham	78	B	High	Confirmed race start; end time estimated	INDYCAR provides a strong North American motorsport window.	1:37-4:52 PM	MLB	New York Yankees at Toronto Blue Jays	Check for weather, cautions and revised broadcast start.	https://www.indycar.com/Schedule
+2026-08-16	7:00-11:00 PM	Tennis	Cincinnati Open	Cincinnati Open - featured night session (early rounds; players TBD)	69	C	Medium	Confirmed tournament date; daily order of play TBD	The top night-session match provides a reliable prime-time tennis option.	4:10-7:25 PM	MLB	Milwaukee Brewers at Los Angeles Dodgers	Replace with the highest-demand confirmed night-session match.	https://cincinnatiopen.com/tournament/schedule/
+2026-08-17	11:00 AM-5:00 PM	Tennis	Cincinnati Open	Cincinnati Open - featured day session (early rounds; players TBD)	66	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.				Replace with the highest-demand confirmed match from the daily order of play.	https://cincinnatiopen.com/tournament/schedule/
+2026-08-17	7:00-11:00 PM	Tennis	Cincinnati Open	Cincinnati Open - featured night session (early rounds; players TBD)	69	C	Medium	Confirmed tournament date; daily order of play TBD	The top night-session match provides a reliable prime-time tennis option.	8:40-11:55 PM	MLB	Los Angeles Dodgers at Colorado Rockies	Replace with the highest-demand confirmed night-session match.	https://cincinnatiopen.com/tournament/schedule/
+2026-08-18	11:00 AM-5:00 PM	Tennis	Cincinnati Open	Cincinnati Open - featured day session (early rounds; players TBD)	66	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.				Replace with the highest-demand confirmed match from the daily order of play.	https://cincinnatiopen.com/tournament/schedule/
+2026-08-18	7:00-11:00 PM	Tennis	Cincinnati Open	Cincinnati Open - featured night session (early rounds; players TBD)	69	C	Medium	Confirmed tournament date; daily order of play TBD	The top night-session match provides a reliable prime-time tennis option.	6:35-9:50 PM	MLB	New York Yankees at Baltimore Orioles	Replace with the highest-demand confirmed night-session match.	https://cincinnatiopen.com/tournament/schedule/
+2026-08-19	11:00 AM-5:00 PM	Tennis	Cincinnati Open	Cincinnati Open - featured day session (early rounds; players TBD)	66	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.				Replace with the highest-demand confirmed match from the daily order of play.	https://cincinnatiopen.com/tournament/schedule/
+2026-08-19	7:00-11:00 PM	Tennis	Cincinnati Open	Cincinnati Open - featured night session (early rounds; players TBD)	69	C	Medium	Confirmed tournament date; daily order of play TBD	The top night-session match provides a reliable prime-time tennis option.	6:35-9:50 PM	MLB	New York Yankees at Baltimore Orioles	Replace with the highest-demand confirmed night-session match.	https://cincinnatiopen.com/tournament/schedule/
+2026-08-20	11:00 AM-5:00 PM	Tennis	Cincinnati Open	Cincinnati Open - featured day session (quarterfinals; players TBD)	72	B	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.	1:10-4:25 PM	MLB	Toronto Blue Jays at Tampa Bay Rays	Replace with the highest-demand confirmed match from the daily order of play.	https://cincinnatiopen.com/tournament/schedule/
+2026-08-20	6:35-9:50 PM	Baseball	MLB	New York Yankees at Baltimore Orioles	68	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	Cincinnati Open	Cincinnati Open - featured night session (quarterfinals; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-20	10:00 PM-1:15 AM	American Football	NFL Preseason	San Francisco 49ers at Los Angeles Chargers	73	B	High	Confirmed preseason start; end time estimated	The strongest available preseason matchup in its time slot.	7:00-11:00 PM	Cincinnati Open	Cincinnati Open - featured night session (quarterfinals; players TBD)	Confirm local blackouts and any late schedule changes.	https://www.nfl.com/news/2026-nfl-preseason-schedule-released
+2026-08-21	4:30-5:30 AM	Motorsport	Formula 1	Dutch Grand Prix - Practice 1	58	C	High	Confirmed session time	Formula 1 practice offers a high-demand international viewing window.				Check for weather delays or session stoppages.	https://www.formula1.com/en/racing/2026
+2026-08-21	8:30-9:15 AM	Motorsport	Formula 1	Dutch Grand Prix - Sprint Qualifying	72	B	High	Confirmed session time	Formula 1 sprint qualifying offers a high-demand international viewing window.				Check for weather delays or session stoppages.	https://www.formula1.com/en/racing/2026
+2026-08-21	3:00-5:15 PM	Soccer	Premier League	Arsenal vs Coventry City	77	B	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	11:00 AM-5:00 PM	Cincinnati Open	Cincinnati Open - featured day session (quarterfinals; players TBD)	Premier League kickoff times can move for television; refresh when broadcast selections are announced.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
+2026-08-21	7:05-10:20 PM	Baseball	MLB	Toronto Blue Jays at New York Yankees	74	B	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	Cincinnati Open	Cincinnati Open - featured night session (quarterfinals; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-21	10:10 PM-1:25 AM	Baseball	MLB	Pittsburgh Pirates at Los Angeles Dodgers	66	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	Cincinnati Open	Cincinnati Open - featured night session (quarterfinals; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-22	4:00-5:00 AM	Motorsport	Formula 1	Dutch Grand Prix - Sprint	76	B	High	Confirmed session time	Formula 1 sprint offers a high-demand international viewing window.				Check for weather delays or session stoppages.	https://www.formula1.com/en/racing/2026
+2026-08-22	7:30-9:45 AM	Soccer	Premier League	Hull City vs Manchester United	78	B	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	8:00-9:15 AM	Formula 1	Dutch Grand Prix - Qualifying	Premier League kickoff times can move for television; refresh when broadcast selections are announced.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
+2026-08-22	12:00-3:15 PM	American Football	NFL Preseason	Washington Commanders at Detroit Lions	72	B	High	Confirmed preseason start; end time estimated	The strongest available preseason matchup in its time slot.	11:00 AM-5:00 PM	Cincinnati Open	Cincinnati Open - featured day session (semifinals; players TBD)	Confirm local blackouts and any late schedule changes.	https://www.nfl.com/news/2026-nfl-preseason-schedule-released
+2026-08-22	4:00-7:15 PM	American Football	NFL Preseason	New Orleans Saints at Los Angeles Rams	69	C	High	Confirmed preseason start; end time estimated	The strongest available preseason matchup in its time slot.	7:00-11:00 PM	Cincinnati Open	Cincinnati Open - featured night session (semifinals; players TBD)	Confirm local blackouts and any late schedule changes.	https://www.nfl.com/news/2026-nfl-preseason-schedule-released
+2026-08-22	7:30-9:45 PM	Soccer	MLS / Leagues Cup	Inter Miami CF vs Toronto FC	65.3	C	High	Confirmed time	Inter Miami provides MLS's strongest current demand signal; secondary-market entry price is used as an additional proxy.	7:00-11:00 PM	Cincinnati Open	Cincinnati Open - featured night session (semifinals; players TBD)	Confirm star availability and playoff implications near matchday.	https://www.intermiamicf.com/schedule/matches
+2026-08-22	10:00 PM-1:15 AM	American Football	NFL Preseason	Dallas Cowboys at Arizona Cardinals	75	B	High	Confirmed preseason start; end time estimated	The strongest available preseason matchup in its time slot.	7:00-11:00 PM	Cincinnati Open	Cincinnati Open - featured night session (semifinals; players TBD)	Confirm local blackouts and any late schedule changes.	https://www.nfl.com/news/2026-nfl-preseason-schedule-released
+2026-08-23	7:00-9:15 AM	Motorsport	Formula 1	Dutch Grand Prix	85	A	High	Confirmed session time	Formula 1 race offers a high-demand international viewing window.				Check for weather delays or session stoppages.	https://www.formula1.com/en/racing/2026
+2026-08-23	11:30 AM-1:45 PM	Soccer	Premier League	Newcastle United vs Liverpool	81	A	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	1:00-5:00 PM	Cincinnati Open	Cincinnati Open - championship final (players TBD)	Premier League kickoff times can move for television; refresh when broadcast selections are announced.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
+2026-08-23	3:00-6:30 PM	Motorsport	NASCAR Cup Series	Dollar Tree 301 at New Hampshire	77	B	High	Confirmed race start; end time estimated	A national NASCAR Cup race provides a high-demand standalone viewing block.	1:00-5:00 PM	Cincinnati Open	Cincinnati Open - championship final (players TBD)	Check for weather delays and overtime finishes.	https://www.nascar.com/nascar-cup-series/2026/schedule/
+2026-08-23	7:00-11:00 PM	Tennis	Winston-Salem Open	Winston-Salem Open - featured night session (early rounds; players TBD)	69	C	Medium	Confirmed tournament date; daily order of play TBD	The top night-session match provides a reliable prime-time tennis option.	8:00-11:15 PM	NFL Preseason	Seattle Seahawks at Tennessee Titans	Replace with the highest-demand confirmed night-session match.	https://www.winstonsalemopen.com/
+2026-08-24	3:00-5:15 PM	Soccer	Premier League	Fulham vs Chelsea	76	B	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	11:00 AM-5:00 PM	Winston-Salem Open	Winston-Salem Open - featured day session (early rounds; players TBD)	Premier League kickoff times can move for television; refresh when broadcast selections are announced.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
+2026-08-24	7:00-11:00 PM	Tennis	Winston-Salem Open	Winston-Salem Open - featured night session (early rounds; players TBD)	69	C	Medium	Confirmed tournament date; daily order of play TBD	The top night-session match provides a reliable prime-time tennis option.	9:40 PM-12:55 AM	MLB	Philadelphia Phillies at Seattle Mariners	Replace with the highest-demand confirmed night-session match.	https://www.winstonsalemopen.com/
+2026-08-25	11:00 AM-5:00 PM	Tennis	Winston-Salem Open	Winston-Salem Open - featured day session (early rounds; players TBD)	66	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.				Replace with the highest-demand confirmed match from the daily order of play.	https://www.winstonsalemopen.com/
+2026-08-25	7:30-10:00 PM	Soccer	Leagues Cup	Leagues Cup quarterfinal - highest-demand matchup TBD	74	B	Low	Quarterfinal date window confirmed; matchup and kickoff TBD	The strongest quarterfinal should become the evening soccer pick once the bracket is known.	7:15-10:30 PM	MLB	Los Angeles Dodgers at Atlanta Braves	Replace with the confirmed quarterfinal matchup and kickoff.	https://www.leaguescup.com/schedule/
+2026-08-26	11:00 AM-5:00 PM	Tennis	Winston-Salem Open	Winston-Salem Open - featured day session (early rounds; players TBD)	66	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.				Replace with the highest-demand confirmed match from the daily order of play.	https://www.winstonsalemopen.com/
+2026-08-26	7:30-10:00 PM	Soccer	Leagues Cup	Leagues Cup quarterfinal - highest-demand matchup TBD	74	B	Low	Quarterfinal date window confirmed; matchup and kickoff TBD	The strongest quarterfinal should become the evening soccer pick once the bracket is known.	7:15-10:30 PM	MLB	Los Angeles Dodgers at Atlanta Braves	Replace with the confirmed quarterfinal matchup and kickoff.	https://www.leaguescup.com/schedule/
+2026-08-27	11:00 AM-5:00 PM	Tennis	Winston-Salem Open	Winston-Salem Open - featured day session (quarterfinals; players TBD)	72	B	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.	3:00-6:00 PM	PGA Tour	TOUR Championship - featured weekday coverage	Replace with the highest-demand confirmed match from the daily order of play.	https://www.winstonsalemopen.com/
+2026-08-27	7:30-10:00 PM	Soccer	Leagues Cup	Leagues Cup quarterfinal - highest-demand matchup TBD	74	B	Low	Quarterfinal date window confirmed; matchup and kickoff TBD	The strongest quarterfinal should become the evening soccer pick once the bracket is known.	7:00-11:00 PM	Winston-Salem Open	Winston-Salem Open - featured night session (quarterfinals; players TBD)	Replace with the confirmed quarterfinal matchup and kickoff.	https://www.leaguescup.com/schedule/
+2026-08-27	10:00 PM-1:15 AM	American Football	NFL Preseason	Los Angeles Rams at Los Angeles Chargers	72	B	High	Confirmed preseason start; end time estimated	The strongest available preseason matchup in its time slot.	7:00-11:00 PM	Winston-Salem Open	Winston-Salem Open - featured night session (quarterfinals; players TBD)	Confirm local blackouts and any late schedule changes.	https://www.nfl.com/news/2026-nfl-preseason-schedule-released
+2026-08-28	3:00-5:15 PM	Soccer	Premier League	Crystal Palace vs Manchester City	77	B	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	11:00 AM-5:00 PM	Winston-Salem Open	Winston-Salem Open - featured day session (semifinals; players TBD)	Premier League kickoff times can move for television; refresh when broadcast selections are announced.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
+2026-08-28	7:05-10:20 PM	Baseball	MLB	Boston Red Sox at New York Yankees	79	B	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	Winston-Salem Open	Winston-Salem Open - featured night session (semifinals; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-29	12:30-2:45 PM	Soccer	Premier League	Newcastle United vs Tottenham Hotspur	78	B	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	1:00-5:00 PM	Winston-Salem Open	Winston-Salem Open - championship final (players TBD)	Premier League kickoff times can move for television; refresh when broadcast selections are announced.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
+2026-08-29	3:00-6:30 PM	American Football	NCAA Football	San José State at USC - Week 0	73	B	High	Confirmed kickoff; end estimated	USC's national profile makes this a high-demand late-afternoon college football option.	1:00-5:00 PM	Winston-Salem Open	Winston-Salem Open - championship final (players TBD)	Confirm television window.	https://www.ncaa.com/schedules/football/fbs
+2026-08-29	7:30-11:00 PM	Motorsport	NASCAR Cup Series	Coke Zero Sugar 400 at Daytona	82	A	High	Confirmed race start; end time estimated	A national NASCAR Cup race provides a high-demand standalone viewing block.	7:15-10:30 PM	MLB	Boston Red Sox at New York Yankees	Check for weather delays and overtime finishes.	https://www.nascar.com/nascar-cup-series/2026/schedule/
+2026-08-30	11:30 AM-1:45 PM	Soccer	Premier League	Manchester United vs Ipswich Town	78	B	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	1:00-6:00 PM	PGA Tour	TOUR Championship - final-round featured coverage	Premier League kickoff times can move for television; refresh when broadcast selections are announced.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
+2026-08-30	1:35-4:50 PM	Baseball	MLB	Boston Red Sox at New York Yankees	79	B	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	1:00-6:00 PM	PGA Tour	TOUR Championship - final-round featured coverage	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
+2026-08-30	7:00-11:00 PM	Tennis	US Open	US Open - featured night session (first round; players TBD)	69	C	Medium	Confirmed tournament date; daily order of play TBD	The top night-session match provides a reliable prime-time tennis option.	7:00-10:00 PM	CFL	BC Lions at Ottawa Redblacks	Replace with the highest-demand confirmed night-session match.	https://www.usopen.org/en_US/about/eventschedule.html
+2026-08-31	3:00-5:15 PM	Soccer	Premier League	Aston Villa vs Arsenal	79	B	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	11:00 AM-5:00 PM	US Open	US Open - featured day session (first round; players TBD)	Premier League kickoff times can move for television; refresh when broadcast selections are announced.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
+2026-08-31	7:00-11:00 PM	Tennis	US Open	US Open - featured night session (first round; players TBD)	69	C	Medium	Confirmed tournament date; daily order of play TBD	The top night-session match provides a reliable prime-time tennis option.	9:38 PM-12:53 AM	MLB	New York Yankees at Los Angeles Angels	Replace with the highest-demand confirmed night-session match.	https://www.usopen.org/en_US/about/eventschedule.html
+2026-09-01	11:00 AM-5:00 PM	Tennis	US Open	US Open - featured day session (first round; players TBD)	66	C	Medium	Confirmed tournament date; daily order of play TBD	The highest-profile daytime tennis matchup will be inserted when the order of play is released.				Replace with the highest-demand confirmed match from the daily order of play.	https://www.usopen.org/en_US/about/eventschedule.html
+2026-09-01	7:30-10:00 PM	Soccer	Leagues Cup	Leagues Cup semifinal - highest-demand matchup TBD	78	B	Low	Semifinal date window confirmed; matchup and kickoff TBD	The strongest semifinal should receive priority once the bracket is known.	7:00-11:00 PM	US Open	US Open - featured night session (first round; players TBD)	Replace with the confirmed semifinal matchup and kickoff.	https://www.leaguescup.com/schedule/
+2026-09-01	10:10 PM-1:25 AM	Baseball	MLB	St. Louis Cardinals at Los Angeles Dodgers	66	C	High	Confirmed first-pitch time; end time estimated	Popular-franchise MLB game selected for demand and Canadian relevance.	7:00-11:00 PM	US Open	US Open - featured night session (first round; players TBD)	Confirm postponements, starting pitchers and doubleheader changes on game day.	https://www.mlb.com/schedule/2026-07-19
 2026-09-02	10:10 PM	Baseball	MLB	St. Louis Cardinals at Los Angeles Dodgers	67	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
 2026-09-03	10:10 PM	Baseball	MLB	St. Louis Cardinals at Los Angeles Dodgers	67	C	High	Confirmed time	Best MLB matchup of the day based on franchise demand, rivalry strength and Canadian relevance.					https://www.mlb.com/schedule/2026-07-19
 2026-09-04	3:00 PM	Soccer	Premier League	Ipswich Town vs Liverpool	78	B	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	9:40 PM	MLB	New York Yankees at San Diego Padres	Premier League kickoff times can move for television; refresh when broadcast selections are announced.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
@@ -206,7 +471,7 @@ struct FeaturedEventCalendar {
 2026-10-22	8:15 PM	American Football	NFL	New England Patriots at Chicago Bears	84	A	High	Confirmed time	NFL games carry high per-game demand; this is the strongest national-window, rivalry or star-team matchup on the date.	7:00 PM	NHL	N.Y. Rangers at Toronto Maple Leafs	Weeks 16-18 and playoff times can be flexed. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://www.nfl.com/schedules/2026/REG1/
 2026-10-23	8:00 PM	Hockey	NHL	Montreal Canadiens at Chicago Blackhawks	62	C	High	Confirmed time	Highest-rated NHL matchup that day using team popularity, rivalry, Canadian relevance and weekend weighting.				NBA schedule may displace this pick after its August release. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://media.d3.nhle.com/image/private/fl_attachment/prd/zj6mn0paz7zqpywcedao.pdf
 2026-10-24	10:00 AM	Soccer	Premier League	Chelsea vs Tottenham Hotspur	85	A	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	5:30 PM	MLS / Leagues Cup	New York Red Bulls vs Inter Miami CF	Premier League kickoff times can move for television; refresh when broadcast selections are announced. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
-2026-10-25	3:00 PM	Soccer	La Liga	Barcelona vs Real Madrid - El Clasico	96	S	Medium	Confirmed date; kickoff provisional	One of club sport's most globally demanded rivalries.	8:20 PM	NFL	Kansas City Chiefs at Seattle Seahawks	Kickoff can move for broadcasting. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://www.laliga.com/en-GB/clubs/fc-barcelona/next-matches
+2026-10-25	3:00 PM	Soccer	La Liga	Barcelona vs Real Madrid - El Clásico	96	S	Medium	Confirmed date; kickoff provisional	One of club sport's most globally demanded rivalries.	8:20 PM	NFL	Kansas City Chiefs at Seattle Seahawks	Kickoff can move for broadcasting. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://www.laliga.com/en-GB/clubs/fc-barcelona/next-matches
 2026-10-26	8:15 PM	American Football	NFL	Dallas Cowboys at Philadelphia Eagles	92	S	High	Confirmed time	NFL games carry high per-game demand; this is the strongest national-window, rivalry or star-team matchup on the date.	8:30 PM	NHL	Toronto Maple Leafs at Calgary Flames	Weeks 16-18 and playoff times can be flexed. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://www.nfl.com/schedules/2026/REG1/
 2026-10-27	8:00 PM	Hockey	NHL	Montreal Canadiens at St. Louis Blues	60.2	C	High	Confirmed time	Highest-rated NHL matchup that day using team popularity, rivalry, Canadian relevance and weekend weighting.				NBA schedule may displace this pick after its August release. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://media.d3.nhle.com/image/private/fl_attachment/prd/zj6mn0paz7zqpywcedao.pdf
 2026-10-28	8:30 PM	Hockey	NHL	Calgary Flames at Edmonton Oilers	68.3	C	High	Confirmed time	Highest-rated NHL matchup that day using team popularity, rivalry, Canadian relevance and weekend weighting.	7:30 PM	MLS / Leagues Cup	Inter Miami CF vs FC Cincinnati	NBA schedule may displace this pick after its August release. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://media.d3.nhle.com/image/private/fl_attachment/prd/zj6mn0paz7zqpywcedao.pdf
@@ -220,7 +485,7 @@ struct FeaturedEventCalendar {
 2026-11-05	8:15 PM	American Football	NFL	Jacksonville Jaguars at Baltimore Ravens	80	A	High	Confirmed time	NFL games carry high per-game demand; this is the strongest national-window, rivalry or star-team matchup on the date.	7:00 PM	NHL	Boston Bruins at Pittsburgh Penguins	Weeks 16-18 and playoff times can be flexed. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://www.nfl.com/schedules/2026/REG1/
 2026-11-06	8:00 PM	Hockey	NHL	San Jose Sharks at Minnesota Wild	58	C	High	Confirmed time	Highest-rated NHL matchup that day using team popularity, rivalry, Canadian relevance and weekend weighting.				NBA schedule may displace this pick after its August release. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://media.d3.nhle.com/image/private/fl_attachment/prd/zj6mn0paz7zqpywcedao.pdf
 2026-11-07	10:00 AM	Soccer	Premier League	Manchester United vs Aston Villa	80	A	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	7:00 PM	NHL	Montreal Canadiens at Toronto Maple Leafs	Premier League kickoff times can move for television; refresh when broadcast selections are announced. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
-2026-11-08	4:25 PM	American Football	NFL	Green Bay Packers at New England Patriots	86	A	High	Confirmed time	NFL games carry high per-game demand; this is the strongest national-window, rivalry or star-team matchup on the date.	1:00 PM	Formula 1	Sao Paulo Grand Prix	Weeks 16-18 and playoff times can be flexed. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://www.nfl.com/schedules/2026/REG1/
+2026-11-08	4:25 PM	American Football	NFL	Green Bay Packers at New England Patriots	86	A	High	Confirmed time	NFL games carry high per-game demand; this is the strongest national-window, rivalry or star-team matchup on the date.	1:00 PM	Formula 1	São Paulo Grand Prix	Weeks 16-18 and playoff times can be flexed. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://www.nfl.com/schedules/2026/REG1/
 2026-11-09	8:15 PM	American Football	NFL	Buffalo Bills at Minnesota Vikings	81	A	High	Confirmed time	NFL games carry high per-game demand; this is the strongest national-window, rivalry or star-team matchup on the date.	9:00 PM	NHL	N.Y. Rangers at Edmonton Oilers	Weeks 16-18 and playoff times can be flexed. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://www.nfl.com/schedules/2026/REG1/
 2026-11-10	7:00 PM	Hockey	NHL	Colorado Avalanche at Toronto Maple Leafs	61.6	C	High	Confirmed time	Highest-rated NHL matchup that day using team popularity, rivalry, Canadian relevance and weekend weighting.				NBA schedule may displace this pick after its August release. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://media.d3.nhle.com/image/private/fl_attachment/prd/zj6mn0paz7zqpywcedao.pdf
 2026-11-11	10:00 PM	Hockey	NHL	Philadelphia Flyers at Edmonton Oilers	61.1	C	High	Confirmed time	Highest-rated NHL matchup that day using team popularity, rivalry, Canadian relevance and weekend weighting.				NBA schedule may displace this pick after its August release. NBA 2026-27 schedule was not yet released on July 18, 2026; re-rank after release.	https://media.d3.nhle.com/image/private/fl_attachment/prd/zj6mn0paz7zqpywcedao.pdf
@@ -402,7 +667,7 @@ struct FeaturedEventCalendar {
 2027-05-06	TBD	Baseball	MLB	San Francisco Giants at Los Angeles Dodgers	76	B	Medium	Confirmed matchup; first-pitch time TBD	Highest-demand available MLB matchup among marquee franchises; 2027 first-pitch times have not been released.				Replace with an NBA/NHL playoff game if one is scheduled and materially higher-demand. IPL 2027 dates/matchups are not yet published and may create a higher global-demand cricket option. NBA/NHL playoff matchups and game dates are not yet known; any elimination game or Game 7 should override.	https://www.mlb.com/schedule/2027-03-25
 2027-05-07	TBD	Baseball	MLB	San Francisco Giants at Los Angeles Dodgers	76	B	Medium	Confirmed matchup; first-pitch time TBD	Highest-demand available MLB matchup among marquee franchises; 2027 first-pitch times have not been released.				Replace with an NBA/NHL playoff game if one is scheduled and materially higher-demand. IPL 2027 dates/matchups are not yet published and may create a higher global-demand cricket option. NBA/NHL playoff matchups and game dates are not yet known; any elimination game or Game 7 should override.	https://www.mlb.com/schedule/2027-03-25
 2027-05-08	10:00 AM	Soccer	Premier League	Manchester City vs Liverpool	91	S	Medium	Provisional kickoff time	Highest-demand Premier League fixture on the date based on club reach, rivalry and likely broadcast prominence.	TBD	MLB	San Francisco Giants at Los Angeles Dodgers	Premier League kickoff times can move for television; refresh when broadcast selections are announced. IPL 2027 dates/matchups are not yet published and may create a higher global-demand cricket option. NBA/NHL playoff matchups and game dates are not yet known; any elimination game or Game 7 should override.	https://www.premierleague.com/en/news/4675097/all-380-fixtures-for-202627-premier-league-season/
-2027-05-09	3:00 PM	Soccer	La Liga	Real Madrid vs Barcelona - El Clasico	96	S	Medium	Confirmed date; kickoff provisional	One of club sport's most globally demanded rivalries.	TBD	MLB	San Francisco Giants at Los Angeles Dodgers	Kickoff can move for broadcasting. IPL 2027 dates/matchups are not yet published and may create a higher global-demand cricket option. NBA/NHL playoff matchups and game dates are not yet known; any elimination game or Game 7 should override.	https://www.laliga.com/en-GB/clubs/real-madrid/next-matches
+2027-05-09	3:00 PM	Soccer	La Liga	Real Madrid vs Barcelona - El Clásico	96	S	Medium	Confirmed date; kickoff provisional	One of club sport's most globally demanded rivalries.	TBD	MLB	San Francisco Giants at Los Angeles Dodgers	Kickoff can move for broadcasting. IPL 2027 dates/matchups are not yet published and may create a higher global-demand cricket option. NBA/NHL playoff matchups and game dates are not yet known; any elimination game or Game 7 should override.	https://www.laliga.com/en-GB/clubs/real-madrid/next-matches
 2027-05-10	TBD	Baseball	MLB	New York Yankees at Baltimore Orioles	62	C	Medium	Confirmed matchup; first-pitch time TBD	Highest-demand available MLB matchup among marquee franchises; 2027 first-pitch times have not been released.				Replace with an NBA/NHL playoff game if one is scheduled and materially higher-demand. IPL 2027 dates/matchups are not yet published and may create a higher global-demand cricket option. NBA/NHL playoff matchups and game dates are not yet known; any elimination game or Game 7 should override.	https://www.mlb.com/schedule/2027-03-25
 2027-05-11	TBD	Baseball	MLB	New York Yankees at Baltimore Orioles	62	C	Medium	Confirmed matchup; first-pitch time TBD	Highest-demand available MLB matchup among marquee franchises; 2027 first-pitch times have not been released.				Replace with an NBA/NHL playoff game if one is scheduled and materially higher-demand. IPL 2027 dates/matchups are not yet published and may create a higher global-demand cricket option. NBA/NHL playoff matchups and game dates are not yet known; any elimination game or Game 7 should override.	https://www.mlb.com/schedule/2027-03-25
 2027-05-12	TBD	Baseball	MLB	New York Yankees at Baltimore Orioles	62	C	Medium	Confirmed matchup; first-pitch time TBD	Highest-demand available MLB matchup among marquee franchises; 2027 first-pitch times have not been released.				Replace with an NBA/NHL playoff game if one is scheduled and materially higher-demand. IPL 2027 dates/matchups are not yet published and may create a higher global-demand cricket option. NBA/NHL playoff matchups and game dates are not yet known; any elimination game or Game 7 should override.	https://www.mlb.com/schedule/2027-03-25
@@ -483,8 +748,8 @@ private extension FeaturedEventPick {
         let matchText = Self.normalized([match.name, match.shortName, match.home.displayName, match.away.displayName].joined(separator: " "))
         if eventText.contains(Self.normalized(match.name)) || matchText.contains(eventText) { return true }
 
-        let homeTokens = Self.significantTokens(in: match.home.displayName)
-        let awayTokens = Self.significantTokens(in: match.away.displayName)
+        let homeTokens = Set(Self.significantTokens(in: match.home.displayName))
+        let awayTokens = Set(Self.significantTokens(in: match.away.displayName))
         let titleTokens = Set(Self.significantTokens(in: title))
         let hasHome = !homeTokens.isDisjoint(with: titleTokens) || Self.titleContainsAbbreviation(match.home.abbreviation, in: title)
         let hasAway = !awayTokens.isDisjoint(with: titleTokens) || Self.titleContainsAbbreviation(match.away.abbreviation, in: title)
@@ -498,16 +763,18 @@ private extension FeaturedEventPick {
     }
 
     private static func normalized(_ value: String) -> String {
-        value.lowercased().components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }.joined(separator: " ")
+        String(value.folding(options: .diacriticInsensitive, locale: .current).lowercased()
+            .map { $0.isLetter || $0.isNumber ? $0 : " " }
+            .split(separator: " ").joined(separator: " "))
     }
 
-    private static func significantTokens(in value: String) -> Set<String> {
-        let ignored: Set<String> = ["the", "and", "for", "with", "at", "vs", "cf", "fc", "sc", "afc", "football", "soccer", "basketball", "baseball", "hockey", "american", "college", "league", "cup", "championship"]
-        return Set(normalized(value).split(separator: " ").map(String.init).filter { $0.count > 2 && !ignored.contains($0) })
+    private static func significantTokens(in value: String) -> [String] {
+        let stopWords: Set<String> = ["at", "vs", "the", "fc", "cf", "sc", "club", "city", "united", "coverage", "featured"]
+        return normalized(value).split(separator: " ").map(String.init).filter { $0.count >= 3 && !stopWords.contains($0) }
     }
 
     private static func titleContainsAbbreviation(_ abbreviation: String, in title: String) -> Bool {
-        guard abbreviation.count > 1 else { return false }
-        return title.localizedCaseInsensitiveContains(abbreviation)
+        guard !abbreviation.isEmpty else { return false }
+        return significantTokens(in: title).contains(abbreviation.lowercased())
     }
 }

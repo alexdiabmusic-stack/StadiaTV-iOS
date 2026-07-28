@@ -62,7 +62,7 @@ struct OnboardingView: View {
             Image("BrandIcon")
                 .resizable()
                 .scaledToFill()
-                .frame(width: 96, height: 96)
+                .frame(width: Theme.scaled(96), height: Theme.scaled(96))
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Theme.hairline))
             BrandMark().scaleEffect(1.6)
@@ -79,7 +79,7 @@ struct OnboardingView: View {
         StepScaffold(title: "Pick your sports",
                      subtitle: "We'll tailor scores and schedules to what you follow.") {
             ScrollView {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 12)], spacing: 12) {
                     ForEach(SportGroup.allCases) { sport in
                         SelectableCard(
                             title: sport.rawValue,
@@ -207,7 +207,7 @@ struct OnboardingView: View {
             VStack(spacing: 16) {
                 Spacer()
                 Image(systemName: "list.and.film")
-                    .font(.system(size: 54))
+                    .font(.system(size: Theme.scaled(54)))
                     .foregroundStyle(Theme.accent)
                 if playlists.playlists.isEmpty {
                     Text("No playlists added yet.")
@@ -420,7 +420,7 @@ private struct SelectableCard: View {
         Button(action: action) {
             VStack(spacing: 12) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 34))
+                    .font(.system(size: Theme.scaled(34)))
                     .foregroundStyle(isSelected ? .white : Theme.accent)
                 Text(title)
                     .font(.subheadline.weight(.semibold))

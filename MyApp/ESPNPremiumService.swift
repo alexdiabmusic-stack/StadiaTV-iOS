@@ -130,19 +130,18 @@ extension ESPNService {
 private struct GameSummaryResponse: Decodable {
     let boxscore: BoxscoreDTO?
     let leaders: [SummaryLeaderNodeDTO]?
+    let plays: [PlayDTO]?
+    let headToHead: HeadToHeadDTO?
+    let videos: [VideoDTO]?
 
     func toSummary() -> GameSummary {
         let teams = (boxscore?.teams ?? []).compactMap { entry -> GameSummary.TeamBox? in
             guard let info = entry.team, let id = info.id else { return nil }
-            let stats = (entry.statistics ?? []).compactMap { stat -> GameSummary.GameStat? in
-                guard let value = stat.displayValue, let label = stat.label ?? stat.name else { return nil }
-                return GameSummary.GameStat(label: label, displayValue: value)
-            }
             return GameSummary.TeamBox(
                 id: id,
                 name: info.displayName ?? "",
                 abbreviation: info.abbreviation ?? "",
-                stats: stats
+                stats: entry.flattenedStats()
             )
         }
 
@@ -174,8 +173,109 @@ private struct GameSummaryResponse: Decodable {
         }
         walk(self.leaders ?? [], category: nil, teamAbbreviation: nil)
 
-        return GameSummary(teams: teams, leaders: Array(leaders.prefix(8)))
+        // Decode plays in reverse order (most recent first), capped at 60 entries.
+        let playEntries = (plays ?? [])
+            .reversed()
+            .prefix(60)
+            .compactMap { $0.toEntry() }
+
+        // Head-to-head series record
+        let h2h: HeadToHeadRecord? = headToHead.flatMap { dto in
+            guard let awayRecord = dto.awayTeamRecord, let homeRecord = dto.homeTeamRecord else { return nil }
+            return HeadToHeadRecord(
+                awayWins: awayRecord.wins ?? 0,
+                homeWins: homeRecord.wins ?? 0,
+                draws: (awayRecord.ties ?? 0) + (homeRecord.ties ?? 0) / 2,
+                label: dto.description ?? "All-time series"
+            )
+        }
+
+        // Video highlights (cap at 6, require a web link)
+        let highlights = (videos ?? []).prefix(6).compactMap { video -> MatchHighlight? in
+            guard let href = video.links?.web?.href ?? video.links?.mobile?.href,
+                  let webURL = URL(string: href) else { return nil }
+            return MatchHighlight(
+                id: video.id ?? UUID().uuidString,
+                title: video.headline ?? video.description ?? "Highlight",
+                thumbnailURL: video.thumbnail.flatMap(URL.init(string:)),
+                webURL: webURL,
+                duration: video.duration
+            )
+        }
+
+        return GameSummary(
+            teams: teams,
+            leaders: Array(leaders.prefix(8)),
+            plays: Array(playEntries),
+            headToHead: h2h,
+            highlights: Array(highlights)
+        )
     }
+}
+
+private struct PlayDTO: Decodable {
+    let id: String?
+    let clock: PlayClockDTO?
+    let period: PlayPeriodDTO?
+    let text: String?
+    let team: SummaryTeamInfoDTO?
+    let homeScore: String?
+    let awayScore: String?
+    let scoringPlay: Bool?
+
+    func toEntry() -> PlayByPlayEntry? {
+        guard let text, !text.isEmpty else { return nil }
+        return PlayByPlayEntry(
+            id: id ?? UUID().uuidString,
+            clock: clock?.displayValue,
+            period: period?.displayValue,
+            periodNumber: period?.number,
+            text: text,
+            teamAbbreviation: team?.abbreviation,
+            awayScore: awayScore,
+            homeScore: homeScore,
+            isScoringPlay: scoringPlay ?? false
+        )
+    }
+}
+
+private struct HeadToHeadDTO: Decodable {
+    let awayTeamRecord: H2HRecordDTO?
+    let homeTeamRecord: H2HRecordDTO?
+    let description: String?
+}
+
+private struct H2HRecordDTO: Decodable {
+    let wins: Int?
+    let losses: Int?
+    let ties: Int?
+}
+
+private struct VideoDTO: Decodable {
+    let id: String?
+    let headline: String?
+    let description: String?
+    let thumbnail: String?
+    let duration: Int?
+    let links: VideoLinksDTO?
+}
+
+private struct VideoLinksDTO: Decodable {
+    let web: VideoLinkDTO?
+    let mobile: VideoLinkDTO?
+}
+
+private struct VideoLinkDTO: Decodable {
+    let href: String?
+}
+
+private struct PlayClockDTO: Decodable {
+    let displayValue: String?
+}
+
+private struct PlayPeriodDTO: Decodable {
+    let displayValue: String?
+    let number: Int?
 }
 
 private struct BoxscoreDTO: Decodable {
@@ -185,6 +285,34 @@ private struct BoxscoreDTO: Decodable {
 private struct BoxscoreTeamDTO: Decodable {
     let team: SummaryTeamInfoDTO?
     let statistics: [BoxscoreStatDTO]?
+
+    func flattenedStats() -> [GameSummary.GameStat] {
+        let flattened = (statistics ?? []).flatMap { stat -> [BoxscoreLeafStatDTO] in
+            if let children = stat.stats, !children.isEmpty { return children }
+            guard let displayValue = stat.displayValue else { return [] }
+            return [BoxscoreLeafStatDTO(name: stat.name, displayName: stat.displayName, shortDisplayName: stat.label, abbreviation: stat.abbreviation, displayValue: displayValue)]
+        }
+
+        let byName = Dictionary(flattened.compactMap { stat -> (String, BoxscoreLeafStatDTO)? in
+            guard let key = stat.lookupKey else { return nil }
+            return (key, stat)
+        }, uniquingKeysWith: { first, _ in first })
+
+        let preferredKeys = [
+            "runs", "hits", "errors", "homeRuns", "RBIs", "walks", "strikeouts",
+            "fieldGoalsMade", "fieldGoalsAttempted", "threePointFieldGoalsMade", "freeThrowsMade",
+            "rebounds", "assists", "steals", "blocks", "turnovers",
+            "shotsOnGoal", "powerPlayGoals", "faceoffsWon", "penaltyMinutes",
+            "totalYards", "passingYards", "rushingYards", "firstDowns", "possessionTime"
+        ].compactMap { byName[$0.lowercased()] }
+
+        let selected = preferredKeys.isEmpty ? flattened : preferredKeys
+        var seen: Set<String> = []
+        return selected.compactMap { stat in
+            guard let displayValue = stat.displayValue, let label = stat.displayLabel, seen.insert(label).inserted else { return nil }
+            return GameSummary.GameStat(label: label, displayValue: displayValue)
+        }
+    }
 }
 
 private struct SummaryTeamInfoDTO: Decodable {
@@ -195,8 +323,27 @@ private struct SummaryTeamInfoDTO: Decodable {
 
 private struct BoxscoreStatDTO: Decodable {
     let name: String?
+    let displayName: String?
     let label: String?
+    let abbreviation: String?
     let displayValue: String?
+    let stats: [BoxscoreLeafStatDTO]?
+}
+
+private struct BoxscoreLeafStatDTO: Decodable {
+    let name: String?
+    let displayName: String?
+    let shortDisplayName: String?
+    let abbreviation: String?
+    let displayValue: String?
+
+    var lookupKey: String? {
+        name?.lowercased()
+    }
+
+    var displayLabel: String? {
+        shortDisplayName ?? abbreviation ?? displayName ?? name
+    }
 }
 
 private struct SummaryLeaderNodeDTO: Decodable {
@@ -277,11 +424,17 @@ private struct StandingsEntry: Decodable {
             abbreviation: team.abbreviation ?? "",
             logoURL: team.logos?.first?.href.flatMap(URL.init(string:)),
             record: record,
+            wins: byType["wins"],
+            losses: byType["losses"],
+            ties: byType["ties"] ?? byType["otlosses"],
             winPercent: byType["winpercent"],
             gamesBack: byType["gamesbehind"] ?? byType["gamesbehindnumber"],
             streak: byType["streak"],
             pointsFor: byType["pointsfor"] ?? byType["avgpointsfor"] ?? byType["pointspergame"],
-            pointsAgainst: byType["pointsagainst"] ?? byType["avgpointsagainst"]
+            pointsAgainst: byType["pointsagainst"] ?? byType["avgpointsagainst"],
+            leaguePoints: byType["points"],
+            gamesPlayed: byType["gamesplayed"],
+            goalDiff: byType["goaldifferential"] ?? byType["pointdifferential"]
         )
     }
 }

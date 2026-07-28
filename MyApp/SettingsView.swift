@@ -3,23 +3,28 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var playlists: PlaylistStore
+    @EnvironmentObject private var entitlements: EntitlementStore
     @State private var showingAddPlaylist = false
+    @State private var showingTeamEditor = false
     @State private var isExportingCalendar = false
     @State private var calendarExportMessage: String?
+    @State private var showPaywall = false
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Theme.background.ignoresSafeArea()
                 List {
+                    premiumSection
                     playlistsSection
-                    leaguesSection
-                    favoritesSection
-                    integrationsSection
+                    myTeamsSection
+                    appearanceSection
+                    notificationsSection
+                    privacySection
                     setupSection
                 }
                 .listStyle(.plain)
-                .scrollContentBackground(.hidden)
+                .hidesScrollContentBackground()
                 .refreshable { await playlists.refreshAll() }
             }
             .navigationTitle("Settings")
@@ -34,9 +39,29 @@ struct SettingsView: View {
             .sheet(isPresented: $showingAddPlaylist) {
                 AddPlaylistView { playlists.add($0) }
             }
+            .sheet(isPresented: $showingTeamEditor) {
+                TeamEditorView()
+            }
+            .sheet(isPresented: $showPaywall) {
+                PaywallView()
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
         }
         .tint(Theme.accent)
     }
+
+    // MARK: - Premium
+
+    private var premiumSection: some View {
+        Section {
+            PremiumStatusCard(showPaywall: $showPaywall)
+        } header: {
+            Label("StadiaTV Premium", systemImage: "sparkles")
+        }
+    }
+
+    // MARK: - Playlists
 
     private var playlistsSection: some View {
         Section {
@@ -82,90 +107,131 @@ struct SettingsView: View {
             if let lastError = playlists.lastError {
                 Text(lastError).foregroundStyle(Theme.live)
             } else {
-                Text("Live TV uses all channels loaded from your M3U and Xtream playlists.")
+                Text("Swipe left to delete a playlist. Pull to refresh all channel lists.")
             }
         }
     }
 
-    private var leaguesSection: some View {
-        ForEach(SportGroup.allCases) { sport in
-            Section {
-                ForEach(League.leagues(in: sport)) { league in
-                    Button {
-                        prefs.toggleLeague(league)
-                    } label: {
-                        HStack {
-                            Text(league.name).foregroundStyle(Theme.textPrimary)
-                            Spacer()
-                            if prefs.isLeagueSelected(league) {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(Theme.accent)
-                            }
-                        }
-                    }
-                    .listRowBackground(Theme.surface)
-                }
-            } header: {
-                Label(sport.rawValue, systemImage: sport.systemImage)
-            }
-        }
-    }
+    // MARK: - My Teams & Leagues
 
-    @ViewBuilder private var favoritesSection: some View {
-        if !prefs.favoriteTeams.isEmpty {
-            Section("Favorite Teams") {
-                ForEach(prefs.favoriteTeams) { favorite in
-                    HStack(spacing: 12) {
-                        AsyncImage(url: favorite.logoURL) { phase in
-                            if case .success(let image) = phase {
-                                image.resizable().scaledToFit()
-                            } else {
-                                Image(systemName: "shield.fill")
-                                    .foregroundStyle(Theme.textSecondary.opacity(0.5))
-                            }
-                        }
-                        .frame(width: 30, height: 30)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(favorite.displayName)
-                                .foregroundStyle(Theme.textPrimary)
-                            if let league = League.all.first(where: { $0.path == favorite.leaguePath }) {
-                                Text(league.name)
-                                    .font(.caption)
-                                    .foregroundStyle(Theme.textSecondary)
-                            }
-                        }
-                        Spacer()
-                        Button {
-                            removeFavorite(favorite)
-                        } label: {
-                            Image(systemName: "star.slash")
-                                .foregroundStyle(Theme.textSecondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .listRowBackground(Theme.surface)
-                }
-            }
-        }
-    }
-
-    private var integrationsSection: some View {
+    private var myTeamsSection: some View {
         Section {
             Button {
-                toggleNotifications()
+                showingTeamEditor = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "star.circle.fill")
+                        .foregroundStyle(Theme.accent)
+                        .frame(width: 28)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Edit My Teams")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.textPrimary)
+                        Text(myTeamsSummary)
+                            .font(.caption)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+            .listRowBackground(Theme.surface)
+        } header: {
+            Label("My Teams & Leagues", systemImage: "person.3.fill")
+        } footer: {
+            Text("Follow leagues and star favorite teams to personalize Home, Sports, and notifications.")
+        }
+    }
+
+    // MARK: - Appearance & Streaming
+
+    private var appearanceSection: some View {
+        Section {
+            Picker("Theme", selection: Binding(
+                get: { prefs.appearance },
+                set: { prefs.setAppearance($0) }
+            )) {
+                ForEach(AppAppearance.allCases) { appearance in
+                    Text(appearance.label).tag(appearance)
+                }
+            }
+            .pickerStyle(.segmented)
+            .listRowBackground(Theme.surface)
+
+            Menu {
+                ForEach(StreamLanguage.all) { language in
+                    Button {
+                        prefs.setDefaultStreamLanguage(language)
+                    } label: {
+                        if prefs.isStreamLanguageSelected(language) {
+                            Label(language.name, systemImage: "checkmark")
+                        } else {
+                            Text(language.name)
+                        }
+                    }
+                }
             } label: {
                 HStack {
-                    Label("Match Notifications", systemImage: prefs.matchNotificationsEnabled ? "bell.fill" : "bell")
+                    Label("Stream Language", systemImage: "globe")
                         .foregroundStyle(Theme.textPrimary)
                     Spacer()
-                    Text(prefs.matchNotificationsEnabled ? "On" : "Off")
+                    Text(defaultStreamLanguageName)
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
                 }
             }
             .listRowBackground(Theme.surface)
 
+            settingsToggle(
+                title: "Spoiler-Free Mode",
+                systemImage: "eye.slash",
+                isOn: Binding(get: { prefs.spoilerFreeMode }, set: { prefs.setSpoilerFreeMode($0) })
+            )
+
+            settingsToggle(
+                title: "Live Score in Player",
+                systemImage: "sportscourt.fill",
+                isOn: Binding(get: { prefs.showLiveScoreBadge }, set: { prefs.setShowLiveScoreBadge($0) })
+            )
+        } header: {
+            Label("Appearance & Streaming", systemImage: "circle.lefthalf.filled")
+        } footer: {
+            Text("Spoiler-Free Mode hides final scores in match lists. Live Score shows a real-time badge while streaming — tap to expand, then × to dismiss.")
+        }
+    }
+
+    // MARK: - Notifications & Calendar
+
+    private var notificationsSection: some View {
+        Section {
+            HStack {
+                Label("Smart Alerts", systemImage: "bell.badge.fill")
+                    .foregroundStyle(Theme.textPrimary)
+                Spacer()
+                if !entitlements.isPremium {
+                    Button {
+                        showPaywall = true
+                    } label: {
+                        Label("Premium", systemImage: "lock.fill")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Toggle("", isOn: Binding(
+                        get: { prefs.matchNotificationsEnabled },
+                        set: { _ in toggleNotifications() }
+                    ))
+                    .labelsHidden()
+                    .tint(Theme.accent)
+                }
+            }
+            .listRowBackground(Theme.surface)
+
             if prefs.matchNotificationsEnabled {
-                Picker("Reminder", selection: Binding(
+                Picker("Remind me", selection: Binding(
                     get: { prefs.matchReminderLeadTime },
                     set: { updateReminderLeadTime($0) }
                 )) {
@@ -173,50 +239,56 @@ struct SettingsView: View {
                         Text(leadTime.label).tag(leadTime)
                     }
                 }
-                .pickerStyle(.menu)
                 .listRowBackground(Theme.surface)
+
+                settingsToggle(
+                    title: "Morning Briefing",
+                    systemImage: "sunrise.fill",
+                    isOn: Binding(get: { prefs.morningDigestEnabled }, set: { prefs.setMorningDigestEnabled($0) })
+                )
             }
 
+            #if !os(tvOS)
             Button {
                 Task { await exportFollowedGamesToCalendar() }
             } label: {
                 HStack {
-                    Label(isExportingCalendar ? "Adding Games" : "Add Upcoming Games to Calendar", systemImage: "calendar.badge.plus")
-                        .foregroundStyle(Theme.textPrimary)
+                    Label(
+                        isExportingCalendar ? "Adding Games…" : "Add Upcoming Games to Calendar",
+                        systemImage: "calendar.badge.plus"
+                    )
+                    .foregroundStyle(Theme.textPrimary)
                     Spacer()
                     if isExportingCalendar { ProgressView().tint(Theme.accent) }
                 }
             }
             .disabled(isExportingCalendar)
             .listRowBackground(Theme.surface)
-
-            Button {
-                prefs.setCloudSyncEnabled(!prefs.cloudSyncEnabled)
-            } label: {
-                HStack {
-                    Label("iCloud Sync", systemImage: prefs.cloudSyncEnabled ? "icloud.fill" : "icloud")
-                        .foregroundStyle(Theme.textPrimary)
-                    Spacer()
-                    Text(prefs.cloudSyncEnabled ? "On" : "Off")
-                        .foregroundStyle(Theme.textSecondary)
-                }
-            }
-            .listRowBackground(Theme.surface)
-
-            HStack {
-                Label("External API Configuration", systemImage: "key.horizontal")
-                    .foregroundStyle(Theme.textPrimary)
-                Spacer()
-                Text(AppConfiguration.isOddsEnabled ? "Configured" : "Not Bundled")
-                    .foregroundStyle(Theme.textSecondary)
-            }
-            .listRowBackground(Theme.surface)
+            #endif
         } header: {
-            Label("Privacy & Integrations", systemImage: "lock.shield")
+            Label("Notifications & Calendar", systemImage: "bell.badge")
         } footer: {
-            Text(calendarExportMessage ?? "Notifications are local. Calendar export uses write-only access. iCloud sync covers preferences, favorite channels, and watch history; Xtream secrets stay in Keychain on this device.")
+            Text(calendarExportMessage ?? "Notifications are local and never leave your device. Calendar export adds upcoming games from your followed leagues.")
         }
     }
+
+    // MARK: - Privacy & Sync
+
+    private var privacySection: some View {
+        Section {
+            settingsToggle(
+                title: "iCloud Sync",
+                systemImage: "icloud.fill",
+                isOn: Binding(get: { prefs.cloudSyncEnabled }, set: { prefs.setCloudSyncEnabled($0) })
+            )
+        } header: {
+            Label("Privacy & Sync", systemImage: "lock.shield")
+        } footer: {
+            Text("iCloud sync covers preferences, favorite channels, and watch history. Xtream Codes credentials stay in Keychain on this device only.")
+        }
+    }
+
+    // MARK: - Setup
 
     private var setupSection: some View {
         Section {
@@ -230,6 +302,29 @@ struct SettingsView: View {
         } footer: {
             Text("Run setup again to pick sports, leagues, teams, and an optional playlist.")
         }
+    }
+
+    // MARK: - Helpers
+
+    @ViewBuilder private func settingsToggle(title: String, systemImage: String, isOn: Binding<Bool>) -> some View {
+        Toggle(isOn: isOn) {
+            Label(title, systemImage: systemImage)
+                .foregroundStyle(Theme.textPrimary)
+        }
+        .tint(Theme.accent)
+        .listRowBackground(Theme.surface)
+    }
+
+    private var myTeamsSummary: String {
+        let selectedLeagues = League.all.filter { prefs.isLeagueSelected($0) }.count
+        let leagueText = selectedLeagues == 0 ? "All leagues" : "\(selectedLeagues) league\(selectedLeagues == 1 ? "" : "s")"
+        let favorites = prefs.favoriteTeams.count
+        return "\(leagueText) · \(favorites) favorite team\(favorites == 1 ? "" : "s")"
+    }
+
+    private var defaultStreamLanguageName: String {
+        let selected = prefs.preferredStreamLanguages.first ?? "en"
+        return StreamLanguage.all.first { $0.code == selected }?.name ?? "English"
     }
 
     private func playlistSubtitle(_ playlist: Playlist) -> String {
@@ -247,9 +342,7 @@ struct SettingsView: View {
             Task {
                 let granted = await MatchNotificationService.shared.requestAuthorization()
                 prefs.setMatchNotificationsEnabled(granted)
-                if granted {
-                    await syncFavoriteGameNotifications()
-                }
+                if granted { await syncFavoriteGameNotifications() }
             }
         }
     }
@@ -269,13 +362,12 @@ struct SettingsView: View {
         )
     }
 
+    #if !os(tvOS)
     private func exportFollowedGamesToCalendar() async {
         guard !isExportingCalendar else { return }
         isExportingCalendar = true
         defer { isExportingCalendar = false }
-
         let matches = await loadFollowedMatches()
-
         do {
             let saved = try await MatchCalendarService.shared.add(matches: matches)
             calendarExportMessage = saved == 1 ? "Added 1 upcoming game to Calendar." : "Added \(saved) upcoming games to Calendar."
@@ -283,6 +375,7 @@ struct SettingsView: View {
             calendarExportMessage = error.localizedDescription
         }
     }
+    #endif
 
     private func loadFollowedMatches() async -> [Match] {
         let service = ESPNService()
@@ -293,24 +386,10 @@ struct SettingsView: View {
                     (try? await service.scoreboards(for: league, starting: Date(), days: 7)) ?? []
                 }
             }
-            for await loaded in group {
-                matches.append(contentsOf: loaded)
-            }
+            for await loaded in group { matches.append(contentsOf: loaded) }
         }
         return Dictionary(grouping: matches, by: \.id)
             .compactMap { $0.value.first }
             .sorted { $0.date < $1.date }
-    }
-
-    private func removeFavorite(_ favorite: FavoriteTeam) {
-        guard let league = League.all.first(where: { $0.path == favorite.leaguePath }) else { return }
-        let team = Team(
-            id: favorite.teamID,
-            displayName: favorite.displayName,
-            shortDisplayName: favorite.displayName,
-            abbreviation: favorite.abbreviation,
-            logoURL: favorite.logoURL
-        )
-        prefs.toggleFavorite(team, in: league)
     }
 }

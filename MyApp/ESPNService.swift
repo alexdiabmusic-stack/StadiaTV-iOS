@@ -37,16 +37,48 @@ struct ESPNService {
         return decoded.events?.compactMap { $0.toMatch(league: league) } ?? []
     }
 
-    /// Fetches scoreboards for consecutive days using a single ranged request
-    /// (dates=YYYYMMDD-YYYYMMDD) and removes duplicate events.
+    /// Fetches scoreboards for consecutive days and removes duplicate events.
+    /// ESPN caps the events returned per request, so long windows (e.g. a full
+    /// year of favorite-team games) are split into concurrent 30-day ranged requests.
     func scoreboards(for league: League, starting startDate: Date, days: Int) async throws -> [Match] {
         let calendar = Calendar.current
-        let endDate = calendar.date(byAdding: .day, value: max(0, days - 1), to: startDate) ?? startDate
+        var windows: [(start: Date, end: Date)] = []
+        var windowStart = startDate
+        var remaining = max(1, days)
+        while remaining > 0 {
+            let length = min(30, remaining)
+            let windowEnd = calendar.date(byAdding: .day, value: length - 1, to: windowStart) ?? windowStart
+            windows.append((windowStart, windowEnd))
+            windowStart = calendar.date(byAdding: .day, value: length, to: windowStart) ?? windowEnd
+            remaining -= length
+        }
 
+        var matches: [Match] = []
+        try await withThrowingTaskGroup(of: [Match].self) { group in
+            for window in windows {
+                group.addTask {
+                    try await scoreboardRange(for: league, from: window.start, to: window.end)
+                }
+            }
+            for try await loaded in group {
+                matches.append(contentsOf: loaded)
+            }
+        }
+
+        if Self.rangeIncludesToday(start: startDate, end: windows.last?.end ?? startDate),
+           let todayMatches = try? await scoreboard(for: league) {
+            matches.append(contentsOf: todayMatches)
+        }
+
+        return Self.uniqueMatchesPreferringLatest(matches)
+    }
+
+    /// A single ranged scoreboard request (dates=YYYYMMDD-YYYYMMDD).
+    private func scoreboardRange(for league: League, from startDate: Date, to endDate: Date) async throws -> [Match] {
         var components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/scoreboard")!
         components.queryItems = [
             URLQueryItem(name: "dates", value: "\(Self.dateFormatter.string(from: startDate))-\(Self.dateFormatter.string(from: endDate))"),
-            URLQueryItem(name: "limit", value: "300"),
+            URLQueryItem(name: "limit", value: "1000"),
         ]
 
         let (data, response) = try await session.data(from: components.url!)
@@ -54,14 +86,7 @@ struct ESPNService {
             throw ServiceError.badResponse
         }
         let decoded = try JSONDecoder().decode(ScoreboardResponse.self, from: data)
-
-        var seenIDs: Set<String> = []
-        var matches: [Match] = []
-        for match in decoded.events?.compactMap({ $0.toMatch(league: league) }) ?? [] where !seenIDs.contains(match.id) {
-            seenIDs.insert(match.id)
-            matches.append(match)
-        }
-        return matches.sorted { $0.date < $1.date }
+        return decoded.events?.compactMap { $0.toMatch(league: league) } ?? []
     }
 
     /// Fetches recent ESPN articles for a league.
@@ -79,6 +104,8 @@ struct ESPNService {
 
     /// Fetches every team in a league (used by the onboarding team picker).
     func teams(for league: League) async throws -> [Team] {
+        guard league.group != .golf else { return [] }
+
         var components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/teams")!
         components.queryItems = [URLQueryItem(name: "limit", value: "1000")]
 
@@ -90,6 +117,70 @@ struct ESPNService {
         let entries = decoded.sports?.first?.leagues?.first?.teams ?? []
         return entries.compactMap { $0.team?.toTeam() }
             .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
+    }
+
+    /// Fetches the full entry list for a racing league's current event
+    /// (e.g. every F1 driver) from the ESPN scoreboard, then syncs each
+    /// racer's constructor/team from ESPN's core athlete records.
+    func racers(for league: League) async throws -> [Racer] {
+        let components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/scoreboard")!
+        let (data, response) = try await session.data(from: components.url!)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw ServiceError.badResponse
+        }
+        let decoded = try JSONDecoder().decode(ScoreboardResponse.self, from: data)
+        let entrants = decoded.events?.first?.toRacers() ?? []
+        return await withTeams(entrants, league: league)
+    }
+
+    /// The scoreboard doesn't carry constructors, so look each racer up in the
+    /// core API (e.g. racing/leagues/f1/athletes/{id}), which lists their vehicle/team.
+    private func withTeams(_ racers: [Racer], league: League) async -> [Racer] {
+        // "racing/f1" -> "racing/leagues/f1"
+        let corePath = league.path.replacingOccurrences(of: "/", with: "/leagues/")
+        var teamsByRacerID: [String: String] = [:]
+        await withTaskGroup(of: (String, String?).self) { group in
+            for racer in racers {
+                group.addTask { [session] in
+                    let url = URL(string: "https://sports.core.api.espn.com/v2/sports/\(corePath)/athletes/\(racer.id)")!
+                    guard let (data, response) = try? await session.data(from: url),
+                          let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+                          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                          let vehicles = json["vehicles"] as? [[String: Any]],
+                          let vehicle = vehicles.first else {
+                        return (racer.id, nil)
+                    }
+                    return (racer.id, vehicle["team"] as? String ?? vehicle["manufacturer"] as? String)
+                }
+            }
+            for await (id, team) in group {
+                teamsByRacerID[id] = team
+            }
+        }
+        return racers.map { racer in
+            guard let team = teamsByRacerID[racer.id], !team.isEmpty else { return racer }
+            return Racer(id: racer.id, name: racer.name, shortName: racer.shortName,
+                         teamName: team, place: racer.place, flagURL: racer.flagURL,
+                         isWinner: racer.isWinner)
+        }
+    }
+
+    private static func rangeIncludesToday(start: Date, end: Date) -> Bool {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return today >= calendar.startOfDay(for: start) && today <= calendar.startOfDay(for: end)
+    }
+
+    private static func uniqueMatchesPreferringLatest(_ matches: [Match]) -> [Match] {
+        var order: [String] = []
+        var byID: [String: Match] = [:]
+        for match in matches {
+            if byID[match.id] == nil {
+                order.append(match.id)
+            }
+            byID[match.id] = match
+        }
+        return order.compactMap { byID[$0] }.sorted { $0.date < $1.date }
     }
 
     static let dateFormatter: DateFormatter = {
@@ -202,6 +293,8 @@ private struct EventDTO: Decodable {
     let status: StatusDTO?
 
     func toMatch(league: League) -> Match? {
+        if league.group == .racing { return toRaceMatch(league: league) }
+        if league.group == .golf { return toGolfMatch(league: league) }
         guard let competition = competitions?.first,
               let competitors = competition.competitors, competitors.count >= 2 else { return nil }
 
@@ -225,6 +318,90 @@ private struct EventDTO: Decodable {
             broadcasts: competition.broadcastNames,
             venue: competition.venue?.fullName
         )
+    }
+
+    /// Golf events carry a leaderboard of athletes instead of two teams. The top
+    /// two listed players stand in as sides so existing match rows and detail
+    /// screens can present the event consistently.
+    private func toGolfMatch(league: League) -> Match? {
+        let competition = competitions?.first
+        let golfers = (competition?.competitors ?? [])
+            .sorted { ($0.order ?? Int.max) < ($1.order ?? Int.max) }
+
+        let status = competition?.status ?? status
+        let state = Self.gameState(from: status?.type?.state)
+        let date = Self.parseDate(date)
+        let placeholder = TeamSide(displayName: "Field", shortName: "Field", abbreviation: "",
+                                   logoURL: nil, score: nil, record: nil, isWinner: false)
+
+        return Match(
+            id: id,
+            league: league,
+            date: date,
+            name: name ?? "Golf Tournament",
+            shortName: shortName ?? name ?? "Golf",
+            state: state,
+            statusDetail: Self.statusDetail(status: status, state: state, date: date),
+            home: golfers.dropFirst().first?.toGolferSide() ?? placeholder,
+            away: golfers.first?.toGolferSide() ?? placeholder,
+            broadcasts: competition?.broadcastNames ?? [],
+            venue: competition?.venue?.fullName
+        )
+    }
+
+    /// Racing events (F1) carry the weekend's sessions and their competitors are
+    /// athletes, not teams. The main race is the session with the most entrants;
+    /// the top two drivers stand in for the two "team" sides of a `Match`.
+    private func toRaceMatch(league: League) -> Match? {
+        let competition = raceCompetition
+        let racers = (competition?.competitors ?? [])
+            .sorted { ($0.order ?? Int.max) < ($1.order ?? Int.max) }
+
+        let status = competition?.status ?? status
+        let state = Self.gameState(from: status?.type?.state)
+        let date = Self.parseDate(date)
+
+        let placeholder = TeamSide(displayName: "TBD", shortName: "TBD", abbreviation: "",
+                                   logoURL: nil, score: nil, record: nil, isWinner: false)
+        return Match(
+            id: id,
+            league: league,
+            date: date,
+            name: name ?? "Race",
+            shortName: shortName ?? "",
+            state: state,
+            statusDetail: Self.statusDetail(status: status, state: state, date: date),
+            home: racers.dropFirst().first?.toRacerSide() ?? placeholder,
+            away: racers.first?.toRacerSide() ?? placeholder,
+            broadcasts: competition?.broadcastNames ?? [],
+            venue: competition?.venue?.fullName
+        )
+    }
+
+    /// The main race session of a racing weekend. ESPN lists FP1…Quali…Race;
+    /// prefer the session typed "Race", falling back to the last session.
+    private var raceCompetition: CompetitionDTO? {
+        competitions?.first { ($0.type?.abbreviation ?? $0.type?.text ?? "").lowercased().contains("race") }
+            ?? competitions?.last
+    }
+
+    /// Maps every entrant of the event's main session to a `Racer`.
+    func toRacers() -> [Racer] {
+        let entrants = (raceCompetition?.competitors ?? [])
+            .sorted { ($0.order ?? Int.max) < ($1.order ?? Int.max) }
+        return entrants.enumerated().compactMap { index, dto in
+            guard let athlete = dto.athlete,
+                  let name = athlete.displayName ?? athlete.fullName else { return nil }
+            return Racer(
+                id: dto.id ?? "\(id)-\(index)",
+                name: name,
+                shortName: athlete.shortName ?? name,
+                teamName: dto.vehicle?.manufacturer ?? "Independent",
+                place: dto.order,
+                flagURL: athlete.flag?.href.flatMap(URL.init(string:)),
+                isWinner: dto.winner ?? false
+            )
+        }
     }
 
     static func gameState(from state: String?) -> GameState {
@@ -292,6 +469,7 @@ private struct EventDTO: Decodable {
 }
 
 private struct CompetitionDTO: Decodable {
+    let type: CompetitionTypeDTO?
     let competitors: [CompetitorDTO]?
     let venue: VenueDTO?
     let broadcasts: [BroadcastDTO]?
@@ -311,11 +489,45 @@ private struct VenueDTO: Decodable {
 }
 
 private struct CompetitorDTO: Decodable {
+    let id: String?
     let homeAway: String?
     let score: String?
     let winner: Bool?
+    let order: Int?
     let team: TeamDTO?
+    let athlete: RaceAthleteDTO?
+    let vehicle: VehicleDTO?
     let records: [RecordDTO]?
+
+    /// Golf competitors are leaderboard athletes; score carries their current
+    /// tournament total, and order carries leaderboard position.
+    func toGolferSide() -> TeamSide {
+        let name = athlete?.displayName ?? athlete?.fullName ?? "TBD"
+        return TeamSide(
+            displayName: name,
+            shortName: athlete?.shortName ?? name,
+            abbreviation: "",
+            logoURL: athlete?.flag?.href.flatMap(URL.init(string:)),
+            score: score,
+            record: order.map { "#\($0)" },
+            isWinner: winner ?? false,
+            teamID: nil
+        )
+    }
+
+    /// Racing competitors are drivers; the constructor shows where a record would.
+    func toRacerSide() -> TeamSide {
+        TeamSide(
+            displayName: athlete?.displayName ?? athlete?.fullName ?? "TBD",
+            shortName: athlete?.shortName ?? athlete?.displayName ?? "TBD",
+            abbreviation: "",
+            logoURL: athlete?.flag?.href.flatMap(URL.init(string:)),
+            score: nil,
+            record: vehicle?.manufacturer,
+            isWinner: winner ?? false,
+            teamID: nil
+        )
+    }
 
     func toTeamSide() -> TeamSide {
         TeamSide(
@@ -343,6 +555,37 @@ private struct TeamDTO: Decodable {
 private struct RecordDTO: Decodable {
     let type: String?
     let summary: String?
+}
+
+private struct RaceAthleteDTO: Decodable {
+    let fullName: String?
+    let displayName: String?
+    let shortName: String?
+    let flag: FlagDTO?
+}
+
+private struct FlagDTO: Decodable {
+    let href: String?
+}
+
+private struct VehicleDTO: Decodable {
+    let number: String?
+    let manufacturer: String?
+}
+
+private struct CompetitionTypeDTO: Decodable {
+    let abbreviation: String?
+    let text: String?
+}
+
+/// Core API athlete record (sports.core.api.espn.com); carries the racer's vehicle/team.
+private struct CoreRaceAthleteDTO: Decodable {
+    let vehicles: [CoreVehicleDTO]?
+}
+
+private struct CoreVehicleDTO: Decodable {
+    let team: String?
+    let manufacturer: String?
 }
 
 private struct StatusDTO: Decodable {

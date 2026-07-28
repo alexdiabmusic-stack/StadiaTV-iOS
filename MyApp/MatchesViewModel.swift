@@ -19,6 +19,10 @@ final class MatchesViewModel: ObservableObject {
         matches.filter { $0.state == .final }.sorted { $0.date > $1.date }
     }
 
+    var favoriteMatchesForSelectedLeague: [Match] {
+        favoriteMatches.filter { $0.league.id == selectedLeague.id }
+    }
+
     func load() async {
         isLoading = matches.isEmpty
         errorMessage = nil
@@ -29,6 +33,47 @@ final class MatchesViewModel: ObservableObject {
             errorMessage = error.localizedDescription
         }
         isLoading = false
+    }
+
+    /// All announced games over the next 365 days for the user's favorite teams,
+    /// fetched across every league those teams belong to.
+    @Published var favoriteMatches: [Match] = []
+    @Published var isLoadingFavorites = false
+
+    func loadFavoriteSchedule(favorites: [FavoriteTeam]) async {
+        guard !favorites.isEmpty else {
+            favoriteMatches = []
+            return
+        }
+        isLoadingFavorites = favoriteMatches.isEmpty
+
+        let leaguePaths = Set(favorites.map(\.leaguePath))
+        let leagues = League.all.filter { leaguePaths.contains($0.path) }
+        var loaded: [Match] = []
+        await withTaskGroup(of: [Match].self) { group in
+            for league in leagues {
+                group.addTask { [service] in
+                    (try? await service.scoreboards(for: league, starting: Date(), days: 365)) ?? []
+                }
+            }
+            for await matches in group {
+                loaded.append(contentsOf: matches)
+            }
+        }
+
+        let favoriteIDs = Set(favorites.map(\.id))
+        let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
+        favoriteMatches = loaded.filter { match in
+            let sides = [match.home, match.away]
+            return sides.contains { side in
+                if let teamID = side.teamID, favoriteIDs.contains("\(match.league.path)-\(teamID)") {
+                    return true
+                }
+                return favoriteNames.contains(side.displayName.lowercased())
+            }
+        }
+        .sorted { $0.date < $1.date }
+        isLoadingFavorites = false
     }
 
     func selectLeague(_ league: League) {

@@ -19,7 +19,7 @@ struct TeamRosterView: View {
             } else if groups.isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: "person.2.slash")
-                        .font(.system(size: 42))
+                        .font(.system(size: Theme.scaled(42)))
                         .foregroundStyle(Theme.textSecondary)
                     Text("Roster isn't available for this team.")
                         .font(.callout)
@@ -61,7 +61,7 @@ struct TeamRosterView: View {
             }
         }
         .navigationTitle(teamName)
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavigationTitle()
         .task { await load() }
     }
 
@@ -152,7 +152,7 @@ struct PlayerDetailView: View {
             }
         }
         .navigationTitle(athlete.displayName)
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavigationTitle()
         .task { await load() }
     }
 
@@ -195,7 +195,7 @@ struct PlayerDetailView: View {
 
         return Group {
             if !items.isEmpty {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
                     ForEach(items, id: \.0) { item in
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.0.uppercased())

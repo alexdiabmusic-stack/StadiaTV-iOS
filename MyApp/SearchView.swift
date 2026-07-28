@@ -80,7 +80,7 @@ struct SearchView: View {
     private var idleState: some View {
         VStack(spacing: 16) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 42))
+                .font(.system(size: Theme.scaled(42)))
                 .foregroundStyle(Theme.accent)
             Text("Search matches, channels, and ESPN news")
                 .font(.headline)
@@ -105,7 +105,7 @@ struct SearchView: View {
     private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 42))
+                .font(.system(size: Theme.scaled(42)))
                 .foregroundStyle(Theme.textSecondary)
             Text("No results for \"\(trimmedQuery)\"")
                 .font(.callout)

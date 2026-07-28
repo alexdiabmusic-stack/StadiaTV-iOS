@@ -14,13 +14,18 @@ struct StandingRow: Identifiable, Hashable {
     let displayName: String
     let abbreviation: String
     let logoURL: URL?
-    /// Ordered display stats (e.g. W, L, PCT, GB, streak) already formatted for display.
     let record: String          // e.g. "48-20"
+    let wins: String?
+    let losses: String?
+    let ties: String?           // draws (soccer) / OT losses (hockey) / ties (football)
     let winPercent: String?     // e.g. ".706"
     let gamesBack: String?      // e.g. "3.5"
     let streak: String?         // e.g. "W4"
     let pointsFor: String?
     let pointsAgainst: String?
+    let leaguePoints: String?   // NHL/soccer standings pts, F1 championship pts
+    let gamesPlayed: String?
+    let goalDiff: String?       // soccer GD / basketball point differential
 
     var id: String { teamID }
 }
@@ -149,8 +154,57 @@ struct GameSummary: Hashable {
 
     let teams: [TeamBox]
     let leaders: [GameLeader]
+    let plays: [PlayByPlayEntry]
+    let headToHead: HeadToHeadRecord?
+    let highlights: [MatchHighlight]
 
     var isEmpty: Bool {
-        teams.allSatisfy { $0.stats.isEmpty } && leaders.isEmpty
+        teams.allSatisfy { $0.stats.isEmpty }
+            && leaders.isEmpty
+            && plays.isEmpty
+            && highlights.isEmpty
+            && headToHead == nil
     }
+}
+
+// MARK: Head-to-head record
+
+/// All-time series record between the two competing teams.
+struct HeadToHeadRecord: Hashable {
+    let awayWins: Int
+    let homeWins: Int
+    let draws: Int
+    /// Human-readable scope, e.g. "All-time series" or "Regular season".
+    let label: String
+}
+
+// MARK: Match highlights
+
+/// A single video highlight clip linked from ESPN.
+struct MatchHighlight: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let thumbnailURL: URL?
+    let webURL: URL?
+    let duration: Int?          // seconds
+
+    var formattedDuration: String? {
+        guard let d = duration else { return nil }
+        return d >= 60 ? "\(d / 60):\(String(format: "%02d", d % 60))" : "0:\(String(format: "%02d", d))"
+    }
+}
+
+// MARK: Play by play
+
+/// A single play entry in the live or final game play-by-play feed.
+struct PlayByPlayEntry: Identifiable, Hashable {
+    let id: String
+    let clock: String?          // e.g. "3:42"
+    let period: String?         // e.g. "3rd Quarter"
+    let periodNumber: Int?
+    let text: String
+    let teamAbbreviation: String?
+    let awayScore: String?
+    let homeScore: String?
+    let isScoringPlay: Bool
 }

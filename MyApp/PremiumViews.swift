@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 // MARK: - Shared premium components
 
@@ -42,7 +45,7 @@ private struct PremiumLoadState<Content: View>: View {
             } else if isEmpty {
                 VStack(spacing: 12) {
                     Image(systemName: emptyIcon)
-                        .font(.system(size: 42))
+                        .font(.system(size: Theme.scaled(42)))
                         .foregroundStyle(Theme.textSecondary)
                     Text(emptyText)
                         .font(.callout)
@@ -66,7 +69,20 @@ struct StandingsView: View {
     let league: League
     @State private var groups: [StandingsGroup] = []
     @State private var isLoading = true
+    @State private var showDivisions = false
     private let service = ESPNService()
+
+    private var hasDivisionData: Bool {
+        groups.contains { $0.name.localizedCaseInsensitiveContains("division") }
+    }
+
+    private var displayedGroups: [StandingsGroup] {
+        guard hasDivisionData else { return groups }
+        return groups.filter { group in
+            let isDivision = group.name.localizedCaseInsensitiveContains("division")
+            return showDivisions ? isDivision : !isDivision
+        }
+    }
 
     var body: some View {
         PremiumLoadState(isLoading: isLoading && groups.isEmpty,
@@ -75,30 +91,31 @@ struct StandingsView: View {
                          emptyText: "Standings aren't available for \(league.name) right now.",
                          retry: { Task { await load() } }) {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 20, pinnedViews: [.sectionHeaders]) {
-                    ForEach(groups) { group in
-                        Section {
-                            VStack(spacing: 0) {
-                                ForEach(Array(group.rows.enumerated()), id: \.element.id) { index, row in
-                                    StandingRowView(rank: index + 1, row: row)
-                                    if index < group.rows.count - 1 {
-                                        Divider().overlay(Theme.hairline)
-                                    }
+                LazyVStack(alignment: .leading, spacing: 14) {
+                    if hasDivisionData {
+                        HStack(spacing: 8) {
+                            ForEach(["Conference", "Division"], id: \.self) { label in
+                                let isDivTab = label == "Division"
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.18)) { showDivisions = isDivTab }
+                                    #if os(iOS)
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    #endif
+                                } label: {
+                                    Text(label)
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundStyle(showDivisions == isDivTab ? .white : Theme.textSecondary)
+                                        .padding(.horizontal, 16).padding(.vertical, 8)
+                                        .background(showDivisions == isDivTab ? Theme.accent : Theme.surface, in: Capsule())
+                                        .overlay(Capsule().strokeBorder(showDivisions == isDivTab ? Color.clear : Theme.hairline))
                                 }
+                                .buttonStyle(.plain)
                             }
-                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
-                        } header: {
-                            HStack {
-                                Text(group.name.uppercased())
-                                Spacer()
-                                Text("W-L").font(.caption2)
-                            }
-                            .font(.footnote.weight(.bold))
-                            .foregroundStyle(Theme.textSecondary)
-                            .padding(.vertical, 6)
-                            .background(Theme.background)
+                            Spacer()
                         }
+                    }
+                    ForEach(displayedGroups) { group in
+                        StandingsGroupCard(group: group, league: league)
                     }
                 }
                 .padding(16)
@@ -106,7 +123,7 @@ struct StandingsView: View {
             .refreshable { await load() }
         }
         .navigationTitle("Standings")
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavigationTitle()
         .task { await load() }
     }
 
@@ -117,46 +134,187 @@ struct StandingsView: View {
     }
 }
 
+private enum StandingsCol: Hashable {
+    case wins, losses, ties, winPct, gamesBack, streak
+    case leaguePoints, gamesPlayed, goalDiff
+
+    var defaultHeader: String {
+        switch self {
+        case .wins: return "W"
+        case .losses: return "L"
+        case .ties: return "T"
+        case .winPct: return "PCT"
+        case .gamesBack: return "GB"
+        case .streak: return "SKT"
+        case .leaguePoints: return "PTS"
+        case .gamesPlayed: return "GP"
+        case .goalDiff: return "GD"
+        }
+    }
+
+    func header(for league: League) -> String {
+        if self == .ties {
+            switch league.group {
+            case .hockey: return "OTL"
+            case .soccer: return "D"
+            default: return "T"
+            }
+        }
+        return defaultHeader
+    }
+
+    var width: CGFloat {
+        switch self {
+        case .wins, .losses, .gamesPlayed: return 26
+        case .ties: return 30
+        case .winPct: return 44
+        case .gamesBack: return 32
+        case .streak: return 32
+        case .leaguePoints: return 36   // needs 3 digits, e.g. "112"
+        case .goalDiff: return 32
+        }
+    }
+
+    var isKey: Bool { self == .winPct || self == .leaguePoints }
+
+    func value(from row: StandingRow) -> String {
+        switch self {
+        case .wins: return row.wins ?? "-"
+        case .losses: return row.losses ?? "-"
+        case .ties: return row.ties ?? "-"
+        case .winPct: return row.winPercent ?? "-"
+        case .gamesBack: return row.gamesBack ?? "-"
+        case .streak: return row.streak ?? "-"
+        case .leaguePoints: return row.leaguePoints ?? "-"
+        case .gamesPlayed: return row.gamesPlayed ?? "-"
+        case .goalDiff: return row.goalDiff ?? "-"
+        }
+    }
+
+    func textColor(for row: StandingRow) -> Color {
+        if self == .streak {
+            let s = row.streak?.lowercased() ?? ""
+            if s.hasPrefix("w") { return Color(hex: 0x37C871) }
+            if s.hasPrefix("l") { return Theme.live }
+        }
+        return isKey ? Theme.textPrimary : Theme.textSecondary
+    }
+
+    static func columns(for league: League) -> [StandingsCol] {
+        switch league.group {
+        case .baseball:      return [.wins, .losses, .winPct, .gamesBack, .streak]
+        case .football:      return [.wins, .losses, .ties, .winPct, .streak]
+        case .basketball:    return [.wins, .losses, .winPct, .gamesBack, .streak]
+        case .hockey:        return [.gamesPlayed, .wins, .losses, .ties, .leaguePoints, .streak]
+        case .soccer:        return [.gamesPlayed, .wins, .ties, .losses, .goalDiff, .leaguePoints]
+        case .golf, .racing: return [.wins, .leaguePoints]
+        }
+    }
+}
+
+private struct StandingsGroupCard: View {
+    let group: StandingsGroup
+    let league: League
+
+    private var columns: [StandingsCol] { StandingsCol.columns(for: league) }
+
+    private var sortedRows: [StandingRow] {
+        group.rows
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(group.name.uppercased())
+                        .font(.footnote.weight(.heavy))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("\(group.rows.count) teams")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Theme.surfaceElevated)
+
+            HStack(spacing: 4) {
+                Text("#").frame(width: 24, alignment: .center)
+                Text("Team").frame(maxWidth: .infinity, alignment: .leading)
+                ForEach(columns, id: \.self) { col in
+                    Text(col.header(for: league))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .frame(width: col.width, alignment: .trailing)
+                }
+            }
+            .font(.caption2.weight(.heavy))
+            .foregroundStyle(Theme.textSecondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Theme.surface.opacity(0.55))
+
+            ForEach(Array(sortedRows.enumerated()), id: \.element.id) { index, row in
+                StandingRowView(rank: index + 1, row: row, columns: columns, league: league)
+                if index < sortedRows.count - 1 {
+                    Divider().overlay(Theme.hairline)
+                }
+            }
+        }
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
 private struct StandingRowView: View {
     let rank: Int
     let row: StandingRow
+    let columns: [StandingsCol]
+    let league: League
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 4) {
             Text("\(rank)")
                 .font(.caption.weight(.bold).monospacedDigit())
-                .foregroundStyle(Theme.textSecondary)
-                .frame(width: 20, alignment: .trailing)
+                .foregroundStyle(rankColor)
+                .frame(width: 24, alignment: .center)
+
             TeamLogo(url: row.logoURL, size: 28)
+
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.displayName)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
-                if let streak = row.streak, !streak.isEmpty {
-                    Text("Streak \(streak)")
-                        .font(.caption2)
+                if !row.abbreviation.isEmpty {
+                    Text(row.abbreviation)
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
                 }
             }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 1) {
-                Text(row.record)
-                    .font(.subheadline.weight(.bold).monospacedDigit())
-                    .foregroundStyle(Theme.textPrimary)
-                if let pct = row.winPercent {
-                    Text(pct)
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(Theme.textSecondary)
-                } else if let gb = row.gamesBack {
-                    Text("GB \(gb)")
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(Theme.textSecondary)
-                }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            ForEach(columns, id: \.self) { col in
+                Text(col.value(from: row))
+                    .font(.caption.weight(col.isKey ? .bold : .semibold).monospacedDigit())
+                    .foregroundStyle(col.textColor(for: row))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(width: col.width, alignment: .trailing)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+    }
+
+    private var rankColor: Color {
+        switch rank {
+        case 1: return Theme.accent
+        case 2, 3: return Theme.textPrimary
+        default: return Theme.textSecondary
+        }
     }
 }
 
@@ -199,7 +357,7 @@ struct LeadersView: View {
             .refreshable { await load() }
         }
         .navigationTitle("Stat Leaders")
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavigationTitle()
         .task { await load() }
     }
 
@@ -266,7 +424,7 @@ struct InjuriesView: View {
             .refreshable { await load() }
         }
         .navigationTitle("Injury Report")
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavigationTitle()
         .task { await load() }
     }
 

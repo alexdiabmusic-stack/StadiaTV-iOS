@@ -5,10 +5,10 @@ struct SearchView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var playlists: PlaylistStore
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.openURL) private var openURL
     @StateObject private var viewModel = SearchViewModel()
     @State private var query = ""
     @State private var playingChannel: Channel?
+    @State private var presentedArticle: ESPNArticle?
 
     private var trimmedQuery: String {
         query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -54,6 +54,9 @@ struct SearchView: View {
             .searchable(text: $query, prompt: "Teams, leagues, games, channels, players")
             .sheet(item: $playingChannel) { channel in
                 PlayerView(channel: channel)
+            }
+            .sheet(item: $presentedArticle) { article in
+                ArticleReaderView(article: article)
             }
         }
         .tint(Theme.accent)
@@ -151,12 +154,11 @@ struct SearchView: View {
             .buttonStyle(.plain)
         case .article(let article):
             Button {
-                if let url = article.url { openURL(url) }
+                presentedArticle = article
             } label: {
                 UniversalSearchRow(result: result)
             }
             .buttonStyle(.plain)
-            .disabled(article.url == nil)
         case .setting(let setting):
             NavigationLink(value: setting) {
                 UniversalSearchRow(result: result)
@@ -655,9 +657,9 @@ private extension Match {
     var searchDateText: String {
         switch state {
         case .live:
-            statusDetail
+            return statusDetail
         case .final:
-            "Final"
+            return "Final"
         case .pre:
             let calendar = Calendar.current
             if calendar.isDateInToday(date) { return "Today" }

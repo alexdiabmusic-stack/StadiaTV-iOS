@@ -54,6 +54,8 @@ struct HomeView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbarContent }
+            .toolbarBackground(Theme.background, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
             .sheet(item: $playingChannel) { PlayerView(channel: $0) }
         }
@@ -133,7 +135,7 @@ struct HomeView: View {
 
                 liveNowSection
 
-                if !viewModel.startingSoon.isEmpty {
+                if !viewModel.liveNow.isEmpty && !viewModel.startingSoon.isEmpty {
                     StartingSoonTimeline(matches: viewModel.startingSoon)
                 }
 
@@ -196,47 +198,24 @@ struct HomeView: View {
 
     @ViewBuilder
     private var sportsDaySummaryCard: some View {
-        let teamsToday = viewModel.favoriteTeamMatchesToday.count
-        let liveCount = viewModel.favoriteTeamLiveMatches.count
+        let matches = viewModel.favoriteTeamMatchesToday
 
-        if teamsToday > 0 || liveCount > 0 {
+        if !matches.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text("YOUR SPORTS DAY")
                     .font(.caption.weight(.heavy))
                     .foregroundStyle(Theme.textSecondary)
 
-                HStack(spacing: 0) {
-                    summaryPill("\(teamsToday)", "teams playing", Theme.upcoming)
-                    if liveCount > 0 {
-                        dividerDot
-                        summaryPill("\(liveCount)", liveCount == 1 ? "game live" : "games live", Theme.live)
+                ForEach(matches) { match in
+                    NavigationLink(value: match) {
+                        ScheduleRow(match: match)
                     }
-                    if prefs.matchNotificationsEnabled {
-                        dividerDot
-                        Label("Alerts on", systemImage: "bell.fill")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Theme.accent)
-                    }
-                    Spacer(minLength: 0)
+                    .buttonStyle(.plain)
                 }
             }
-            .padding(16)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.hairline))
         } else if !prefs.favoriteTeams.isEmpty {
             noTeamsPlayingCard
         }
-    }
-
-    private func summaryPill(_ value: String, _ label: String, _ color: Color) -> some View {
-        HStack(spacing: 4) {
-            Text(value).font(.subheadline.weight(.bold)).foregroundStyle(color)
-            Text(label).font(.subheadline).foregroundStyle(Theme.textPrimary)
-        }
-    }
-
-    private var dividerDot: some View {
-        Text(" · ").font(.subheadline).foregroundStyle(Theme.textSecondary)
     }
 
     private var noTeamsPlayingCard: some View {

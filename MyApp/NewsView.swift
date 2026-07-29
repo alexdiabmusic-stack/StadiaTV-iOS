@@ -192,7 +192,7 @@ final class NewsViewModel: ObservableObject {
     /// Fetches a single league on demand (used by filter chips outside the followed set).
     func loadIfNeeded(league: League, force: Bool = false) async {
         if !force, articlesByLeague[league.id]?.isEmpty == false { return }
-        guard !loadingLeagueIDs.contains(league.id) else { return }
+        if !force, loadingLeagueIDs.contains(league.id) { return }
         loadingLeagueIDs.insert(league.id)
         defer { loadingLeagueIDs.remove(league.id) }
         articlesByLeague[league.id] = await fetch(league: league)

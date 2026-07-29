@@ -23,6 +23,10 @@ private enum FollowingContentTab: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+private enum DayFilter {
+    case live, today, thisWeek
+}
+
 struct MatchesView: View {
     @StateObject private var viewModel = MatchesViewModel()
     @StateObject private var newsViewModel = NewsViewModel()
@@ -38,6 +42,7 @@ struct MatchesView: View {
     @State private var showingNotificationAlert = false
     @State private var notificationAlertMessage = ""
     @State private var hiddenMatchIDs: Set<String> = []
+    @State private var dayFilter: DayFilter? = nil
 
     var body: some View {
         NavigationStack {
@@ -220,9 +225,18 @@ struct MatchesView: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle("Your Day")
             HStack(spacing: 8) {
-                MetricCard(value: "\(liveMatches.count)", label: liveMatches.count == 1 ? "Live" : "Live", tint: Theme.live, icon: "circle.fill")
-                MetricCard(value: "\(todayMatches.count)", label: "Today", tint: Theme.upcoming, icon: "calendar")
-                MetricCard(value: "\(thisWeekMatches.count)", label: "This Week", tint: Theme.starting, icon: "bell")
+                Button { dayFilter = dayFilter == .live ? nil : .live } label: {
+                    MetricCard(value: "\(liveMatches.count)", label: "Live", tint: Theme.live, icon: "circle.fill", isSelected: dayFilter == .live)
+                }
+                .buttonStyle(.plain)
+                Button { dayFilter = dayFilter == .today ? nil : .today } label: {
+                    MetricCard(value: "\(todayMatches.count)", label: "Today", tint: Theme.upcoming, icon: "calendar", isSelected: dayFilter == .today)
+                }
+                .buttonStyle(.plain)
+                Button { dayFilter = dayFilter == .thisWeek ? nil : .thisWeek } label: {
+                    MetricCard(value: "\(thisWeekMatches.count)", label: "This Week", tint: Theme.starting, icon: "bell", isSelected: dayFilter == .thisWeek)
+                }
+                .buttonStyle(.plain)
             }
             if todayMatches.isEmpty, let next = upcomingMatches.first {
                 VStack(alignment: .leading, spacing: 4) {
@@ -347,12 +361,23 @@ struct MatchesView: View {
 
     private var standingsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle("Standings Snapshot")
-            if prefs.favoriteTeams.isEmpty {
-                EmptyInlineCard(title: "No teams selected", message: "Choose teams to see standings context here.")
-            } else {
-                ForEach(Array(prefs.favoriteTeams.prefix(4))) { team in
-                    FollowingStandingCard(team: team, recentMatch: latestMatch(for: team))
+            sectionTitle("Standings")
+            switch selectedSelection {
+            case .team(let team):
+                if let league = League.all.first(where: { $0.path == team.leaguePath }) {
+                    FollowingStandingsPanel(league: league, highlightTeamID: team.teamID)
+                } else {
+                    EmptyInlineCard(title: "League not found", message: "Standings aren't available for this team.")
+                }
+            case .league(let league):
+                FollowingStandingsPanel(league: league, highlightTeamID: nil)
+            case .all:
+                if prefs.favoriteTeams.isEmpty {
+                    EmptyInlineCard(title: "No teams selected", message: "Choose teams to see standings context here.")
+                } else {
+                    ForEach(Array(prefs.favoriteTeams.prefix(4))) { team in
+                        FollowingStandingCard(team: team, recentMatch: latestMatch(for: team))
+                    }
                 }
             }
         }
@@ -445,37 +470,54 @@ struct MatchesView: View {
         }
     }
 
-    private var filteredMatches: [Match] {
+    // Base: selection + hidden + recency filters only — no sport chip or day filter.
+    // Used for priority match and metric counts so those don't react to drill-down filters.
+    private var filteredBaseMatches: [Match] {
         selectedMatches
             .filter { !hiddenMatchIDs.contains($0.id) }
-            .filter { match in selectedSport.map { match.league.group == $0 } ?? true }
             .filter { $0.state != .final || Calendar.current.dateComponents([.day], from: $0.date, to: Date()).day ?? 0 < 3 }
-            .sorted { lhs, rhs in
-                if lhs.state == .live && rhs.state != .live { return true }
-                if lhs.state != .live && rhs.state == .live { return false }
-                return lhs.date < rhs.date
-            }
+    }
+
+    private var filteredMatches: [Match] {
+        var result = filteredBaseMatches
+            .filter { match in selectedSport.map { match.league.group == $0 } ?? true }
+        switch dayFilter {
+        case .live:
+            result = result.filter { $0.state == .live }
+        case .today:
+            result = result.filter { Calendar.current.isDateInToday($0.date) }
+        case .thisWeek:
+            let endOfWeek = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+            result = result.filter { $0.state == .pre && $0.date >= Date() && $0.date <= endOfWeek }
+        case nil:
+            break
+        }
+        return result.sorted { lhs, rhs in
+            if lhs.state == .live && rhs.state != .live { return true }
+            if lhs.state != .live && rhs.state == .live { return false }
+            return lhs.date < rhs.date
+        }
     }
 
     private var priorityMatch: Match? {
-        filteredMatches.first { $0.state == .live }
-            ?? filteredMatches.first { $0.state == .pre && $0.date >= Date() }
-            ?? filteredMatches.first
+        filteredBaseMatches.first { $0.state == .live }
+            ?? filteredBaseMatches.first { $0.state == .pre && $0.date >= Date() }
+            ?? filteredBaseMatches.first
     }
 
-    private var liveMatches: [Match] { filteredMatches.filter { $0.state == .live } }
+    private var liveMatches: [Match] { filteredBaseMatches.filter { $0.state == .live } }
 
     private var todayMatches: [Match] {
-        filteredMatches.filter { Calendar.current.isDateInToday($0.date) && $0.state != .final }
+        filteredBaseMatches.filter { Calendar.current.isDateInToday($0.date) && $0.state != .final }
     }
 
     private var upcomingMatches: [Match] {
-        filteredMatches.filter { $0.state == .pre && $0.date >= Date() }
+        filteredBaseMatches.filter { $0.state == .pre && $0.date >= Date() }
     }
 
     private var thisWeekMatches: [Match] {
         let endOfWeek = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
-        return filteredMatches.filter { $0.state == .pre && $0.date >= Date() && $0.date <= endOfWeek }
+        return filteredBaseMatches.filter { $0.state == .pre && $0.date >= Date() && $0.date <= endOfWeek }
     }
 
     private var availableSports: [SportGroup] {
@@ -571,25 +613,27 @@ private struct MetricCard: View {
     let label: String
     let tint: Color
     let icon: String
+    var isSelected: Bool = false
 
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(.caption2.weight(.heavy))
-                .foregroundStyle(tint)
+                .foregroundStyle(isSelected ? .white : tint)
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
                     .font(.headline.weight(.heavy).monospacedDigit())
-                    .foregroundStyle(Theme.textPrimary)
+                    .foregroundStyle(isSelected ? .white : Theme.textPrimary)
                 Text(label)
                     .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Theme.textSecondary)
+                    .foregroundStyle(isSelected ? .white.opacity(0.8) : Theme.textSecondary)
             }
             Spacer(minLength: 0)
         }
         .padding(10)
         .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
-        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(isSelected ? tint : Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(isSelected ? tint : Color.clear))
     }
 }
 
@@ -964,6 +1008,73 @@ private struct FollowingStandingCard: View {
             return match.away.shortName
         }
         return match.home.shortName
+    }
+}
+
+// MARK: - Inline standings panel
+
+private struct FollowingStandingsPanel: View {
+    let league: League
+    var highlightTeamID: String? = nil
+    @State private var groups: [StandingsGroup] = []
+    @State private var isLoading = true
+    @State private var showDivisions = false
+    private let service = ESPNService()
+
+    private var hasDivisionData: Bool {
+        groups.contains { $0.name.localizedCaseInsensitiveContains("division") }
+    }
+
+    private var displayedGroups: [StandingsGroup] {
+        guard hasDivisionData else { return groups }
+        return groups.filter { group in
+            let isDivision = group.name.localizedCaseInsensitiveContains("division")
+            return showDivisions ? isDivision : !isDivision
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if isLoading && groups.isEmpty {
+                ProgressView().tint(Theme.accent)
+                    .frame(maxWidth: .infinity, minHeight: 80)
+            } else if groups.isEmpty {
+                EmptyInlineCard(
+                    title: "Standings unavailable",
+                    message: "Standings for \(league.name) aren't available right now."
+                )
+            } else {
+                if hasDivisionData {
+                    HStack(spacing: 8) {
+                        ForEach(["Conference", "Division"], id: \.self) { label in
+                            let isDivTab = label == "Division"
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.18)) { showDivisions = isDivTab }
+                            } label: {
+                                Text(label)
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(showDivisions == isDivTab ? .white : Theme.textSecondary)
+                                    .padding(.horizontal, 14).padding(.vertical, 7)
+                                    .background(showDivisions == isDivTab ? Theme.accent : Theme.surface, in: Capsule())
+                                    .overlay(Capsule().strokeBorder(showDivisions == isDivTab ? Color.clear : Theme.hairline))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Spacer()
+                    }
+                }
+                ForEach(displayedGroups) { group in
+                    StandingsGroupCard(group: group, league: league, highlightTeamID: highlightTeamID)
+                }
+            }
+        }
+        .task(id: league.id) { await load() }
+    }
+
+    private func load() async {
+        isLoading = true
+        groups = (try? await service.standings(for: league)) ?? []
+        isLoading = false
     }
 }
 

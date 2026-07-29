@@ -134,7 +134,7 @@ struct StandingsView: View {
     }
 }
 
-private enum StandingsCol: Hashable {
+enum StandingsCol: Hashable {
     case wins, losses, ties, winPct, gamesBack, streak
     case leaguePoints, gamesPlayed, goalDiff
 
@@ -212,9 +212,10 @@ private enum StandingsCol: Hashable {
     }
 }
 
-private struct StandingsGroupCard: View {
+struct StandingsGroupCard: View {
     let group: StandingsGroup
     let league: League
+    var highlightTeamID: String? = nil
 
     private var columns: [StandingsCol] { StandingsCol.columns(for: league) }
 
@@ -256,7 +257,7 @@ private struct StandingsGroupCard: View {
             .background(Theme.surface.opacity(0.55))
 
             ForEach(Array(sortedRows.enumerated()), id: \.element.id) { index, row in
-                StandingRowView(rank: index + 1, row: row, columns: columns, league: league)
+                StandingRowView(rank: index + 1, row: row, columns: columns, league: league, highlightTeamID: highlightTeamID)
                 if index < sortedRows.count - 1 {
                     Divider().overlay(Theme.hairline)
                 }
@@ -268,30 +269,33 @@ private struct StandingsGroupCard: View {
     }
 }
 
-private struct StandingRowView: View {
+struct StandingRowView: View {
     let rank: Int
     let row: StandingRow
     let columns: [StandingsCol]
     let league: League
+    var highlightTeamID: String? = nil
+
+    private var isHighlighted: Bool { highlightTeamID != nil && highlightTeamID == row.teamID }
 
     var body: some View {
         HStack(spacing: 4) {
             Text("\(rank)")
                 .font(.caption.weight(.bold).monospacedDigit())
-                .foregroundStyle(rankColor)
+                .foregroundStyle(isHighlighted ? Theme.accent : rankColor)
                 .frame(width: 24, alignment: .center)
 
             TeamLogo(url: row.logoURL, size: 28)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.displayName)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.textPrimary)
+                    .font(.subheadline.weight(isHighlighted ? .bold : .semibold))
+                    .foregroundStyle(isHighlighted ? Theme.accent : Theme.textPrimary)
                     .lineLimit(1)
                 if !row.abbreviation.isEmpty {
                     Text(row.abbreviation)
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(Theme.textSecondary)
+                        .foregroundStyle(isHighlighted ? Theme.accent.opacity(0.8) : Theme.textSecondary)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -307,6 +311,14 @@ private struct StandingRowView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 9)
+        .background(isHighlighted ? Theme.accent.opacity(0.08) : Color.clear)
+        .overlay(alignment: .leading) {
+            if isHighlighted {
+                Rectangle()
+                    .fill(Theme.accent)
+                    .frame(width: 3)
+            }
+        }
     }
 
     private var rankColor: Color {

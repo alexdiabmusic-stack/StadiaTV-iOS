@@ -224,9 +224,8 @@ struct DiscoverView: View {
     }
 
     private func refreshTargetLeagues() async {
-        for league in targetLeagues.prefix(selectedSport == .all ? 8 : targetLeagues.count) {
-            await viewModel.loadIfNeeded(league: league, force: true)
-        }
+        let leagues = Array(targetLeagues.prefix(selectedSport == .all ? 8 : targetLeagues.count))
+        await viewModel.load(leagues: leagues)
     }
 }
 

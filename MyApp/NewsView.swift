@@ -1,8 +1,5 @@
 import SwiftUI
 import Combine
-#if canImport(SafariServices)
-import SafariServices
-#endif
 
 struct NewsView: View {
     @EnvironmentObject private var prefs: PreferencesStore
@@ -33,14 +30,7 @@ struct NewsView: View {
             .navigationTitle("News")
             .searchToolbar()
             .sheet(item: $presentedArticle) { article in
-                #if os(tvOS)
-                ArticleSummaryView(article: article)
-                #else
-                if let url = article.url {
-                    SafariView(url: url)
-                        .ignoresSafeArea()
-                }
-                #endif
+                ArticleReaderView(article: article)
             }
         }
         .tint(Theme.accent)
@@ -127,9 +117,7 @@ struct NewsView: View {
                 LazyVStack(spacing: 14) {
                     ForEach(displayedArticles) { article in
                         NewsArticleCard(article: article) {
-                            if article.url != nil {
-                                presentedArticle = article
-                            }
+                            presentedArticle = article
                         }
                     }
                 }
@@ -155,54 +143,6 @@ struct NewsView: View {
     }
 }
 
-#if os(tvOS)
-/// tvOS has no web browser, so articles show as a full-screen summary instead.
-private struct ArticleSummaryView: View {
-    let article: ESPNArticle
-
-    var body: some View {
-        ZStack {
-            Theme.background.ignoresSafeArea()
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    Text(article.league.shortName)
-                        .font(.headline.weight(.heavy))
-                        .foregroundStyle(Theme.accent)
-                    Text(article.headline)
-                        .font(.largeTitle.weight(.bold))
-                        .foregroundStyle(Theme.textPrimary)
-                    if !article.description.isEmpty {
-                        Text(article.description)
-                            .font(.title3)
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-                    if let byline = article.byline, !byline.isEmpty {
-                        Text(byline)
-                            .font(.headline)
-                            .foregroundStyle(Theme.textSecondary.opacity(0.85))
-                    }
-                    Text("Read the full story on your iPhone or iPad.")
-                        .font(.callout)
-                        .foregroundStyle(Theme.textSecondary)
-                }
-                .frame(maxWidth: 900, alignment: .leading)
-                .padding(60)
-            }
-        }
-    }
-}
-#else
-/// In-app browser so articles never bounce out to Safari.
-private struct SafariView: UIViewControllerRepresentable {
-    let url: URL
-
-    func makeUIViewController(context: Context) -> SFSafariViewController {
-        SFSafariViewController(url: url)
-    }
-
-    func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
-}
-#endif
 
 @MainActor
 final class NewsViewModel: ObservableObject {

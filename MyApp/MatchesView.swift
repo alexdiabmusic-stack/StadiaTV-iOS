@@ -28,10 +28,10 @@ struct MatchesView: View {
     @StateObject private var newsViewModel = NewsViewModel()
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var predictions: PredictionsStore
+    @AppStorage("following.tab.v1") private var savedTabRaw: String = FollowingContentTab.overview.rawValue
     @State private var selectedSelection: FollowingSelection = .all
     @State private var selectedTab: FollowingContentTab = .overview
     @State private var selectedSport: SportGroup?
-    @State private var showingSearch = false
     @State private var showingTeamEditor = false
 
     var body: some View {
@@ -40,21 +40,24 @@ struct MatchesView: View {
                 Theme.background.ignoresSafeArea()
                 content
             }
+            .navigationTitle("Following")
             .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showingSearch = true } label: {
-                        Image(systemName: "magnifyingglass")
-                    }
-                    .accessibilityLabel("Search")
+                    Button("Edit") { showingTeamEditor = true }
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Theme.accent)
                 }
             }
-            .sheet(isPresented: $showingSearch) { SearchView() }
             .sheet(isPresented: $showingTeamEditor) { TeamEditorView() }
         }
         .tint(Theme.accent)
         .task(id: loadKey) { await loadFollowing() }
-        .onAppear { viewModel.startAutoRefresh() }
+        .onAppear {
+            viewModel.startAutoRefresh()
+            selectedTab = FollowingContentTab(rawValue: savedTabRaw) ?? .overview
+        }
+        .onChange(of: selectedTab) { _, new in savedTabRaw = new.rawValue }
         .onDisappear { viewModel.stopAutoRefresh() }
         .onChange(of: prefs.favoriteTeams) { _, _ in selectedSelection = .all }
     }
@@ -99,7 +102,6 @@ struct MatchesView: View {
     private var followingScroll: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 18) {
-                personalizedHeader
                 yourDaySection
 
                 if let priorityMatch {
@@ -126,54 +128,43 @@ struct MatchesView: View {
             .padding(.top, 12)
             .padding(.bottom, 28)
         }
+        .safeAreaInset(edge: .top) {
+            personalizedHeader
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(.bar)
+        }
         .refreshable { await loadFollowing() }
     }
 
     private var personalizedHeader: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Following")
-                        .font(.system(size: 30, weight: .bold))
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                followChip(title: "All", logoURL: nil, isSelected: selectedSelection == .all) {
+                    selectedSelection = .all
+                }
+                ForEach(prefs.favoriteTeams) { team in
+                    followChip(title: team.abbreviation.isEmpty ? team.displayName : team.abbreviation,
+                               logoURL: team.logoURL,
+                               isSelected: selectedSelection == .team(team)) {
+                        selectedSelection = .team(team)
+                    }
+                }
+                ForEach(followedLeagueChips) { league in
+                    followChip(title: league.shortName, logoURL: nil, isSelected: selectedSelection == .league(league)) {
+                        selectedSelection = .league(league)
+                    }
+                }
+                Button { showingTeamEditor = true } label: {
+                    Image(systemName: "plus")
+                        .font(.subheadline.weight(.bold))
                         .foregroundStyle(Theme.textPrimary)
-                    Text("Your teams, leagues and players")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.textSecondary)
+                        .frame(width: 38, height: 38)
+                        .background(Theme.surface, in: Capsule())
+                        .overlay(Capsule().strokeBorder(Theme.hairline))
                 }
-                Spacer()
-                Button("Edit") { showingTeamEditor = true }
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(Theme.accent)
-            }
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    followChip(title: "All", logoURL: nil, isSelected: selectedSelection == .all) {
-                        selectedSelection = .all
-                    }
-                    ForEach(prefs.favoriteTeams) { team in
-                        followChip(title: team.abbreviation.isEmpty ? team.displayName : team.abbreviation,
-                                   logoURL: team.logoURL,
-                                   isSelected: selectedSelection == .team(team)) {
-                            selectedSelection = .team(team)
-                        }
-                    }
-                    ForEach(followedLeagueChips) { league in
-                        followChip(title: league.shortName, logoURL: nil, isSelected: selectedSelection == .league(league)) {
-                            selectedSelection = .league(league)
-                        }
-                    }
-                    Button { showingTeamEditor = true } label: {
-                        Image(systemName: "plus")
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(Theme.textPrimary)
-                            .frame(width: 38, height: 38)
-                            .background(Theme.surface, in: Capsule())
-                            .overlay(Capsule().strokeBorder(Theme.hairline))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Add following")
-                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Add following")
             }
         }
     }
@@ -184,7 +175,10 @@ struct MatchesView: View {
     }
 
     private func followChip(title: String, logoURL: URL?, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            action()
+        }) {
             HStack(spacing: 7) {
                 if let logoURL {
                     TeamLogo(url: logoURL, size: 22)
@@ -210,7 +204,7 @@ struct MatchesView: View {
             HStack(spacing: 8) {
                 MetricCard(value: "\(liveMatches.count)", label: liveMatches.count == 1 ? "Live" : "Live", tint: Theme.live, icon: "circle.fill")
                 MetricCard(value: "\(todayMatches.count)", label: "Today", tint: Theme.upcoming, icon: "calendar")
-                MetricCard(value: "\(upcomingMatches.count)", label: "Upcoming", tint: Theme.starting, icon: "bell")
+                MetricCard(value: "\(thisWeekMatches.count)", label: "This Week", tint: Theme.starting, icon: "bell")
             }
             if todayMatches.isEmpty, let next = upcomingMatches.first {
                 VStack(alignment: .leading, spacing: 4) {
@@ -421,6 +415,11 @@ struct MatchesView: View {
         filteredMatches.filter { $0.state == .pre && $0.date >= Date() }
     }
 
+    private var thisWeekMatches: [Match] {
+        let endOfWeek = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+        return filteredMatches.filter { $0.state == .pre && $0.date >= Date() && $0.date <= endOfWeek }
+    }
+
     private var availableSports: [SportGroup] {
         var seen: Set<SportGroup> = []
         return selectedMatches.compactMap { match in
@@ -471,7 +470,7 @@ struct MatchesView: View {
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.caption.weight(.heavy))
+            .font(.footnote.weight(.semibold))
             .foregroundStyle(Theme.textSecondary)
     }
 
@@ -529,96 +528,138 @@ private struct PriorityGameCard: View {
 
     private var spoilersHidden: Bool { prefs.spoilerFreeMode && match.state == .final }
 
+    private var isActuallyForYou: Bool {
+        let names = Set(prefs.favoriteTeams.map { $0.displayName.lowercased() })
+        let ids = Set(prefs.favoriteTeams.map(\.id))
+        return [match.home, match.away].contains { side in
+            if let tid = side.teamID { return ids.contains("\(match.league.path)-\(tid)") }
+            return names.contains(side.displayName.lowercased())
+        }
+    }
+
+    private var heroLabel: String {
+        switch match.state {
+        case .live: return isActuallyForYou ? "LIVE FOR YOU" : "RECOMMENDED LIVE"
+        case .pre: return isActuallyForYou ? "NEXT FOR YOU" : "RECOMMENDED"
+        case .final: return "FINAL"
+        }
+    }
+
+    private var heroLabelColor: Color {
+        if !isActuallyForYou { return Theme.textSecondary }
+        return match.state == .live ? Theme.live : Theme.accent
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(match.state == .live ? "LIVE FOR YOU" : "NEXT FOR YOU")
-                    .font(.caption.weight(.heavy))
-                    .foregroundStyle(match.state == .live ? Theme.live : Theme.textSecondary)
+                HStack(spacing: 5) {
+                    if match.state == .live { PulsingLiveBadge() }
+                    Text(heroLabel)
+                        .font(.caption.weight(.heavy))
+                        .foregroundStyle(heroLabelColor)
+                }
                 Spacer()
                 Text(match.league.shortName)
-                    .font(.caption.weight(.heavy))
+                    .font(.caption2.weight(.heavy))
                     .foregroundStyle(Theme.textSecondary)
-            }
-
-            HStack(alignment: .center, spacing: 12) {
-                priorityTeam(match.away)
-                Text(match.state == .pre ? "at" : "vs")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Theme.textSecondary)
-                priorityTeam(match.home)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(statusText)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(match.state == .live ? Theme.live : Theme.textPrimary)
-                if let venue = match.venue, !venue.isEmpty {
-                    Text(venue)
-                        .font(.caption)
-                        .foregroundStyle(Theme.textSecondary)
-                }
             }
 
             HStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    TeamLogo(url: match.away.logoURL, size: 32)
+                    Text(match.away.shortName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if match.state != .pre, !spoilersHidden {
+                    HStack(spacing: 6) {
+                        Text(match.away.score ?? "-")
+                        Text("–").foregroundStyle(Theme.textSecondary)
+                        Text(match.home.score ?? "-")
+                    }
+                    .font(.system(size: 20, weight: .bold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(Theme.textPrimary)
+                } else {
+                    Text("at")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+
+                HStack(spacing: 8) {
+                    Text(match.home.shortName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
+                    TeamLogo(url: match.home.logoURL, size: 32)
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+
+            Text(statusLine)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(match.state == .live ? Theme.live : Theme.textSecondary)
+                .lineLimit(1)
+
+            HStack(spacing: 8) {
                 Text(match.state == .live ? "Match Centre" : "Game Centre")
                     .font(.caption.weight(.heavy))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, 14)
                     .padding(.vertical, 8)
                     .background(Theme.accent, in: Capsule())
-                Label(prefs.matchNotificationsEnabled ? "Alert Set" : "Set Alert", systemImage: prefs.matchNotificationsEnabled ? "bell.fill" : "bell")
-                    .font(.caption.weight(.heavy))
-                    .foregroundStyle(Theme.starting)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Theme.surfaceElevated, in: Capsule())
+                Spacer()
+                Label(
+                    prefs.matchNotificationsEnabled ? "Alert Set" : "Set Alert",
+                    systemImage: prefs.matchNotificationsEnabled ? "bell.fill" : "bell"
+                )
+                .font(.caption.weight(.heavy))
+                .foregroundStyle(Theme.starting)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Theme.surfaceElevated, in: Capsule())
+            }
+
+            if !isActuallyForYou {
+                Text("Recommended · \(match.league.shortName)")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.textTertiary)
             }
         }
-        .padding(16)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .padding(14)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(match.state == .live ? Theme.live.opacity(0.42) : Theme.accent.opacity(0.32))
                 .frame(height: 3)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
         .shadow(color: match.state == .live ? Theme.live.opacity(0.12) : .clear, radius: 16, y: 8)
-    }
-
-    private func priorityTeam(_ team: TeamSide) -> some View {
-        VStack(spacing: 8) {
-            TeamLogo(url: team.logoURL, size: 46)
-            Text(team.shortName)
-                .font(.subheadline.weight(.heavy))
-                .foregroundStyle(Theme.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            if match.state != .pre, !spoilersHidden, let score = team.score {
-                Text(score)
-                    .font(.title2.weight(.heavy).monospacedDigit())
-                    .foregroundStyle(team.isWinner ? Theme.textPrimary : Theme.textSecondary)
-            }
+        .contextMenu {
+            Button("Set Alert", systemImage: "bell") { }
+            Button("Add to Calendar", systemImage: "calendar.badge.plus") { }
+            Divider()
+            Button("Hide", systemImage: "eye.slash", role: .destructive) { }
         }
-        .frame(maxWidth: .infinity)
     }
 
-    private var statusText: String {
+    private var statusLine: String {
+        var parts: [String] = []
         switch match.state {
-        case .live:
-            return "LIVE · \(match.statusDetail)"
+        case .live: parts.append("LIVE · \(match.statusDetail)")
         case .pre:
-            return "\(match.date.formatted(date: .abbreviated, time: .shortened)) · \(relativeStart)"
-        case .final:
-            return "Final"
+            let formatter = RelativeDateTimeFormatter()
+            formatter.unitsStyle = .full
+            parts.append(match.date.formatted(date: .abbreviated, time: .shortened))
+            parts.append(formatter.localizedString(for: match.date, relativeTo: Date()))
+        case .final: parts.append("Final")
         }
-    }
-
-    private var relativeStart: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return formatter.localizedString(for: match.date, relativeTo: Date())
+        if let venue = match.venue, !venue.isEmpty { parts.append(venue) }
+        return parts.joined(separator: " · ")
     }
 }
 
@@ -668,6 +709,12 @@ private struct CompactFollowingMatchRow: View {
         .padding(12)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .contextMenu {
+            Button("Set Alert", systemImage: "bell") { }
+            Button("Add to Calendar", systemImage: "calendar.badge.plus") { }
+            Divider()
+            Button("Hide", systemImage: "eye.slash", role: .destructive) { }
+        }
     }
 
     private func teamLine(_ team: TeamSide) -> some View {
@@ -735,6 +782,12 @@ private struct FollowingUpdateRow: View {
         .padding(12)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .contextMenu {
+            Button("Save Article", systemImage: "bookmark") { }
+            Button("Share", systemImage: "square.and.arrow.up") { }
+            Divider()
+            Button("Not Interested", systemImage: "hand.thumbsdown", role: .destructive) { }
+        }
     }
 
     private func relativeDate(_ date: Date) -> String {

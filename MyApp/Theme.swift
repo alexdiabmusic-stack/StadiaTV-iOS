@@ -12,6 +12,7 @@ enum Theme {
     static let upcoming         = Color(hex: 0x31C978)
     static let textPrimary      = dynamic(dark: 0xF7F8FA, light: 0x15181D)
     static let textSecondary    = dynamic(dark: 0x9BA3B2, light: 0x5C6470)
+    static let textTertiary     = dynamic(dark: 0x636B7A, light: 0x8F979F)
     static let hairline         = dynamic(dark: 0xFFFFFF, light: 0x000000, darkAlpha: 0.09, lightAlpha: 0.09)
 
     private static func dynamic(dark: UInt, light: UInt, darkAlpha: Double = 1, lightAlpha: Double = 1) -> Color {

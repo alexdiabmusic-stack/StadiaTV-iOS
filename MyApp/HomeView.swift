@@ -235,26 +235,30 @@ struct HomeView: View {
     }
 
     private var noTeamsPlayingCard: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Image(systemName: "calendar")
-                .font(.title3)
+                .font(.callout)
                 .foregroundStyle(Theme.textSecondary)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text("No followed teams play today")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
                 if let next = viewModel.favoriteTeamUpcoming.first {
-                    Text("Next: \(next.shortName) · \(next.date.formatted(.dateTime.weekday(.wide).hour().minute()))")
-                        .font(.caption)
+                    Text("Next: \(next.shortName) · \(next.date.formatted(.dateTime.weekday(.abbreviated).hour().minute()))")
+                        .font(.caption2)
                         .foregroundStyle(Theme.textSecondary)
                         .lineLimit(1)
                 }
             }
             Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Theme.textSecondary.opacity(0.5))
         }
-        .padding(16)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.hairline))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     // MARK: - Live Now
@@ -442,11 +446,25 @@ private struct FeaturedHeroCard: View {
                             Spacer()
                             VStack(spacing: 4) {
                                 if match.state == .pre {
-                                    Text("VS")
-                                        .font(.system(size: 20, weight: .black))
-                                        .foregroundStyle(.white)
                                     if let start = pick.startDate, start > now {
-                                        countdownText(to: start, now: now)
+                                        let secs = max(0, Int(start.timeIntervalSince(now)))
+                                        let h = secs / 3600; let m = (secs % 3600) / 60
+                                        VStack(spacing: 2) {
+                                            Text(m < 1 && h == 0 ? "NOW" : "STARTS IN")
+                                                .font(.system(size: 9, weight: .heavy))
+                                                .foregroundStyle(.white.opacity(0.65))
+                                                .tracking(0.5)
+                                            Text(h > 0 ? "\(h)h \(m)m" : (m < 1 ? "NOW" : "\(m) MIN"))
+                                                .font(.system(size: 20, weight: .black, design: .rounded).monospacedDigit())
+                                                .foregroundStyle(.white)
+                                            Text(start, style: .time)
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundStyle(.white.opacity(0.7))
+                                        }
+                                    } else {
+                                        Text("VS")
+                                            .font(.system(size: 20, weight: .black))
+                                            .foregroundStyle(.white)
                                     }
                                 } else {
                                     Text("\(match.away.score ?? "-") – \(match.home.score ?? "-")")
@@ -471,11 +489,20 @@ private struct FeaturedHeroCard: View {
 
                     // Action buttons
                     HStack(spacing: 10) {
-                        heroButton(isLive ? "Watch Live" : "Match Centre",
-                                   icon: isLive ? "play.fill" : "sportscourt",
-                                   primary: true)
-                        if match != nil {
-                            heroButton("Streams", icon: "tv", primary: false)
+                        if let match {
+                            switch match.state {
+                            case .live:
+                                heroButton("Watch Live", icon: "play.fill", primary: true)
+                                heroButton("Match Centre", icon: "sportscourt", primary: false)
+                            case .pre:
+                                heroButton("Set Alert", icon: "bell", primary: false)
+                                heroButton("Streams", icon: "tv", primary: true)
+                            case .final:
+                                heroButton("Highlights", icon: "film", primary: true)
+                                heroButton("Recap", icon: "doc.text", primary: false)
+                            }
+                        } else {
+                            heroButton("Streams", icon: "tv", primary: true)
                         }
                     }
                 }
@@ -637,7 +664,7 @@ private struct LiveNowCommandCenter: View {
             HStack(spacing: 8) {
                 PulsingLiveBadge()
                 Text("LIVE NOW")
-                    .font(.system(size: 15, weight: .heavy))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(Theme.live)
                 Spacer()
                 if !matches.isEmpty {
@@ -749,7 +776,7 @@ struct StartingSoonTimeline: View {
             HStack(spacing: 6) {
                 Image(systemName: "clock.badge.fill")
                 Text("STARTING SOON")
-                    .font(.system(size: 15, weight: .heavy))
+                    .font(.footnote.weight(.semibold))
                     .foregroundStyle(Theme.starting)
                 Spacer()
             }
@@ -777,52 +804,53 @@ private struct SoonTimelineCard: View {
         TimelineView(.periodic(from: .now, by: 30)) { ctx in
             let secs = max(0, Int(match.date.timeIntervalSince(ctx.date)))
             let h = secs / 3600; let m = (secs % 3600) / 60
+            let urgent = m < 10 && h == 0
 
-            VStack(spacing: 10) {
-                Text(match.date, style: .time)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(Theme.textSecondary)
+            VStack(alignment: .leading, spacing: 7) {
+                HStack {
+                    Text(match.date, style: .time)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Spacer()
+                    Text(match.league.shortName)
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(Theme.textSecondary)
+                }
 
                 HStack(spacing: 6) {
-                    TeamLogo(url: match.away.logoURL, size: 30)
+                    TeamLogo(url: match.away.logoURL, size: 28)
                     Text("vs")
                         .font(.caption2.weight(.heavy))
                         .foregroundStyle(Theme.textSecondary)
-                    TeamLogo(url: match.home.logoURL, size: 30)
+                    TeamLogo(url: match.home.logoURL, size: 28)
                 }
 
                 Text(match.shortName)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .frame(width: 118)
 
-                VStack(spacing: 2) {
-                    Text(h > 0 ? "\(h)h \(m)m" : "\(m) min")
-                        .font(.system(size: 14, weight: .black, design: .rounded).monospacedDigit())
-                        .foregroundStyle(m < 10 && h == 0 ? Theme.live : Theme.starting)
-                    Text(match.league.shortName)
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(Theme.textSecondary)
-                }
+                Text(secs < 60 ? "Starts now" : (h > 0 ? "In \(h)h \(m)m" : "In \(m) min"))
+                    .font(.system(size: 12, weight: .heavy, design: .rounded).monospacedDigit())
+                    .foregroundStyle(urgent ? Theme.live : Theme.starting)
 
                 if !match.broadcasts.isEmpty {
                     Label(match.broadcasts.first!, systemImage: "tv")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(Theme.textSecondary)
                         .lineLimit(1)
-                        .frame(width: 118)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 14)
-            .frame(width: 140)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(m < 10 && h == 0 ? Theme.starting.opacity(0.5) : Theme.hairline)
-            )
+            .padding(12)
+            .frame(width: 150)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline))
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(urgent ? Theme.live : Theme.starting)
+                    .frame(height: 2)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
         }
     }
 }
@@ -897,7 +925,7 @@ private struct ScheduleSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("YOUR SCHEDULE")
-                .font(.system(size: 15, weight: .heavy))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(Theme.textSecondary)
 
             // Day picker
@@ -949,7 +977,7 @@ private struct ScheduleSection: View {
                 let groups = groupByDay(displayedMatches)
                 ForEach(groups, id: \.label) { group in
                     Text(group.label)
-                        .font(.caption.weight(.heavy))
+                        .font(.footnote.weight(.semibold))
                         .foregroundStyle(Theme.textSecondary)
                         .padding(.top, 4)
                     ForEach(group.matches) { match in
@@ -977,13 +1005,15 @@ private struct ScheduleRow: View {
         HStack(spacing: 14) {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(match.date, style: .time)
-                    .font(.system(size: 14, weight: .bold, design: .rounded).monospacedDigit())
+                    .font(.system(size: 13, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
                 Text(match.league.shortName)
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
             }
-            .frame(width: 56, alignment: .trailing)
+            .frame(width: 68, alignment: .trailing)
 
             Rectangle()
                 .fill(Theme.hairline)
@@ -1028,7 +1058,7 @@ private struct TrendingSection: View {
             HStack(spacing: 6) {
                 Image(systemName: "play.circle.fill")
                 Text("RECENT HIGHLIGHTS")
-                    .font(.system(size: 15, weight: .heavy))
+                    .font(.footnote.weight(.semibold))
             }
             .foregroundStyle(Theme.accent)
 
@@ -1054,7 +1084,7 @@ struct ContinueWatchingSection: View {
             HStack(spacing: 6) {
                 Image(systemName: "clock.arrow.circlepath")
                 Text("CONTINUE WATCHING")
-                    .font(.system(size: 15, weight: .heavy))
+                    .font(.footnote.weight(.semibold))
             }
             .foregroundStyle(Theme.accent)
 
@@ -1295,9 +1325,19 @@ final class HomeViewModel: ObservableObject {
             .sorted { $0.date < $1.date }
             .prefix(3)
             .map { $0 }
+        // Compute featured IDs first so we can suppress duplicates below
+        var syncedFeaturedMatches = Dictionary(uniqueKeysWithValues: featuredPicks.map { ($0.id, $0.streamMatch) })
+        for match in allMatches.sorted(by: { score($0) > score($1) }) {
+            for pick in featuredCalendar.matchingPicks(for: match) {
+                syncedFeaturedMatches[pick.id] = match
+            }
+        }
+        featuredMatchesByPickID = syncedFeaturedMatches
+        let featuredIDs = Set(syncedFeaturedMatches.values.map { $0.id })
+        liveNow = liveNow.filter { !featuredIDs.contains($0.id) }
         let soonWindow = now.addingTimeInterval(6 * 60 * 60)
         startingSoon = allMatches
-            .filter { $0.state == .pre && $0.date > now && $0.date <= soonWindow }
+            .filter { $0.state == .pre && $0.date > now && $0.date <= soonWindow && !featuredIDs.contains($0.id) }
             .sorted { $0.date < $1.date }
             .prefix(8)
             .map { $0 }
@@ -1306,13 +1346,6 @@ final class HomeViewModel: ObservableObject {
             .sorted { $0.date < $1.date }
             .prefix(12)
             .map { $0 }
-        var syncedFeaturedMatches = Dictionary(uniqueKeysWithValues: featuredPicks.map { ($0.id, $0.streamMatch) })
-        for match in allMatches.sorted(by: { score($0) > score($1) }) {
-            for pick in featuredCalendar.matchingPicks(for: match) {
-                syncedFeaturedMatches[pick.id] = match
-            }
-        }
-        featuredMatchesByPickID = syncedFeaturedMatches
         primeMatch = (liveNow + favoriteTeamUpcoming + upcoming)
             .max { score($0) < score($1) }
     }

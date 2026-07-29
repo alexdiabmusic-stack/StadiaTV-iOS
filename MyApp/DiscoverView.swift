@@ -5,7 +5,7 @@ struct DiscoverView: View {
     @StateObject private var viewModel = NewsViewModel()
     @State private var selectedSport: DiscoverSportFilter = .forYou
     @State private var selectedContentType: DiscoverContentType = .topStories
-    @Environment(\.openURL) private var openURL
+    @State private var presentedArticle: ESPNArticle?
 
     private var targetLeagues: [League] {
         switch selectedSport {
@@ -22,15 +22,12 @@ struct DiscoverView: View {
 
     private var displayedArticles: [ESPNArticle] {
         let articles = viewModel.articles(for: nil)
-            .filter { targetLeagues.contains($0.league) }
+            .filter { targetLeagues.contains($0.league) && !$0.isHighlight }
         switch selectedContentType {
         case .topStories:
             return articles
         case .latest:
             return articles.sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
-        case .highlights:
-            let highlights = articles.filter { $0.isHighlight }
-            return highlights.isEmpty ? articles.prefix(12).map { $0 } : highlights
         }
     }
 
@@ -53,13 +50,8 @@ struct DiscoverView: View {
         .map { $0 }
     }
 
-    private var highlightArticles: [ESPNArticle] {
-        let highlights = remainingArticles.filter { $0.isHighlight }
-        return Array((highlights.isEmpty ? remainingArticles : highlights).prefix(8))
-    }
-
     private var latestArticles: [ESPNArticle] {
-        let excluded = Set(([heroArticle].compactMap { $0 } + teamArticles + highlightArticles).map(\.id))
+        let excluded = Set(([heroArticle].compactMap { $0 } + teamArticles).map(\.id))
         return remainingArticles.filter { !excluded.contains($0.id) }.prefix(24).map { $0 }
     }
 
@@ -74,6 +66,9 @@ struct DiscoverView: View {
             }
             .navigationTitle("Discover")
             .searchToolbar()
+            .sheet(item: $presentedArticle) { article in
+                ArticleReaderView(article: article)
+            }
         }
         .tint(Theme.accent)
         .task(id: prefs.followedLeagues.map(\.id).joined(separator: ",")) {
@@ -86,7 +81,7 @@ struct DiscoverView: View {
 
     private var stickyFilters: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Sports news, highlights and stories")
+            Text("Sports news and stories")
                 .font(.subheadline)
                 .foregroundStyle(Theme.textSecondary)
                 .padding(.horizontal, 20)
@@ -168,23 +163,6 @@ struct DiscoverView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
                 }
 
-                liveStorylines
-
-                if !highlightArticles.isEmpty {
-                    DiscoverSectionHeader(title: "HIGHLIGHTS", actionTitle: "See All")
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(highlightArticles) { article in
-                                Button { open(article: article) } label: {
-                                    HighlightArticleCard(article: article)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    }
-                    .padding(.horizontal, -20)
-                }
 
                 if !latestArticles.isEmpty {
                     DiscoverSectionHeader(title: "LATEST", actionTitle: nil)
@@ -212,21 +190,6 @@ struct DiscoverView: View {
         }
     }
 
-    private var liveStorylines: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("LIVE STORYLINES")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Theme.textSecondary)
-                .padding(.horizontal, 4)
-            VStack(spacing: 0) {
-                StorylineRow(title: "Live games from your followed leagues", action: "View live game")
-                Divider().overlay(Theme.hairline)
-                StorylineRow(title: "Breaking updates and in-game highlights", action: "Follow game")
-            }
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-        }
-    }
 
     private var emptyState: some View {
         VStack(spacing: 16) {
@@ -251,8 +214,7 @@ struct DiscoverView: View {
     }
 
     private func open(article: ESPNArticle) {
-        guard let url = article.url else { return }
-        openURL(url)
+        presentedArticle = article
     }
 
     private func loadTargetLeaguesIfNeeded() async {
@@ -291,7 +253,6 @@ private enum DiscoverSportFilter: Hashable, Identifiable, CaseIterable {
 private enum DiscoverContentType: String, Identifiable, CaseIterable {
     case topStories
     case latest
-    case highlights
 
     var id: String { rawValue }
 
@@ -299,7 +260,6 @@ private enum DiscoverContentType: String, Identifiable, CaseIterable {
         switch self {
         case .topStories: "Top Stories"
         case .latest: "Latest"
-        case .highlights: "Highlights"
         }
     }
 }
@@ -311,7 +271,7 @@ private struct DiscoverSectionHeader: View {
     var body: some View {
         HStack {
             Text(title)
-                .font(.caption.weight(.semibold))
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(Theme.textSecondary)
             Spacer()
             if let actionTitle {
@@ -355,13 +315,6 @@ private struct HeroArticleCard: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
-                if !article.description.isEmpty {
-                    Text(article.description)
-                        .font(.subheadline)
-                        .foregroundStyle(.white.opacity(0.82))
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                }
 
                 Text(article.metadataLine(includeSource: true))
                     .font(.caption.weight(.semibold))
@@ -400,67 +353,6 @@ private struct TeamNewsRow: View {
     }
 }
 
-private struct StorylineRow: View {
-    let title: String
-    let action: String
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                Text("\(action) →")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Theme.accent)
-            }
-            Spacer()
-            Text("LIVE")
-                .font(.caption2.weight(.heavy))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(Theme.live, in: Capsule())
-        }
-        .padding(14)
-    }
-}
-
-private struct HighlightArticleCard: View {
-    let article: ESPNArticle
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack {
-                ArticleImage(url: article.imageURL)
-                    .frame(width: 196, height: 110)
-                Color.black.opacity(0.18)
-                HStack(spacing: 6) {
-                    Image(systemName: "play.fill")
-                    Text(article.durationText)
-                }
-                .font(.caption.weight(.heavy))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 6)
-                .background(.black.opacity(0.58), in: Capsule())
-            }
-            .frame(width: 196, height: 110)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-            Text(article.headline)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.textPrimary)
-                .lineLimit(2)
-                .frame(width: 196, alignment: .leading)
-            Text("Video · \(article.metadataLine(includeSource: false))")
-                .font(.caption)
-                .foregroundStyle(Theme.textSecondary)
-                .lineLimit(1)
-        }
-        .contextMenu { ArticleContextActions() }
-    }
-}
 
 private struct StandardArticleCard: View {
     let article: ESPNArticle
@@ -568,11 +460,6 @@ private extension ESPNArticle {
         return nil
     }
 
-    var durationText: String {
-        let minutes = abs(id.hashValue % 4) + 1
-        let seconds = abs(headline.hashValue % 50) + 10
-        return "\(minutes):\(String(format: "%02d", seconds))"
-    }
 
     var relativePublishedText: String {
         guard let published else { return "Just now" }

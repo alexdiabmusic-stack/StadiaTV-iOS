@@ -6,7 +6,8 @@ import Combine
 struct LiveView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @StateObject private var viewModel = LiveViewModel()
-    @State private var filter: LiveFilter = .forYou
+    @AppStorage("live.filter.v1") private var savedFilterRaw: String = LiveFilter.closeGames.rawValue
+    @State private var filter: LiveFilter = .closeGames
     @State private var selectedSport: SportGroup?
 
     var body: some View {
@@ -15,12 +16,12 @@ struct LiveView: View {
                 Theme.background.ignoresSafeArea()
                 content
             }
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("Live")
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    HStack(spacing: 6) {
-                        PulsingLiveBadge()
-                        Text("LIVE").font(.system(size: 16, weight: .black)).foregroundStyle(Theme.textPrimary)
+                ToolbarItem(placement: .primaryAction) {
+                    NavigationLink(destination: SearchView()) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(Theme.textPrimary)
                     }
                 }
             }
@@ -28,9 +29,11 @@ struct LiveView: View {
         }
         .tint(Theme.accent)
         .task {
+            filter = LiveFilter(rawValue: savedFilterRaw) ?? .closeGames
             await viewModel.load(favoriteTeams: prefs.favoriteTeams)
             viewModel.startAutoRefresh(favoriteTeams: prefs.favoriteTeams)
         }
+        .onChange(of: filter) { _, new in savedFilterRaw = new.rawValue }
         .onDisappear { viewModel.stopAutoRefresh() }
     }
 
@@ -55,14 +58,24 @@ struct LiveView: View {
     private var liveList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
-                // Filter + Sport chips
-                filterStrip
+                if !viewModel.allLive.isEmpty {
+                    Text(viewModel.allLive.count == 1 ? "1 game currently live" : "\(viewModel.allLive.count) games currently live")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.textSecondary)
+                }
 
-                if displayedMatches.isEmpty {
+                sportNavigator
+
+                if visibleMatches.isEmpty {
                     emptyState
+                } else if selectedSport != nil {
+                    ForEach(visibleMatches) { match in
+                        NavigationLink(value: match) { LiveMatchCard(match: match) }
+                            .buttonStyle(.plain)
+                    }
                 } else {
                     ForEach(groupedSports, id: \.self) { group in
-                        let groupMatches = displayedMatches.filter { $0.league.group == group }
+                        let groupMatches = visibleMatches.filter { $0.league.group == group }
                         if !groupMatches.isEmpty {
                             liveSportSection(sport: group, matches: groupMatches)
                         }
@@ -76,9 +89,57 @@ struct LiveView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
         }
+        .safeAreaInset(edge: .top) {
+            filterStrip
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+                .background(.bar)
+        }
         .refreshable {
             await viewModel.load(favoriteTeams: prefs.favoriteTeams, force: true)
         }
+    }
+
+    private var visibleMatches: [Match] {
+        guard let sport = selectedSport else { return displayedMatches }
+        return displayedMatches.filter { $0.league.group == sport }
+    }
+
+    @ViewBuilder
+    private var sportNavigator: some View {
+        let sports = groupedSports
+        if sports.count > 1 {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    sportNavChip(nil, label: "All")
+                    ForEach(sports, id: \.self) { sport in
+                        sportNavChip(sport, label: sport.rawValue)
+                    }
+                }
+            }
+        }
+    }
+
+    private func sportNavChip(_ sport: SportGroup?, label: String) -> some View {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(.snappy) { selectedSport = sport }
+        } label: {
+            HStack(spacing: 4) {
+                if let sport {
+                    Image(systemName: sport.systemImage)
+                        .font(.caption2.weight(.bold))
+                }
+                Text(label)
+                    .font(.caption.weight(.bold))
+            }
+            .foregroundStyle(selectedSport == sport ? .white : Theme.textSecondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(selectedSport == sport ? Theme.accent.opacity(0.9) : Theme.surface, in: Capsule())
+            .overlay(Capsule().strokeBorder(selectedSport == sport ? Theme.accent : Theme.hairline))
+        }
+        .buttonStyle(.plain)
     }
 
     private var filterStrip: some View {
@@ -92,7 +153,10 @@ struct LiveView: View {
     }
 
     private func filterChip(_ f: LiveFilter) -> some View {
-        Button { withAnimation(.snappy) { filter = f } } label: {
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(.snappy) { filter = f }
+        } label: {
             Text(f.label)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(filter == f ? .white : Theme.textSecondary)
@@ -134,10 +198,10 @@ struct LiveView: View {
                 Image(systemName: sport.systemImage)
                     .font(.caption.weight(.bold))
                 Text(sport.rawValue.uppercased())
-                    .font(.caption.weight(.heavy))
+                    .font(.footnote.weight(.semibold))
                 Spacer()
                 Text("\(matches.count) LIVE")
-                    .font(.caption2.weight(.bold))
+                    .font(.caption.weight(.semibold))
             }
             .foregroundStyle(Theme.live)
 
@@ -155,7 +219,7 @@ struct LiveView: View {
             HStack(spacing: 6) {
                 Image(systemName: "clock.badge.fill")
                 Text("STARTING SOON")
-                    .font(.caption.weight(.heavy))
+                    .font(.footnote.weight(.semibold))
             }
             .foregroundStyle(Theme.starting)
 
@@ -249,13 +313,51 @@ struct LiveView: View {
 struct LiveMatchCard: View {
     let match: Match
 
+    private var intelligenceLabel: String? {
+        guard match.state == .live,
+              let h = match.home.score.flatMap(Int.init),
+              let a = match.away.score.flatMap(Int.init) else { return nil }
+        let diff = abs(h - a)
+        let status = match.statusDetail.lowercased()
+        switch match.league.group {
+        case .baseball:
+            if ["10th","11th","12th","13th","14th","15th","extra"].contains(where: { status.contains($0) }) { return "EXTRA INNINGS" }
+            if diff == 0 { return "TIED" }
+            if diff == 1 { return "ONE-RUN GAME" }
+        case .basketball:
+            if status.contains("ot") { return "OVERTIME" }
+            if diff <= 5 { return "CLOSE GAME" }
+        case .hockey:
+            if status.contains("ot") { return "OVERTIME" }
+            if diff == 0 { return "TIED" }
+            if diff <= 1 { return "ONE-GOAL GAME" }
+        case .soccer:
+            if diff == 0 { return "LEVEL" }
+            if diff <= 1 { return "CLOSE MATCH" }
+        case .football:
+            if status.contains("ot") { return "OVERTIME" }
+            if diff <= 3 { return "FIELD GOAL GAME" }
+            if diff <= 8 { return "ONE-SCORE GAME" }
+        default: break
+        }
+        return nil
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 PulsingLiveBadge()
                 Text(match.league.shortName)
                     .font(.caption2.weight(.heavy))
                     .foregroundStyle(Theme.textSecondary)
+                if let label = intelligenceLabel {
+                    Text("·")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.textSecondary)
+                    Text(label)
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(Theme.starting)
+                }
                 Spacer()
                 Text(match.statusDetail)
                     .font(.caption.weight(.bold))
@@ -264,20 +366,31 @@ struct LiveMatchCard: View {
             }
 
             HStack(spacing: 0) {
-                liveTeamColumn(match.away)
-                Spacer()
-                VStack(spacing: 4) {
-                    HStack(spacing: 8) {
-                        Text(match.away.score ?? "-")
-                        Text("–")
-                            .foregroundStyle(Theme.textSecondary)
-                        Text(match.home.score ?? "-")
-                    }
-                    .font(.system(size: 32, weight: .bold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(Theme.textPrimary)
+                HStack(spacing: 8) {
+                    TeamLogo(url: match.away.logoURL, size: 36)
+                    Text(match.away.shortName)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
                 }
-                Spacer()
-                liveTeamColumn(match.home)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: 6) {
+                    Text(match.away.score ?? "-")
+                    Text("–").foregroundStyle(Theme.textSecondary)
+                    Text(match.home.score ?? "-")
+                }
+                .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
+                .foregroundStyle(Theme.textPrimary)
+
+                HStack(spacing: 8) {
+                    Text(match.home.shortName)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
+                    TeamLogo(url: match.home.logoURL, size: 36)
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
 
             if !match.broadcasts.isEmpty {
@@ -290,24 +403,22 @@ struct LiveMatchCard: View {
                 .foregroundStyle(Theme.textSecondary)
             }
         }
-        .padding(16)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(Theme.live.opacity(0.3))
-        )
-    }
-
-    private func liveTeamColumn(_ side: TeamSide) -> some View {
-        VStack(spacing: 8) {
-            TeamLogo(url: side.logoURL, size: 44)
-            Text(side.shortName)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline))
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Theme.live)
+                .frame(height: 2)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
-        .frame(width: 80)
+        .contextMenu {
+            Button("Set Alert", systemImage: "bell") { }
+            Button("Add to Calendar", systemImage: "calendar.badge.plus") { }
+            Divider()
+            Button("Hide", systemImage: "eye.slash", role: .destructive) { }
+        }
     }
 }
 
@@ -366,8 +477,8 @@ struct PulsingLiveBadge: View {
 // MARK: - Filter
 
 enum LiveFilter: String, CaseIterable, Identifiable {
-    case forYou = "forYou"
     case closeGames = "closeGames"
+    case forYou = "forYou"
     case all = "all"
 
     var id: String { rawValue }

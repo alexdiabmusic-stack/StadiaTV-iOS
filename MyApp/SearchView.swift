@@ -14,31 +14,17 @@ struct SearchView: View {
         query.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var matchResults: [Match] {
-        guard !trimmedQuery.isEmpty else { return [] }
-        return viewModel.matches.filter { match in
-            [match.name, match.shortName, match.league.name, match.home.displayName, match.away.displayName, match.broadcasts.joined(separator: " ")]
-                .joined(separator: " ")
-                .localizedCaseInsensitiveContains(trimmedQuery)
-        }
-    }
-
-    private var channelResults: [Channel] {
-        guard !trimmedQuery.isEmpty else { return [] }
-        return playlists.allChannels.filter { channel in
-            [channel.name, channel.group ?? "", channel.playlistName]
-                .joined(separator: " ")
-                .localizedCaseInsensitiveContains(trimmedQuery)
-        }
-    }
-
-    private var articleResults: [ESPNArticle] {
-        guard !trimmedQuery.isEmpty else { return [] }
-        return viewModel.articles.filter { article in
-            [article.headline, article.description, article.league.name]
-                .joined(separator: " ")
-                .localizedCaseInsensitiveContains(trimmedQuery)
-        }
+    private var results: [UniversalSearchResult] {
+        SearchIndex.results(
+            for: trimmedQuery,
+            leagues: League.all,
+            teams: viewModel.teams,
+            matches: viewModel.matches,
+            channels: playlists.allChannels,
+            players: viewModel.players,
+            articles: viewModel.articles,
+            settings: SearchSettingDestination.allCases
+        )
     }
 
     var body: some View {
@@ -51,26 +37,35 @@ struct SearchView: View {
             .navigationDestination(for: Match.self) { match in
                 MatchDetailView(match: match)
             }
+            .navigationDestination(for: SearchTeamResult.self) { result in
+                TeamRosterView(league: result.league, teamID: result.team.id, teamName: result.team.displayName)
+            }
+            .navigationDestination(for: SearchPlayerResult.self) { result in
+                PlayerDetailView(league: result.league, athlete: result.athlete)
+            }
+            .navigationDestination(for: SearchSettingDestination.self) { destination in
+                destination.view
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
             }
-            .searchable(text: $query, prompt: "Teams, leagues, channels, news")
+            .searchable(text: $query, prompt: "Teams, leagues, games, channels, players")
             .sheet(item: $playingChannel) { channel in
                 PlayerView(channel: channel)
             }
         }
         .tint(Theme.accent)
-        .task(id: prefs.followedLeagues.map(\.id).joined(separator: ",")) {
-            await viewModel.load(leagues: prefs.followedLeagues)
+        .task(id: prefs.followedLeagues.map(\.id).joined(separator: ",") + "|" + prefs.favoriteTeams.map(\.id).joined(separator: ",")) {
+            await viewModel.load(leagues: prefs.followedLeagues, favoriteTeams: prefs.favoriteTeams)
         }
     }
 
     @ViewBuilder private var content: some View {
         if trimmedQuery.isEmpty {
             idleState
-        } else if matchResults.isEmpty && channelResults.isEmpty && articleResults.isEmpty {
+        } else if results.isEmpty {
             emptyState
         } else {
             resultsList
@@ -79,15 +74,15 @@ struct SearchView: View {
 
     private var idleState: some View {
         VStack(spacing: 16) {
-            Image(systemName: "magnifyingglass")
+            Image(systemName: "command.circle.fill")
                 .font(.system(size: Theme.scaled(42)))
                 .foregroundStyle(Theme.accent)
-            Text("Search matches, channels, and ESPN news")
+            Text("Search teams, leagues, games, channels, players, news, highlights, and settings")
                 .font(.headline)
                 .foregroundStyle(Theme.textPrimary)
                 .multilineTextAlignment(.center)
             FlowLayout(spacing: 8) {
-                ForEach(["NBA", "NFL", "Premier League", "ESPN", "UFC"], id: \.self) { suggestion in
+                ForEach(["Senators", "NBA", "TSN", "Highlights", "Notifications", "Injury report"], id: \.self) { suggestion in
                     Button(suggestion) { query = suggestion }
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.textPrimary)
@@ -117,32 +112,56 @@ struct SearchView: View {
 
     private var resultsList: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 20) {
-                if !matchResults.isEmpty {
-                    SearchSectionTitle(title: "Matches", count: matchResults.count)
-                    ForEach(matchResults.prefix(8)) { match in
-                        NavigationLink(value: match) { MatchRow(match: match) }
-                            .buttonStyle(.plain)
-                    }
-                }
-
-                if !channelResults.isEmpty {
-                    SearchSectionTitle(title: "Channels", count: channelResults.count)
-                    ForEach(channelResults.prefix(12)) { channel in
-                        ChannelListRow(channel: channel) { playingChannel = channel }
-                    }
-                }
-
-                if !articleResults.isEmpty {
-                    SearchSectionTitle(title: "News", count: articleResults.count)
-                    ForEach(articleResults.prefix(10)) { article in
-                        SearchArticleRow(article: article) {
-                            if let url = article.url { openURL(url) }
-                        }
-                    }
+            LazyVStack(alignment: .leading, spacing: 10) {
+                SearchSectionTitle(title: "Results", count: results.count)
+                ForEach(results.prefix(30)) { result in
+                    row(for: result)
                 }
             }
             .padding(16)
+        }
+    }
+
+    @ViewBuilder private func row(for result: UniversalSearchResult) -> some View {
+        switch result.payload {
+        case .team(let team):
+            NavigationLink(value: team) {
+                UniversalSearchRow(result: result)
+            }
+            .buttonStyle(.plain)
+        case .league(let league):
+            NavigationLink(value: SearchSettingDestination.teamsLeagues) {
+                UniversalSearchRow(result: result, accessoryText: league.group.rawValue)
+            }
+            .buttonStyle(.plain)
+        case .match(let match):
+            NavigationLink(value: match) {
+                UniversalSearchRow(result: result)
+            }
+            .buttonStyle(.plain)
+        case .channel(let channel):
+            Button { playingChannel = channel } label: {
+                UniversalSearchRow(result: result)
+            }
+            .buttonStyle(.plain)
+        case .player(let player):
+            NavigationLink(value: player) {
+                UniversalSearchRow(result: result)
+            }
+            .buttonStyle(.plain)
+        case .article(let article):
+            Button {
+                if let url = article.url { openURL(url) }
+            } label: {
+                UniversalSearchRow(result: result)
+            }
+            .buttonStyle(.plain)
+            .disabled(article.url == nil)
+        case .setting(let setting):
+            NavigationLink(value: setting) {
+                UniversalSearchRow(result: result)
+            }
+            .buttonStyle(.plain)
         }
     }
 }
@@ -151,27 +170,48 @@ struct SearchView: View {
 final class SearchViewModel: ObservableObject {
     @Published private(set) var matches: [Match] = []
     @Published private(set) var articles: [ESPNArticle] = []
+    @Published private(set) var teams: [SearchTeamResult] = []
+    @Published private(set) var players: [SearchPlayerResult] = []
 
     private let service = ESPNService()
 
-    func load(leagues: [League]) async {
+    func load(leagues: [League], favoriteTeams: [FavoriteTeam]) async {
         var loadedMatches: [Match] = []
         var loadedArticles: [ESPNArticle] = []
+        var loadedTeams: [SearchTeamResult] = []
+        var loadedPlayers: [SearchPlayerResult] = []
+        let favoriteTeamIDsByLeague = Dictionary(grouping: favoriteTeams, by: \.leaguePath)
 
         await withTaskGroup(of: SearchLoadResult.self) { group in
             for league in leagues {
                 group.addTask {
-                    async let matches = self.service.scoreboards(for: league, starting: Date(), days: 7)
-                    async let articles = self.service.news(for: league, limit: 6)
+                    async let matches = self.service.scoreboards(for: league, starting: Date(), days: 14)
+                    async let articles = self.service.realtimeNews(for: league, limit: 12)
+                    async let teams = self.service.teams(for: league)
+
+                    let loadedTeams = (try? await teams) ?? []
+                    var leaguePlayers: [SearchPlayerResult] = []
+                    for favorite in favoriteTeamIDsByLeague[league.path] ?? [] {
+                        let rosterGroups = (try? await self.service.roster(for: league, teamID: favorite.teamID)) ?? []
+                        let teamName = favorite.displayName
+                        leaguePlayers.append(contentsOf: rosterGroups.flatMap(\.athletes).map { athlete in
+                            SearchPlayerResult(league: league, teamID: favorite.teamID, teamName: teamName, athlete: athlete)
+                        })
+                    }
+
                     return SearchLoadResult(
                         matches: (try? await matches) ?? [],
-                        articles: (try? await articles) ?? []
+                        articles: (try? await articles) ?? [],
+                        teams: loadedTeams.map { SearchTeamResult(league: league, team: $0) },
+                        players: leaguePlayers
                     )
                 }
             }
             for await result in group {
                 loadedMatches.append(contentsOf: result.matches)
                 loadedArticles.append(contentsOf: result.articles)
+                loadedTeams.append(contentsOf: result.teams)
+                loadedPlayers.append(contentsOf: result.players)
             }
         }
 
@@ -181,12 +221,342 @@ final class SearchViewModel: ObservableObject {
         articles = Dictionary(grouping: loadedArticles, by: \.id)
             .compactMap { $0.value.first }
             .sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
+        teams = Dictionary(grouping: loadedTeams, by: \.id)
+            .compactMap { $0.value.first }
+            .sorted { $0.team.displayName.localizedCaseInsensitiveCompare($1.team.displayName) == .orderedAscending }
+        players = Dictionary(grouping: loadedPlayers, by: \.id)
+            .compactMap { $0.value.first }
+            .sorted { $0.athlete.displayName.localizedCaseInsensitiveCompare($1.athlete.displayName) == .orderedAscending }
     }
 }
 
 private struct SearchLoadResult {
     let matches: [Match]
     let articles: [ESPNArticle]
+    let teams: [SearchTeamResult]
+    let players: [SearchPlayerResult]
+}
+
+struct SearchTeamResult: Identifiable, Hashable {
+    let league: League
+    let team: Team
+
+    var id: String { "team-\(league.id)-\(team.id)" }
+}
+
+struct SearchPlayerResult: Identifiable, Hashable {
+    let league: League
+    let teamID: String
+    let teamName: String
+    let athlete: RosterAthlete
+
+    var id: String { "player-\(league.id)-\(teamID)-\(athlete.id)" }
+}
+
+private enum SearchResultPayload: Hashable {
+    case team(SearchTeamResult)
+    case league(League)
+    case match(Match)
+    case channel(Channel)
+    case player(SearchPlayerResult)
+    case article(ESPNArticle)
+    case setting(SearchSettingDestination)
+}
+
+private struct UniversalSearchResult: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let subtitle: String
+    let systemImage: String
+    let imageURL: URL?
+    let rank: Int
+    let payload: SearchResultPayload
+}
+
+enum SearchSettingDestination: String, CaseIterable, Identifiable, Hashable {
+    case playlists
+    case teamsLeagues
+    case appearancePlayback
+    case notificationsCalendar
+    case privacySync
+    case premium
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .playlists: "Playlists"
+        case .teamsLeagues: "Teams & Leagues"
+        case .appearancePlayback: "Appearance & Playback"
+        case .notificationsCalendar: "Notifications & Calendar"
+        case .privacySync: "Privacy & iCloud Sync"
+        case .premium: "StadiaTV Premium"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .playlists: "Settings"
+        case .teamsLeagues: "Settings"
+        case .appearancePlayback: "Settings"
+        case .notificationsCalendar: "Settings"
+        case .privacySync: "Settings"
+        case .premium: "Subscription"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .playlists: "list.and.film"
+        case .teamsLeagues: "star.circle.fill"
+        case .appearancePlayback: "paintpalette.fill"
+        case .notificationsCalendar: "bell.badge.fill"
+        case .privacySync: "lock.icloud.fill"
+        case .premium: "sparkles"
+        }
+    }
+
+    var keywords: [String] {
+        switch self {
+        case .playlists:
+            ["settings", "channels", "m3u", "xtream", "live tv", "playlist", "source"]
+        case .teamsLeagues:
+            ["settings", "teams", "leagues", "following", "favorites", "sports", "setup"]
+        case .appearancePlayback:
+            ["settings", "appearance", "theme", "playback", "language", "player", "spoiler", "scores"]
+        case .notificationsCalendar:
+            ["settings", "notifications", "alerts", "calendar", "reminders", "digest", "game starting"]
+        case .privacySync:
+            ["settings", "privacy", "icloud", "sync", "data", "watch history", "reset"]
+        case .premium:
+            ["settings", "premium", "subscription", "pro", "unlock", "stats", "alerts"]
+        }
+    }
+
+    @ViewBuilder var view: some View {
+        switch self {
+        case .playlists:
+            PlaylistsSettingsView()
+        case .teamsLeagues:
+            TeamEditorView()
+        case .appearancePlayback:
+            AppearancePlaybackSettingsView()
+        case .notificationsCalendar:
+            NotificationsCalendarSettingsView()
+        case .privacySync:
+            PrivacySyncSettingsView()
+        case .premium:
+            PaywallView()
+        }
+    }
+}
+
+private enum SearchIndex {
+    static func results(
+        for query: String,
+        leagues: [League],
+        teams: [SearchTeamResult],
+        matches: [Match],
+        channels: [Channel],
+        players: [SearchPlayerResult],
+        articles: [ESPNArticle],
+        settings: [SearchSettingDestination]
+    ) -> [UniversalSearchResult] {
+        let query = SearchQuery(query)
+        guard !query.isEmpty else { return [] }
+
+        var results: [UniversalSearchResult] = []
+        results.append(contentsOf: teams.compactMap { result(for: $0, query: query) })
+        results.append(contentsOf: leagues.compactMap { result(for: $0, query: query) })
+        results.append(contentsOf: matches.compactMap { result(for: $0, query: query) })
+        results.append(contentsOf: channels.compactMap { result(for: $0, query: query) })
+        results.append(contentsOf: players.compactMap { result(for: $0, query: query) })
+        results.append(contentsOf: articles.compactMap { result(for: $0, query: query) })
+        results.append(contentsOf: settings.compactMap { result(for: $0, query: query) })
+
+        return results.sorted {
+            if $0.rank != $1.rank { return $0.rank > $1.rank }
+            return $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+        }
+    }
+
+    private static func result(for team: SearchTeamResult, query: SearchQuery) -> UniversalSearchResult? {
+        let fields = [
+            team.team.displayName,
+            team.team.shortDisplayName,
+            team.team.abbreviation,
+            team.league.name,
+            team.league.shortName,
+            team.league.group.rawValue,
+            "team teams club favorite following"
+        ]
+        guard let rank = score(query: query, title: team.team.displayName, fields: fields, categoryBoost: 24) else { return nil }
+        return UniversalSearchResult(
+            id: team.id,
+            title: team.team.displayName,
+            subtitle: "Team",
+            systemImage: "shield.fill",
+            imageURL: team.team.logoURL,
+            rank: rank,
+            payload: .team(team)
+        )
+    }
+
+    private static func result(for league: League, query: SearchQuery) -> UniversalSearchResult? {
+        let fields = [league.name, league.shortName, league.group.rawValue, league.keywords.joined(separator: " "), "league leagues sport settings"]
+        guard let rank = score(query: query, title: league.name, fields: fields, categoryBoost: 18) else { return nil }
+        return UniversalSearchResult(
+            id: "league-\(league.id)",
+            title: league.name,
+            subtitle: "League",
+            systemImage: league.group.systemImage,
+            imageURL: nil,
+            rank: rank,
+            payload: .league(league)
+        )
+    }
+
+    private static func result(for match: Match, query: SearchQuery) -> UniversalSearchResult? {
+        let fields = [
+            match.name,
+            match.shortName,
+            match.league.name,
+            match.league.shortName,
+            match.home.displayName,
+            match.home.shortName,
+            match.home.abbreviation,
+            match.away.displayName,
+            match.away.shortName,
+            match.away.abbreviation,
+            match.broadcasts.joined(separator: " "),
+            match.venue ?? "",
+            "game games match matches schedule upcoming live final"
+        ]
+        guard let rank = score(query: query, title: match.name, fields: fields, categoryBoost: match.state == .live ? 24 : 16) else { return nil }
+        return UniversalSearchResult(
+            id: "match-\(match.id)",
+            title: match.name,
+            subtitle: "\(match.state.label) game · \(match.searchDateText)",
+            systemImage: match.state == .live ? "dot.radiowaves.left.and.right" : "calendar",
+            imageURL: match.away.logoURL ?? match.home.logoURL,
+            rank: rank,
+            payload: .match(match)
+        )
+    }
+
+    private static func result(for channel: Channel, query: SearchQuery) -> UniversalSearchResult? {
+        let fields = [channel.name, channel.group ?? "", channel.playlistName, "channel channels stream live tv watch"]
+        guard let rank = score(query: query, title: channel.name, fields: fields, categoryBoost: 14) else { return nil }
+        return UniversalSearchResult(
+            id: "channel-\(channel.id)",
+            title: channel.name,
+            subtitle: "Channel",
+            systemImage: "play.tv.fill",
+            imageURL: channel.logoURL,
+            rank: rank,
+            payload: .channel(channel)
+        )
+    }
+
+    private static func result(for player: SearchPlayerResult, query: SearchQuery) -> UniversalSearchResult? {
+        let fields = [
+            player.athlete.displayName,
+            player.athlete.position ?? "",
+            player.athlete.positionName ?? "",
+            player.teamName,
+            player.league.name,
+            player.league.shortName,
+            "player players athlete roster stats injury injured"
+        ]
+        guard let rank = score(query: query, title: player.athlete.displayName, fields: fields, categoryBoost: 20) else { return nil }
+        return UniversalSearchResult(
+            id: player.id,
+            title: player.athlete.displayName,
+            subtitle: "Player · \(player.teamName)",
+            systemImage: player.athlete.isInjured ? "cross.case.fill" : "person.fill",
+            imageURL: player.athlete.headshotURL,
+            rank: rank,
+            payload: .player(player)
+        )
+    }
+
+    private static func result(for article: ESPNArticle, query: SearchQuery) -> UniversalSearchResult? {
+        let isHighlight = article.isSearchHighlight
+        let fields = [
+            article.headline,
+            article.description,
+            article.league.name,
+            article.league.shortName,
+            article.byline ?? "",
+            article.type ?? "",
+            article.categories.joined(separator: " "),
+            isHighlight ? "highlight highlights video clips replay media" : "news story article report injury trade analysis"
+        ]
+        guard let rank = score(query: query, title: article.headline, fields: fields, categoryBoost: isHighlight ? 18 : 12) else { return nil }
+        return UniversalSearchResult(
+            id: "article-\(article.id)",
+            title: article.headline,
+            subtitle: isHighlight ? "Highlight" : "News",
+            systemImage: isHighlight ? "play.rectangle.fill" : "newspaper.fill",
+            imageURL: article.imageURL,
+            rank: rank,
+            payload: .article(article)
+        )
+    }
+
+    private static func result(for setting: SearchSettingDestination, query: SearchQuery) -> UniversalSearchResult? {
+        let fields = [setting.title, setting.subtitle, setting.keywords.joined(separator: " ")]
+        guard let rank = score(query: query, title: setting.title, fields: fields, categoryBoost: 10) else { return nil }
+        return UniversalSearchResult(
+            id: "setting-\(setting.id)",
+            title: setting.title,
+            subtitle: setting.subtitle,
+            systemImage: setting.systemImage,
+            imageURL: nil,
+            rank: rank,
+            payload: .setting(setting)
+        )
+    }
+
+    private static func score(query: SearchQuery, title: String, fields: [String], categoryBoost: Int) -> Int? {
+        let normalizedTitle = title.searchNormalized
+        let normalizedFields = fields.map(\.searchNormalized)
+        let combined = normalizedFields.joined(separator: " ")
+
+        guard combined.contains(query.normalized) || query.tokens.allSatisfy({ token in combined.contains(token) }) else {
+            return nil
+        }
+
+        var score = categoryBoost
+        if normalizedTitle == query.normalized { score += 140 }
+        if normalizedTitle.hasPrefix(query.normalized) { score += 110 }
+        if normalizedTitle.contains(query.normalized) { score += 80 }
+        for token in query.tokens {
+            if normalizedTitle.hasPrefix(token) { score += 24 }
+            if normalizedTitle.contains(token) { score += 18 }
+            if normalizedFields.contains(where: { $0.hasPrefix(token) }) { score += 12 }
+            if normalizedFields.contains(where: { $0.contains(token) }) { score += 8 }
+        }
+        if query.tokens.count > 1 && combined.contains(query.normalized) { score += 32 }
+        return score
+    }
+}
+
+private struct SearchQuery {
+    let normalized: String
+    let tokens: [String]
+
+    init(_ rawValue: String) {
+        normalized = rawValue.searchNormalized
+        tokens = normalized
+            .split(separator: " ")
+            .map(String.init)
+            .filter { $0.count > 1 }
+    }
+
+    var isEmpty: Bool {
+        normalized.isEmpty || tokens.isEmpty
+    }
 }
 
 private struct SearchSectionTitle: View {
@@ -201,39 +571,117 @@ private struct SearchSectionTitle: View {
         }
         .font(.footnote.weight(.bold))
         .foregroundStyle(Theme.textSecondary)
+        .padding(.vertical, 6)
     }
 }
 
-private struct SearchArticleRow: View {
-    let article: ESPNArticle
-    let action: () -> Void
+private struct UniversalSearchRow: View {
+    let result: UniversalSearchResult
+    var accessoryText: String? = nil
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: "newspaper.fill")
-                    .font(.headline)
-                    .foregroundStyle(Theme.accent)
-                    .frame(width: 38, height: 38)
-                    .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(article.headline)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(2)
-                    Text(article.league.name)
-                        .font(.caption)
-                        .foregroundStyle(Theme.textSecondary)
-                }
-                Spacer()
-                Image(systemName: "arrow.up.right")
-                    .font(.caption.weight(.bold))
+        HStack(spacing: 12) {
+            SearchResultArtwork(result: result)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(result.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(2)
+                Text(result.subtitle)
+                    .font(.caption)
                     .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
             }
-            .padding(12)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+            Spacer(minLength: 10)
+            if let accessoryText {
+                Text(accessoryText)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+            }
+            Image(systemName: result.accessorySystemImage)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Theme.textSecondary)
         }
-        .buttonStyle(.plain)
+        .padding(12)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+    }
+}
+
+private struct SearchResultArtwork: View {
+    let result: UniversalSearchResult
+
+    var body: some View {
+        ZStack {
+            Theme.surfaceElevated
+            if let imageURL = result.imageURL {
+                AsyncImage(url: imageURL) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().scaledToFit().padding(5)
+                    } else {
+                        fallbackIcon
+                    }
+                }
+            } else {
+                fallbackIcon
+            }
+        }
+        .frame(width: 42, height: 42)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var fallbackIcon: some View {
+        Image(systemName: result.systemImage)
+            .font(.headline)
+            .foregroundStyle(Theme.accent)
+    }
+}
+
+private extension UniversalSearchResult {
+    var accessorySystemImage: String {
+        switch payload {
+        case .channel:
+            "play.fill"
+        case .article:
+            "arrow.up.right"
+        default:
+            "chevron.right"
+        }
+    }
+}
+
+private extension Match {
+    var searchDateText: String {
+        switch state {
+        case .live:
+            statusDetail
+        case .final:
+            "Final"
+        case .pre:
+            let calendar = Calendar.current
+            if calendar.isDateInToday(date) { return "Today" }
+            if calendar.isDateInTomorrow(date) { return "Tomorrow" }
+            let formatter = DateFormatter()
+            formatter.setLocalizedDateFormatFromTemplate("EEEE")
+            return formatter.string(from: date)
+        }
+    }
+}
+
+private extension ESPNArticle {
+    var isSearchHighlight: Bool {
+        let text = "\(type ?? "") \(headline) \(categories.joined(separator: " "))".searchNormalized
+        return text.contains("highlight") || text.contains("video") || text.contains("media") || text.contains("play")
+    }
+}
+
+private extension String {
+    var searchNormalized: String {
+        folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 }

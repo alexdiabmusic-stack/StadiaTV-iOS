@@ -1,10 +1,12 @@
 import SwiftUI
 
-/// "More" tab — a dashboard of destinations, with focused settings pushed from here.
+/// Settings tab — a dashboard of destinations, with focused settings pushed from here.
 struct MoreView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var playlists: PlaylistStore
     @EnvironmentObject private var entitlements: EntitlementStore
+    @EnvironmentObject private var watchStore: WatchStore
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showPaywall = false
     @State private var showingTeamEditor = false
 
@@ -21,7 +23,7 @@ struct MoreView: View {
                     .padding(20)
                 }
             }
-            .navigationTitle("More")
+            .navigationTitle("Settings")
             .sheet(isPresented: $showPaywall) {
                 PaywallView()
                     .presentationDetents([.large])
@@ -62,28 +64,21 @@ struct MoreView: View {
 
     private var navigationGroups: some View {
         VStack(spacing: 18) {
-            MoreNavigationGroup(title: "PLAYBACK") {
+            MoreNavigationGroup(title: "PREFERENCES") {
                 NavigationLink { AppearancePlaybackSettingsView() } label: {
-                    MoreNavigationRow(title: "Appearance & Playback")
+                    MoreNavigationRow(title: "Appearance & Playback", value: colorScheme == .dark ? "Dark" : "Light")
                 }
                 MoreNavigationRow(title: "Streaming Language", value: defaultStreamLanguageName)
-            }
-
-            MoreNavigationGroup(title: "PERSONALIZATION") {
-                Button { showingTeamEditor = true } label: {
-                    MoreNavigationRow(title: "Teams & Leagues")
-                }
-                .buttonStyle(.plain)
                 NavigationLink { NotificationsCalendarSettingsView() } label: {
-                    MoreNavigationRow(title: "Notifications & Calendar")
+                    MoreNavigationRow(title: "Notifications & Calendar", value: prefs.matchNotificationsEnabled ? "On" : "Off")
                 }
             }
 
-            MoreNavigationGroup(title: "DATA") {
+            MoreNavigationGroup(title: "DATA & PRIVACY") {
                 NavigationLink { PrivacySyncSettingsView() } label: {
-                    MoreNavigationRow(title: "Privacy & iCloud Sync")
+                    MoreNavigationRow(title: "Privacy & iCloud Sync", value: "On")
                 }
-                MoreNavigationRow(title: "Watch History")
+                MoreNavigationRow(title: "Watch History", value: watchStore.history.isEmpty ? nil : "\(watchStore.history.count) items")
             }
 
             MoreNavigationGroup(title: "SUPPORT") {
@@ -166,9 +161,15 @@ private struct QuickManagementCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Image(systemName: systemImage)
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(Theme.accent)
+            HStack(alignment: .top) {
+                Image(systemName: systemImage)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Theme.textSecondary)
+            }
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.subheadline.weight(.bold))

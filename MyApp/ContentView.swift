@@ -61,7 +61,7 @@ struct RootView: View {
                 DiscoverView()
             }
 
-            Tab("More", systemImage: "ellipsis.circle.fill") {
+            Tab("Settings", systemImage: "gearshape.fill") {
                 MoreView()
             }
         }

@@ -655,19 +655,27 @@ private extension UniversalSearchResult {
 
 private extension Match {
     var searchDateText: String {
+        let text: String
+
         switch state {
         case .live:
-            return statusDetail
+            text = statusDetail
         case .final:
-            return "Final"
+            text = "Final"
         case .pre:
             let calendar = Calendar.current
-            if calendar.isDateInToday(date) { return "Today" }
-            if calendar.isDateInTomorrow(date) { return "Tomorrow" }
-            let formatter = DateFormatter()
-            formatter.setLocalizedDateFormatFromTemplate("EEEE")
-            return formatter.string(from: date)
+            if calendar.isDateInToday(date) {
+                text = "Today"
+            } else if calendar.isDateInTomorrow(date) {
+                text = "Tomorrow"
+            } else {
+                let formatter = DateFormatter()
+                formatter.setLocalizedDateFormatFromTemplate("EEEE")
+                text = formatter.string(from: date)
+            }
         }
+
+        return text
     }
 }
 

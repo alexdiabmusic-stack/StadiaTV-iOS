@@ -6,6 +6,7 @@ struct MoreView: View {
     @EnvironmentObject private var playlists: PlaylistStore
     @EnvironmentObject private var entitlements: EntitlementStore
     @EnvironmentObject private var watchStore: WatchStore
+    @EnvironmentObject private var articleLibrary: ArticleLibraryStore
     @Environment(\.colorScheme) private var colorScheme
     @State private var showPaywall = false
     @State private var showingTeamEditor = false
@@ -75,15 +76,25 @@ struct MoreView: View {
             }
 
             MoreNavigationGroup(title: "DATA & PRIVACY") {
+                NavigationLink { SavedArticlesSettingsView() } label: {
+                    MoreNavigationRow(title: "Saved Articles", value: articleLibrary.savedArticles.isEmpty ? nil : "\(articleLibrary.savedArticles.count) saved")
+                }
                 NavigationLink { PrivacySyncSettingsView() } label: {
                     MoreNavigationRow(title: "Privacy & iCloud Sync", value: "On")
+                }
+                NavigationLink { PrivacyPolicySettingsView() } label: {
+                    MoreNavigationRow(title: "Privacy Policy")
                 }
                 MoreNavigationRow(title: "Watch History", value: watchStore.history.isEmpty ? nil : "\(watchStore.history.count) items")
             }
 
             MoreNavigationGroup(title: "SUPPORT") {
-                MoreNavigationRow(title: "Help & Feedback")
-                MoreNavigationRow(title: "About StadiaTV")
+                NavigationLink { HelpFeedbackSettingsView() } label: {
+                    MoreNavigationRow(title: "Help & Feedback")
+                }
+                NavigationLink { AboutStadiaTVSettingsView() } label: {
+                    MoreNavigationRow(title: "About StadiaTV")
+                }
             }
         }
     }

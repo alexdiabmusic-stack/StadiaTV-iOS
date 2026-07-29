@@ -115,17 +115,27 @@ private struct PlaylistRow: View {
 struct AddPlaylistView: View {
     enum Mode: String, CaseIterable { case m3u = "M3U", xtream = "Xtream" }
 
+    let initialPlaylist: Playlist?
     let onAdd: (Playlist) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @State private var mode: Mode = .m3u
-    @State private var name = ""
+    @State private var mode: Mode
+    @State private var name: String
     // M3U
-    @State private var m3uURL = ""
+    @State private var m3uURL: String
     // Xtream
-    @State private var host = ""
+    @State private var host: String
     @State private var username = ""
     @State private var password = ""
+
+    init(initialPlaylist: Playlist? = nil, onAdd: @escaping (Playlist) -> Void) {
+        self.initialPlaylist = initialPlaylist
+        self.onAdd = onAdd
+        _mode = State(initialValue: initialPlaylist?.kind == .xtream ? .xtream : .m3u)
+        _name = State(initialValue: initialPlaylist?.name ?? "")
+        _m3uURL = State(initialValue: initialPlaylist?.m3uURL ?? "")
+        _host = State(initialValue: initialPlaylist?.host ?? "")
+    }
 
     private var isValid: Bool {
         guard !name.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
@@ -176,13 +186,13 @@ struct AddPlaylistView: View {
             }
             .hidesScrollContentBackground()
             .background(Theme.background)
-            .navigationTitle("Add Playlist")
+            .navigationTitle(initialPlaylist == nil ? "Add Playlist" : "Edit Playlist")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") { add() }.disabled(!isValid)
+                    Button(initialPlaylist == nil ? "Add" : "Save") { add() }.disabled(!isValid)
                 }
             }
         }
@@ -199,11 +209,13 @@ struct AddPlaylistView: View {
         let playlist: Playlist
         switch mode {
         case .m3u:
-            playlist = Playlist(name: trimmedName, kind: .m3u,
-                                m3uURL: m3uURL.trimmingCharacters(in: .whitespaces))
+            playlist = Playlist(id: initialPlaylist?.id ?? UUID(), name: trimmedName, kind: .m3u,
+                                m3uURL: m3uURL.trimmingCharacters(in: .whitespaces),
+                                credentialID: initialPlaylist?.credentialID)
         case .xtream:
-            playlist = Playlist(name: trimmedName, kind: .xtream,
+            playlist = Playlist(id: initialPlaylist?.id ?? UUID(), name: trimmedName, kind: .xtream,
                                 host: host.trimmingCharacters(in: .whitespaces),
+                                credentialID: initialPlaylist?.credentialID,
                                 username: username.trimmingCharacters(in: .whitespaces),
                                 password: password)
         }

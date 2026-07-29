@@ -11,9 +11,11 @@ final class PlaylistStore: ObservableObject {
     /// Channels loaded per playlist, keyed by playlist id.
     @Published private(set) var channelsByPlaylist: [UUID: [Channel]] = [:]
     @Published private(set) var loadingPlaylistIDs: Set<UUID> = []
+    @Published private(set) var defaultPlaylistID: UUID?
     @Published var lastError: String?
 
     private let defaultsKey = "stadiatv.playlists.v1"
+    private let defaultPlaylistKey = "stadiatv.defaultplaylist.v1"
     private let session = URLSession(configuration: {
         let c = URLSessionConfiguration.default
         c.timeoutIntervalForRequest = 30
@@ -32,9 +34,14 @@ final class PlaylistStore: ObservableObject {
     // MARK: - Persistence
 
     private func load() {
+        defaultPlaylistID = UserDefaults.standard.string(forKey: defaultPlaylistKey).flatMap(UUID.init(uuidString:))
         guard let data = UserDefaults.standard.data(forKey: defaultsKey),
               let decoded = try? JSONDecoder().decode([Playlist].self, from: data) else { return }
         playlists = decoded.map { migrateCredentialsIfNeeded(for: $0) }
+        if let defaultPlaylistID, !playlists.contains(where: { $0.id == defaultPlaylistID }) {
+            self.defaultPlaylistID = nil
+            UserDefaults.standard.removeObject(forKey: defaultPlaylistKey)
+        }
         persist()
     }
 
@@ -81,11 +88,37 @@ final class PlaylistStore: ObservableObject {
         do {
             let secured = try secureCredentialsIfNeeded(for: playlist)
             playlists.append(secured)
+            if defaultPlaylistID == nil { setDefault(secured) }
             persist()
             Task { await refresh(secured) }
         } catch {
             lastError = "\(playlist.name): Couldn't save credentials securely."
         }
+    }
+
+    func replace(_ playlist: Playlist) {
+        guard let index = playlists.firstIndex(where: { $0.id == playlist.id }) else {
+            add(playlist)
+            return
+        }
+        do {
+            let secured = try secureCredentialsIfNeeded(for: playlist)
+            playlists[index] = secured
+            channelsByPlaylist[secured.id] = nil
+            persist()
+            Task { await refresh(secured) }
+        } catch {
+            lastError = "\(playlist.name): Couldn't save credentials securely."
+        }
+    }
+
+    func setDefault(_ playlist: Playlist) {
+        defaultPlaylistID = playlist.id
+        UserDefaults.standard.set(playlist.id.uuidString, forKey: defaultPlaylistKey)
+    }
+
+    func isDefault(_ playlist: Playlist) -> Bool {
+        defaultPlaylistID == playlist.id
     }
 
     func remove(at offsets: IndexSet) {
@@ -97,6 +130,14 @@ final class PlaylistStore: ObservableObject {
             }
         }
         playlists.remove(atOffsets: offsets)
+        if let defaultPlaylistID, !playlists.contains(where: { $0.id == defaultPlaylistID }) {
+            self.defaultPlaylistID = playlists.first?.id
+            if let fallbackID = self.defaultPlaylistID {
+                UserDefaults.standard.set(fallbackID.uuidString, forKey: defaultPlaylistKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: defaultPlaylistKey)
+            }
+        }
         persist()
     }
 

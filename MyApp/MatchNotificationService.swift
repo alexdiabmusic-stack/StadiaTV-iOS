@@ -10,6 +10,7 @@ final class MatchNotificationService {
     private init() {}
 
     func requestAuthorization() async -> Bool { false }
+    func scheduleReminder(for match: Match, leadTime: MatchReminderLeadTime) async -> Bool { false }
     func syncNotifications(matches: [Match], favorites: [FavoriteTeam], leadTime: MatchReminderLeadTime) async {}
     func scheduleMorningDigest(matches: [Match]) async {}
     func removeAllMatchNotifications() {}
@@ -38,6 +39,32 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
         do {
             return try await center.requestAuthorization(options: [.alert, .sound, .badge])
         } catch {
+            return false
+        }
+    }
+
+    func scheduleReminder(for match: Match, leadTime: MatchReminderLeadTime) async -> Bool {
+        let settings = await center.notificationSettings()
+        let authorized: Bool
+        switch settings.authorizationStatus {
+        case .authorized, .provisional:
+            authorized = true
+        case .notDetermined:
+            authorized = await requestAuthorization()
+        default:
+            authorized = false
+        }
+        guard authorized else { return false }
+
+        switch match.state {
+        case .pre:
+            await scheduleStartNotificationIfNeeded(for: match, leadTime: leadTime)
+            return true
+        case .live:
+            await scheduleLiveNotificationIfNeeded(for: match)
+            await scheduleCloseGameNotificationIfNeeded(for: match)
+            return true
+        case .final:
             return false
         }
     }
@@ -102,7 +129,7 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
     private func scheduleStartNotificationIfNeeded(for match: Match, leadTime: MatchReminderLeadTime) async {
         guard match.state == .pre else { return }
         let fireDate = match.date.addingTimeInterval(TimeInterval(-leadTime.minutes * 60))
-        guard fireDate > Date() else { return }
+        guard match.date > Date() else { return }
 
         let content = UNMutableNotificationContent()
         content.title = "It's game time in \(leadTime.minutes) minutes!!"
@@ -114,9 +141,14 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
             "notificationType": "gameTimeReminder"
         ]
 
-        let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        await addRequest(identifier: startIdentifier(for: match), content: content, trigger: trigger)
+        if fireDate > Date() {
+            let components = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+            await addRequest(identifier: startIdentifier(for: match), content: content, trigger: trigger)
+        } else {
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+            await addRequest(identifier: startIdentifier(for: match), content: content, trigger: trigger)
+        }
     }
 
     private func scheduleLiveNotificationIfNeeded(for match: Match) async {

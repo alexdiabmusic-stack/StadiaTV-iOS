@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import WebKit
+#endif
 
 struct ArticleReaderView: View {
     let article: ESPNArticle
@@ -88,10 +91,18 @@ struct ArticleReaderView: View {
 
     @ViewBuilder private var bodyText: some View {
         if paragraphs.isEmpty {
-            Text("This source did not include article text in the feed.")
-                .font(.body)
-                .foregroundStyle(Theme.textSecondary)
-                .lineSpacing(5)
+            if let url = article.url {
+                #if os(iOS)
+                ArticleWebView(url: url)
+                    .frame(minHeight: 680)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                #else
+                unavailableArticleText
+                #endif
+            } else {
+                unavailableArticleText
+            }
         } else {
             VStack(alignment: .leading, spacing: 14) {
                 ForEach(paragraphs, id: \.self) { paragraph in
@@ -103,6 +114,13 @@ struct ArticleReaderView: View {
                 }
             }
         }
+    }
+
+    private var unavailableArticleText: some View {
+        Text("This source did not include article text in the feed.")
+            .font(.body)
+            .foregroundStyle(Theme.textSecondary)
+            .lineSpacing(5)
     }
 
     @ViewBuilder private var sourceAction: some View {
@@ -127,3 +145,22 @@ struct ArticleReaderView: View {
         return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
+
+#if os(iOS)
+private struct ArticleWebView: UIViewRepresentable {
+    let url: URL
+
+    func makeUIView(context: Context) -> WKWebView {
+        let webView = WKWebView()
+        webView.scrollView.backgroundColor = UIColor.clear
+        webView.isOpaque = false
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        if webView.url != url {
+            webView.load(URLRequest(url: url))
+        }
+    }
+}
+#endif

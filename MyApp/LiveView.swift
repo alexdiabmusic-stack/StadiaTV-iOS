@@ -9,6 +9,9 @@ struct LiveView: View {
     @AppStorage("live.filter.v1") private var savedFilterRaw: String = LiveFilter.closeGames.rawValue
     @State private var filter: LiveFilter = .closeGames
     @State private var selectedSport: SportGroup?
+    @State private var hiddenMatchIDs: Set<String> = []
+    @State private var showingActionAlert = false
+    @State private var actionAlertMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -35,6 +38,11 @@ struct LiveView: View {
         }
         .onChange(of: filter) { _, new in savedFilterRaw = new.rawValue }
         .onDisappear { viewModel.stopAutoRefresh() }
+        .alert("Live", isPresented: $showingActionAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(actionAlertMessage)
+        }
     }
 
     @ViewBuilder
@@ -70,7 +78,14 @@ struct LiveView: View {
                     emptyState
                 } else if selectedSport != nil {
                     ForEach(visibleMatches) { match in
-                        NavigationLink(value: match) { LiveMatchCard(match: match) }
+                        NavigationLink(value: match) {
+                            LiveMatchCard(
+                                match: match,
+                                onSetAlert: { Task { await setAlert(for: match) } },
+                                onAddToCalendar: { Task { await addToCalendar(match) } },
+                                onHide: { hide(match) }
+                            )
+                        }
                             .buttonStyle(.plain)
                     }
                 } else {
@@ -181,7 +196,7 @@ struct LiveView: View {
         case .all:
             base = viewModel.allLive
         }
-        return base
+        return base.filter { !hiddenMatchIDs.contains($0.id) }
     }
 
     private var groupedSports: [SportGroup] {
@@ -207,7 +222,12 @@ struct LiveView: View {
 
             ForEach(matches) { match in
                 NavigationLink(value: match) {
-                    LiveMatchCard(match: match)
+                    LiveMatchCard(
+                        match: match,
+                        onSetAlert: { Task { await setAlert(for: match) } },
+                        onAddToCalendar: { Task { await addToCalendar(match) } },
+                        onHide: { hide(match) }
+                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -306,12 +326,42 @@ struct LiveView: View {
         if h > 0 { return "\(h)h \(m)m" }
         return "\(m) min"
     }
+
+    private func setAlert(for match: Match) async {
+        let scheduled = await MatchNotificationService.shared.scheduleReminder(for: match, leadTime: prefs.matchReminderLeadTime)
+        prefs.setMatchNotificationsEnabled(scheduled)
+        actionAlertMessage = scheduled
+            ? (match.state == .live ? "Live alert sent for \(match.shortName)." : "Alert set for \(match.shortName).")
+            : (match.state == .final ? "\(match.shortName) is already final." : "Notifications are disabled. Enable them in Settings to receive game alerts.")
+        showingActionAlert = true
+    }
+
+    private func addToCalendar(_ match: Match) async {
+        #if canImport(EventKit)
+        do {
+            let saved = try await MatchCalendarService.shared.add(matches: [match])
+            actionAlertMessage = saved == 1 ? "Added \(match.shortName) to Calendar." : "No calendar event was added."
+        } catch {
+            actionAlertMessage = error.localizedDescription
+        }
+        #else
+        actionAlertMessage = "Calendar export is not available on this device."
+        #endif
+        showingActionAlert = true
+    }
+
+    private func hide(_ match: Match) {
+        hiddenMatchIDs.insert(match.id)
+    }
 }
 
 // MARK: - Live Match Card
 
 struct LiveMatchCard: View {
     let match: Match
+    let onSetAlert: () -> Void
+    let onAddToCalendar: () -> Void
+    let onHide: () -> Void
 
     private var intelligenceLabel: String? {
         guard match.state == .live,
@@ -414,10 +464,10 @@ struct LiveMatchCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .contextMenu {
-            Button("Set Alert", systemImage: "bell") { }
-            Button("Add to Calendar", systemImage: "calendar.badge.plus") { }
+            Button("Set Alert", systemImage: "bell") { onSetAlert() }
+            Button("Add to Calendar", systemImage: "calendar.badge.plus") { onAddToCalendar() }
             Divider()
-            Button("Hide", systemImage: "eye.slash", role: .destructive) { }
+            Button("Hide", systemImage: "eye.slash", role: .destructive) { onHide() }
         }
     }
 }

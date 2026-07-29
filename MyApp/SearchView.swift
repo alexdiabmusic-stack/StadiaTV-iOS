@@ -14,6 +14,19 @@ struct SearchView: View {
         query.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private var playerSearchKey: String {
+        "\(trimmedQuery.searchNormalized)|\(prefs.favoriteTeams.map(\.id).sorted().joined(separator: ","))"
+    }
+
+    private var shouldLoadPlayers: Bool {
+        guard !prefs.favoriteTeams.isEmpty else { return false }
+        let normalized = trimmedQuery.searchNormalized
+        guard normalized.count >= 3 else { return false }
+        let playerIntentWords = ["player", "players", "roster", "stats", "injury", "injured"]
+        return normalized.split(separator: " ").count >= 2
+            || playerIntentWords.contains { normalized.contains($0) }
+    }
+
     private var results: [UniversalSearchResult] {
         SearchIndex.results(
             for: trimmedQuery,
@@ -61,7 +74,11 @@ struct SearchView: View {
         }
         .tint(Theme.accent)
         .task(id: prefs.followedLeagues.map(\.id).joined(separator: ",") + "|" + prefs.favoriteTeams.map(\.id).joined(separator: ",")) {
-            await viewModel.load(leagues: prefs.followedLeagues, favoriteTeams: prefs.favoriteTeams)
+            await viewModel.loadBase(leagues: prefs.followedLeagues, favoriteTeams: prefs.favoriteTeams)
+        }
+        .task(id: playerSearchKey) {
+            guard shouldLoadPlayers else { return }
+            await viewModel.loadFavoritePlayers(favoriteTeams: prefs.favoriteTeams)
         }
     }
 
@@ -177,35 +194,29 @@ final class SearchViewModel: ObservableObject {
 
     private let service = ESPNService()
 
-    func load(leagues: [League], favoriteTeams: [FavoriteTeam]) async {
+    private var loadedFavoritePlayerTeamIDs: Set<String> = []
+
+    func loadBase(leagues: [League], favoriteTeams: [FavoriteTeam]) async {
         var loadedMatches: [Match] = []
         var loadedArticles: [ESPNArticle] = []
         var loadedTeams: [SearchTeamResult] = []
-        var loadedPlayers: [SearchPlayerResult] = []
-        let favoriteTeamIDsByLeague = Dictionary(grouping: favoriteTeams, by: \.leaguePath)
+        let favoriteIDs = Set(favoriteTeams.map(\.id))
+        players.removeAll { !favoriteIDs.contains("\($0.league.path)-\($0.teamID)") }
+        loadedFavoritePlayerTeamIDs.formIntersection(favoriteIDs)
 
         await withTaskGroup(of: SearchLoadResult.self) { group in
             for league in leagues {
                 group.addTask {
                     async let matches = self.service.scoreboards(for: league, starting: Date(), days: 14)
-                    async let articles = self.service.realtimeNews(for: league, limit: 12)
+                    async let articles = self.service.news(for: league, limit: 12)
                     async let teams = self.service.teams(for: league)
 
                     let loadedTeams = (try? await teams) ?? []
-                    var leaguePlayers: [SearchPlayerResult] = []
-                    for favorite in favoriteTeamIDsByLeague[league.path] ?? [] {
-                        let rosterGroups = (try? await self.service.roster(for: league, teamID: favorite.teamID)) ?? []
-                        let teamName = favorite.displayName
-                        leaguePlayers.append(contentsOf: rosterGroups.flatMap(\.athletes).map { athlete in
-                            SearchPlayerResult(league: league, teamID: favorite.teamID, teamName: teamName, athlete: athlete)
-                        })
-                    }
-
                     return SearchLoadResult(
                         matches: (try? await matches) ?? [],
                         articles: (try? await articles) ?? [],
                         teams: loadedTeams.map { SearchTeamResult(league: league, team: $0) },
-                        players: leaguePlayers
+                        players: []
                     )
                 }
             }
@@ -213,7 +224,6 @@ final class SearchViewModel: ObservableObject {
                 loadedMatches.append(contentsOf: result.matches)
                 loadedArticles.append(contentsOf: result.articles)
                 loadedTeams.append(contentsOf: result.teams)
-                loadedPlayers.append(contentsOf: result.players)
             }
         }
 
@@ -226,7 +236,30 @@ final class SearchViewModel: ObservableObject {
         teams = Dictionary(grouping: loadedTeams, by: \.id)
             .compactMap { $0.value.first }
             .sorted { $0.team.displayName.localizedCaseInsensitiveCompare($1.team.displayName) == .orderedAscending }
-        players = Dictionary(grouping: loadedPlayers, by: \.id)
+    }
+
+    func loadFavoritePlayers(favoriteTeams: [FavoriteTeam]) async {
+        let teamsToLoad = favoriteTeams.filter { !loadedFavoritePlayerTeamIDs.contains($0.id) }
+        guard !teamsToLoad.isEmpty else { return }
+        teamsToLoad.forEach { loadedFavoritePlayerTeamIDs.insert($0.id) }
+
+        var loadedPlayers: [SearchPlayerResult] = []
+        await withTaskGroup(of: [SearchPlayerResult].self) { group in
+            for favorite in teamsToLoad {
+                guard let league = League.all.first(where: { $0.path == favorite.leaguePath }) else { continue }
+                group.addTask {
+                    let rosterGroups = (try? await self.service.roster(for: league, teamID: favorite.teamID)) ?? []
+                    return rosterGroups.flatMap(\.athletes).map { athlete in
+                        SearchPlayerResult(league: league, teamID: favorite.teamID, teamName: favorite.displayName, athlete: athlete)
+                    }
+                }
+            }
+            for await result in group {
+                loadedPlayers.append(contentsOf: result)
+            }
+        }
+
+        players = Dictionary(grouping: players + loadedPlayers, by: \.id)
             .compactMap { $0.value.first }
             .sorted { $0.athlete.displayName.localizedCaseInsensitiveCompare($1.athlete.displayName) == .orderedAscending }
     }

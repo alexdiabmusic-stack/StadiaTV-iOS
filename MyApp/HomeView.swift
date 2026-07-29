@@ -42,8 +42,9 @@ struct HomeView: View {
     @StateObject private var viewModel = HomeViewModel()
     @State private var playingChannel: Channel?
     @State private var selectedLiveSport: SportGroup?
-    @State private var selectedFilter: HomeFilter = .forYou
     @State private var selectedScheduleDay: ScheduleDay = .today
+    @State private var showingNotificationAlert = false
+    @State private var notificationAlertMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -68,6 +69,11 @@ struct HomeView: View {
             viewModel.startAutoRefresh()
         }
         .onDisappear { viewModel.stopAutoRefresh() }
+        .alert("Notifications", isPresented: $showingNotificationAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(notificationAlertMessage)
+        }
         .refreshable {
             await viewModel.load(
                 leagues: prefs.followedLeagues,
@@ -144,9 +150,6 @@ struct HomeView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
         }
-        .safeAreaInset(edge: .top) {
-            HomeFilterBar(selected: $selectedFilter, followedLeagues: prefs.followedLeagues)
-        }
     }
 
     // MARK: - Greeting
@@ -180,7 +183,9 @@ struct HomeView: View {
                 return end > ctx.date
             }
             if let pick {
-                FeaturedHeroCard(pick: pick, match: viewModel.featuredMatchesByPickID[pick.id])
+                FeaturedHeroCard(pick: pick, match: viewModel.featuredMatchesByPickID[pick.id]) { match in
+                    Task { await setAlert(for: match) }
+                }
             } else if let prime = viewModel.primeMatch {
                 PrimeHeroCard(match: prime)
             }
@@ -268,7 +273,9 @@ struct HomeView: View {
             matches: viewModel.liveNow,
             startingSoon: viewModel.startingSoon,
             nextMatches: viewModel.nextMatchesAcrossSports,
-            selectedSport: $selectedLiveSport
+            selectedSport: $selectedLiveSport,
+            onSetAlert: { match in Task { await setAlert(for: match) } },
+            onAddToCalendar: { match in Task { await addToCalendar(match) } }
         )
     }
 
@@ -279,6 +286,29 @@ struct HomeView: View {
             upcoming: viewModel.upcoming,
             selectedDay: $selectedScheduleDay
         )
+    }
+
+    private func setAlert(for match: Match) async {
+        let scheduled = await MatchNotificationService.shared.scheduleReminder(for: match, leadTime: prefs.matchReminderLeadTime)
+        prefs.setMatchNotificationsEnabled(scheduled)
+        notificationAlertMessage = scheduled
+            ? (match.state == .live ? "Live alert sent for \(match.shortName)." : "Alert set for \(match.shortName).")
+            : (match.state == .final ? "\(match.shortName) is already final." : "Notifications are disabled. Enable them in Settings to receive game alerts.")
+        showingNotificationAlert = true
+    }
+
+    private func addToCalendar(_ match: Match) async {
+        #if canImport(EventKit)
+        do {
+            let saved = try await MatchCalendarService.shared.add(matches: [match])
+            notificationAlertMessage = saved == 1 ? "Added \(match.shortName) to Calendar." : "No calendar event was added."
+        } catch {
+            notificationAlertMessage = error.localizedDescription
+        }
+        #else
+        notificationAlertMessage = "Calendar export is not available on this device."
+        #endif
+        showingNotificationAlert = true
     }
 
     // MARK: - Error
@@ -361,18 +391,12 @@ private struct HomeFilterBar: View {
 private struct FeaturedHeroCard: View {
     let pick: FeaturedEventPick
     let match: Match?
+    let onSetAlert: (Match) -> Void
 
     private var isLive: Bool { match?.state == .live }
 
     var body: some View {
-        Group {
-            if let match {
-                NavigationLink(value: match) { card }
-                    .buttonStyle(.plain)
-            } else {
-                card
-            }
-        }
+        card
     }
 
     private var card: some View {
@@ -492,17 +516,35 @@ private struct FeaturedHeroCard: View {
                         if let match {
                             switch match.state {
                             case .live:
-                                heroButton("Watch Live", icon: "play.fill", primary: true)
-                                heroButton("Match Centre", icon: "sportscourt", primary: false)
+                                NavigationLink(value: match) {
+                                    heroButtonLabel("Watch Live", icon: "play.fill", primary: true)
+                                }
+                                .buttonStyle(.plain)
+                                NavigationLink(value: match) {
+                                    heroButtonLabel("Match Centre", icon: "sportscourt", primary: false)
+                                }
+                                .buttonStyle(.plain)
                             case .pre:
-                                heroButton("Set Alert", icon: "bell", primary: false)
-                                heroButton("Streams", icon: "tv", primary: true)
+                                Button { onSetAlert(match) } label: {
+                                    heroButtonLabel("Set Alert", icon: "bell", primary: false)
+                                }
+                                .buttonStyle(.plain)
+                                NavigationLink(value: match) {
+                                    heroButtonLabel("Streams", icon: "tv", primary: true)
+                                }
+                                .buttonStyle(.plain)
                             case .final:
-                                heroButton("Highlights", icon: "film", primary: true)
-                                heroButton("Recap", icon: "doc.text", primary: false)
+                                NavigationLink(value: match) {
+                                    heroButtonLabel("Highlights", icon: "film", primary: true)
+                                }
+                                .buttonStyle(.plain)
+                                NavigationLink(value: match) {
+                                    heroButtonLabel("Recap", icon: "doc.text", primary: false)
+                                }
+                                .buttonStyle(.plain)
                             }
                         } else {
-                            heroButton("Streams", icon: "tv", primary: true)
+                            heroButtonLabel("Streams", icon: "tv", primary: true)
                         }
                     }
                 }
@@ -542,7 +584,7 @@ private struct FeaturedHeroCard: View {
             .foregroundStyle(.white.opacity(0.75))
     }
 
-    private func heroButton(_ title: String, icon: String, primary: Bool) -> some View {
+    private func heroButtonLabel(_ title: String, icon: String, primary: Bool) -> some View {
         Label(title, systemImage: icon)
             .font(.caption.weight(.bold))
             .foregroundStyle(.white)
@@ -646,16 +688,23 @@ private struct LiveNowCommandCenter: View {
     let startingSoon: [Match]
     let nextMatches: [Match]
     @Binding var selectedSport: SportGroup?
+    let onSetAlert: (Match) -> Void
+    let onAddToCalendar: (Match) -> Void
+    @State private var hiddenMatchIDs: Set<String> = []
+
+    private var visibleMatches: [Match] {
+        matches.filter { !hiddenMatchIDs.contains($0.id) }
+    }
 
     private var activeSports: [SportGroup] {
         var seen: [SportGroup] = []
-        for m in matches where !seen.contains(m.league.group) { seen.append(m.league.group) }
+        for m in visibleMatches where !seen.contains(m.league.group) { seen.append(m.league.group) }
         return seen
     }
 
     private var displayed: [Match] {
-        guard let s = selectedSport else { return matches }
-        return matches.filter { $0.league.group == s }
+        guard let s = selectedSport else { return visibleMatches }
+        return visibleMatches.filter { $0.league.group == s }
     }
 
     var body: some View {
@@ -693,7 +742,7 @@ private struct LiveNowCommandCenter: View {
             }
 
             // Content
-            if matches.isEmpty {
+            if visibleMatches.isEmpty {
                 noLiveContent
             } else if displayed.isEmpty {
                 Text("No live \(selectedSport?.rawValue ?? "games") right now.")
@@ -706,7 +755,12 @@ private struct LiveNowCommandCenter: View {
             } else {
                 ForEach(displayed.prefix(4)) { match in
                     NavigationLink(value: match) {
-                        LiveMatchCard(match: match)
+                        LiveMatchCard(
+                            match: match,
+                            onSetAlert: { onSetAlert(match) },
+                            onAddToCalendar: { onAddToCalendar(match) },
+                            onHide: { hiddenMatchIDs.insert(match.id) }
+                        )
                     }
                     .buttonStyle(.plain)
                 }
@@ -864,11 +918,20 @@ private struct ScheduleSection: View {
     private let calendar = Calendar.current
 
     private var todayMatches: [Match] {
-        upcoming.filter { calendar.isDateInToday($0.date) }
+        matches(inDayOffset: 0)
     }
 
     private var tomorrowMatches: [Match] {
-        upcoming.filter { calendar.isDateInTomorrow($0.date) }
+        matches(inDayOffset: 1)
+    }
+
+    private func matches(inDayOffset offset: Int) -> [Match] {
+        let start = calendar.startOfDay(for: Date())
+        guard let dayStart = calendar.date(byAdding: .day, value: offset, to: start),
+              let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else {
+            return []
+        }
+        return upcoming.filter { $0.date >= dayStart && $0.date < dayEnd }
     }
 
     // Only the actual upcoming Sat+Sun (or today if Sat/Sun).

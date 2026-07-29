@@ -7,6 +7,7 @@ struct MyApp: App {
     @StateObject private var watchStore = WatchStore()
     @StateObject private var entitlements = EntitlementStore()
     @StateObject private var predictions = PredictionsStore()
+    @StateObject private var articleLibrary = ArticleLibraryStore()
 
     var body: some Scene {
         WindowGroup {
@@ -30,6 +31,7 @@ struct MyApp: App {
             .environmentObject(watchStore)
             .environmentObject(entitlements)
             .environmentObject(predictions)
+            .environmentObject(articleLibrary)
             #if !os(tvOS)
             .dynamicTypeSize(Theme.isPad ? DynamicTypeSize.xLarge... : DynamicTypeSize.xSmall...)
             #endif
@@ -104,5 +106,6 @@ struct RootView: View {
         .environmentObject(WatchStore())
         .environmentObject(EntitlementStore())
         .environmentObject(PredictionsStore())
+        .environmentObject(ArticleLibraryStore())
         .preferredColorScheme(.dark)
 }

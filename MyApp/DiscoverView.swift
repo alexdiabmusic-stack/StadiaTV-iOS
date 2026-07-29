@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DiscoverView: View {
     @EnvironmentObject private var prefs: PreferencesStore
+    @EnvironmentObject private var articleLibrary: ArticleLibraryStore
     @StateObject private var viewModel = NewsViewModel()
     @State private var selectedSport: DiscoverSportFilter = .forYou
     @State private var selectedContentType: DiscoverContentType = .topStories
@@ -23,6 +24,7 @@ struct DiscoverView: View {
     private var displayedArticles: [ESPNArticle] {
         let articles = viewModel.articles(for: nil)
             .filter { targetLeagues.contains($0.league) && !$0.isHighlight }
+            .filter { !articleLibrary.isHidden($0) && !articleLibrary.isMuted($0) }
         switch selectedContentType {
         case .topStories:
             return articles
@@ -143,7 +145,13 @@ struct DiscoverView: View {
             LazyVStack(alignment: .leading, spacing: 22) {
                 if let heroArticle {
                     Button { open(article: heroArticle) } label: {
-                        HeroArticleCard(article: heroArticle)
+                        HeroArticleCard(
+                            article: heroArticle,
+                            isSaved: articleLibrary.isSaved(heroArticle),
+                            onToggleSaved: { articleLibrary.toggleSaved(heroArticle) },
+                            onHide: { articleLibrary.hide(heroArticle) },
+                            onMute: { articleLibrary.muteSource(for: heroArticle) }
+                        )
                     }
                     .buttonStyle(.plain)
                 }
@@ -153,7 +161,13 @@ struct DiscoverView: View {
                     VStack(spacing: 0) {
                         ForEach(teamArticles) { article in
                             Button { open(article: article) } label: {
-                                TeamNewsRow(article: article)
+                                TeamNewsRow(
+                                    article: article,
+                                    isSaved: articleLibrary.isSaved(article),
+                                    onToggleSaved: { articleLibrary.toggleSaved(article) },
+                                    onHide: { articleLibrary.hide(article) },
+                                    onMute: { articleLibrary.muteSource(for: article) }
+                                )
                             }
                             .buttonStyle(.plain)
                             if article.id != teamArticles.last?.id { Divider().overlay(Theme.hairline) }
@@ -170,9 +184,21 @@ struct DiscoverView: View {
                         ForEach(Array(latestArticles.enumerated()), id: \.element.id) { index, article in
                             Button { open(article: article) } label: {
                                 if index.isMultiple(of: 3) {
-                                    StandardArticleCard(article: article)
+                                    StandardArticleCard(
+                                        article: article,
+                                        isSaved: articleLibrary.isSaved(article),
+                                        onToggleSaved: { articleLibrary.toggleSaved(article) },
+                                        onHide: { articleLibrary.hide(article) },
+                                        onMute: { articleLibrary.muteSource(for: article) }
+                                    )
                                 } else {
-                                    CompactArticleRow(article: article)
+                                    CompactArticleRow(
+                                        article: article,
+                                        isSaved: articleLibrary.isSaved(article),
+                                        onToggleSaved: { articleLibrary.toggleSaved(article) },
+                                        onHide: { articleLibrary.hide(article) },
+                                        onMute: { articleLibrary.muteSource(for: article) }
+                                    )
                                 }
                             }
                             .buttonStyle(.plain)
@@ -285,6 +311,10 @@ private struct DiscoverSectionHeader: View {
 
 private struct HeroArticleCard: View {
     let article: ESPNArticle
+    let isSaved: Bool
+    let onToggleSaved: () -> Void
+    let onHide: () -> Void
+    let onMute: () -> Void
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -323,12 +353,16 @@ private struct HeroArticleCard: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-        .contextMenu { ArticleContextActions() }
+        .contextMenu { ArticleContextActions(article: article, isSaved: isSaved, onToggleSaved: onToggleSaved, onHide: onHide, onMute: onMute) }
     }
 }
 
 private struct TeamNewsRow: View {
     let article: ESPNArticle
+    let isSaved: Bool
+    let onToggleSaved: () -> Void
+    let onHide: () -> Void
+    let onMute: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -348,13 +382,17 @@ private struct TeamNewsRow: View {
             Spacer()
         }
         .padding(14)
-        .contextMenu { ArticleContextActions() }
+        .contextMenu { ArticleContextActions(article: article, isSaved: isSaved, onToggleSaved: onToggleSaved, onHide: onHide, onMute: onMute) }
     }
 }
 
 
 private struct StandardArticleCard: View {
     let article: ESPNArticle
+    let isSaved: Bool
+    let onToggleSaved: () -> Void
+    let onHide: () -> Void
+    let onMute: () -> Void
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -381,12 +419,16 @@ private struct StandardArticleCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
         .padding(14)
-        .contextMenu { ArticleContextActions() }
+        .contextMenu { ArticleContextActions(article: article, isSaved: isSaved, onToggleSaved: onToggleSaved, onHide: onHide, onMute: onMute) }
     }
 }
 
 private struct CompactArticleRow: View {
     let article: ESPNArticle
+    let isSaved: Bool
+    let onToggleSaved: () -> Void
+    let onHide: () -> Void
+    let onMute: () -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -407,7 +449,7 @@ private struct CompactArticleRow: View {
             Spacer(minLength: 0)
         }
         .padding(14)
-        .contextMenu { ArticleContextActions() }
+        .contextMenu { ArticleContextActions(article: article, isSaved: isSaved, onToggleSaved: onToggleSaved, onHide: onHide, onMute: onMute) }
     }
 }
 
@@ -431,11 +473,23 @@ private struct ArticleImage: View {
 }
 
 private struct ArticleContextActions: View {
+    let article: ESPNArticle
+    let isSaved: Bool
+    let onToggleSaved: () -> Void
+    let onHide: () -> Void
+    let onMute: () -> Void
+
     var body: some View {
-        Button { } label: { Label("Save", systemImage: "bookmark") }
-        Button { } label: { Label("Share", systemImage: "square.and.arrow.up") }
-        Button { } label: { Label("Hide stories like this", systemImage: "eye.slash") }
-        Button { } label: { Label("Mute this source", systemImage: "speaker.slash") }
+        Button(action: onToggleSaved) {
+            Label(isSaved ? "Remove Saved Article" : "Save Article", systemImage: isSaved ? "bookmark.slash" : "bookmark")
+        }
+        if let url = article.url {
+            ShareLink(item: url) {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+        }
+        Button(action: onHide) { Label("Hide stories like this", systemImage: "eye.slash") }
+        Button(action: onMute) { Label("Mute this source", systemImage: "speaker.slash") }
     }
 }
 

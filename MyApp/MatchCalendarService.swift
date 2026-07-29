@@ -16,7 +16,7 @@ final class MatchCalendarService {
         guard let calendar = eventStore.defaultCalendarForNewEvents else { throw CalendarError.noWritableCalendar }
 
         var savedCount = 0
-        for match in matches where match.state == .pre && match.date > Date() {
+        for match in matches {
             let event = EKEvent(eventStore: eventStore)
             event.calendar = calendar
             event.title = "\(match.away.shortName) vs \(match.home.shortName)"
@@ -25,7 +25,9 @@ final class MatchCalendarService {
             event.location = match.venue
             event.notes = notes(for: match)
             event.availability = .free
-            event.addAlarm(EKAlarm(relativeOffset: -15 * 60))
+            if match.date > Date() {
+                event.addAlarm(EKAlarm(relativeOffset: -15 * 60))
+            }
             try eventStore.save(event, span: .thisEvent, commit: false)
             savedCount += 1
         }

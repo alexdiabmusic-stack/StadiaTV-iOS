@@ -12,6 +12,7 @@ struct LiveView: View {
     @State private var hiddenMatchIDs: Set<String> = []
     @State private var showingActionAlert = false
     @State private var actionAlertMessage = ""
+    @State private var showingChannels = false
 
     var body: some View {
         NavigationStack {
@@ -22,12 +23,19 @@ struct LiveView: View {
                 .toolbarBackground(Theme.background, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
                 .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
+                    ToolbarItemGroup(placement: .topBarTrailing) {
+                        Button { showingChannels = true } label: {
+                            Image(systemName: "tv")
+                                .foregroundStyle(Theme.textPrimary)
+                        }
                         NavigationLink(destination: SearchView()) {
                             Image(systemName: "magnifyingglass")
                                 .foregroundStyle(Theme.textPrimary)
                         }
                     }
+                }
+                .sheet(isPresented: $showingChannels) {
+                    LiveTVView()
                 }
                 .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
         }
@@ -51,7 +59,14 @@ struct LiveView: View {
         if viewModel.isLoading && viewModel.allLive.isEmpty {
             loadingView
         } else {
-            liveList
+            VStack(spacing: 0) {
+                filterStrip
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(.bar)
+                Divider().overlay(Theme.hairline)
+                liveList
+            }
         }
     }
 
@@ -84,7 +99,8 @@ struct LiveView: View {
                                 match: match,
                                 onSetAlert: { Task { await setAlert(for: match) } },
                                 onAddToCalendar: { Task { await addToCalendar(match) } },
-                                onHide: { hide(match) }
+                                onHide: { hide(match) },
+                                showScoreBar: prefs.showLiveScoreBar
                             )
                         }
                             .buttonStyle(.plain)
@@ -104,12 +120,6 @@ struct LiveView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 16)
-        }
-        .safeAreaInset(edge: .top) {
-            filterStrip
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
-                .background(.bar)
         }
         .refreshable {
             await viewModel.load(favoriteTeams: prefs.favoriteTeams, force: true)
@@ -225,7 +235,8 @@ struct LiveView: View {
                         match: match,
                         onSetAlert: { Task { await setAlert(for: match) } },
                         onAddToCalendar: { Task { await addToCalendar(match) } },
-                        onHide: { hide(match) }
+                        onHide: { hide(match) },
+                        showScoreBar: prefs.showLiveScoreBar
                     )
                 }
                 .buttonStyle(.plain)
@@ -354,6 +365,7 @@ struct LiveMatchCard: View {
     let onSetAlert: () -> Void
     let onAddToCalendar: () -> Void
     let onHide: () -> Void
+    var showScoreBar: Bool = false
 
     private var intelligenceLabel: String? {
         guard match.state == .live,
@@ -450,10 +462,12 @@ struct LiveMatchCard: View {
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline))
         .overlay(alignment: .top) {
-            Rectangle()
-                .fill(Theme.live)
-                .frame(height: 2)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            if showScoreBar {
+                Rectangle()
+                    .fill(Theme.live)
+                    .frame(height: 2)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
         }
         .contextMenu {
             Button("Add to Calendar", systemImage: "calendar.badge.plus") { onAddToCalendar() }

@@ -221,6 +221,13 @@ struct AppearancePlaybackSettingsView: View {
                     .padding(.bottom, 10)
                 Divider().overlay(Theme.hairline)
                 SettingsToggleRow(title: "Live Score Overlay", isOn: Binding(get: { prefs.showLiveScoreBadge }, set: { prefs.setShowLiveScoreBadge($0) }))
+                Divider().overlay(Theme.hairline)
+                SettingsToggleRow(title: "Live Score Bar", isOn: Binding(get: { prefs.showLiveScoreBar }, set: { prefs.setShowLiveScoreBar($0) }))
+                Text("Shows a red accent bar at the top of live match cards.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
             }
         }
     }

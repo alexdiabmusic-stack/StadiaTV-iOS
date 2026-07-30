@@ -111,42 +111,43 @@ struct MatchesView: View {
     }
 
     private var followingScroll: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 18) {
-                yourDaySection
-
-                if let priorityMatch {
-                    PriorityGameCard(
-                        match: priorityMatch,
-                        onAddToCalendar: { match in Task { await addToCalendar(match) } },
-                        onHide: { match in hide(match) }
-                    )
-                }
-
-                contentTabs
-                sportFilters
-
-                switch selectedTab {
-                case .overview:
-                    gamesSection(limit: 6)
-                    standingsSection
-                case .games:
-                    gamesSection(limit: nil)
-                case .standings:
-                    standingsSection
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 28)
-        }
-        .safeAreaInset(edge: .top) {
+        VStack(spacing: 0) {
             personalizedHeader
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(.bar)
+            Divider().overlay(Theme.hairline)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 18) {
+                    yourDaySection
+
+                    if let priorityMatch {
+                        PriorityGameCard(
+                            match: priorityMatch,
+                            onAddToCalendar: { match in Task { await addToCalendar(match) } },
+                            onHide: { match in hide(match) }
+                        )
+                    }
+
+                    contentTabs
+                    sportFilters
+
+                    switch selectedTab {
+                    case .overview:
+                        gamesSection(limit: 6)
+                        standingsSection
+                    case .games:
+                        gamesSection(limit: nil)
+                    case .standings:
+                        standingsSection
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 28)
+            }
+            .refreshable { await loadFollowing() }
         }
-        .refreshable { await loadFollowing() }
     }
 
     private var personalizedHeader: some View {
@@ -183,7 +184,9 @@ struct MatchesView: View {
 
     private var followedLeagueChips: [League] {
         let favoriteLeagueIDs = Set(prefs.favoriteTeams.map(\.leaguePath))
-        return prefs.followedLeagues.filter { favoriteLeagueIDs.contains($0.id) }.prefix(4).map { $0 }
+        return Array(League.all.filter {
+            prefs.isLeagueSelected($0) || favoriteLeagueIDs.contains($0.id)
+        }.prefix(4))
     }
 
     private func followChip(title: String, logoURL: URL?, isSelected: Bool, action: @escaping () -> Void) -> some View {
@@ -263,6 +266,7 @@ struct MatchesView: View {
                 }
             }
         }
+        .background(Color.clear)
     }
 
     private func filterChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {

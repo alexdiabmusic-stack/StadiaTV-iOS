@@ -89,13 +89,14 @@ struct UserPreferences: Codable, Equatable {
     var preferredStreamLanguages: Set<String> = ["en"]   // StreamLanguage.code values
     var spoilerFreeMode = false
     var showLiveScoreBadge = true
+    var showLiveScoreBar = false
 
     init() {}
 
     private enum CodingKeys: String, CodingKey {
         case hasCompletedOnboarding, selectedLeagueIDs, favoriteTeams
         case matchNotificationsEnabled, matchReminderLeadTime, morningDigestEnabled, cloudSyncEnabled
-        case appearance, preferredStreamLanguages, spoilerFreeMode, showLiveScoreBadge
+        case appearance, preferredStreamLanguages, spoilerFreeMode, showLiveScoreBadge, showLiveScoreBar
     }
 
     /// Decodes leniently so preferences saved by older app versions
@@ -113,6 +114,7 @@ struct UserPreferences: Codable, Equatable {
         preferredStreamLanguages = try container.decodeIfPresent(Set<String>.self, forKey: .preferredStreamLanguages) ?? ["en"]
         spoilerFreeMode = try container.decodeIfPresent(Bool.self, forKey: .spoilerFreeMode) ?? false
         showLiveScoreBadge = try container.decodeIfPresent(Bool.self, forKey: .showLiveScoreBadge) ?? true
+        showLiveScoreBar = try container.decodeIfPresent(Bool.self, forKey: .showLiveScoreBar) ?? false
     }
 }
 
@@ -266,6 +268,15 @@ final class PreferencesStore: ObservableObject {
 
     func setShowLiveScoreBadge(_ enabled: Bool) {
         prefs.showLiveScoreBadge = enabled
+        persist()
+    }
+
+    // MARK: Live Score Bar
+
+    var showLiveScoreBar: Bool { prefs.showLiveScoreBar }
+
+    func setShowLiveScoreBar(_ enabled: Bool) {
+        prefs.showLiveScoreBar = enabled
         persist()
     }
 

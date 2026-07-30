@@ -34,6 +34,14 @@ struct MatchDetailView: View {
     @State private var odds: MatchOddsDisplay?
     @State private var isLoadingOdds = false
     @State private var showPickCelebration = false
+    @State private var gameCenterTab: GameCenterTab = .gameStats
+
+    private enum GameCenterTab: String, CaseIterable, Identifiable {
+        case players = "Players"
+        case gameStats = "Game Stats"
+        case standings = "Standings"
+        var id: String { rawValue }
+    }
 
     private var filteredMatchedSources: [RankedSource] {
         guard showingAllChannels else { return Array(rankedSources.prefix(3)) }
@@ -68,7 +76,6 @@ struct MatchDetailView: View {
                     if match.state == .final {
                         highlightsSection
                         scoringSummarySection
-                        inGameStatsSection
                     }
                     if match.state != .final {
                         sourcesSection
@@ -77,9 +84,6 @@ struct MatchDetailView: View {
                         RacersSection(league: match.league)
                     } else {
                         gameCenterSection
-                    }
-                    if match.state != .final {
-                        inGameStatsSection
                     }
                     playByPlaySection
                     if match.state != .final {
@@ -703,7 +707,7 @@ struct MatchDetailView: View {
         }
     }
 
-    // MARK: Game Center (premium ESPN data)
+    // MARK: Game Centre (premium ESPN data)
 
     @ViewBuilder private var gameCenterSection: some View {
         if entitlements.isPremium {
@@ -714,9 +718,9 @@ struct MatchDetailView: View {
                     .blur(radius: 8)
                     .allowsHitTesting(false)
                 PremiumGateOverlay(
-                    icon: "sparkles",
-                    title: "Game Center",
-                    description: "Roster, live leaders, standings preview and deep team stats.",
+                    icon: "sportscourt.fill",
+                    title: "Game Centre",
+                    description: "Players, live stats, standings and deep team analytics.",
                     showPaywall: $showPaywall
                 )
             }
@@ -727,31 +731,95 @@ struct MatchDetailView: View {
     private var gameCenterContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                Text("Game Center")
+                Image(systemName: "sportscourt.fill")
+                Text("Game Centre")
                 Spacer()
             }
             .font(.headline.weight(.bold))
             .foregroundStyle(Theme.accent)
 
-            Picker("Team", selection: $selectedGameCenterTeam) {
-                Text(match.away.shortName).tag(GameCenterTeam.away)
-                Text(match.home.shortName).tag(GameCenterTeam.home)
-            }
-            .pickerStyle(.segmented)
-
-            selectedTeamHub
-            MatchStandingsPreview(league: match.league, highlightedTeamIDs: Set([match.away.teamID, match.home.teamID].compactMap { $0 }))
-
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 10)], spacing: 10) {
-                gameCenterTile(title: "Leaders", subtitle: match.league.shortName, systemImage: "chart.bar.fill") {
-                    LeadersView(league: match.league)
+            // Tab bar
+            HStack(spacing: 0) {
+                ForEach(GameCenterTab.allCases) { tab in
+                    Button {
+                        withAnimation(.snappy) { gameCenterTab = tab }
+                    } label: {
+                        Text(tab.rawValue)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(gameCenterTab == tab ? .white : Theme.textSecondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 9)
+                            .background(
+                                gameCenterTab == tab ? Theme.accent : Color.clear,
+                                in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            )
+                    }
+                    .buttonStyle(.plain)
                 }
-                gameCenterTile(title: "Injuries", subtitle: "Report", systemImage: "cross.case.fill") {
-                    InjuriesView(league: match.league)
+            }
+            .padding(3)
+            .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.hairline))
+
+            Group {
+                switch gameCenterTab {
+                case .players: gameCenterPlayersTab
+                case .gameStats: gameCenterStatsTab
+                case .standings: gameCenterStandingsTab
                 }
             }
         }
+    }
+
+    @ViewBuilder private var gameCenterPlayersTab: some View {
+        Picker("Team", selection: $selectedGameCenterTeam) {
+            Text(match.away.shortName).tag(GameCenterTeam.away)
+            Text(match.home.shortName).tag(GameCenterTeam.home)
+        }
+        .pickerStyle(.segmented)
+
+        selectedTeamHub
+
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 10)], spacing: 10) {
+            gameCenterTile(title: "Leaders", subtitle: match.league.shortName, systemImage: "chart.bar.fill") {
+                LeadersView(league: match.league)
+            }
+            gameCenterTile(title: "Injuries", subtitle: "Report", systemImage: "cross.case.fill") {
+                InjuriesView(league: match.league)
+            }
+        }
+    }
+
+    @ViewBuilder private var gameCenterStatsTab: some View {
+        if let summary = gameSummary, !summary.isEmpty {
+            inGameStatsBody(summary: summary)
+        } else if match.state == .pre {
+            HStack(spacing: 10) {
+                Image(systemName: "chart.bar.xaxis")
+                Text("Stats available once the game begins")
+            }
+            .font(.callout)
+            .foregroundStyle(Theme.textSecondary)
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        } else {
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small).tint(Theme.accent)
+                Text("Loading stats…")
+                    .font(.callout)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            .padding(14)
+        }
+    }
+
+    private var gameCenterStandingsTab: some View {
+        MatchStandingsPreview(
+            league: match.league,
+            highlightedTeamIDs: Set([match.away.teamID, match.home.teamID].compactMap { $0 })
+        )
     }
 
     @ViewBuilder private var selectedTeamHub: some View {

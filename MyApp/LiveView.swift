@@ -6,8 +6,8 @@ import Combine
 struct LiveView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @StateObject private var viewModel = LiveViewModel()
-    @AppStorage("live.filter.v1") private var savedFilterRaw: String = LiveFilter.closeGames.rawValue
-    @State private var filter: LiveFilter = .closeGames
+    @AppStorage("live.filter.v1") private var savedFilterRaw: String = LiveFilter.forYou.rawValue
+    @State private var filter: LiveFilter = .forYou
     @State private var selectedSport: SportGroup?
     @State private var hiddenMatchIDs: Set<String> = []
     @State private var showingActionAlert = false
@@ -15,24 +15,25 @@ struct LiveView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Theme.background.ignoresSafeArea()
-                content
-            }
-            .navigationTitle("Live")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    NavigationLink(destination: SearchView()) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundStyle(Theme.textPrimary)
+            content
+                .background(Theme.background.ignoresSafeArea())
+                .navigationTitle("Live")
+                .navigationBarTitleDisplayMode(.large)
+                .toolbarBackground(Theme.background, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        NavigationLink(destination: SearchView()) {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundStyle(Theme.textPrimary)
+                        }
                     }
                 }
-            }
-            .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
+                .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
         }
         .tint(Theme.accent)
         .task {
-            filter = LiveFilter(rawValue: savedFilterRaw) ?? .closeGames
+            filter = LiveFilter(rawValue: savedFilterRaw) ?? .forYou
             await viewModel.load(favoriteTeams: prefs.favoriteTeams)
             viewModel.startAutoRefresh(favoriteTeams: prefs.favoriteTeams)
         }
@@ -191,8 +192,6 @@ struct LiveView: View {
             let favNames = Set(prefs.favoriteTeams.map { $0.displayName.lowercased() })
             let favMatches = viewModel.allLive.filter { involvesFavorite($0, favIDs: favIDs, favNames: favNames) }
             base = favMatches.isEmpty ? viewModel.allLive : favMatches
-        case .closeGames:
-            base = viewModel.allLive.filter { isClose($0) }
         case .all:
             base = viewModel.allLive
         }
@@ -262,14 +261,7 @@ struct LiveView: View {
                 .font(.system(size: 44))
                 .foregroundStyle(Theme.textSecondary.opacity(0.4))
 
-            if filter == .closeGames {
-                Text("No close games right now.")
-                    .font(.headline)
-                    .foregroundStyle(Theme.textPrimary)
-                Text("All live games have comfortable leads.")
-                    .font(.callout)
-                    .foregroundStyle(Theme.textSecondary)
-            } else if filter == .forYou {
+            if filter == .forYou {
                 Text("None of your teams are live.")
                     .font(.headline)
                     .foregroundStyle(Theme.textPrimary)
@@ -464,7 +456,6 @@ struct LiveMatchCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .contextMenu {
-            Button("Set Alert", systemImage: "bell") { onSetAlert() }
             Button("Add to Calendar", systemImage: "calendar.badge.plus") { onAddToCalendar() }
             Divider()
             Button("Hide", systemImage: "eye.slash", role: .destructive) { onHide() }
@@ -527,7 +518,6 @@ struct PulsingLiveBadge: View {
 // MARK: - Filter
 
 enum LiveFilter: String, CaseIterable, Identifiable {
-    case closeGames = "closeGames"
     case forYou = "forYou"
     case all = "all"
 
@@ -536,7 +526,6 @@ enum LiveFilter: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .forYou: return "For You"
-        case .closeGames: return "Close Games"
         case .all: return "All Live"
         }
     }

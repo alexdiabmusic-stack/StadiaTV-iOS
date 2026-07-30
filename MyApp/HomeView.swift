@@ -228,7 +228,7 @@ struct HomeView: View {
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
                 if let next = viewModel.favoriteTeamUpcoming.first {
-                    Text("Next: \(next.shortName) · \(next.date.formatted(.dateTime.weekday(.abbreviated).hour().minute()))")
+                    Text("Next: \(next.shortName) · \(next.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))")
                         .font(.caption2)
                         .foregroundStyle(Theme.textSecondary)
                         .lineLimit(1)
@@ -504,10 +504,6 @@ private struct FeaturedHeroCard: View {
                                 }
                                 .buttonStyle(.plain)
                             case .pre:
-                                Button { onSetAlert(match) } label: {
-                                    heroButtonLabel("Set Alert", icon: "bell", primary: false)
-                                }
-                                .buttonStyle(.plain)
                                 NavigationLink(value: match) {
                                     heroButtonLabel("Streams", icon: "tv", primary: true)
                                 }

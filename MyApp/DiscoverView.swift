@@ -5,7 +5,6 @@ struct DiscoverView: View {
     @EnvironmentObject private var articleLibrary: ArticleLibraryStore
     @StateObject private var viewModel = NewsViewModel()
     @State private var selectedSport: DiscoverSportFilter = .forYou
-    @State private var selectedContentType: DiscoverContentType = .topStories
     @State private var presentedArticle: ESPNArticle?
 
     private var targetLeagues: [League] {
@@ -22,15 +21,9 @@ struct DiscoverView: View {
     }
 
     private var displayedArticles: [ESPNArticle] {
-        let articles = viewModel.articles(for: nil)
+        viewModel.articles(for: nil)
             .filter { targetLeagues.contains($0.league) && !$0.isHighlight }
             .filter { !articleLibrary.isHidden($0) && !articleLibrary.isMuted($0) }
-        switch selectedContentType {
-        case .topStories:
-            return articles
-        case .latest:
-            return articles.sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
-        }
     }
 
     private var heroArticle: ESPNArticle? {
@@ -98,14 +91,6 @@ struct DiscoverView: View {
                 }
                 .padding(.horizontal, 20)
             }
-
-            Picker("Content type", selection: $selectedContentType) {
-                ForEach(DiscoverContentType.allCases) { contentType in
-                    Text(contentType.title).tag(contentType)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 20)
         }
         .padding(.top, 4)
         .padding(.bottom, 12)
@@ -179,7 +164,6 @@ struct DiscoverView: View {
 
 
                 if !latestArticles.isEmpty {
-                    DiscoverSectionHeader(title: "LATEST", actionTitle: nil)
                     VStack(spacing: 0) {
                         ForEach(Array(latestArticles.enumerated()), id: \.element.id) { index, article in
                             Button { open(article: article) } label: {
@@ -271,20 +255,6 @@ private enum DiscoverSportFilter: Hashable, Identifiable, CaseIterable {
         case .all: "All"
         case .league(let shortName): shortName
         case .soccer: "Soccer"
-        }
-    }
-}
-
-private enum DiscoverContentType: String, Identifiable, CaseIterable {
-    case topStories
-    case latest
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .topStories: "Top Stories"
-        case .latest: "Latest"
         }
     }
 }

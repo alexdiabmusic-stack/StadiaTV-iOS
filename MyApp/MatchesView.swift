@@ -17,7 +17,6 @@ private enum FollowingSelection: Hashable {
 private enum FollowingContentTab: String, CaseIterable, Identifiable {
     case overview = "Overview"
     case games = "Games"
-    case updates = "Updates"
     case standings = "Standings"
 
     var id: String { rawValue }
@@ -29,16 +28,13 @@ private enum DayFilter {
 
 struct MatchesView: View {
     @StateObject private var viewModel = MatchesViewModel()
-    @StateObject private var newsViewModel = NewsViewModel()
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var predictions: PredictionsStore
-    @EnvironmentObject private var articleLibrary: ArticleLibraryStore
     @AppStorage("following.tab.v1") private var savedTabRaw: String = FollowingContentTab.overview.rawValue
     @State private var selectedSelection: FollowingSelection = .all
     @State private var selectedTab: FollowingContentTab = .overview
     @State private var selectedSport: SportGroup?
     @State private var showingTeamEditor = false
-    @State private var presentedArticle: ESPNArticle?
     @State private var showingNotificationAlert = false
     @State private var notificationAlertMessage = ""
     @State private var hiddenMatchIDs: Set<String> = []
@@ -46,28 +42,26 @@ struct MatchesView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Theme.background.ignoresSafeArea()
-                content
-            }
-            .navigationTitle("Following")
-            .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Edit") { showingTeamEditor = true }
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(Theme.accent)
+            content
+                .background(Theme.background.ignoresSafeArea())
+                .navigationTitle("Following")
+                .navigationBarTitleDisplayMode(.large)
+                .toolbarBackground(Theme.background, for: .navigationBar)
+                .toolbarBackground(.visible, for: .navigationBar)
+                .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Edit") { showingTeamEditor = true }
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(Theme.accent)
+                    }
                 }
-            }
-            .sheet(isPresented: $showingTeamEditor) { TeamEditorView() }
-            .sheet(item: $presentedArticle) { article in
-                ArticleReaderView(article: article)
-            }
-            .alert("Notifications", isPresented: $showingNotificationAlert) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(notificationAlertMessage)
-            }
+                .sheet(isPresented: $showingTeamEditor) { TeamEditorView() }
+                .alert("Notifications", isPresented: $showingNotificationAlert) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text(notificationAlertMessage)
+                }
         }
         .tint(Theme.accent)
         .task(id: loadKey) { await loadFollowing() }
@@ -91,7 +85,6 @@ struct MatchesView: View {
 
     private func loadFollowing() async {
         await viewModel.loadFollowing(leagues: prefs.followedLeagues, favorites: prefs.favoriteTeams)
-        await newsViewModel.load(leagues: prefs.followedLeagues)
         predictions.resolveAll(from: viewModel.allFollowedMatches)
         if prefs.matchNotificationsEnabled {
             await MatchNotificationService.shared.syncNotifications(
@@ -125,7 +118,6 @@ struct MatchesView: View {
                 if let priorityMatch {
                     PriorityGameCard(
                         match: priorityMatch,
-                        onSetAlert: { match in Task { await setAlert(for: match) } },
                         onAddToCalendar: { match in Task { await addToCalendar(match) } },
                         onHide: { match in hide(match) }
                     )
@@ -137,12 +129,9 @@ struct MatchesView: View {
                 switch selectedTab {
                 case .overview:
                     gamesSection(limit: 6)
-                    latestSection(limit: 5)
                     standingsSection
                 case .games:
                     gamesSection(limit: nil)
-                case .updates:
-                    latestSection(limit: nil)
                 case .standings:
                     standingsSection
                 }
@@ -314,8 +303,6 @@ struct MatchesView: View {
                             NavigationLink(value: match) {
                                 CompactFollowingMatchRow(
                                     match: match,
-                                    alertsEnabled: prefs.matchNotificationsEnabled,
-                                    onSetAlert: { Task { await setAlert(for: match) } },
                                     onAddToCalendar: { Task { await addToCalendar(match) } },
                                     onHide: { hide(match) }
                                 )
@@ -323,37 +310,6 @@ struct MatchesView: View {
                             .buttonStyle(.plain)
                         }
                     }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder private func latestSection(limit: Int?) -> some View {
-        let updates = limit.map { Array(teamArticles.prefix($0)) } ?? teamArticles
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                sectionTitle("Latest From Your Teams")
-                Spacer()
-                if selectedTab == .overview {
-                    Button { selectedTab = .updates } label: {
-                        Image(systemName: "newspaper")
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Theme.accent)
-                    .accessibilityLabel("Open updates")
-                }
-            }
-            if updates.isEmpty {
-                EmptyInlineCard(title: "No updates loaded", message: "Pull to refresh for the latest stories from followed leagues.")
-            } else {
-                ForEach(updates) { article in
-                    FollowingUpdateRow(
-                        article: article,
-                        isSaved: articleLibrary.isSaved(article),
-                        action: { presentedArticle = article },
-                        onToggleSaved: { articleLibrary.toggleSaved(article) },
-                        onHide: { articleLibrary.hide(article) }
-                    )
                 }
             }
         }
@@ -527,18 +483,6 @@ struct MatchesView: View {
         }
     }
 
-    private var teamArticles: [ESPNArticle] {
-        let favoriteNames = prefs.favoriteTeams.map { $0.displayName.lowercased() }
-        let articles = newsViewModel.articles(for: nil)
-        let teamSpecific = articles.filter { article in
-            let text = "\(article.headline) \(article.description)".lowercased()
-            return favoriteNames.contains { text.contains($0) }
-        }
-        let visibleTeamSpecific = teamSpecific.filter { !articleLibrary.isHidden($0) && !articleLibrary.isMuted($0) }
-        let visibleArticles = articles.filter { !articleLibrary.isHidden($0) && !articleLibrary.isMuted($0) }
-        return visibleTeamSpecific.isEmpty ? Array(visibleArticles.prefix(8)) : Array(visibleTeamSpecific.prefix(12))
-    }
-
     private func latestMatch(for team: FavoriteTeam) -> Match? {
         viewModel.allFollowedMatches
             .filter { matchIncludes($0, team: team) }
@@ -547,8 +491,11 @@ struct MatchesView: View {
     }
 
     private func matchIncludes(_ match: Match, team: FavoriteTeam) -> Bool {
-        [match.home, match.away].contains { side in
-            if side.teamID == team.teamID { return true }
+        guard match.league.path == team.leaguePath else { return false }
+        return [match.home, match.away].contains { side in
+            if let tid = side.teamID, !tid.isEmpty, !team.teamID.isEmpty {
+                return tid == team.teamID
+            }
             let names = [side.displayName, side.shortName, side.abbreviation]
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
                 .filter { !$0.isEmpty }
@@ -557,7 +504,7 @@ struct MatchesView: View {
                 .filter { !$0.isEmpty }
             return names.contains { sideName in
                 favoriteNames.contains { favoriteName in
-                    sideName == favoriteName || sideName.contains(favoriteName) || favoriteName.contains(sideName)
+                    sideName == favoriteName
                 }
             }
         }
@@ -639,7 +586,6 @@ private struct MetricCard: View {
 
 private struct PriorityGameCard: View {
     let match: Match
-    let onSetAlert: (Match) -> Void
     let onAddToCalendar: (Match) -> Void
     let onHide: (Match) -> Void
     @EnvironmentObject private var prefs: PreferencesStore
@@ -743,18 +689,6 @@ private struct PriorityGameCard: View {
                 }
                 .buttonStyle(.plain)
                 Spacer()
-                Button { onSetAlert(match) } label: {
-                    Label(
-                        prefs.matchNotificationsEnabled ? "Alert Set" : "Set Alert",
-                        systemImage: prefs.matchNotificationsEnabled ? "bell.fill" : "bell"
-                    )
-                    .font(.caption.weight(.heavy))
-                    .foregroundStyle(Theme.starting)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(Theme.surfaceElevated, in: Capsule())
-                }
-                .buttonStyle(.plain)
             }
 
             if !isActuallyForYou {
@@ -774,7 +708,6 @@ private struct PriorityGameCard: View {
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
         .shadow(color: match.state == .live ? Theme.live.opacity(0.12) : .clear, radius: 16, y: 8)
         .contextMenu {
-            Button("Set Alert", systemImage: "bell") { onSetAlert(match) }
             Button("Add to Calendar", systemImage: "calendar.badge.plus") { onAddToCalendar(match) }
             Divider()
             Button("Hide", systemImage: "eye.slash", role: .destructive) { onHide(match) }
@@ -799,8 +732,6 @@ private struct PriorityGameCard: View {
 
 private struct CompactFollowingMatchRow: View {
     let match: Match
-    let alertsEnabled: Bool
-    let onSetAlert: () -> Void
     let onAddToCalendar: () -> Void
     let onHide: () -> Void
     @EnvironmentObject private var prefs: PreferencesStore
@@ -836,18 +767,11 @@ private struct CompactFollowingMatchRow: View {
                 .foregroundStyle(Theme.textSecondary)
             }
 
-            Spacer(minLength: 4)
-
-            Image(systemName: alertsEnabled ? "bell.fill" : "bell")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(alertsEnabled ? Theme.starting : Theme.textSecondary)
-                .frame(width: 28, height: 28)
         }
         .padding(12)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
         .contextMenu {
-            Button("Set Alert", systemImage: "bell") { onSetAlert() }
             Button("Add to Calendar", systemImage: "calendar.badge.plus") { onAddToCalendar() }
             Divider()
             Button("Hide", systemImage: "eye.slash", role: .destructive) { onHide() }
@@ -880,72 +804,6 @@ private struct CompactFollowingMatchRow: View {
     }
 }
 
-private struct FollowingUpdateRow: View {
-    let article: ESPNArticle
-    let isSaved: Bool
-    let action: () -> Void
-    let onToggleSaved: () -> Void
-    let onHide: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(alignment: .top, spacing: 10) {
-            AsyncImage(url: article.imageURL) { phase in
-                if case .success(let image) = phase {
-                    image.resizable().scaledToFill()
-                } else {
-                    Image(systemName: "newspaper.fill")
-                        .font(.headline)
-                        .foregroundStyle(Theme.accent)
-                }
-            }
-            .frame(width: 48, height: 48)
-            .background(Theme.surfaceElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 6) {
-                    Text(article.league.shortName)
-                        .font(.caption2.weight(.heavy))
-                        .foregroundStyle(Theme.accent)
-                    if let published = article.published {
-                        Text(relativeDate(published))
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-                }
-                Text(article.headline)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(2)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(12)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-        .contextMenu {
-            Button(action: onToggleSaved) {
-                Label(isSaved ? "Remove Saved Article" : "Save Article", systemImage: isSaved ? "bookmark.slash" : "bookmark")
-            }
-            if let url = article.url {
-                ShareLink(item: url) {
-                    Label("Share", systemImage: "square.and.arrow.up")
-                }
-            }
-            Divider()
-            Button("Not Interested", systemImage: "hand.thumbsdown", role: .destructive) { onHide() }
-        }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func relativeDate(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
-}
 
 private struct FollowingStandingCard: View {
     let team: FavoriteTeam

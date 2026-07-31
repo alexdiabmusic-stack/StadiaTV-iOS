@@ -10,8 +10,14 @@ struct ArticleReaderView: View {
     @State private var bodyParagraphs: [String] = []
     @State private var isLoading = false
     @State private var fullyLoaded = false
+    @State private var isPremium = false
 
     private let service = ESPNService()
+
+    private var isPremiumArticle: Bool {
+        guard let url = article.url?.absoluteString else { return false }
+        return url.contains("/insider/") || article.isPremium
+    }
 
     var body: some View {
         NavigationStack {
@@ -138,9 +144,9 @@ struct ArticleReaderView: View {
             // Body
             bodySection
 
-            // Footer link
+            // Footer link — always shown for premium; subtle link when we have full content
             if let url = article.url {
-                footerLink(url: url)
+                footerLink(url: url, prominent: isPremium || bodyParagraphs.isEmpty)
             }
         }
     }
@@ -149,6 +155,8 @@ struct ArticleReaderView: View {
     private var bodySection: some View {
         if isLoading {
             loadingPlaceholder
+        } else if isPremium {
+            premiumLock
         } else if !bodyParagraphs.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
                 ForEach(Array(bodyParagraphs.enumerated()), id: \.offset) { index, paragraph in
@@ -161,7 +169,6 @@ struct ArticleReaderView: View {
                 }
             }
         } else {
-            // Fallback: just show the teaser/description we already have
             if !article.description.isEmpty {
                 Text(article.description)
                     .font(.body)
@@ -174,6 +181,23 @@ struct ArticleReaderView: View {
                     .foregroundStyle(Theme.textSecondary)
             }
         }
+    }
+
+    private var premiumLock: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "lock.fill")
+                .font(.largeTitle)
+                .foregroundStyle(Theme.accent)
+            Text("ESPN+ Exclusive")
+                .font(.headline)
+                .foregroundStyle(Theme.textPrimary)
+            Text("This article is only available to ESPN Insider subscribers.")
+                .font(.subheadline)
+                .foregroundStyle(Theme.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
     }
 
     private var loadingPlaceholder: some View {
@@ -190,49 +214,53 @@ struct ArticleReaderView: View {
         .padding(.vertical, 8)
     }
 
-    private func footerLink(url: URL) -> some View {
+    private func footerLink(url: URL, prominent: Bool) -> some View {
         Button { openURL(url) } label: {
             HStack(spacing: 6) {
-                Image(systemName: "newspaper")
+                Image(systemName: prominent ? "newspaper" : "arrow.up.right.square")
                     .font(.footnote)
-                Text("Read full story at ESPN.com")
+                Text(prominent ? "Read full story at ESPN.com" : "Open at ESPN.com")
                     .font(.footnote.weight(.semibold))
-                Image(systemName: "arrow.up.right")
-                    .font(.footnote)
+                if prominent {
+                    Image(systemName: "arrow.up.right")
+                        .font(.footnote)
+                }
             }
-            .foregroundStyle(Theme.accent)
-            .padding(.vertical, 12)
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity)
+            .foregroundStyle(prominent ? Theme.accent : Theme.textSecondary)
+            .padding(.vertical, prominent ? 12 : 8)
+            .padding(.horizontal, prominent ? 16 : 0)
+            .frame(maxWidth: prominent ? .infinity : nil, alignment: .leading)
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Theme.accent.opacity(0.4))
+                Group {
+                    if prominent {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Theme.accent.opacity(0.4))
+                    }
+                }
             )
         }
         .buttonStyle(.plain)
-        .padding(.top, 8)
+        .padding(.top, prominent ? 8 : 4)
     }
 
     // MARK: - Data loading
 
     private func loadBody() async {
         guard !fullyLoaded else { return }
-        guard let articleID = espnArticleID() else { return }
+
+        // Premium articles are paywalled — don't waste a network request
+        if isPremiumArticle {
+            isPremium = true
+            fullyLoaded = true
+            return
+        }
+
+        guard let articleURL = article.url else { return }
         isLoading = true
-        let fetched = (try? await service.articleBody(id: articleID, league: article.league)) ?? []
+        let fetched = (try? await service.articleBodyFromURL(articleURL)) ?? []
         isLoading = false
         bodyParagraphs = fetched
         fullyLoaded = true
-    }
-
-    /// Extracts the numeric ESPN article ID from article.id or from the article URL.
-    private func espnArticleID() -> Int? {
-        if let id = Int(article.id) { return id }
-        // Fallback: extract from URL like /id/40123456/
-        guard let urlString = article.url?.absoluteString,
-              let range = urlString.range(of: "/id/") else { return nil }
-        let tail = String(urlString[range.upperBound...])
-        return Int(tail.components(separatedBy: "/").first ?? "")
     }
 
     // MARK: - Helpers

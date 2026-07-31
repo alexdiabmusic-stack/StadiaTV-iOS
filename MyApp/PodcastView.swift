@@ -24,6 +24,8 @@ struct PodcastBrowserView: View {
         return filters
     }
 
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -35,6 +37,12 @@ struct PodcastBrowserView: View {
             }
             .navigationTitle("Sports Talk")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                }
+            }
             .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search podcasts")
             .onSubmit(of: .search) { runSearch() }
             .onChange(of: searchText) { if searchText.isEmpty { searchResults = [] } }
@@ -496,27 +504,27 @@ struct PodcastDetailView: View {
     }
 
     private var podcastHeader: some View {
-        HStack(alignment: .top, spacing: 14) {
-            PodcastArtwork(url: podcast.artworkURL, size: 96)
+        HStack(alignment: .center, spacing: 14) {
+            PodcastArtwork(url: podcast.artworkURL, size: 88)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(podcast.title)
-                    .font(.title3.weight(.bold))
+                    .font(.headline.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(2)
                 if !podcast.publisher.isEmpty {
                     Text(podcast.publisher)
-                        .font(.subheadline)
+                        .font(.caption)
                         .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
                 }
-                Spacer(minLength: 0)
                 Button(action: { store.toggleSubscription(podcast) }) {
                     Label(isSubscribed ? "Subscribed" : "Subscribe",
                           systemImage: isSubscribed ? "checkmark.circle.fill" : "plus.circle")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundStyle(isSubscribed ? Theme.accent : .white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
                         .background(isSubscribed ? Theme.surface : Theme.accent, in: Capsule())
                 }
                 .buttonStyle(.plain)
@@ -556,70 +564,71 @@ struct PodcastEpisodeRow: View {
     private var isNowPlaying: Bool { store.nowPlaying?.id == episode.id }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 6) {
-                    if isNowPlaying {
-                        Image(systemName: store.isPlaying ? "waveform" : "pause.circle")
+        Button(action: onPlay) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 6) {
+                        if isNowPlaying {
+                            Image(systemName: store.isPlaying ? "waveform" : "pause.circle")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Theme.accent)
+                        }
+                        Text(episode.relativeDate)
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(isNowPlaying ? Theme.accent : Theme.textSecondary)
                     }
-                    Text(episode.relativeDate)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(isNowPlaying ? Theme.accent : Theme.textSecondary)
-                }
-                Text(episode.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                if !episode.episodeDescription.isEmpty {
-                    Text(episode.episodeDescription)
-                        .font(.caption)
-                        .foregroundStyle(Theme.textSecondary)
+                    Text(episode.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
                         .lineLimit(2)
-                }
-                HStack(spacing: 12) {
-                    Button(action: onPlay) {
+                        .multilineTextAlignment(.leading)
+                    if !episode.episodeDescription.isEmpty {
+                        Text(episode.episodeDescription)
+                            .font(.caption)
+                            .foregroundStyle(Theme.textSecondary)
+                            .lineLimit(2)
+                    }
+                    HStack(spacing: 12) {
+                        // Styled as a button pill but tap is handled by the outer Button
                         Label(isNowPlaying && store.isPlaying ? "Playing" : (episode.isVideo ? "Watch" : "Play"),
                               systemImage: isNowPlaying && store.isPlaying ? "waveform" : (episode.isVideo ? "video.fill" : "play.fill"))
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(Theme.accent)
-                    }
-                    .buttonStyle(.plain)
-                    if !episode.formattedDuration.isEmpty {
-                        Text(episode.formattedDuration)
-                            .font(.caption)
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-                    if episode.isVideo {
-                        Text("VIDEO")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 3))
-                    }
-                    if store.isPlayed(episode) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.caption)
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-                }
-                if progress > 0 && progress < 1 {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(Theme.hairline).frame(height: 3)
-                            Capsule().fill(Theme.accent).frame(width: geo.size.width * progress, height: 3)
+                        if !episode.formattedDuration.isEmpty {
+                            Text(episode.formattedDuration)
+                                .font(.caption)
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        if episode.isVideo {
+                            Text("VIDEO")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 3))
+                        }
+                        if store.isPlayed(episode) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(Theme.textSecondary)
                         }
                     }
-                    .frame(height: 3)
+                    if progress > 0 && progress < 1 {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Capsule().fill(Theme.hairline).frame(height: 3)
+                                Capsule().fill(Theme.accent).frame(width: geo.size.width * progress, height: 3)
+                            }
+                        }
+                        .frame(height: 3)
+                    }
                 }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            .padding(14)
+            .contentShape(Rectangle())
         }
-        .padding(14)
-        .contentShape(Rectangle())
+        .buttonStyle(.plain)
     }
 }
 

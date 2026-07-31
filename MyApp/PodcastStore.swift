@@ -55,6 +55,7 @@ final class PodcastStore: ObservableObject {
     // MARK: - Private internals
 
     private var player: AVPlayer?
+    @Published private(set) var videoPlayer: AVPlayer?   // non-nil when nowPlaying is a video episode
     private var timeObserverToken: Any?
     private var statusObserver: NSKeyValueObservation?
     private var rateObserver: NSKeyValueObservation?
@@ -76,11 +77,42 @@ final class PodcastStore: ObservableObject {
     // MARK: - Catalog loading
 
     private func loadBundledCatalog() {
+        var allFeeds: [PodcastCatalog.CatalogFeed] = []
+        var seenURLs = Set<String>()
+
+        // Primary curated catalog
         if let url = Bundle.main.url(forResource: "sports_podcast_rss_catalog_v2", withExtension: "json"),
            let data = try? Data(contentsOf: url),
            let decoded = try? JSONDecoder().decode(PodcastCatalog.self, from: data) {
-            catalog = decoded.feeds
+            for feed in decoded.feeds where seenURLs.insert(feed.feedURL.absoluteString).inserted {
+                allFeeds.append(feed)
+            }
         }
+
+        // DB-derived supplemental catalog (higher volume, includes pre-seeded artwork URLs)
+        if let url = Bundle.main.url(forResource: "sports_db_catalog", withExtension: "json"),
+           let data = try? Data(contentsOf: url),
+           let decoded = try? JSONDecoder().decode(PodcastCatalog.self, from: data) {
+            for feed in decoded.feeds where seenURLs.insert(feed.feedURL.absoluteString).inserted {
+                allFeeds.append(feed)
+            }
+        }
+
+        catalog = allFeeds
+
+        // Pre-seed artwork cache from catalog entries that ship with an image URL
+        for feed in catalog {
+            guard let imageURL = feed.imageURL else { continue }
+            let key = feed.feedURL.absoluteString
+            if podcastMetaCache[key] == nil {
+                podcastMetaCache[key] = Podcast(
+                    id: key, title: feed.title, publisher: "",
+                    feedURL: feed.feedURL, artworkURL: imageURL,
+                    podcastDescription: "", sport: feed.sport, tags: feed.tags
+                )
+            }
+        }
+
         if let url = Bundle.main.url(forResource: "sports_team_podcast_coverage", withExtension: "json"),
            let data = try? Data(contentsOf: url),
            let decoded = try? JSONDecoder().decode(TeamPodcastRegistry.self, from: data) {
@@ -119,6 +151,7 @@ final class PodcastStore: ObservableObject {
     // MARK: - Artwork prefetch
 
     /// Fetches and caches the artwork URL for a feed without loading full episode data.
+    /// Returns immediately if artwork is already available in the catalog or cache.
     func fetchArtwork(for feedURL: URL) async {
         let key = feedURL.absoluteString
         guard podcastMetaCache[key]?.artworkURL == nil else { return }
@@ -133,7 +166,8 @@ final class PodcastStore: ObservableObject {
             artworkURL: artwork,
             podcastDescription: existing?.podcastDescription ?? (feed.description ?? ""),
             sport: existing?.sport,
-            tags: existing?.tags ?? []
+            tags: existing?.tags ?? [],
+            medium: existing?.medium ?? feed.podcastMedium
         )
     }
 
@@ -156,7 +190,8 @@ final class PodcastStore: ObservableObject {
                     podcastMetaCache[key] = Podcast(
                         id: key, title: first.podcastTitle, publisher: "",
                         feedURL: feedURL, artworkURL: first.podcastArtworkURL,
-                        podcastDescription: "", sport: nil, tags: []
+                        podcastDescription: "", sport: nil, tags: [],
+                        medium: first.medium
                     )
                 }
                 return
@@ -178,26 +213,29 @@ final class PodcastStore: ObservableObject {
         }
     }
 
-    /// Resolve team-specific podcasts via Apple Search and cache results.
+    /// Resolve team-specific podcasts.
+    /// Primary: curated seed via Apple Search. Fallback: PodcastMatcher live API search.
     func resolvePodcasts(for team: FavoriteTeam) async -> [Podcast] {
         let seedID = seedID(for: team)
-        guard let seed = teamSeeds[seedID] else { return [] }
-        do {
-            let shows = try await teamResolver.podcasts(for: seed)
-            return shows.compactMap { show in
-                guard let feedURL = show.feedUrl else { return nil }
-                return Podcast(id: feedURL.absoluteString,
-                               title: show.collectionName ?? "Unknown",
-                               publisher: show.artistName ?? "",
-                               feedURL: feedURL,
-                               artworkURL: show.artworkUrl600,
-                               podcastDescription: "",
-                               sport: seed.sport,
-                               tags: [seed.league.lowercased()])
-            }
-        } catch {
-            return []
+        if let seed = teamSeeds[seedID] {
+            do {
+                let shows = try await teamResolver.podcasts(for: seed)
+                let podcasts = shows.compactMap { show -> Podcast? in
+                    guard let feedURL = show.feedUrl else { return nil }
+                    return Podcast(id: feedURL.absoluteString,
+                                   title: show.collectionName ?? "Unknown",
+                                   publisher: show.artistName ?? "",
+                                   feedURL: feedURL,
+                                   artworkURL: show.artworkUrl600,
+                                   podcastDescription: "",
+                                   sport: seed.sport,
+                                   tags: [seed.league.lowercased()])
+                }
+                if !podcasts.isEmpty { return podcasts }
+            } catch {}
         }
+        // Fallback: advanced keyword search via PodcastIndex
+        return await PodcastMatcher.shared.findPodcasts(for: team)
     }
 
     private func seedID(for team: FavoriteTeam) -> String {
@@ -255,6 +293,7 @@ final class PodcastStore: ObservableObject {
         totalDuration = episode.duration > 0 ? episode.duration : 0
         currentTime = episodeProgress[episode.id] ?? 0
         isPlaying = true
+        videoPlayer = episode.isVideo ? player : nil
 
         if currentTime > 0 {
             player?.seek(to: CMTime(seconds: currentTime, preferredTimescale: 600))
@@ -377,6 +416,7 @@ final class PodcastStore: ObservableObject {
         rateObserver?.invalidate(); rateObserver = nil
         player?.pause()
         player = nil
+        videoPlayer = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 

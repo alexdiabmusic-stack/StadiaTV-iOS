@@ -213,29 +213,38 @@ final class PodcastStore: ObservableObject {
         }
     }
 
-    /// Resolve team-specific podcasts.
-    /// Primary: curated seed via Apple Search. Fallback: PodcastMatcher live API search.
+    /// Resolve team-specific podcasts by running Apple Search and PodcastMatcher in parallel.
+    /// Results are merged (Apple Search first as they are more verified) and deduplicated.
     func resolvePodcasts(for team: FavoriteTeam) async -> [Podcast] {
+        // Both resolvers run concurrently
+        async let matcherResult = PodcastMatcher.shared.findPodcasts(for: team, max: 15)
+
+        var applePodcasts: [Podcast] = []
         let seedID = seedID(for: team)
         if let seed = teamSeeds[seedID] {
-            do {
-                let shows = try await teamResolver.podcasts(for: seed)
-                let podcasts = shows.compactMap { show -> Podcast? in
-                    guard let feedURL = show.feedUrl else { return nil }
-                    return Podcast(id: feedURL.absoluteString,
-                                   title: show.collectionName ?? "Unknown",
-                                   publisher: show.artistName ?? "",
-                                   feedURL: feedURL,
-                                   artworkURL: show.artworkUrl600,
-                                   podcastDescription: "",
-                                   sport: seed.sport,
-                                   tags: [seed.league.lowercased()])
-                }
-                if !podcasts.isEmpty { return podcasts }
-            } catch {}
+            let shows = (try? await teamResolver.podcasts(for: seed)) ?? []
+            applePodcasts = shows.compactMap { show -> Podcast? in
+                guard let feedURL = show.feedUrl else { return nil }
+                return Podcast(id: feedURL.absoluteString,
+                               title: show.collectionName ?? "Unknown",
+                               publisher: show.artistName ?? "",
+                               feedURL: feedURL,
+                               artworkURL: show.artworkUrl600,
+                               podcastDescription: "",
+                               sport: seed.sport,
+                               tags: [seed.league.lowercased()])
+            }
         }
-        // Fallback: advanced keyword search via PodcastIndex
-        return await PodcastMatcher.shared.findPodcasts(for: team)
+
+        let matcherPodcasts = await matcherResult
+
+        // Merge: Apple results lead (curated), matcher fills out the rest
+        var seen = Set<String>()
+        var merged: [Podcast] = []
+        for podcast in applePodcasts + matcherPodcasts {
+            if seen.insert(podcast.id).inserted { merged.append(podcast) }
+        }
+        return merged
     }
 
     private func seedID(for team: FavoriteTeam) -> String {

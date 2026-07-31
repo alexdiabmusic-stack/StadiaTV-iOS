@@ -119,6 +119,55 @@ struct ESPNService {
             .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
 
+    /// Fetches the full body of an ESPN article as plain-text paragraphs.
+    /// Uses the individual `/news/{id}` endpoint which returns a `story` HTML field
+    /// containing the complete article text (only available for "Story"/"Recap" types).
+    func articleBody(id: Int, league: League) async throws -> [String] {
+        let url = URL(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/news/\(id)")!
+        let (data, response) = try await session.data(from: url)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw ServiceError.badResponse
+        }
+        struct Detail: Decodable {
+            let story: String?
+            let description: String?
+        }
+        let detail = (try? JSONDecoder().decode(Detail.self, from: data))
+        let html = detail?.story ?? detail?.description ?? ""
+        return Self.extractParagraphs(from: html)
+    }
+
+    /// Converts ESPN HTML story content into an array of readable plain-text paragraphs.
+    static func extractParagraphs(from html: String) -> [String] {
+        guard !html.isEmpty else { return [] }
+        var text = html
+        // Replace block-level closing tags with paragraph separators
+        for tag in ["</p>", "</h1>", "</h2>", "</h3>", "</li>", "<br>", "<br/>", "<br />"] {
+            text = text.replacingOccurrences(of: tag, with: "\n", options: .caseInsensitive)
+        }
+        // Strip all remaining HTML tags
+        while let open = text.range(of: "<"),
+              let close = text.range(of: ">", range: open.upperBound..<text.endIndex) {
+            let tagRange = open.lowerBound..<close.upperBound
+            text.removeSubrange(tagRange)
+        }
+        // Decode common HTML entities
+        let entities: [(String, String)] = [
+            ("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""),
+            ("&#39;", "'"), ("&apos;", "'"), ("&nbsp;", " "),
+            ("&ndash;", "–"), ("&mdash;", "—"), ("&hellip;", "…"),
+            ("&rsquo;", "\u{2019}"), ("&lsquo;", "\u{2018}"),
+            ("&rdquo;", "\u{201D}"), ("&ldquo;", "\u{201C}"),
+            ("&bull;", "•"), ("&copy;", "©"), ("&reg;", "®"),
+        ]
+        for (entity, char) in entities { text = text.replacingOccurrences(of: entity, with: char) }
+        // Split, trim, and filter out noise (nav fragments, attribution footers, etc.)
+        return text
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.count > 20 }
+    }
+
     /// Fetches the full entry list for a racing league's current event
     /// (e.g. every F1 driver) from the ESPN scoreboard, then syncs each
     /// racer's constructor/team from ESPN's core athlete records.

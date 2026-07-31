@@ -1,166 +1,295 @@
 import SwiftUI
-#if os(iOS)
-import WebKit
-#endif
+
+// MARK: - Native ESPN article reader
 
 struct ArticleReaderView: View {
     let article: ESPNArticle
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
 
-    private var paragraphs: [String] {
-        article.description
-            .components(separatedBy: CharacterSet.newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-    }
+    @State private var bodyParagraphs: [String] = []
+    @State private var isLoading = false
+    @State private var fullyLoaded = false
+
+    private let service = ESPNService()
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Theme.background.ignoresSafeArea()
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        heroImage
-                        header
-                        bodyText
-                        sourceAction
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        heroSection
+                        contentSection
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 40)
                     }
-                    .padding(20)
-                    .frame(maxWidth: 760, alignment: .leading)
+                    .frame(maxWidth: 720)
                     .frame(maxWidth: .infinity)
                 }
             }
-            .navigationTitle(article.league.shortName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(Theme.textSecondary)
+                            .font(.title3)
+                    }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    if let url = article.url {
+                        ShareLink(item: url) {
+                            Image(systemName: "square.and.arrow.up")
+                                .foregroundStyle(Theme.accent)
+                        }
+                    }
                 }
             }
         }
         .tint(Theme.accent)
+        .task { await loadBody() }
     }
 
-    @ViewBuilder private var heroImage: some View {
-        if let imageURL = article.imageURL {
-            AsyncImage(url: imageURL) { phase in
-                if case .success(let image) = phase {
-                    image.resizable().scaledToFill()
-                } else {
-                    Theme.surfaceElevated.overlay {
-                        Image(systemName: "newspaper.fill")
-                            .font(.largeTitle)
-                            .foregroundStyle(Theme.textSecondary.opacity(0.55))
+    // MARK: - Sections
+
+    @ViewBuilder
+    private var heroSection: some View {
+        ZStack(alignment: .bottomLeading) {
+            if let imageURL = article.imageURL {
+                AsyncImage(url: imageURL) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().scaledToFill()
+                    } else {
+                        Theme.surfaceElevated
                     }
                 }
-            }
-            .frame(maxWidth: .infinity)
-            .aspectRatio(16 / 9, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-        }
-    }
+                .frame(maxWidth: .infinity)
+                .aspectRatio(16 / 9, contentMode: .fit)
+                .clipped()
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
+                // Gradient scrim for the metadata overlay
+                LinearGradient(
+                    colors: [.clear, .black.opacity(0.72)],
+                    startPoint: .center,
+                    endPoint: .bottom
+                )
+            } else {
+                Theme.surfaceElevated
+                    .frame(maxWidth: .infinity)
+                    .aspectRatio(16 / 9, contentMode: .fit)
+            }
+
+            // League + date badges over the image
+            HStack(spacing: 6) {
                 Text(article.league.shortName.uppercased())
                     .font(.caption.weight(.heavy))
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Theme.accent, in: Capsule())
+
+                if let badgeText = article.badgeText {
+                    Text(badgeText)
+                        .font(.caption.weight(.heavy))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(badgeText == "BREAKING" ? Theme.live : Theme.surfaceElevated.opacity(0.8), in: Capsule())
+                }
+
+                Spacer()
+
                 if let published = article.published {
                     Text(relativeDate(published))
                         .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+            }
+            .padding(12)
+        }
+    }
+
+    private var contentSection: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            // Headline
+            Text(article.headline)
+                .font(.title2.weight(.bold))
+                .foregroundStyle(Theme.textPrimary)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 20)
+
+            // Byline
+            if let byline = article.byline, !byline.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "person.fill")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                    Text(byline)
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.textSecondary)
                 }
             }
 
-            Text(article.headline)
-                .font(.title2.weight(.bold))
-                .foregroundStyle(Theme.textPrimary)
-                .lineSpacing(2)
-                .fixedSize(horizontal: false, vertical: true)
+            Divider().overlay(Theme.hairline)
 
-            if let byline = article.byline, !byline.isEmpty {
-                Text(byline)
-                    .font(.subheadline.weight(.semibold))
+            // Body
+            bodySection
+
+            // Footer link
+            if let url = article.url {
+                footerLink(url: url)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var bodySection: some View {
+        if isLoading {
+            loadingPlaceholder
+        } else if !bodyParagraphs.isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(Array(bodyParagraphs.enumerated()), id: \.offset) { index, paragraph in
+                    Text(paragraph)
+                        .font(.body)
+                        .foregroundStyle(index == 0 ? Theme.textPrimary : Theme.textPrimary.opacity(0.9))
+                        .fontWeight(index == 0 ? .medium : .regular)
+                        .lineSpacing(6)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        } else {
+            // Fallback: just show the teaser/description we already have
+            if !article.description.isEmpty {
+                Text(article.description)
+                    .font(.body)
+                    .foregroundStyle(Theme.textPrimary.opacity(0.9))
+                    .lineSpacing(6)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("No article text available.")
+                    .font(.body)
                     .foregroundStyle(Theme.textSecondary)
             }
         }
     }
 
-    @ViewBuilder private var bodyText: some View {
-        if paragraphs.isEmpty {
-            if let url = article.url {
-                #if os(iOS)
-                ArticleWebView(url: url)
-                    .frame(minHeight: 680)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-                #else
-                unavailableArticleText
-                #endif
-            } else {
-                unavailableArticleText
+    private var loadingPlaceholder: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(0..<5, id: \.self) { i in
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Theme.surfaceElevated)
+                    .frame(maxWidth: i == 4 ? .infinity * 0.6 : .infinity)
+                    .frame(height: 14)
+                    .redacted(reason: .placeholder)
+                    .shimmering()
             }
-        } else {
-            VStack(alignment: .leading, spacing: 14) {
-                ForEach(paragraphs, id: \.self) { paragraph in
-                    Text(paragraph)
-                        .font(.body)
-                        .foregroundStyle(Theme.textPrimary)
-                        .lineSpacing(5)
-                        .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 8)
+    }
+
+    private func footerLink(url: URL) -> some View {
+        Button { openURL(url) } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "newspaper")
+                    .font(.footnote)
+                Text("Read full story at ESPN.com")
+                    .font(.footnote.weight(.semibold))
+                Image(systemName: "arrow.up.right")
+                    .font(.footnote)
+            }
+            .foregroundStyle(Theme.accent)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Theme.accent.opacity(0.4))
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 8)
+    }
+
+    // MARK: - Data loading
+
+    private func loadBody() async {
+        guard !fullyLoaded else { return }
+        guard let articleID = espnArticleID() else { return }
+        isLoading = true
+        let fetched = (try? await service.articleBody(id: articleID, league: article.league)) ?? []
+        isLoading = false
+        bodyParagraphs = fetched
+        fullyLoaded = true
+    }
+
+    /// Extracts the numeric ESPN article ID from article.id or from the article URL.
+    private func espnArticleID() -> Int? {
+        if let id = Int(article.id) { return id }
+        // Fallback: extract from URL like /id/40123456/
+        guard let urlString = article.url?.absoluteString,
+              let range = urlString.range(of: "/id/") else { return nil }
+        let tail = String(urlString[range.upperBound...])
+        return Int(tail.components(separatedBy: "/").first ?? "")
+    }
+
+    // MARK: - Helpers
+
+    private func relativeDate(_ date: Date) -> String {
+        let diff = max(0, Int(Date().timeIntervalSince(date)))
+        if diff < 60 { return "Just now" }
+        let minutes = diff / 60
+        if minutes < 60 { return "\(minutes)m ago" }
+        let hours = minutes / 60
+        if hours < 24 { return "\(hours)h ago" }
+        let days = hours / 24
+        if days == 1 { return "Yesterday" }
+        return "\(days)d ago"
+    }
+}
+
+// MARK: - Shimmer modifier for loading placeholders
+
+private extension View {
+    func shimmering() -> some View {
+        self.overlay(ShimmerView())
+            .mask(self)
+    }
+}
+
+private struct ShimmerView: View {
+    @State private var phase: CGFloat = -1
+
+    var body: some View {
+        GeometryReader { geo in
+            LinearGradient(
+                gradient: Gradient(stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: .white.opacity(0.25), location: 0.5),
+                    .init(color: .clear, location: 1),
+                ]),
+                startPoint: .init(x: phase, y: 0.5),
+                endPoint: .init(x: phase + 1, y: 0.5)
+            )
+            .onAppear {
+                withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) {
+                    phase = 1
                 }
             }
         }
     }
-
-    private var unavailableArticleText: some View {
-        Text("This source did not include article text in the feed.")
-            .font(.body)
-            .foregroundStyle(Theme.textSecondary)
-            .lineSpacing(5)
-    }
-
-    @ViewBuilder private var sourceAction: some View {
-        if let url = article.url {
-            Button {
-                openURL(url)
-            } label: {
-                Label("Open Original", systemImage: "arrow.up.right")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 13)
-            }
-            .foregroundStyle(.white)
-            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .padding(.top, 4)
-        }
-    }
-
-    private func relativeDate(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
 }
 
-#if os(iOS)
-private struct ArticleWebView: UIViewRepresentable {
-    let url: URL
+// MARK: - Article badge helper (reused from DiscoverView)
 
-    func makeUIView(context: Context) -> WKWebView {
-        let webView = WKWebView()
-        webView.scrollView.backgroundColor = UIColor.clear
-        webView.isOpaque = false
-        return webView
-    }
-
-    func updateUIView(_ webView: WKWebView, context: Context) {
-        if webView.url != url {
-            webView.load(URLRequest(url: url))
-        }
+private extension ESPNArticle {
+    var badgeText: String? {
+        let text = "\(type ?? "") \(headline) \(categories.joined(separator: " "))".lowercased()
+        if text.contains("breaking") || text.contains("injury") || text.contains("trade") { return "BREAKING" }
+        if text.contains("analysis") { return "ANALYSIS" }
+        if text.contains("rumor") || text.contains("rumour") { return "RUMOUR" }
+        return nil
     }
 }
-#endif

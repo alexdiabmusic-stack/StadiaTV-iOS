@@ -13,6 +13,15 @@ struct PodcastBrowserView: View {
     @State private var isSearching = false
     @State private var selectedPodcast: Podcast?
     @State private var showingPlayer = false
+    @State private var teamPodcastCache: [String: [Podcast]] = [:]
+    @State private var loadingTeamIDs: Set<String> = []
+
+    private var allFilters: [PodcastFilter] {
+        var filters: [PodcastFilter] = [.forYou, .subscribed]
+        for team in prefs.favoriteTeams.prefix(6) { filters.append(.team(team)) }
+        for group in SportGroup.allCases { filters.append(.sport(group)) }
+        return filters
+    }
 
     var body: some View {
         NavigationStack {
@@ -43,7 +52,7 @@ struct PodcastBrowserView: View {
     private var filterStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(PodcastFilter.allCases) { filter in
+                ForEach(allFilters) { filter in
                     filterChip(filter)
                 }
             }
@@ -105,8 +114,9 @@ struct PodcastBrowserView: View {
     @ViewBuilder
     private var browseContent: some View {
         switch selectedFilter {
-        case .forYou:     forYouContent
-        case .subscribed: subscribedContent
+        case .forYou:       forYouContent
+        case .subscribed:   subscribedContent
+        case .team(let t):  teamContent(t)
         case .sport(let g): sportContent(g)
         }
     }
@@ -114,15 +124,105 @@ struct PodcastBrowserView: View {
     private var forYouContent: some View {
         let feeds = store.catalogFeedsForFollowedSports(prefs.followedLeagues)
         return Group {
-            if feeds.isEmpty {
+            if feeds.isEmpty && prefs.favoriteTeams.isEmpty {
                 emptyState(icon: "waveform", title: "Follow some leagues", subtitle: "Your podcast recommendations will appear here.")
             } else {
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 22) {
-                        PodcastSectionHeader(title: "RECOMMENDED FOR YOU", actionTitle: nil)
-                        podcastGrid(feeds: feeds)
+                    LazyVStack(alignment: .leading, spacing: 28) {
+                        if !prefs.favoriteTeams.isEmpty {
+                            PodcastSectionHeader(title: "MY TEAMS", actionTitle: nil)
+                            LazyVStack(spacing: 0) {
+                                ForEach(prefs.favoriteTeams.prefix(6)) { team in
+                                    teamRow(team)
+                                    if team.id != prefs.favoriteTeams.prefix(6).last?.id {
+                                        Divider().overlay(Theme.hairline)
+                                    }
+                                }
+                            }
+                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                        }
+                        if !feeds.isEmpty {
+                            PodcastSectionHeader(title: "RECOMMENDED FOR YOU", actionTitle: nil)
+                            podcastGrid(feeds: feeds)
+                        }
                     }
                     .padding(20)
+                }
+            }
+        }
+    }
+
+    private func teamRow(_ team: FavoriteTeam) -> some View {
+        Button {
+            withAnimation(.snappy) { selectedFilter = .team(team) }
+        } label: {
+            HStack(spacing: 12) {
+                AsyncImage(url: team.logoURL) { phase in
+                    if case .success(let img) = phase { img.resizable().scaledToFit() }
+                    else { Theme.surface.overlay(Image(systemName: "person.3").foregroundStyle(Theme.textSecondary)) }
+                }
+                .frame(width: 36, height: 36)
+                .clipShape(Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(team.displayName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text(team.leaguePath.components(separatedBy: "/").last?.uppercased() ?? "")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Theme.accent)
+                }
+                Spacer()
+                let pods = teamPodcastCache[team.id] ?? []
+                if loadingTeamIDs.contains(team.id) {
+                    ProgressView().scaleEffect(0.7)
+                } else if !pods.isEmpty {
+                    Text("\(pods.count) shows")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                Image(systemName: "chevron.right").font(.caption).foregroundStyle(Theme.textSecondary)
+            }
+            .padding(14)
+        }
+        .buttonStyle(.plain)
+        .task(id: team.id) { await loadTeamPodcasts(for: team) }
+    }
+
+    private func loadTeamPodcasts(for team: FavoriteTeam) async {
+        guard teamPodcastCache[team.id] == nil, !loadingTeamIDs.contains(team.id) else { return }
+        loadingTeamIDs.insert(team.id)
+        let pods = await store.resolvePodcasts(for: team)
+        teamPodcastCache[team.id] = pods
+        loadingTeamIDs.remove(team.id)
+    }
+
+    private func teamContent(_ team: FavoriteTeam) -> some View {
+        Group {
+            if loadingTeamIDs.contains(team.id) {
+                VStack { Spacer(); ProgressView().tint(Theme.accent); Spacer() }
+            } else {
+                let pods = teamPodcastCache[team.id] ?? []
+                if pods.isEmpty {
+                    VStack {
+                        Spacer()
+                        emptyState(icon: "waveform", title: "Loading \(team.displayName) podcasts",
+                                   subtitle: "Searching for team-specific shows…")
+                        Spacer()
+                    }
+                    .task { await loadTeamPodcasts(for: team) }
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(pods) { podcast in
+                                PodcastRow(podcast: podcast) { selectedPodcast = podcast }
+                                Divider().overlay(Theme.hairline)
+                            }
+                        }
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                        .padding(20)
+                    }
                 }
             }
         }
@@ -215,12 +315,11 @@ struct PodcastBrowserView: View {
 
 // MARK: - Filter model
 
-private enum PodcastFilter: Hashable, Identifiable, CaseIterable {
+private enum PodcastFilter: Hashable, Identifiable {
     case forYou
     case subscribed
+    case team(FavoriteTeam)
     case sport(SportGroup)
-
-    static let allCases: [PodcastFilter] = [.forYou, .subscribed] + SportGroup.allCases.map { .sport($0) }
 
     var id: String { title }
 
@@ -228,6 +327,7 @@ private enum PodcastFilter: Hashable, Identifiable, CaseIterable {
         switch self {
         case .forYou:         return "For You"
         case .subscribed:     return "Subscribed"
+        case .team(let t):    return t.displayName
         case .sport(let g):   return g.rawValue
         }
     }
@@ -238,11 +338,16 @@ private enum PodcastFilter: Hashable, Identifiable, CaseIterable {
 struct PodcastCardTile: View {
     let podcast: Podcast
     let onTap: () -> Void
+    @EnvironmentObject private var store: PodcastStore
+
+    private var artworkURL: URL? {
+        store.podcastMetaCache[podcast.id]?.artworkURL ?? podcast.artworkURL
+    }
 
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 8) {
-                PodcastArtwork(url: podcast.artworkURL, size: 150)
+                PodcastArtwork(url: artworkURL, size: 150)
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 Text(podcast.title)
                     .font(.caption.weight(.semibold))
@@ -258,6 +363,7 @@ struct PodcastCardTile: View {
             }
         }
         .buttonStyle(.plain)
+        .task(id: podcast.id) { await store.fetchArtwork(for: podcast.feedURL) }
     }
 }
 
@@ -266,11 +372,16 @@ struct PodcastCardTile: View {
 struct PodcastRow: View {
     let podcast: Podcast
     let onTap: () -> Void
+    @EnvironmentObject private var store: PodcastStore
+
+    private var artworkURL: URL? {
+        store.podcastMetaCache[podcast.id]?.artworkURL ?? podcast.artworkURL
+    }
 
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
-                PodcastArtwork(url: podcast.artworkURL, size: 56)
+                PodcastArtwork(url: artworkURL, size: 56)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(podcast.title)
@@ -297,6 +408,7 @@ struct PodcastRow: View {
             .padding(14)
         }
         .buttonStyle(.plain)
+        .task(id: podcast.id) { await store.fetchArtwork(for: podcast.feedURL) }
     }
 }
 

@@ -2,6 +2,8 @@ import Foundation
 import AVFoundation
 import SwiftUI
 import Combine
+import MediaPlayer
+import UIKit
 
 // MARK: - Playback speed
 
@@ -68,6 +70,7 @@ final class PodcastStore: ObservableObject {
     init() {
         loadPersistedState()
         loadBundledCatalog()
+        setupRemoteCommands()
     }
 
     // MARK: - Catalog loading
@@ -98,7 +101,7 @@ final class PodcastStore: ObservableObject {
         case .golf:       label = "Golf"
         case .racing:     label = "Racing"
         }
-        return catalog.filter { $0.sport.lowercased() == label.lowercased() }.prefix(10).map { $0 }
+        return catalog.filter { $0.sport.lowercased() == label.lowercased() }.prefix(20).map { $0 }
     }
 
     func catalogFeedsForFollowedSports(_ leagues: [League]) -> [PodcastCatalog.CatalogFeed] {
@@ -110,7 +113,28 @@ final class PodcastStore: ObservableObject {
                 if seenIDs.insert(feed.id).inserted { result.append(feed) }
             }
         }
-        return Array(result.prefix(12))
+        return Array(result.prefix(24))
+    }
+
+    // MARK: - Artwork prefetch
+
+    /// Fetches and caches the artwork URL for a feed without loading full episode data.
+    func fetchArtwork(for feedURL: URL) async {
+        let key = feedURL.absoluteString
+        guard podcastMetaCache[key]?.artworkURL == nil else { return }
+        guard let feed = try? await api.podcast(forFeedURL: feedURL) else { return }
+        guard let artwork = feed.image else { return }
+        let existing = podcastMetaCache[key]
+        podcastMetaCache[key] = Podcast(
+            id: key,
+            title: existing?.title ?? feed.title,
+            publisher: existing?.publisher ?? (feed.author ?? ""),
+            feedURL: feedURL,
+            artworkURL: artwork,
+            podcastDescription: existing?.podcastDescription ?? (feed.description ?? ""),
+            sport: existing?.sport,
+            tags: existing?.tags ?? []
+        )
     }
 
     // MARK: - Episode fetching
@@ -239,6 +263,7 @@ final class PodcastStore: ObservableObject {
         player?.rate = speed.rawValue
 
         setupObservers()
+        configureNowPlaying(for: episode)
     }
 
     func togglePlayPause() {
@@ -252,11 +277,13 @@ final class PodcastStore: ObservableObject {
             player?.rate = speed.rawValue
             isPlaying = true
         }
+        updateNowPlayingPlayback()
     }
 
     func seek(to seconds: TimeInterval) {
         player?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
         currentTime = seconds
+        updateNowPlayingPlayback()
     }
 
     func skip(seconds: TimeInterval) {
@@ -267,6 +294,7 @@ final class PodcastStore: ObservableObject {
     func setSpeed(_ newSpeed: PodcastSpeed) {
         speed = newSpeed
         if isPlaying { player?.rate = newSpeed.rawValue }
+        updateNowPlayingPlayback()
     }
 
     func markPlayed(_ episode: PodcastEpisode) {
@@ -309,6 +337,7 @@ final class PodcastStore: ObservableObject {
                     if let dur = self.player?.currentItem?.duration.seconds, dur.isFinite, dur > 0 {
                         self.totalDuration = dur
                     }
+                    self.tickNowPlayingTime(t)
                 }
             }
         }
@@ -334,6 +363,7 @@ final class PodcastStore: ObservableObject {
             Task { @MainActor [weak self] in
                 if let ep = self?.nowPlaying { self?.markPlayed(ep) }
                 self?.isPlaying = false
+                self?.updateNowPlayingPlayback()
             }
         }
     }
@@ -347,12 +377,101 @@ final class PodcastStore: ObservableObject {
         rateObserver?.invalidate(); rateObserver = nil
         player?.pause()
         player = nil
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
     }
 
     private func saveProgress() {
         guard let episode = nowPlaying, currentTime > 0 else { return }
         episodeProgress[episode.id] = currentTime
         persistState()
+    }
+
+    // MARK: - Now Playing info (lock screen / Control Center / Dynamic Island)
+
+    private func configureNowPlaying(for episode: PodcastEpisode) {
+        var info: [String: Any] = [
+            MPMediaItemPropertyTitle: episode.title,
+            MPMediaItemPropertyArtist: episode.podcastTitle,
+            MPMediaItemPropertyAlbumTitle: episode.podcastTitle,
+            MPMediaItemPropertyPlaybackDuration: episode.duration > 0 ? episode.duration : 0,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
+            MPNowPlayingInfoPropertyPlaybackRate: Double(speed.rawValue),
+            MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue
+        ]
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+
+        // Fetch artwork asynchronously and update once loaded
+        if let artworkURL = episode.podcastArtworkURL {
+            Task {
+                guard let (data, _) = try? await URLSession.shared.data(from: artworkURL),
+                      let image = UIImage(data: data) else { return }
+                let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+                info[MPMediaItemPropertyArtwork] = artwork
+                MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+            }
+        }
+    }
+
+    private func updateNowPlayingPlayback() {
+        guard var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
+        info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
+        info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? Double(speed.rawValue) : 0.0
+        if totalDuration > 0 { info[MPMediaItemPropertyPlaybackDuration] = totalDuration }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    private func tickNowPlayingTime(_ time: TimeInterval) {
+        guard var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
+        info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = time
+        if totalDuration > 0 { info[MPMediaItemPropertyPlaybackDuration] = totalDuration }
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    // MARK: - Remote Command Center
+
+    private func setupRemoteCommands() {
+        let center = MPRemoteCommandCenter.shared()
+
+        center.playCommand.isEnabled = true
+        center.playCommand.addTarget { [weak self] _ in
+            Task { @MainActor [weak self] in self?.togglePlayPause() }
+            return .success
+        }
+
+        center.pauseCommand.isEnabled = true
+        center.pauseCommand.addTarget { [weak self] _ in
+            Task { @MainActor [weak self] in self?.togglePlayPause() }
+            return .success
+        }
+
+        center.togglePlayPauseCommand.isEnabled = true
+        center.togglePlayPauseCommand.addTarget { [weak self] _ in
+            Task { @MainActor [weak self] in self?.togglePlayPause() }
+            return .success
+        }
+
+        center.skipForwardCommand.isEnabled = true
+        center.skipForwardCommand.preferredIntervals = [30]
+        center.skipForwardCommand.addTarget { [weak self] event in
+            guard let e = event as? MPSkipIntervalCommandEvent else { return .commandFailed }
+            Task { @MainActor [weak self] in self?.skip(seconds: e.interval) }
+            return .success
+        }
+
+        center.skipBackwardCommand.isEnabled = true
+        center.skipBackwardCommand.preferredIntervals = [15]
+        center.skipBackwardCommand.addTarget { [weak self] event in
+            guard let e = event as? MPSkipIntervalCommandEvent else { return .commandFailed }
+            Task { @MainActor [weak self] in self?.skip(seconds: -e.interval) }
+            return .success
+        }
+
+        center.changePlaybackPositionCommand.isEnabled = true
+        center.changePlaybackPositionCommand.addTarget { [weak self] event in
+            guard let e = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
+            Task { @MainActor [weak self] in self?.seek(to: e.positionTime) }
+            return .success
+        }
     }
 
     // MARK: - Persistence

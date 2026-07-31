@@ -277,7 +277,7 @@ struct PodcastBrowserView: View {
                                      title: feed.title,
                                      publisher: "",
                                      feedURL: feed.feedURL,
-                                     artworkURL: store.podcastMetaCache[feed.feedURL.absoluteString]?.artworkURL,
+                                     artworkURL: nil,  // PodcastCardTile reads from cache itself
                                      podcastDescription: "",
                                      sport: feed.sport,
                                      tags: feed.tags)
@@ -419,10 +419,20 @@ struct PodcastDetailView: View {
     let podcast: Podcast
     @EnvironmentObject private var store: PodcastStore
     @State private var showingPlayer = false
+    @State private var mediumFilter: PodcastMedium? = nil  // nil = show all
 
-    private var episodes: [PodcastEpisode] {
+    private var allEpisodes: [PodcastEpisode] {
         store.episodesByFeed[podcast.id] ?? []
     }
+    private var hasVideoEpisodes: Bool { allEpisodes.contains { $0.isVideo } }
+    private var hasAudioEpisodes: Bool { allEpisodes.contains { !$0.isVideo } }
+    private var showsMediumFilter: Bool { hasVideoEpisodes && hasAudioEpisodes }
+
+    private var episodes: [PodcastEpisode] {
+        guard let filter = mediumFilter else { return allEpisodes }
+        return allEpisodes.filter { $0.medium == filter }
+    }
+
     private var isLoading: Bool { store.loadingFeedIDs.contains(podcast.id) }
     private var isSubscribed: Bool { store.isSubscribed(podcast) }
 
@@ -432,13 +442,19 @@ struct PodcastDetailView: View {
             VStack(spacing: 0) {
                 podcastHeader
                 Divider().overlay(Theme.hairline)
-                if isLoading && episodes.isEmpty {
+                if showsMediumFilter {
+                    mediumFilterBar
+                    Divider().overlay(Theme.hairline)
+                }
+                if isLoading && allEpisodes.isEmpty {
                     Spacer(); ProgressView().tint(Theme.accent); Spacer()
                 } else if episodes.isEmpty {
                     Spacer()
-                    Image(systemName: "waveform").font(.system(size: 44))
+                    Image(systemName: mediumFilter == .video ? "video.slash" : "waveform")
+                        .font(.system(size: 44))
                         .foregroundStyle(Theme.textSecondary.opacity(0.4))
-                    Text("No episodes found").font(.headline).foregroundStyle(Theme.textPrimary).padding(.top, 12)
+                    Text(mediumFilter == .video ? "No video episodes" : "No episodes found")
+                        .font(.headline).foregroundStyle(Theme.textPrimary).padding(.top, 12)
                     Spacer()
                 } else {
                     episodeList
@@ -450,6 +466,33 @@ struct PodcastDetailView: View {
         .task { await store.loadEpisodes(for: podcast.feedURL) }
         .sheet(isPresented: $showingPlayer) { PodcastPlayerSheet() }
         .tint(Theme.accent)
+    }
+
+    private var mediumFilterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                mediumChip(label: "All", icon: "list.bullet", value: nil)
+                mediumChip(label: "Listen", icon: "headphones", value: .audio)
+                mediumChip(label: "Watch", icon: "video", value: .video)
+            }
+            .padding(.horizontal, 16)
+        }
+        .padding(.vertical, 10)
+        .background(Theme.background)
+    }
+
+    private func mediumChip(label: String, icon: String, value: PodcastMedium?) -> some View {
+        let isSelected = mediumFilter == value
+        return Button { mediumFilter = value } label: {
+            Label(label, systemImage: icon)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(isSelected ? .white : Theme.textSecondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(isSelected ? Theme.accent : Theme.surface, in: Capsule())
+                .overlay(Capsule().strokeBorder(isSelected ? Theme.accent : Theme.hairline))
+        }
+        .buttonStyle(.plain)
     }
 
     private var podcastHeader: some View {
@@ -861,10 +904,14 @@ struct PodcastSectionHeader: View {
 
 // MARK: - Horizontal podcast carousel (embedded in DiscoverView)
 
+// Note: deliberately has NO @EnvironmentObject store reference.
+// Holding a store ref would cause this view (and its ScrollView) to re-render
+// on every currentTime tick (every 0.5s during playback) and every artwork load,
+// resetting the carousel scroll position. PodcastCardTile handles store access
+// internally as a leaf view so the carousel stays stable.
 struct PodcastCarousel: View {
     let feeds: [PodcastCatalog.CatalogFeed]
     let onShowAll: () -> Void
-    @EnvironmentObject private var store: PodcastStore
     @State private var selectedPodcast: Podcast?
 
     var body: some View {
@@ -879,7 +926,7 @@ struct PodcastCarousel: View {
                             title: feed.title,
                             publisher: "",
                             feedURL: feed.feedURL,
-                            artworkURL: store.podcastMetaCache[feed.feedURL.absoluteString]?.artworkURL,
+                            artworkURL: nil,  // PodcastCardTile reads from cache itself
                             podcastDescription: "",
                             sport: feed.sport,
                             tags: feed.tags
@@ -890,6 +937,7 @@ struct PodcastCarousel: View {
                 }
                 .padding(.horizontal, 4)
             }
+            .scrollIndicators(.hidden)
         }
         .navigationDestination(item: $selectedPodcast) { podcast in
             PodcastDetailView(podcast: podcast)

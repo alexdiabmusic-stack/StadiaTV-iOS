@@ -1,0 +1,3396 @@
+{
+  "schema_version": "2.0",
+  "generated_at": "2026-07-30T15:23:00Z",
+  "minimum_team_specific_shows": 3,
+  "supported_leagues": [
+    "NHL",
+    "NFL",
+    "NBA",
+    "MLB",
+    "MLS"
+  ],
+  "total_teams": 154,
+  "policy": {
+    "require_direct_team_match": true,
+    "deduplicate_by_final_feed_url": true,
+    "validate_audio_enclosures": true,
+    "reject_inactive_or_empty_feeds": true,
+    "refresh_resolution_days": 7,
+    "league_fallbacks_do_not_count_toward_team_minimum": true
+  },
+  "official_team_sources": {
+    "NHL": "https://www.nhl.com/info/teams/",
+    "NFL": "https://www.nfl.com/teams/",
+    "NBA": "https://www.nba.com/teams",
+    "MLB": "https://www.mlb.com/team",
+    "MLS": "https://www.mlssoccer.com/clubs/"
+  },
+  "teams": [
+    {
+      "id": "nhl-anaheim-ducks",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Anaheim Ducks",
+      "aliases": [
+        "Anaheim Ducks",
+        "Ducks"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Anaheim Ducks podcast",
+        "Locked On Anaheim Ducks",
+        "Anaheim Ducks Hockey",
+        "Ducks podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-boston-bruins",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Boston Bruins",
+      "aliases": [
+        "Boston Bruins",
+        "Bruins"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Boston Bruins podcast",
+        "Locked On Boston Bruins",
+        "Boston Bruins Hockey",
+        "Bruins podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-buffalo-sabres",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Buffalo Sabres",
+      "aliases": [
+        "Buffalo Sabres",
+        "Sabres"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Buffalo Sabres podcast",
+        "Locked On Buffalo Sabres",
+        "Buffalo Sabres Hockey",
+        "Sabres podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-calgary-flames",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Calgary Flames",
+      "aliases": [
+        "Calgary Flames",
+        "Flames"
+      ],
+      "country_storefront": "CA",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Calgary Flames podcast",
+        "Locked On Calgary Flames",
+        "Calgary Flames Hockey",
+        "Flames podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-carolina-hurricanes",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Carolina Hurricanes",
+      "aliases": [
+        "Carolina Hurricanes",
+        "Hurricanes"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Carolina Hurricanes podcast",
+        "Locked On Carolina Hurricanes",
+        "Carolina Hurricanes Hockey",
+        "Hurricanes podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-chicago-blackhawks",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Chicago Blackhawks",
+      "aliases": [
+        "Chicago Blackhawks",
+        "Blackhawks"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Chicago Blackhawks podcast",
+        "Locked On Chicago Blackhawks",
+        "Chicago Blackhawks Hockey",
+        "Blackhawks podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-colorado-avalanche",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Colorado Avalanche",
+      "aliases": [
+        "Colorado Avalanche",
+        "Avalanche"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Colorado Avalanche podcast",
+        "Locked On Colorado Avalanche",
+        "Colorado Avalanche Hockey",
+        "Avalanche podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-columbus-blue-jackets",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Columbus Blue Jackets",
+      "aliases": [
+        "Columbus Blue Jackets",
+        "Jackets",
+        "Blue Jackets"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Columbus Blue Jackets podcast",
+        "Locked On Columbus Blue Jackets",
+        "Columbus Blue Jackets Hockey",
+        "Jackets podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-dallas-stars",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Dallas Stars",
+      "aliases": [
+        "Dallas Stars",
+        "Stars"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Dallas Stars podcast",
+        "Locked On Dallas Stars",
+        "Dallas Stars Hockey",
+        "Stars podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-detroit-red-wings",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Detroit Red Wings",
+      "aliases": [
+        "Detroit Red Wings",
+        "Wings",
+        "Red Wings"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Detroit Red Wings podcast",
+        "Locked On Detroit Red Wings",
+        "Detroit Red Wings Hockey",
+        "Wings podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-edmonton-oilers",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Edmonton Oilers",
+      "aliases": [
+        "Edmonton Oilers",
+        "Oilers"
+      ],
+      "country_storefront": "CA",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Edmonton Oilers podcast",
+        "Locked On Edmonton Oilers",
+        "Edmonton Oilers Hockey",
+        "Oilers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-florida-panthers",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Florida Panthers",
+      "aliases": [
+        "Florida Panthers",
+        "Panthers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Florida Panthers podcast",
+        "Locked On Florida Panthers",
+        "Florida Panthers Hockey",
+        "Panthers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-los-angeles-kings",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Los Angeles Kings",
+      "aliases": [
+        "Los Angeles Kings",
+        "Kings",
+        "Angeles Kings",
+        "LA Kings"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Los Angeles Kings podcast",
+        "Locked On Los Angeles Kings",
+        "Los Angeles Kings Hockey",
+        "Kings podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-minnesota-wild",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Minnesota Wild",
+      "aliases": [
+        "Minnesota Wild",
+        "Wild"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Minnesota Wild podcast",
+        "Locked On Minnesota Wild",
+        "Minnesota Wild Hockey",
+        "Wild podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-montreal-canadiens",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Montreal Canadiens",
+      "aliases": [
+        "Montreal Canadiens",
+        "Canadiens",
+        "Montréal Canadiens",
+        "Habs"
+      ],
+      "country_storefront": "CA",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Montreal Canadiens podcast",
+        "Locked On Montreal Canadiens",
+        "Montreal Canadiens Hockey",
+        "Canadiens podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-nashville-predators",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Nashville Predators",
+      "aliases": [
+        "Nashville Predators",
+        "Predators"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Nashville Predators podcast",
+        "Locked On Nashville Predators",
+        "Nashville Predators Hockey",
+        "Predators podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-new-jersey-devils",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "New Jersey Devils",
+      "aliases": [
+        "New Jersey Devils",
+        "Devils",
+        "Jersey Devils"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "New Jersey Devils podcast",
+        "Locked On New Jersey Devils",
+        "New Jersey Devils Hockey",
+        "Devils podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-new-york-islanders",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "New York Islanders",
+      "aliases": [
+        "New York Islanders",
+        "Islanders",
+        "York Islanders",
+        "Isles"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "New York Islanders podcast",
+        "Locked On New York Islanders",
+        "New York Islanders Hockey",
+        "Islanders podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-new-york-rangers",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "New York Rangers",
+      "aliases": [
+        "New York Rangers",
+        "Rangers",
+        "York Rangers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "New York Rangers podcast",
+        "Locked On New York Rangers",
+        "New York Rangers Hockey",
+        "Rangers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-ottawa-senators",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Ottawa Senators",
+      "aliases": [
+        "Ottawa Senators",
+        "Senators",
+        "Sens",
+        "Go Sens Go"
+      ],
+      "country_storefront": "CA",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Ottawa Senators podcast",
+        "Locked On Ottawa Senators",
+        "Ottawa Senators Hockey",
+        "Senators podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "met_verified",
+      "shows": [
+        {
+          "id": "locked-on-senators-daily-podcast-on-the-ottawa-senators-fce98b4082",
+          "title": "Locked On Senators - Daily Podcast On The Ottawa Senators",
+          "feed_url": "https://feeds.simplecast.com/8p7t_7If",
+          "publisher": "Locked On Podcast Network",
+          "source_page": "https://plinkhq.com/i/1488639622?to=page",
+          "verification_date": "2026-07-30",
+          "update_frequency": "daily",
+          "team_specific": true,
+          "validation_status": "directory_verified_feed_url"
+        },
+        {
+          "id": "coming-in-hot-with-wallace-york-nichols-bcf33644d1",
+          "title": "Coming In Hot with Wallace, York & Nichols",
+          "feed_url": "https://feeds.acast.com/public/shows/635955d6566a76001322cb0f",
+          "publisher": "The Nation Network",
+          "source_page": "https://plinkhq.com/i/1556698709?to=page",
+          "verification_date": "2026-07-30",
+          "update_frequency": "daily",
+          "team_specific": true,
+          "validation_status": "directory_verified_feed_url"
+        },
+        {
+          "id": "absolute-non-sens-ad691fa992",
+          "title": "Absolute Non-Sens",
+          "feed_url": "https://anchor.fm/s/109c34b28/podcast/rss",
+          "publisher": "Ottawa Senators",
+          "source_page": "https://podstatus.com/podcasts/absolute-non-sens-1068508",
+          "verification_date": "2026-07-30",
+          "update_frequency": "biweekly",
+          "team_specific": true,
+          "validation_status": "directory_verified_feed_url"
+        }
+      ],
+      "team_specific_show_count": 3
+    },
+    {
+      "id": "nhl-philadelphia-flyers",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Philadelphia Flyers",
+      "aliases": [
+        "Philadelphia Flyers",
+        "Flyers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Philadelphia Flyers podcast",
+        "Locked On Philadelphia Flyers",
+        "Philadelphia Flyers Hockey",
+        "Flyers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-pittsburgh-penguins",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Pittsburgh Penguins",
+      "aliases": [
+        "Pittsburgh Penguins",
+        "Penguins"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Pittsburgh Penguins podcast",
+        "Locked On Pittsburgh Penguins",
+        "Pittsburgh Penguins Hockey",
+        "Penguins podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-san-jose-sharks",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "San Jose Sharks",
+      "aliases": [
+        "San Jose Sharks",
+        "Sharks",
+        "Jose Sharks"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "San Jose Sharks podcast",
+        "Locked On San Jose Sharks",
+        "San Jose Sharks Hockey",
+        "Sharks podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-seattle-kraken",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Seattle Kraken",
+      "aliases": [
+        "Seattle Kraken",
+        "Kraken"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Seattle Kraken podcast",
+        "Locked On Seattle Kraken",
+        "Seattle Kraken Hockey",
+        "Kraken podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-st-louis-blues",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "St. Louis Blues",
+      "aliases": [
+        "St. Louis Blues",
+        "Blues",
+        "Louis Blues"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "St. Louis Blues podcast",
+        "Locked On St. Louis Blues",
+        "St. Louis Blues Hockey",
+        "Blues podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-tampa-bay-lightning",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Tampa Bay Lightning",
+      "aliases": [
+        "Tampa Bay Lightning",
+        "Lightning",
+        "Bay Lightning",
+        "Bolts"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Tampa Bay Lightning podcast",
+        "Locked On Tampa Bay Lightning",
+        "Tampa Bay Lightning Hockey",
+        "Lightning podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-toronto-maple-leafs",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Toronto Maple Leafs",
+      "aliases": [
+        "Toronto Maple Leafs",
+        "Leafs",
+        "Maple Leafs"
+      ],
+      "country_storefront": "CA",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Toronto Maple Leafs podcast",
+        "Locked On Toronto Maple Leafs",
+        "Toronto Maple Leafs Hockey",
+        "Leafs podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-utah-mammoth",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Utah Mammoth",
+      "aliases": [
+        "Utah Mammoth",
+        "Mammoth",
+        "Utah Hockey Club"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Utah Mammoth podcast",
+        "Locked On Utah Mammoth",
+        "Utah Mammoth Hockey",
+        "Mammoth podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-vancouver-canucks",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Vancouver Canucks",
+      "aliases": [
+        "Vancouver Canucks",
+        "Canucks"
+      ],
+      "country_storefront": "CA",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Vancouver Canucks podcast",
+        "Locked On Vancouver Canucks",
+        "Vancouver Canucks Hockey",
+        "Canucks podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-vegas-golden-knights",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Vegas Golden Knights",
+      "aliases": [
+        "Vegas Golden Knights",
+        "Knights",
+        "Golden Knights",
+        "VGK"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Vegas Golden Knights podcast",
+        "Locked On Vegas Golden Knights",
+        "Vegas Golden Knights Hockey",
+        "Knights podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-washington-capitals",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Washington Capitals",
+      "aliases": [
+        "Washington Capitals",
+        "Capitals"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Washington Capitals podcast",
+        "Locked On Washington Capitals",
+        "Washington Capitals Hockey",
+        "Capitals podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nhl-winnipeg-jets",
+      "league": "NHL",
+      "sport": "Hockey",
+      "team_name": "Winnipeg Jets",
+      "aliases": [
+        "Winnipeg Jets",
+        "Jets"
+      ],
+      "country_storefront": "CA",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Winnipeg Jets podcast",
+        "Locked On Winnipeg Jets",
+        "Winnipeg Jets Hockey",
+        "Jets podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-arizona-cardinals",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Arizona Cardinals",
+      "aliases": [
+        "Arizona Cardinals",
+        "Cardinals"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Arizona Cardinals podcast",
+        "Locked On Arizona Cardinals",
+        "Arizona Cardinals American Football",
+        "Cardinals podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-atlanta-falcons",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Atlanta Falcons",
+      "aliases": [
+        "Atlanta Falcons",
+        "Falcons"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Atlanta Falcons podcast",
+        "Locked On Atlanta Falcons",
+        "Atlanta Falcons American Football",
+        "Falcons podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-baltimore-ravens",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Baltimore Ravens",
+      "aliases": [
+        "Baltimore Ravens",
+        "Ravens"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Baltimore Ravens podcast",
+        "Locked On Baltimore Ravens",
+        "Baltimore Ravens American Football",
+        "Ravens podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-buffalo-bills",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Buffalo Bills",
+      "aliases": [
+        "Buffalo Bills",
+        "Bills"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Buffalo Bills podcast",
+        "Locked On Buffalo Bills",
+        "Buffalo Bills American Football",
+        "Bills podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-carolina-panthers",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Carolina Panthers",
+      "aliases": [
+        "Carolina Panthers",
+        "Panthers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Carolina Panthers podcast",
+        "Locked On Carolina Panthers",
+        "Carolina Panthers American Football",
+        "Panthers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-chicago-bears",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Chicago Bears",
+      "aliases": [
+        "Chicago Bears",
+        "Bears"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Chicago Bears podcast",
+        "Locked On Chicago Bears",
+        "Chicago Bears American Football",
+        "Bears podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-cincinnati-bengals",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Cincinnati Bengals",
+      "aliases": [
+        "Cincinnati Bengals",
+        "Bengals"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Cincinnati Bengals podcast",
+        "Locked On Cincinnati Bengals",
+        "Cincinnati Bengals American Football",
+        "Bengals podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-cleveland-browns",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Cleveland Browns",
+      "aliases": [
+        "Cleveland Browns",
+        "Browns"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Cleveland Browns podcast",
+        "Locked On Cleveland Browns",
+        "Cleveland Browns American Football",
+        "Browns podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-dallas-cowboys",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Dallas Cowboys",
+      "aliases": [
+        "Dallas Cowboys",
+        "Cowboys"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Dallas Cowboys podcast",
+        "Locked On Dallas Cowboys",
+        "Dallas Cowboys American Football",
+        "Cowboys podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-denver-broncos",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Denver Broncos",
+      "aliases": [
+        "Denver Broncos",
+        "Broncos"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Denver Broncos podcast",
+        "Locked On Denver Broncos",
+        "Denver Broncos American Football",
+        "Broncos podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-detroit-lions",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Detroit Lions",
+      "aliases": [
+        "Detroit Lions",
+        "Lions"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Detroit Lions podcast",
+        "Locked On Detroit Lions",
+        "Detroit Lions American Football",
+        "Lions podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-green-bay-packers",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Green Bay Packers",
+      "aliases": [
+        "Green Bay Packers",
+        "Packers",
+        "Bay Packers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Green Bay Packers podcast",
+        "Locked On Green Bay Packers",
+        "Green Bay Packers American Football",
+        "Packers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-houston-texans",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Houston Texans",
+      "aliases": [
+        "Houston Texans",
+        "Texans"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Houston Texans podcast",
+        "Locked On Houston Texans",
+        "Houston Texans American Football",
+        "Texans podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-indianapolis-colts",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Indianapolis Colts",
+      "aliases": [
+        "Indianapolis Colts",
+        "Colts"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Indianapolis Colts podcast",
+        "Locked On Indianapolis Colts",
+        "Indianapolis Colts American Football",
+        "Colts podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-jacksonville-jaguars",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Jacksonville Jaguars",
+      "aliases": [
+        "Jacksonville Jaguars",
+        "Jaguars"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Jacksonville Jaguars podcast",
+        "Locked On Jacksonville Jaguars",
+        "Jacksonville Jaguars American Football",
+        "Jaguars podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-kansas-city-chiefs",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Kansas City Chiefs",
+      "aliases": [
+        "Kansas City Chiefs",
+        "Chiefs",
+        "City Chiefs"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Kansas City Chiefs podcast",
+        "Locked On Kansas City Chiefs",
+        "Kansas City Chiefs American Football",
+        "Chiefs podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-las-vegas-raiders",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Las Vegas Raiders",
+      "aliases": [
+        "Las Vegas Raiders",
+        "Raiders",
+        "Vegas Raiders"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Las Vegas Raiders podcast",
+        "Locked On Las Vegas Raiders",
+        "Las Vegas Raiders American Football",
+        "Raiders podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-los-angeles-chargers",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Los Angeles Chargers",
+      "aliases": [
+        "Los Angeles Chargers",
+        "Chargers",
+        "Angeles Chargers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Los Angeles Chargers podcast",
+        "Locked On Los Angeles Chargers",
+        "Los Angeles Chargers American Football",
+        "Chargers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-los-angeles-rams",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Los Angeles Rams",
+      "aliases": [
+        "Los Angeles Rams",
+        "Rams",
+        "Angeles Rams"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Los Angeles Rams podcast",
+        "Locked On Los Angeles Rams",
+        "Los Angeles Rams American Football",
+        "Rams podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-miami-dolphins",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Miami Dolphins",
+      "aliases": [
+        "Miami Dolphins",
+        "Dolphins"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Miami Dolphins podcast",
+        "Locked On Miami Dolphins",
+        "Miami Dolphins American Football",
+        "Dolphins podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-minnesota-vikings",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Minnesota Vikings",
+      "aliases": [
+        "Minnesota Vikings",
+        "Vikings"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Minnesota Vikings podcast",
+        "Locked On Minnesota Vikings",
+        "Minnesota Vikings American Football",
+        "Vikings podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-new-england-patriots",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "New England Patriots",
+      "aliases": [
+        "New England Patriots",
+        "Patriots",
+        "England Patriots"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "New England Patriots podcast",
+        "Locked On New England Patriots",
+        "New England Patriots American Football",
+        "Patriots podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-new-orleans-saints",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "New Orleans Saints",
+      "aliases": [
+        "New Orleans Saints",
+        "Saints",
+        "Orleans Saints"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "New Orleans Saints podcast",
+        "Locked On New Orleans Saints",
+        "New Orleans Saints American Football",
+        "Saints podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-new-york-giants",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "New York Giants",
+      "aliases": [
+        "New York Giants",
+        "Giants",
+        "York Giants"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "New York Giants podcast",
+        "Locked On New York Giants",
+        "New York Giants American Football",
+        "Giants podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-new-york-jets",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "New York Jets",
+      "aliases": [
+        "New York Jets",
+        "Jets",
+        "York Jets"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "New York Jets podcast",
+        "Locked On New York Jets",
+        "New York Jets American Football",
+        "Jets podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-philadelphia-eagles",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Philadelphia Eagles",
+      "aliases": [
+        "Philadelphia Eagles",
+        "Eagles"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Philadelphia Eagles podcast",
+        "Locked On Philadelphia Eagles",
+        "Philadelphia Eagles American Football",
+        "Eagles podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-pittsburgh-steelers",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Pittsburgh Steelers",
+      "aliases": [
+        "Pittsburgh Steelers",
+        "Steelers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Pittsburgh Steelers podcast",
+        "Locked On Pittsburgh Steelers",
+        "Pittsburgh Steelers American Football",
+        "Steelers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-san-francisco-49ers",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "San Francisco 49ers",
+      "aliases": [
+        "San Francisco 49ers",
+        "49ers",
+        "Francisco 49ers",
+        "Niners"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "San Francisco 49ers podcast",
+        "Locked On San Francisco 49ers",
+        "San Francisco 49ers American Football",
+        "49ers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-seattle-seahawks",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Seattle Seahawks",
+      "aliases": [
+        "Seattle Seahawks",
+        "Seahawks"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Seattle Seahawks podcast",
+        "Locked On Seattle Seahawks",
+        "Seattle Seahawks American Football",
+        "Seahawks podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-tampa-bay-buccaneers",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Tampa Bay Buccaneers",
+      "aliases": [
+        "Tampa Bay Buccaneers",
+        "Buccaneers",
+        "Bay Buccaneers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Tampa Bay Buccaneers podcast",
+        "Locked On Tampa Bay Buccaneers",
+        "Tampa Bay Buccaneers American Football",
+        "Buccaneers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-tennessee-titans",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Tennessee Titans",
+      "aliases": [
+        "Tennessee Titans",
+        "Titans"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Tennessee Titans podcast",
+        "Locked On Tennessee Titans",
+        "Tennessee Titans American Football",
+        "Titans podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nfl-washington-commanders",
+      "league": "NFL",
+      "sport": "American Football",
+      "team_name": "Washington Commanders",
+      "aliases": [
+        "Washington Commanders",
+        "Commanders"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Washington Commanders podcast",
+        "Locked On Washington Commanders",
+        "Washington Commanders American Football",
+        "Commanders podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-atlanta-hawks",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Atlanta Hawks",
+      "aliases": [
+        "Atlanta Hawks",
+        "Hawks"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Atlanta Hawks podcast",
+        "Locked On Atlanta Hawks",
+        "Atlanta Hawks Basketball",
+        "Hawks podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-boston-celtics",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Boston Celtics",
+      "aliases": [
+        "Boston Celtics",
+        "Celtics"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Boston Celtics podcast",
+        "Locked On Boston Celtics",
+        "Boston Celtics Basketball",
+        "Celtics podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-brooklyn-nets",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Brooklyn Nets",
+      "aliases": [
+        "Brooklyn Nets",
+        "Nets"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Brooklyn Nets podcast",
+        "Locked On Brooklyn Nets",
+        "Brooklyn Nets Basketball",
+        "Nets podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-charlotte-hornets",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Charlotte Hornets",
+      "aliases": [
+        "Charlotte Hornets",
+        "Hornets"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Charlotte Hornets podcast",
+        "Locked On Charlotte Hornets",
+        "Charlotte Hornets Basketball",
+        "Hornets podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-chicago-bulls",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Chicago Bulls",
+      "aliases": [
+        "Chicago Bulls",
+        "Bulls"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Chicago Bulls podcast",
+        "Locked On Chicago Bulls",
+        "Chicago Bulls Basketball",
+        "Bulls podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-cleveland-cavaliers",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Cleveland Cavaliers",
+      "aliases": [
+        "Cleveland Cavaliers",
+        "Cavaliers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Cleveland Cavaliers podcast",
+        "Locked On Cleveland Cavaliers",
+        "Cleveland Cavaliers Basketball",
+        "Cavaliers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-dallas-mavericks",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Dallas Mavericks",
+      "aliases": [
+        "Dallas Mavericks",
+        "Mavericks"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Dallas Mavericks podcast",
+        "Locked On Dallas Mavericks",
+        "Dallas Mavericks Basketball",
+        "Mavericks podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-denver-nuggets",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Denver Nuggets",
+      "aliases": [
+        "Denver Nuggets",
+        "Nuggets"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Denver Nuggets podcast",
+        "Locked On Denver Nuggets",
+        "Denver Nuggets Basketball",
+        "Nuggets podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-detroit-pistons",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Detroit Pistons",
+      "aliases": [
+        "Detroit Pistons",
+        "Pistons"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Detroit Pistons podcast",
+        "Locked On Detroit Pistons",
+        "Detroit Pistons Basketball",
+        "Pistons podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-golden-state-warriors",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Golden State Warriors",
+      "aliases": [
+        "Golden State Warriors",
+        "Warriors",
+        "State Warriors"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Golden State Warriors podcast",
+        "Locked On Golden State Warriors",
+        "Golden State Warriors Basketball",
+        "Warriors podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-houston-rockets",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Houston Rockets",
+      "aliases": [
+        "Houston Rockets",
+        "Rockets"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Houston Rockets podcast",
+        "Locked On Houston Rockets",
+        "Houston Rockets Basketball",
+        "Rockets podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-indiana-pacers",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Indiana Pacers",
+      "aliases": [
+        "Indiana Pacers",
+        "Pacers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Indiana Pacers podcast",
+        "Locked On Indiana Pacers",
+        "Indiana Pacers Basketball",
+        "Pacers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-la-clippers",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "LA Clippers",
+      "aliases": [
+        "LA Clippers",
+        "Clippers",
+        "Los Angeles Clippers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "LA Clippers podcast",
+        "Locked On LA Clippers",
+        "LA Clippers Basketball",
+        "Clippers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-los-angeles-lakers",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Los Angeles Lakers",
+      "aliases": [
+        "Los Angeles Lakers",
+        "Lakers",
+        "Angeles Lakers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Los Angeles Lakers podcast",
+        "Locked On Los Angeles Lakers",
+        "Los Angeles Lakers Basketball",
+        "Lakers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-memphis-grizzlies",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Memphis Grizzlies",
+      "aliases": [
+        "Memphis Grizzlies",
+        "Grizzlies"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Memphis Grizzlies podcast",
+        "Locked On Memphis Grizzlies",
+        "Memphis Grizzlies Basketball",
+        "Grizzlies podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-miami-heat",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Miami Heat",
+      "aliases": [
+        "Miami Heat",
+        "Heat"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Miami Heat podcast",
+        "Locked On Miami Heat",
+        "Miami Heat Basketball",
+        "Heat podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-milwaukee-bucks",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Milwaukee Bucks",
+      "aliases": [
+        "Milwaukee Bucks",
+        "Bucks"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Milwaukee Bucks podcast",
+        "Locked On Milwaukee Bucks",
+        "Milwaukee Bucks Basketball",
+        "Bucks podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-minnesota-timberwolves",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Minnesota Timberwolves",
+      "aliases": [
+        "Minnesota Timberwolves",
+        "Timberwolves"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Minnesota Timberwolves podcast",
+        "Locked On Minnesota Timberwolves",
+        "Minnesota Timberwolves Basketball",
+        "Timberwolves podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-new-orleans-pelicans",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "New Orleans Pelicans",
+      "aliases": [
+        "New Orleans Pelicans",
+        "Pelicans",
+        "Orleans Pelicans"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "New Orleans Pelicans podcast",
+        "Locked On New Orleans Pelicans",
+        "New Orleans Pelicans Basketball",
+        "Pelicans podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-new-york-knicks",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "New York Knicks",
+      "aliases": [
+        "New York Knicks",
+        "Knicks",
+        "York Knicks"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "New York Knicks podcast",
+        "Locked On New York Knicks",
+        "New York Knicks Basketball",
+        "Knicks podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-oklahoma-city-thunder",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Oklahoma City Thunder",
+      "aliases": [
+        "Oklahoma City Thunder",
+        "Thunder",
+        "City Thunder",
+        "OKC Thunder"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Oklahoma City Thunder podcast",
+        "Locked On Oklahoma City Thunder",
+        "Oklahoma City Thunder Basketball",
+        "Thunder podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-orlando-magic",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Orlando Magic",
+      "aliases": [
+        "Orlando Magic",
+        "Magic"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Orlando Magic podcast",
+        "Locked On Orlando Magic",
+        "Orlando Magic Basketball",
+        "Magic podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-philadelphia-76ers",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Philadelphia 76ers",
+      "aliases": [
+        "Philadelphia 76ers",
+        "76ers",
+        "Sixers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Philadelphia 76ers podcast",
+        "Locked On Philadelphia 76ers",
+        "Philadelphia 76ers Basketball",
+        "76ers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-phoenix-suns",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Phoenix Suns",
+      "aliases": [
+        "Phoenix Suns",
+        "Suns"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Phoenix Suns podcast",
+        "Locked On Phoenix Suns",
+        "Phoenix Suns Basketball",
+        "Suns podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-portland-trail-blazers",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Portland Trail Blazers",
+      "aliases": [
+        "Portland Trail Blazers",
+        "Blazers",
+        "Trail Blazers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Portland Trail Blazers podcast",
+        "Locked On Portland Trail Blazers",
+        "Portland Trail Blazers Basketball",
+        "Blazers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-sacramento-kings",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Sacramento Kings",
+      "aliases": [
+        "Sacramento Kings",
+        "Kings"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Sacramento Kings podcast",
+        "Locked On Sacramento Kings",
+        "Sacramento Kings Basketball",
+        "Kings podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-san-antonio-spurs",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "San Antonio Spurs",
+      "aliases": [
+        "San Antonio Spurs",
+        "Spurs",
+        "Antonio Spurs"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "San Antonio Spurs podcast",
+        "Locked On San Antonio Spurs",
+        "San Antonio Spurs Basketball",
+        "Spurs podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-toronto-raptors",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Toronto Raptors",
+      "aliases": [
+        "Toronto Raptors",
+        "Raptors"
+      ],
+      "country_storefront": "CA",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Toronto Raptors podcast",
+        "Locked On Toronto Raptors",
+        "Toronto Raptors Basketball",
+        "Raptors podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-utah-jazz",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Utah Jazz",
+      "aliases": [
+        "Utah Jazz",
+        "Jazz"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Utah Jazz podcast",
+        "Locked On Utah Jazz",
+        "Utah Jazz Basketball",
+        "Jazz podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "nba-washington-wizards",
+      "league": "NBA",
+      "sport": "Basketball",
+      "team_name": "Washington Wizards",
+      "aliases": [
+        "Washington Wizards",
+        "Wizards"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Washington Wizards podcast",
+        "Locked On Washington Wizards",
+        "Washington Wizards Basketball",
+        "Wizards podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-arizona-diamondbacks",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Arizona Diamondbacks",
+      "aliases": [
+        "Arizona Diamondbacks",
+        "Diamondbacks",
+        "D-backs"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Arizona Diamondbacks podcast",
+        "Locked On Arizona Diamondbacks",
+        "Arizona Diamondbacks Baseball",
+        "Diamondbacks podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-athletics",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Athletics",
+      "aliases": [
+        "Athletics",
+        "Oakland Athletics",
+        "A’s",
+        "A's"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Athletics podcast",
+        "Locked On Athletics",
+        "Athletics Baseball",
+        "Oakland Athletics podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-atlanta-braves",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Atlanta Braves",
+      "aliases": [
+        "Atlanta Braves",
+        "Braves"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Atlanta Braves podcast",
+        "Locked On Atlanta Braves",
+        "Atlanta Braves Baseball",
+        "Braves podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-baltimore-orioles",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Baltimore Orioles",
+      "aliases": [
+        "Baltimore Orioles",
+        "Orioles"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Baltimore Orioles podcast",
+        "Locked On Baltimore Orioles",
+        "Baltimore Orioles Baseball",
+        "Orioles podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-boston-red-sox",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Boston Red Sox",
+      "aliases": [
+        "Boston Red Sox",
+        "Sox",
+        "Red Sox"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Boston Red Sox podcast",
+        "Locked On Boston Red Sox",
+        "Boston Red Sox Baseball",
+        "Sox podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-chicago-cubs",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Chicago Cubs",
+      "aliases": [
+        "Chicago Cubs",
+        "Cubs"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Chicago Cubs podcast",
+        "Locked On Chicago Cubs",
+        "Chicago Cubs Baseball",
+        "Cubs podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-chicago-white-sox",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Chicago White Sox",
+      "aliases": [
+        "Chicago White Sox",
+        "Sox",
+        "White Sox"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Chicago White Sox podcast",
+        "Locked On Chicago White Sox",
+        "Chicago White Sox Baseball",
+        "Sox podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-cincinnati-reds",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Cincinnati Reds",
+      "aliases": [
+        "Cincinnati Reds",
+        "Reds"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Cincinnati Reds podcast",
+        "Locked On Cincinnati Reds",
+        "Cincinnati Reds Baseball",
+        "Reds podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-cleveland-guardians",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Cleveland Guardians",
+      "aliases": [
+        "Cleveland Guardians",
+        "Guardians"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Cleveland Guardians podcast",
+        "Locked On Cleveland Guardians",
+        "Cleveland Guardians Baseball",
+        "Guardians podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-colorado-rockies",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Colorado Rockies",
+      "aliases": [
+        "Colorado Rockies",
+        "Rockies"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Colorado Rockies podcast",
+        "Locked On Colorado Rockies",
+        "Colorado Rockies Baseball",
+        "Rockies podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-detroit-tigers",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Detroit Tigers",
+      "aliases": [
+        "Detroit Tigers",
+        "Tigers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Detroit Tigers podcast",
+        "Locked On Detroit Tigers",
+        "Detroit Tigers Baseball",
+        "Tigers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-houston-astros",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Houston Astros",
+      "aliases": [
+        "Houston Astros",
+        "Astros"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Houston Astros podcast",
+        "Locked On Houston Astros",
+        "Houston Astros Baseball",
+        "Astros podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-kansas-city-royals",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Kansas City Royals",
+      "aliases": [
+        "Kansas City Royals",
+        "Royals",
+        "City Royals"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Kansas City Royals podcast",
+        "Locked On Kansas City Royals",
+        "Kansas City Royals Baseball",
+        "Royals podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-los-angeles-angels",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Los Angeles Angels",
+      "aliases": [
+        "Los Angeles Angels",
+        "Angels",
+        "Angeles Angels",
+        "LA Angels"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Los Angeles Angels podcast",
+        "Locked On Los Angeles Angels",
+        "Los Angeles Angels Baseball",
+        "Angels podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-los-angeles-dodgers",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Los Angeles Dodgers",
+      "aliases": [
+        "Los Angeles Dodgers",
+        "Dodgers",
+        "Angeles Dodgers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Los Angeles Dodgers podcast",
+        "Locked On Los Angeles Dodgers",
+        "Los Angeles Dodgers Baseball",
+        "Dodgers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-miami-marlins",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Miami Marlins",
+      "aliases": [
+        "Miami Marlins",
+        "Marlins"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Miami Marlins podcast",
+        "Locked On Miami Marlins",
+        "Miami Marlins Baseball",
+        "Marlins podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-milwaukee-brewers",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Milwaukee Brewers",
+      "aliases": [
+        "Milwaukee Brewers",
+        "Brewers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Milwaukee Brewers podcast",
+        "Locked On Milwaukee Brewers",
+        "Milwaukee Brewers Baseball",
+        "Brewers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-minnesota-twins",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Minnesota Twins",
+      "aliases": [
+        "Minnesota Twins",
+        "Twins"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Minnesota Twins podcast",
+        "Locked On Minnesota Twins",
+        "Minnesota Twins Baseball",
+        "Twins podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-new-york-mets",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "New York Mets",
+      "aliases": [
+        "New York Mets",
+        "Mets",
+        "York Mets"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "New York Mets podcast",
+        "Locked On New York Mets",
+        "New York Mets Baseball",
+        "Mets podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-new-york-yankees",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "New York Yankees",
+      "aliases": [
+        "New York Yankees",
+        "Yankees",
+        "York Yankees"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "New York Yankees podcast",
+        "Locked On New York Yankees",
+        "New York Yankees Baseball",
+        "Yankees podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-philadelphia-phillies",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Philadelphia Phillies",
+      "aliases": [
+        "Philadelphia Phillies",
+        "Phillies"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Philadelphia Phillies podcast",
+        "Locked On Philadelphia Phillies",
+        "Philadelphia Phillies Baseball",
+        "Phillies podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-pittsburgh-pirates",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Pittsburgh Pirates",
+      "aliases": [
+        "Pittsburgh Pirates",
+        "Pirates"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Pittsburgh Pirates podcast",
+        "Locked On Pittsburgh Pirates",
+        "Pittsburgh Pirates Baseball",
+        "Pirates podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-san-diego-padres",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "San Diego Padres",
+      "aliases": [
+        "San Diego Padres",
+        "Padres",
+        "Diego Padres"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "San Diego Padres podcast",
+        "Locked On San Diego Padres",
+        "San Diego Padres Baseball",
+        "Padres podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-san-francisco-giants",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "San Francisco Giants",
+      "aliases": [
+        "San Francisco Giants",
+        "Giants",
+        "Francisco Giants"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "San Francisco Giants podcast",
+        "Locked On San Francisco Giants",
+        "San Francisco Giants Baseball",
+        "Giants podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-seattle-mariners",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Seattle Mariners",
+      "aliases": [
+        "Seattle Mariners",
+        "Mariners"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Seattle Mariners podcast",
+        "Locked On Seattle Mariners",
+        "Seattle Mariners Baseball",
+        "Mariners podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-st-louis-cardinals",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "St. Louis Cardinals",
+      "aliases": [
+        "St. Louis Cardinals",
+        "Cardinals",
+        "Louis Cardinals"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "St. Louis Cardinals podcast",
+        "Locked On St. Louis Cardinals",
+        "St. Louis Cardinals Baseball",
+        "Cardinals podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-tampa-bay-rays",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Tampa Bay Rays",
+      "aliases": [
+        "Tampa Bay Rays",
+        "Rays",
+        "Bay Rays"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Tampa Bay Rays podcast",
+        "Locked On Tampa Bay Rays",
+        "Tampa Bay Rays Baseball",
+        "Rays podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-texas-rangers",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Texas Rangers",
+      "aliases": [
+        "Texas Rangers",
+        "Rangers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Texas Rangers podcast",
+        "Locked On Texas Rangers",
+        "Texas Rangers Baseball",
+        "Rangers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-toronto-blue-jays",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Toronto Blue Jays",
+      "aliases": [
+        "Toronto Blue Jays",
+        "Jays",
+        "Blue Jays"
+      ],
+      "country_storefront": "CA",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Toronto Blue Jays podcast",
+        "Locked On Toronto Blue Jays",
+        "Toronto Blue Jays Baseball",
+        "Jays podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mlb-washington-nationals",
+      "league": "MLB",
+      "sport": "Baseball",
+      "team_name": "Washington Nationals",
+      "aliases": [
+        "Washington Nationals",
+        "Nationals"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Washington Nationals podcast",
+        "Locked On Washington Nationals",
+        "Washington Nationals Baseball",
+        "Nationals podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-atlanta-united",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Atlanta United",
+      "aliases": [
+        "Atlanta United",
+        "United"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Atlanta United podcast",
+        "Locked On Atlanta United",
+        "Atlanta United Soccer",
+        "United podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-austin-fc",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Austin FC",
+      "aliases": [
+        "Austin FC",
+        "Austin",
+        "FC"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Austin FC podcast",
+        "Locked On Austin FC",
+        "Austin FC Soccer",
+        "Austin podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-charlotte-fc",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Charlotte FC",
+      "aliases": [
+        "Charlotte FC",
+        "Charlotte",
+        "FC"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Charlotte FC podcast",
+        "Locked On Charlotte FC",
+        "Charlotte FC Soccer",
+        "Charlotte podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-chicago-fire-fc",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Chicago Fire FC",
+      "aliases": [
+        "Chicago Fire FC",
+        "Chicago Fire",
+        "FC",
+        "Fire FC"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Chicago Fire FC podcast",
+        "Locked On Chicago Fire FC",
+        "Chicago Fire FC Soccer",
+        "Chicago Fire podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-fc-cincinnati",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "FC Cincinnati",
+      "aliases": [
+        "FC Cincinnati",
+        "Cincinnati"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "FC Cincinnati podcast",
+        "Locked On FC Cincinnati",
+        "FC Cincinnati Soccer",
+        "Cincinnati podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-colorado-rapids",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Colorado Rapids",
+      "aliases": [
+        "Colorado Rapids",
+        "Rapids"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Colorado Rapids podcast",
+        "Locked On Colorado Rapids",
+        "Colorado Rapids Soccer",
+        "Rapids podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-columbus-crew",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Columbus Crew",
+      "aliases": [
+        "Columbus Crew",
+        "Crew"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Columbus Crew podcast",
+        "Locked On Columbus Crew",
+        "Columbus Crew Soccer",
+        "Crew podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-d-c-united",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "D.C. United",
+      "aliases": [
+        "D.C. United",
+        "United",
+        "DC United"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "D.C. United podcast",
+        "Locked On D.C. United",
+        "D.C. United Soccer",
+        "United podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-fc-dallas",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "FC Dallas",
+      "aliases": [
+        "FC Dallas",
+        "Dallas"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "FC Dallas podcast",
+        "Locked On FC Dallas",
+        "FC Dallas Soccer",
+        "Dallas podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-houston-dynamo-fc",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Houston Dynamo FC",
+      "aliases": [
+        "Houston Dynamo FC",
+        "Houston Dynamo",
+        "FC",
+        "Dynamo FC"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Houston Dynamo FC podcast",
+        "Locked On Houston Dynamo FC",
+        "Houston Dynamo FC Soccer",
+        "Houston Dynamo podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-la-galaxy",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "LA Galaxy",
+      "aliases": [
+        "LA Galaxy",
+        "Galaxy"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "LA Galaxy podcast",
+        "Locked On LA Galaxy",
+        "LA Galaxy Soccer",
+        "Galaxy podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-los-angeles-fc",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Los Angeles FC",
+      "aliases": [
+        "Los Angeles FC",
+        "Los Angeles",
+        "FC",
+        "Angeles FC",
+        "LAFC"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Los Angeles FC podcast",
+        "Locked On Los Angeles FC",
+        "Los Angeles FC Soccer",
+        "Los Angeles podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-inter-miami-cf",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Inter Miami CF",
+      "aliases": [
+        "Inter Miami CF",
+        "Inter Miami",
+        "CF",
+        "Miami CF"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Inter Miami CF podcast",
+        "Locked On Inter Miami CF",
+        "Inter Miami CF Soccer",
+        "Inter Miami podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-minnesota-united-fc",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Minnesota United FC",
+      "aliases": [
+        "Minnesota United FC",
+        "Minnesota United",
+        "FC",
+        "United FC"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Minnesota United FC podcast",
+        "Locked On Minnesota United FC",
+        "Minnesota United FC Soccer",
+        "Minnesota United podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-cf-montreal",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "CF Montreal",
+      "aliases": [
+        "CF Montreal",
+        "Montreal",
+        "CF Montréal",
+        "Montreal Impact"
+      ],
+      "country_storefront": "CA",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "CF Montreal podcast",
+        "Locked On CF Montreal",
+        "CF Montreal Soccer",
+        "Montreal podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-nashville-sc",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Nashville SC",
+      "aliases": [
+        "Nashville SC",
+        "Nashville",
+        "SC"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Nashville SC podcast",
+        "Locked On Nashville SC",
+        "Nashville SC Soccer",
+        "Nashville podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-new-england-revolution",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "New England Revolution",
+      "aliases": [
+        "New England Revolution",
+        "Revolution",
+        "England Revolution"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "New England Revolution podcast",
+        "Locked On New England Revolution",
+        "New England Revolution Soccer",
+        "Revolution podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-red-bull-new-york",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Red Bull New York",
+      "aliases": [
+        "Red Bull New York",
+        "York",
+        "New York",
+        "New York Red Bulls",
+        "NY Red Bulls"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Red Bull New York podcast",
+        "Locked On Red Bull New York",
+        "Red Bull New York Soccer",
+        "York podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-new-york-city-fc",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "New York City FC",
+      "aliases": [
+        "New York City FC",
+        "New York City",
+        "FC",
+        "City FC",
+        "NYCFC"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "New York City FC podcast",
+        "Locked On New York City FC",
+        "New York City FC Soccer",
+        "New York City podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-orlando-city-sc",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Orlando City SC",
+      "aliases": [
+        "Orlando City SC",
+        "Orlando City",
+        "SC",
+        "City SC"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Orlando City SC podcast",
+        "Locked On Orlando City SC",
+        "Orlando City SC Soccer",
+        "Orlando City podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-philadelphia-union",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Philadelphia Union",
+      "aliases": [
+        "Philadelphia Union",
+        "Union"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Philadelphia Union podcast",
+        "Locked On Philadelphia Union",
+        "Philadelphia Union Soccer",
+        "Union podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-portland-timbers",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Portland Timbers",
+      "aliases": [
+        "Portland Timbers",
+        "Timbers"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Portland Timbers podcast",
+        "Locked On Portland Timbers",
+        "Portland Timbers Soccer",
+        "Timbers podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-real-salt-lake",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Real Salt Lake",
+      "aliases": [
+        "Real Salt Lake",
+        "Lake",
+        "Salt Lake"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Real Salt Lake podcast",
+        "Locked On Real Salt Lake",
+        "Real Salt Lake Soccer",
+        "Lake podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-san-diego-fc",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "San Diego FC",
+      "aliases": [
+        "San Diego FC",
+        "San Diego",
+        "FC",
+        "Diego FC"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "San Diego FC podcast",
+        "Locked On San Diego FC",
+        "San Diego FC Soccer",
+        "San Diego podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-san-jose-earthquakes",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "San Jose Earthquakes",
+      "aliases": [
+        "San Jose Earthquakes",
+        "Earthquakes",
+        "Jose Earthquakes"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "San Jose Earthquakes podcast",
+        "Locked On San Jose Earthquakes",
+        "San Jose Earthquakes Soccer",
+        "Earthquakes podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-seattle-sounders-fc",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Seattle Sounders FC",
+      "aliases": [
+        "Seattle Sounders FC",
+        "Seattle Sounders",
+        "FC",
+        "Sounders FC"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Seattle Sounders FC podcast",
+        "Locked On Seattle Sounders FC",
+        "Seattle Sounders FC Soccer",
+        "Seattle Sounders podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-sporting-kansas-city",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Sporting Kansas City",
+      "aliases": [
+        "Sporting Kansas City",
+        "City",
+        "Kansas City"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Sporting Kansas City podcast",
+        "Locked On Sporting Kansas City",
+        "Sporting Kansas City Soccer",
+        "City podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-st-louis-city-sc",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "St. Louis CITY SC",
+      "aliases": [
+        "St. Louis CITY SC",
+        "St. Louis CITY",
+        "SC",
+        "CITY SC",
+        "St Louis City"
+      ],
+      "country_storefront": "US",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "St. Louis CITY SC podcast",
+        "Locked On St. Louis CITY SC",
+        "St. Louis CITY SC Soccer",
+        "St. Louis CITY podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-toronto-fc",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Toronto FC",
+      "aliases": [
+        "Toronto FC",
+        "Toronto",
+        "FC"
+      ],
+      "country_storefront": "CA",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Toronto FC podcast",
+        "Locked On Toronto FC",
+        "Toronto FC Soccer",
+        "Toronto podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    },
+    {
+      "id": "mls-vancouver-whitecaps-fc",
+      "league": "MLS",
+      "sport": "Soccer",
+      "team_name": "Vancouver Whitecaps FC",
+      "aliases": [
+        "Vancouver Whitecaps FC",
+        "Vancouver Whitecaps",
+        "FC",
+        "Whitecaps FC"
+      ],
+      "country_storefront": "CA",
+      "minimum_team_specific_shows": 3,
+      "search_terms": [
+        "Vancouver Whitecaps FC podcast",
+        "Locked On Vancouver Whitecaps FC",
+        "Vancouver Whitecaps FC Soccer",
+        "Vancouver Whitecaps podcast"
+      ],
+      "resolution_strategy": "apple_search_api_then_rss_validation",
+      "coverage_status": "resolve_on_demand",
+      "shows": []
+    }
+  ]
+}

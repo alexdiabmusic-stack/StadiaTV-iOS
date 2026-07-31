@@ -50,40 +50,26 @@ struct RootView: View {
     @State private var showingPodcastPlayer = false
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            TabView {
-                Tab("Home", systemImage: "house.fill") {
-                    HomeView()
-                }
-                Tab("Following", systemImage: "star.circle.fill") {
-                    MatchesView()
-                }
-                Tab("Live", systemImage: "dot.radiowaves.left.and.right") {
-                    LiveView()
-                }
-                Tab("Discover", systemImage: "safari.fill") {
-                    DiscoverView()
-                }
-                Tab("Settings", systemImage: "gearshape.fill") {
-                    MoreView()
-                }
+        TabView {
+            Tab("Home", systemImage: "house.fill") {
+                HomeView()
             }
-            .tabViewStyle(.sidebarAdaptable)
-            .tint(Theme.accent)
-            .task { updateFavoriteNotificationPrompt() }
-            .onChange(of: prefs.favoriteTeams) { updateFavoriteNotificationPrompt() }
-            .onChange(of: prefs.matchNotificationsEnabled) { updateFavoriteNotificationPrompt() }
-            .alert("Get notified before your favourite teams play?", isPresented: $showingFavoriteNotificationPrompt) {
-                Button("Not Now", role: .cancel) {
-                    prefs.markFavoriteTeamNotificationPromptAnswered()
-                }
-                Button("Enable Notifications") {
-                    Task { await enableFavoriteTeamNotifications() }
-                }
-            } message: {
-                Text("StadiaTV can remind you before games for teams you star. You can change this later in Settings.")
+            Tab("Following", systemImage: "star.circle.fill") {
+                MatchesView()
             }
-
+            Tab("Live", systemImage: "dot.radiowaves.left.and.right") {
+                LiveView()
+            }
+            Tab("Discover", systemImage: "safari.fill") {
+                DiscoverView()
+            }
+            Tab("Settings", systemImage: "gearshape.fill") {
+                MoreView()
+            }
+        }
+        .tabViewStyle(.sidebarAdaptable)
+        .tint(Theme.accent)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             if podcastStore.nowPlaying != nil {
                 PodcastMiniPlayer(showingPlayer: $showingPodcastPlayer)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -91,6 +77,19 @@ struct RootView: View {
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: podcastStore.nowPlaying != nil)
         .sheet(isPresented: $showingPodcastPlayer) { PodcastPlayerSheet() }
+        .task { updateFavoriteNotificationPrompt() }
+        .onChange(of: prefs.favoriteTeams) { updateFavoriteNotificationPrompt() }
+        .onChange(of: prefs.matchNotificationsEnabled) { updateFavoriteNotificationPrompt() }
+        .alert("Get notified before your favourite teams play?", isPresented: $showingFavoriteNotificationPrompt) {
+            Button("Not Now", role: .cancel) {
+                prefs.markFavoriteTeamNotificationPromptAnswered()
+            }
+            Button("Enable Notifications") {
+                Task { await enableFavoriteTeamNotifications() }
+            }
+        } message: {
+            Text("StadiaTV can remind you before games for teams you star. You can change this later in Settings.")
+        }
     }
 
     private func updateFavoriteNotificationPrompt() {

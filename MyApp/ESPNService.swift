@@ -119,39 +119,105 @@ struct ESPNService {
             .sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
     }
 
-    /// Fetches the full body of an ESPN article as plain-text paragraphs.
-    /// Uses the individual `/news/{id}` endpoint which returns a `story` HTML field
-    /// containing the complete article text (only available for "Story"/"Recap" types).
-    func articleBody(id: Int, league: League) async throws -> [String] {
-        let url = URL(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/news/\(id)")!
-        let (data, response) = try await session.data(from: url)
+    /// Fetches the full article body by loading the article's web page and extracting
+    /// content from ESPN's Next.js `__NEXT_DATA__` JSON blob, falling back to `<p>` tag parsing.
+    /// This is the primary content path — ESPN's API endpoints only return teasers.
+    func articleBodyFromURL(_ url: URL) async throws -> [String] {
+        var request = URLRequest(url: url)
+        // Desktop Safari UA to get server-side rendered HTML with full article content
+        request.setValue(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.6 Safari/605.1.15",
+            forHTTPHeaderField: "User-Agent"
+        )
+        request.setValue("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
+        request.setValue("en-US,en;q=0.9", forHTTPHeaderField: "Accept-Language")
+        request.timeoutInterval = 15
+
+        let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw ServiceError.badResponse
         }
-        struct Detail: Decodable {
-            let story: String?
-            let description: String?
+        guard let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else {
+            throw ServiceError.badResponse
         }
-        let detail = (try? JSONDecoder().decode(Detail.self, from: data))
-        let html = detail?.story ?? detail?.description ?? ""
-        return Self.extractParagraphs(from: html)
+
+        // Primary: extract from Next.js __NEXT_DATA__ JSON (structured, clean text)
+        if let paragraphs = Self.extractFromNextData(html), paragraphs.count >= 2 {
+            return paragraphs
+        }
+
+        // Fallback: parse <p> tags from the article section of the HTML
+        return Self.extractParagraphsFromHTML(html)
     }
 
-    /// Converts ESPN HTML story content into an array of readable plain-text paragraphs.
+    /// Extracts the "story" HTML from ESPN's server-side Next.js JSON blob.
+    private static func extractFromNextData(_ html: String) -> [String]? {
+        guard let markerRange = html.range(of: "id=\"__NEXT_DATA__\"") else { return nil }
+        guard let tagClose = html.range(of: ">", range: markerRange.upperBound..<html.endIndex) else { return nil }
+        guard let scriptClose = html.range(of: "</script>", options: .caseInsensitive,
+                                             range: tagClose.upperBound..<html.endIndex) else { return nil }
+
+        let jsonStr = String(html[tagClose.upperBound..<scriptClose.lowerBound])
+        guard let jsonData = jsonStr.data(using: .utf8),
+              let root = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] else { return nil }
+
+        // Recursively find the longest "story" value that looks like HTML content
+        guard let storyHTML = deepFindLongest(key: "story", in: root, minLength: 200) else { return nil }
+        return extractParagraphs(from: storyHTML)
+    }
+
+    /// Recursively searches JSON for the longest string value matching `key` with at least `minLength` characters.
+    private static func deepFindLongest(key: String, in value: Any, minLength: Int) -> String? {
+        var best: String? = nil
+        func search(_ v: Any) {
+            switch v {
+            case let dict as [String: Any]:
+                if let str = dict[key] as? String, str.count >= minLength, str.count > (best?.count ?? 0) {
+                    best = str
+                }
+                dict.values.forEach { search($0) }
+            case let arr as [Any]:
+                arr.forEach { search($0) }
+            default: break
+            }
+        }
+        search(value)
+        return best
+    }
+
+    /// Fallback HTML parser: isolates the article section then pulls `<p>` tag content.
+    private static func extractParagraphsFromHTML(_ html: String) -> [String] {
+        // Narrow scope to the article body to avoid nav/footer noise
+        var scope = html
+        for marker in ["class=\"article-body\"", "class=\"story__text\"", "class=\"article__body\"", "<article"] {
+            if let r = html.range(of: marker) { scope = String(html[r.lowerBound...]); break }
+        }
+
+        var result: [String] = []
+        var remaining = scope
+        while let pOpen = remaining.range(of: "<p", options: .caseInsensitive),
+              let tagEnd = remaining.range(of: ">", range: pOpen.upperBound..<remaining.endIndex),
+              let pClose = remaining.range(of: "</p>", options: .caseInsensitive,
+                                           range: tagEnd.upperBound..<remaining.endIndex) {
+            let inner = String(remaining[tagEnd.upperBound..<pClose.lowerBound])
+            result.append(contentsOf: extractParagraphs(from: inner))
+            remaining = String(remaining[pClose.upperBound...])
+            if remaining.contains("class=\"footer\"") || remaining.contains("id=\"footer\"") { break }
+        }
+        return result
+    }
+
+    /// Converts ESPN HTML story content into plain-text paragraphs (used by both the API and HTML paths).
     static func extractParagraphs(from html: String) -> [String] {
         guard !html.isEmpty else { return [] }
         var text = html
-        // Replace block-level closing tags with paragraph separators
         for tag in ["</p>", "</h1>", "</h2>", "</h3>", "</li>", "<br>", "<br/>", "<br />"] {
             text = text.replacingOccurrences(of: tag, with: "\n", options: .caseInsensitive)
         }
-        // Strip all remaining HTML tags
         while let open = text.range(of: "<"),
               let close = text.range(of: ">", range: open.upperBound..<text.endIndex) {
-            let tagRange = open.lowerBound..<close.upperBound
-            text.removeSubrange(tagRange)
+            text.removeSubrange(open.lowerBound..<close.upperBound)
         }
-        // Decode common HTML entities
         let entities: [(String, String)] = [
             ("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""),
             ("&#39;", "'"), ("&apos;", "'"), ("&nbsp;", " "),
@@ -161,7 +227,6 @@ struct ESPNService {
             ("&bull;", "•"), ("&copy;", "©"), ("&reg;", "®"),
         ]
         for (entity, char) in entities { text = text.replacingOccurrences(of: entity, with: char) }
-        // Split, trim, and filter out noise (nav fragments, attribution footers, etc.)
         return text
             .components(separatedBy: "\n")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }

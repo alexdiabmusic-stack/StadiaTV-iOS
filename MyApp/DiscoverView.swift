@@ -3,9 +3,11 @@ import SwiftUI
 struct DiscoverView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var articleLibrary: ArticleLibraryStore
+    @EnvironmentObject private var podcastStore: PodcastStore
     @StateObject private var viewModel = NewsViewModel()
     @State private var selectedSport: DiscoverSportFilter = .forYou
     @State private var presentedArticle: ESPNArticle?
+    @State private var showingPodcasts = false
 
     private var targetLeagues: [League] {
         switch selectedSport {
@@ -50,6 +52,17 @@ struct DiscoverView: View {
         return remainingArticles.filter { !excluded.contains($0.id) }.prefix(24).map { $0 }
     }
 
+    private var podcastFeeds: [PodcastCatalog.CatalogFeed] {
+        podcastStore.catalogFeedsForFollowedSports(targetLeagues)
+    }
+
+    @ViewBuilder
+    private var podcastCarouselSection: some View {
+        if !podcastFeeds.isEmpty {
+            PodcastCarousel(feeds: podcastFeeds, onShowAll: { showingPodcasts = true })
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -63,6 +76,9 @@ struct DiscoverView: View {
             .searchToolbar()
             .sheet(item: $presentedArticle) { article in
                 ArticleReaderView(article: article)
+            }
+            .sheet(isPresented: $showingPodcasts) {
+                PodcastBrowserView()
             }
         }
         .tint(Theme.accent)
@@ -162,6 +178,8 @@ struct DiscoverView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
                 }
 
+
+                podcastCarouselSection
 
                 if !latestArticles.isEmpty {
                     VStack(spacing: 0) {

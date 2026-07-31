@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import AVKit
 
 // MARK: - Podcast browser (full view, opened from Discover)
 
@@ -537,8 +538,8 @@ struct PodcastEpisodeRow: View {
                 }
                 HStack(spacing: 12) {
                     Button(action: onPlay) {
-                        Label(isNowPlaying && store.isPlaying ? "Playing" : "Play",
-                              systemImage: isNowPlaying && store.isPlaying ? "waveform" : "play.fill")
+                        Label(isNowPlaying && store.isPlaying ? "Playing" : (episode.isVideo ? "Watch" : "Play"),
+                              systemImage: isNowPlaying && store.isPlaying ? "waveform" : (episode.isVideo ? "video.fill" : "play.fill"))
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(Theme.accent)
                     }
@@ -547,6 +548,14 @@ struct PodcastEpisodeRow: View {
                         Text(episode.formattedDuration)
                             .font(.caption)
                             .foregroundStyle(Theme.textSecondary)
+                    }
+                    if episode.isVideo {
+                        Text("VIDEO")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 3))
                     }
                     if store.isPlayed(episode) {
                         Image(systemName: "checkmark.circle.fill")
@@ -575,15 +584,23 @@ struct PodcastEpisodeRow: View {
 
 struct PodcastMiniPlayer: View {
     @EnvironmentObject private var store: PodcastStore
-    @Binding var showingPlayer: Bool
+    @State private var showingPlayer = false
 
     var body: some View {
-        guard let episode = store.nowPlaying else { return AnyView(EmptyView()) }
-        return AnyView(
+        if let episode = store.nowPlaying {
             Button { showingPlayer = true } label: {
                 HStack(spacing: 12) {
-                    PodcastArtwork(url: episode.podcastArtworkURL, size: 40)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    ZStack(alignment: .bottomTrailing) {
+                        PodcastArtwork(url: episode.podcastArtworkURL, size: 40)
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        if episode.isVideo {
+                            Image(systemName: "video.fill")
+                                .font(.system(size: 8, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(2)
+                                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 3))
+                        }
+                    }
                     VStack(alignment: .leading, spacing: 2) {
                         Text(episode.title)
                             .font(.caption.weight(.semibold))
@@ -595,17 +612,13 @@ struct PodcastMiniPlayer: View {
                             .lineLimit(1)
                     }
                     Spacer()
-                    Button {
-                        store.togglePlayPause()
-                    } label: {
+                    Button { store.togglePlayPause() } label: {
                         Image(systemName: store.isPlaying ? "pause.fill" : "play.fill")
                             .font(.title3)
                             .foregroundStyle(Theme.textPrimary)
                     }
                     .buttonStyle(.plain)
-                    Button {
-                        store.skip(seconds: 30)
-                    } label: {
+                    Button { store.skip(seconds: 30) } label: {
                         Image(systemName: "goforward.30")
                             .font(.title3)
                             .foregroundStyle(Theme.textSecondary)
@@ -615,15 +628,15 @@ struct PodcastMiniPlayer: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(Theme.hairline)
-                )
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
             }
             .buttonStyle(.plain)
-        )
+            .sheet(isPresented: $showingPlayer) {
+                PodcastPlayerSheet()
+            }
+        }
     }
 }
 
@@ -662,20 +675,38 @@ struct PodcastPlayerSheet: View {
     private func playerContent(_ episode: PodcastEpisode) -> some View {
         VStack(spacing: 0) {
             Spacer()
-            // Artwork
-            PodcastArtwork(url: episode.podcastArtworkURL, size: 260)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
-                .scaleEffect(store.isPlaying ? 1.0 : 0.88)
-                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: store.isPlaying)
+            // Artwork or video player
+            if episode.isVideo, let avPlayer = store.videoPlayer {
+                VideoPlayer(player: avPlayer)
+                    .frame(height: 230)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .shadow(color: .black.opacity(0.3), radius: 20, y: 8)
+                    .padding(.horizontal, 20)
+            } else {
+                PodcastArtwork(url: episode.podcastArtworkURL, size: 260)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
+                    .scaleEffect(store.isPlaying ? 1.0 : 0.88)
+                    .animation(.spring(response: 0.4, dampingFraction: 0.7), value: store.isPlaying)
+            }
             Spacer().frame(height: 36)
             // Title
             VStack(alignment: .leading, spacing: 4) {
-                Text(episode.title)
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                HStack(spacing: 8) {
+                    Text(episode.title)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    if episode.isVideo {
+                        Text("VIDEO")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 3)
+                            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 3))
+                    }
+                }
                 Text(episode.podcastTitle)
                     .font(.subheadline)
                     .foregroundStyle(Theme.textSecondary)
@@ -692,9 +723,11 @@ struct PodcastPlayerSheet: View {
             controls
                 .padding(.horizontal, 32)
             Spacer().frame(height: 24)
-            // Speed picker
-            speedPicker
-                .padding(.horizontal, 32)
+            // Speed picker (only meaningful for audio)
+            if !episode.isVideo {
+                speedPicker
+                    .padding(.horizontal, 32)
+            }
             Spacer()
         }
     }

@@ -47,36 +47,42 @@ struct RootView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var podcastStore: PodcastStore
     @State private var showingFavoriteNotificationPrompt = false
-    @State private var showingPodcastPlayer = false
+
+    // Applying safeAreaInset to each Tab's content (not the TabView) is the correct
+    // way to place content between the tab content and the tab bar chrome.
+    @ViewBuilder private var miniPlayerBar: some View {
+        if podcastStore.nowPlaying != nil {
+            PodcastMiniPlayer()
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
 
     var body: some View {
         TabView {
             Tab("Home", systemImage: "house.fill") {
                 HomeView()
+                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }
             Tab("Following", systemImage: "star.circle.fill") {
                 MatchesView()
+                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }
             Tab("Live", systemImage: "dot.radiowaves.left.and.right") {
                 LiveView()
+                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }
             Tab("Discover", systemImage: "safari.fill") {
                 DiscoverView()
+                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }
             Tab("Settings", systemImage: "gearshape.fill") {
                 MoreView()
+                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }
         }
         .tabViewStyle(.sidebarAdaptable)
         .tint(Theme.accent)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if podcastStore.nowPlaying != nil {
-                PodcastMiniPlayer(showingPlayer: $showingPodcastPlayer)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: podcastStore.nowPlaying != nil)
-        .sheet(isPresented: $showingPodcastPlayer) { PodcastPlayerSheet() }
         .task { updateFavoriteNotificationPrompt() }
         .onChange(of: prefs.favoriteTeams) { updateFavoriteNotificationPrompt() }
         .onChange(of: prefs.matchNotificationsEnabled) { updateFavoriteNotificationPrompt() }

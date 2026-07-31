@@ -1,0 +1,2468 @@
+{
+  "feeds": [
+    {
+      "id": "db_15951",
+      "title": "The Baseball Betting Show with Greg Peterson",
+      "feed_url": "https://feeds.simplecast.com/edqrZb8q",
+      "image_url": "https://image.simplecastcdn.com/images/4eee12fe-46ee-43b4-a2a5-efbe536a2490/62e0afb8-d2f5-4799-9f7a-922e582a4f83/3000x3000/baseballbettingshow.jpg?aid=rss_feed",
+      "sport": "Baseball",
+      "tags": [
+        "baseball"
+      ],
+      "language": "en",
+      "author": "VSiN"
+    },
+    {
+      "id": "db_48918",
+      "title": "DNVR Colorado Rockies Podcast",
+      "feed_url": "https://feeds.simplecast.com/NLesxExP",
+      "image_url": "https://image.simplecastcdn.com/images/32fade3b-18a3-4a82-910e-9bcefa4b54be/79fde2dd-ed1e-4bfc-be8e-58df52efff00/3000x3000/rockiespodcastv2.jpg?aid=rss_feed",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "ALLCITY Network, DNVR Sports"
+    },
+    {
+      "id": "db_71844",
+      "title": "FIRE BRESLOW PODCAST (Red Sox)",
+      "feed_url": "https://feeds.redcircle.com/e3f05fff-4434-4258-b139-7b17ccb6278b",
+      "image_url": "https://media.redcircle.com/images/2026/5/21/0/1af1307f-838e-4cbb-b450-1cb55d5fcfb7_firebreslow.jpg",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Red Sox Podcast"
+    },
+    {
+      "id": "db_89433",
+      "title": "Talkin' Baseball (MLB Podcast)",
+      "feed_url": "https://feeds.simplecast.com/06DZNq60",
+      "image_url": "https://image.simplecastcdn.com/images/bb878a5d-3f55-417a-a77c-40519c5471ab/5b7f6932-1bd6-4692-b88d-f0b3b0f576da/3000x3000/talkin_baseball_x_fmx_logo_lockup_1.jpg?aid=rss_feed",
+      "sport": "Baseball",
+      "tags": [
+        "mlb",
+        "baseball"
+      ],
+      "language": "en",
+      "author": "Jomboy Media"
+    },
+    {
+      "id": "db_165062",
+      "title": "Home Run Applesauce: A New York Mets podcast",
+      "feed_url": "https://feeds.megaphone.fm/amazin-avenue",
+      "image_url": "https://megaphone.imgix.net/podcasts/b10f3d7e-3914-11e9-9fcf-330072d27a8c/image/HRAS_FFSN.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Home Run Applesauce"
+    },
+    {
+      "id": "db_461445",
+      "title": "Talkin' Yanks (Yankees Podcast)",
+      "feed_url": "https://feeds.simplecast.com/llNIYInM",
+      "image_url": "https://image.simplecastcdn.com/images/342f47c0-66bd-4158-99df-d681a74f779d/adb30f72-9147-4034-8854-b1bf721bf566/3000x3000/talkin_yanks_x_fbg_logo_lockup.jpg?aid=rss_feed",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Jomboy Media"
+    },
+    {
+      "id": "db_484112",
+      "title": "Good Impression Podcast",
+      "feed_url": "https://anchor.fm/s/9614ec4/podcast/rss",
+      "image_url": "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_nologo/1473721/1473721-1780017756547-5abfbbbdce684.jpg",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Chris Arneson"
+    },
+    {
+      "id": "db_627145",
+      "title": "CHGO Chicago Cubs Podcast",
+      "feed_url": "https://feeds.simplecast.com/UdlGZkcN",
+      "image_url": "https://image.simplecastcdn.com/images/9ca0a6f7-b81c-42cf-94da-ca52f2d5eac2/0ae63848-a88c-4862-9c59-2cb45738f00f/3000x3000/chgocubs.png?aid=rss_feed",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "ALLCITY Network, CHGO Sports"
+    },
+    {
+      "id": "db_692652",
+      "title": "Rates & Barrels: A show about Baseball",
+      "feed_url": "https://feeds.acast.com/public/shows/6818a1a4eb737caf8ca41879",
+      "image_url": "https://assets.pippa.io/shows/6818a1a4eb737caf8ca41879/1774225915041-25aacc15-e115-4d2e-b3fa-72decc9773cb.jpeg",
+      "sport": "Baseball",
+      "tags": [
+        "baseball"
+      ],
+      "language": "en",
+      "author": "The Athletic"
+    },
+    {
+      "id": "db_732095",
+      "title": "B-Schaeff Daily: St. Louis Cardinals Talk, Every Day",
+      "feed_url": "https://anchor.fm/s/12f52af0/podcast/rss",
+      "image_url": "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_nologo/3080572/3080572-1744403801953-c774139c1506e.jpg",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Brenden Schaeffer"
+    },
+    {
+      "id": "db_739206",
+      "title": "RotoWire Fantasy Baseball Podcast",
+      "feed_url": "https://feeds.simplecast.com/NmVj8gOr",
+      "image_url": "https://image.simplecastcdn.com/images/56c24876-afcd-484e-88e4-2833f6ec33f3/2133aba9-e9ac-4c30-90e3-8954584aac78/3000x3000/0e0098f4_4694_4ed0_a888_7c1db0012b1f.jpg?aid=rss_feed",
+      "sport": "Baseball",
+      "tags": [
+        "baseball"
+      ],
+      "language": "en",
+      "author": "RotoWire.com"
+    },
+    {
+      "id": "db_740253",
+      "title": "Cleveland Guardians Podcast",
+      "feed_url": "https://feeds.megaphone.fm/ENTDM7247622341",
+      "image_url": "https://megaphone.imgix.net/podcasts/6d99e08e-e318-11eb-98e2-7fdd0032a313/image/CLE_-_Guardians_Podcasts_graphic.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "MLB.com"
+    },
+    {
+      "id": "db_740254",
+      "title": "Cincinnati Reds Podcast",
+      "feed_url": "https://feeds.megaphone.fm/ENTDM6735422147",
+      "image_url": "https://megaphone.imgix.net/podcasts/653d4bf6-e318-11eb-b401-d776deb3e5d7/image/d828d469e71c7316ca48a42e7f99d2d42f6125be308abca0a0168a89c11bd47dcce9ceb0d25cc56c126e50b293b7995bcfdb412a76ef99a7102676382dea27b0.jpeg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "MLB.com"
+    },
+    {
+      "id": "db_740256",
+      "title": "Houston Astros Podcast",
+      "feed_url": "https://feeds.megaphone.fm/ENTDM7519853104",
+      "image_url": "https://megaphone.imgix.net/podcasts/4d49ad50-e318-11eb-b309-e30fd3c14292/image/4792e45e5f660fb10ed5c79ec7ba476d410160822d4de27c9acace90348b20e48d1b3b76ec26fcedab4c0abb3883b7b560e21498948bfd347c56d8a5dde05306.jpeg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "MLB.com"
+    },
+    {
+      "id": "db_743835",
+      "title": "The Baseball Prospectus Podcast Network",
+      "feed_url": "https://www.spreaker.com/show/4080382/episodes/feed",
+      "image_url": "https://d3wo5wojvuv7l.cloudfront.net/t_rss_itunes_square_1400/images.spreaker.com/original/5fa3293da2ab19ceb31c0ae48400d675.jpg",
+      "sport": "Baseball",
+      "tags": [
+        "baseball"
+      ],
+      "language": "en",
+      "author": "Bret Sayre"
+    },
+    {
+      "id": "db_771958",
+      "title": "Pitcher List Fantasy Baseball",
+      "feed_url": "https://feeds.simplecast.com/Rbrm7xIB",
+      "image_url": "https://image.simplecastcdn.com/images/58ea58be-dfa1-48ee-9d2c-d88575cfd995/fa002eca-1237-4ea0-9099-0789808b2a63/3000x3000/24fd7fc6-9205-4fde-aa67-ddac75e5ca91.jpg?aid=rss_feed",
+      "sport": "Baseball",
+      "tags": [
+        "baseball"
+      ],
+      "language": "en",
+      "author": "Pitcher List"
+    },
+    {
+      "id": "db_790770",
+      "title": "Effectively Wild: A FanGraphs Baseball Podcast",
+      "feed_url": "https://blogs.fangraphs.com/feed/effectively-wild/",
+      "image_url": "https://blogs.fangraphs.com/wp-content/uploads/2017/01/ewfglogo.png",
+      "sport": "Baseball",
+      "tags": [
+        "baseball"
+      ],
+      "language": "en",
+      "author": "Ben Lindbergh, Meg Rowley"
+    },
+    {
+      "id": "db_877282",
+      "title": "Nothing Personal with David Samson",
+      "feed_url": "https://feeds.megaphone.fm/npds",
+      "image_url": "https://megaphone.imgix.net/podcasts/2c731c66-eb16-11e9-8bb6-ff318e450d36/image/bb9b01f73e35e53817e0691bf1160dd3.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Le Batard & Friends, Sports, Baseball, MLB"
+    },
+    {
+      "id": "db_923555",
+      "title": "RotoGraphs Fantasy Baseball",
+      "feed_url": "https://fantasy.fangraphs.com/feed/podcast/",
+      "image_url": "http://www.fangraphs.com/images/itunes_rotographs.png",
+      "sport": "Baseball",
+      "tags": [
+        "baseball"
+      ],
+      "language": "en",
+      "author": "RotoGraphs Fantasy Baseball"
+    },
+    {
+      "id": "db_974853",
+      "title": "Sox Machine",
+      "feed_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/56226d70-0715-4696-8c85-b47f012e2df5/69a88559-a336-440d-9425-b47f012e2e00/podcast.rss",
+      "image_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/56226d70-0715-4696-8c85-b47f012e2df5/69a88559-a336-440d-9425-b47f012e2e00/image.jpg?t=1783362015&size=Large",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Foul Territory Network"
+    },
+    {
+      "id": "db_1116800",
+      "title": "Play Tessie - A Red Sox Podcast",
+      "feed_url": "https://rss.amperwave.net/v2/feed/podcorn/ca5bdc8ea4d6b25292d284de4523634b",
+      "image_url": "https://images.castfire.com/image/660/0/0/0/0-8380093.jpg",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Audacy"
+    },
+    {
+      "id": "db_1118396",
+      "title": "PHNX Arizona Diamondbacks Podcast",
+      "feed_url": "https://rss.pdrl.fm/11f86e/feeds.simplecast.com/RC4_0PjT",
+      "image_url": "https://image.simplecastcdn.com/images/b1d9b566-6476-4e57-86ba-41cdc12773cf/1cf1cc93-7cfd-4cb8-9358-f5b982ff81ac/3000x3000/8c51672bb78f152e07a83454bd0a4d79.png?aid=rss_feed",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "ALLCITY Network, PHNX Sports"
+    },
+    {
+      "id": "db_1641056",
+      "title": "Fantasy Baseball Today Express",
+      "feed_url": "https://rss.amperwave.net/v2/feed/audacynetwork/fbtin5",
+      "image_url": "https://images.castfire.com/image/661/0/0/0/0-8382519.jpg",
+      "sport": "Baseball",
+      "tags": [
+        "baseball"
+      ],
+      "language": "en",
+      "author": "CBS Sports"
+    },
+    {
+      "id": "db_3672598",
+      "title": "The Just Baseball Show",
+      "feed_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/e4b9cea4-e5d4-4cfa-bb58-b45900e1c89e/52ea80fc-1e5c-45cb-b88e-b45900e1c8b0/podcast.rss",
+      "image_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/e4b9cea4-e5d4-4cfa-bb58-b45900e1c89e/52ea80fc-1e5c-45cb-b88e-b45900e1c8b0/image.jpg?t=1780062124&size=Large",
+      "sport": "Baseball",
+      "tags": [
+        "baseball"
+      ],
+      "language": "en",
+      "author": "Just Baseball Media"
+    },
+    {
+      "id": "db_3707732",
+      "title": "Champions Adjust",
+      "feed_url": "https://anchor.fm/s/55b259f8/podcast/rss",
+      "image_url": "https://d3t3ozftmdmh3i.cloudfront.net/production/podcast_uploaded_nologo/14277518/14277518-1617845205938-9c73ce20377e8.jpg",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Champions Adjust"
+    },
+    {
+      "id": "db_4037275",
+      "title": "MLB Gambling Podcast",
+      "feed_url": "https://feeds.simplecast.com/9D9_3b4u",
+      "image_url": "https://image.simplecastcdn.com/images/9647ea77-af21-4b6e-a873-f7cbde0cf0fb/317f135a-2e57-4adb-bfa1-ca0b7c6fb8e7/3000x3000/c82df7791066b1329fd735d7c7e3f1a6.jpg?aid=rss_feed",
+      "sport": "Baseball",
+      "tags": [
+        "mlb"
+      ],
+      "language": "en",
+      "author": "Sports Gambling Podcast Network"
+    },
+    {
+      "id": "db_4965975",
+      "title": "High Noon",
+      "feed_url": "https://www.spreaker.com/show/5352820/episodes/feed",
+      "image_url": "https://d3wo5wojvuv7l.cloudfront.net/t_rss_itunes_square_1400/images.spreaker.com/original/20daa0253f92d74edd773f3cecb57c7e.jpg",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "590 The Fan - KFNS"
+    },
+    {
+      "id": "db_6073883",
+      "title": "Foul Territory",
+      "feed_url": "https://rss.pdrl.fm/c6743a/www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/c3f1e59a-1c1c-48cb-ab4c-b33100f0b468/781af1cf-e109-41c1-9c1b-b33100f0b471/podcast.rss",
+      "image_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/c3f1e59a-1c1c-48cb-ab4c-b33100f0b468/781af1cf-e109-41c1-9c1b-b33100f0b471/image.jpg?t=1777916214&size=Large",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Foul Territory Network"
+    },
+    {
+      "id": "db_946797",
+      "title": "The White Sox Podcast w/ Chuck Garfien",
+      "feed_url": "https://feed.podbean.com/chsnwhitesox/feed.xml",
+      "image_url": "https://pbcdn1.podbean.com/imglogo/image-logo/19523674/WhiteSoxPodcastWindCreek.jpg",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Chicago Sports Network"
+    },
+    {
+      "id": "db_1382844",
+      "title": "Nats Chat",
+      "feed_url": "https://feeds.simplecast.com/B5KtLEZT",
+      "image_url": "https://image.simplecastcdn.com/images/f826bf44-89e8-4d6b-a66b-b0c7358bb128/44603739-720d-4090-8f28-bda62047d6ef/3000x3000/nats-chat-cover.png?aid=rss_feed",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Mark Zuckerman & Al Galdi, Blue Wire"
+    },
+    {
+      "id": "db_10174",
+      "title": "Astros Baseball Podcast",
+      "feed_url": "https://feeds.redcircle.com/37ab928c-c9de-4ef6-9dee-1190a4b7abf4",
+      "image_url": "https://media.redcircle.com/images/2025/4/11/12/816b509e-f0d0-4764-b136-b187e76a9c6e_8da_891df6e0-9f11-4fda-9cdd-9cb7a510fbb1_image.jpg",
+      "sport": "Baseball",
+      "tags": [
+        "baseball"
+      ],
+      "language": "en",
+      "author": "MinuteMedia Podcasts"
+    },
+    {
+      "id": "db_6167987",
+      "title": "Fish On First: A Miami Marlins podcast",
+      "feed_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/2a600c6c-133e-4afb-b84b-b3f5017092d4/bf4826cd-13de-4b6b-8159-b3f5017092e2/podcast.rss",
+      "image_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/2a600c6c-133e-4afb-b84b-b3f5017092d4/bf4826cd-13de-4b6b-8159-b3f5017092e2/image.jpg?t=1771453322&size=Large",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Foul Territory Network"
+    },
+    {
+      "id": "db_3666917",
+      "title": "Talking Friars: A San Diego Padres podcast",
+      "feed_url": "https://feeds.megaphone.fm/gaslamp-ball",
+      "image_url": "https://megaphone.imgix.net/podcasts/56b7903c-302a-11ec-a4e9-e31489472c83/image/23e06983ac35ad6b3e981e1aef51d67f.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Talking Friars"
+    },
+    {
+      "id": "db_827486",
+      "title": "The Riverfront: A Cincinnati Reds Show",
+      "feed_url": "https://feeds.simplecast.com/_A09TE_o",
+      "image_url": "https://image.simplecastcdn.com/images/a9a5e925-1308-4ce6-9015-04d99a5ad5ef/b9ed6b8d-47a5-48db-96f5-e3af6439d715/3000x3000/86bae93f5f38f0cc26e498c71e1aaa76.jpg?aid=rss_feed",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "The Riverfront"
+    },
+    {
+      "id": "db_2136186",
+      "title": "The Windup: A show about Baseball",
+      "feed_url": "https://feeds.acast.com/public/shows/6818ceb0eb146d8e35d36017",
+      "image_url": "https://assets.pippa.io/shows/6818ceb0eb146d8e35d36017/show-cover.jpg",
+      "sport": "Baseball",
+      "tags": [
+        "baseball"
+      ],
+      "language": "en",
+      "author": "The Athletic"
+    },
+    {
+      "id": "db_541045",
+      "title": "In This League Fantasy Baseball",
+      "feed_url": "https://www.spreaker.com/show/3691391/episodes/feed",
+      "image_url": "https://d3wo5wojvuv7l.cloudfront.net/t_rss_itunes_square_1400/images.spreaker.com/original/ef957ab9c51c13b3280a40c447c1c642.jpg",
+      "sport": "Baseball",
+      "tags": [
+        "baseball"
+      ],
+      "language": "en",
+      "author": "Chris Welsh"
+    },
+    {
+      "id": "db_1364926",
+      "title": "Bastards of Boston Baseball (Red Sox)",
+      "feed_url": "https://feeds.buzzsprout.com/1578196.rss",
+      "image_url": "https://media.redcircle.com/images/2025/1/27/19/eb6cfba1-b4fe-4151-9fff-08f9ec7e38f0_f22_96ca37ac-b1cf-49b5-b72d-c88fbda80cea_image.jpg",
+      "sport": "Baseball",
+      "tags": [
+        "baseball"
+      ],
+      "language": "en",
+      "author": "Red Sox Podcast"
+    },
+    {
+      "id": "db_793818",
+      "title": "Bleacher Bunch Network: A Chicago Cubs Podcast",
+      "feed_url": "https://feeds.megaphone.fm/RRTET6214441367",
+      "image_url": "https://megaphone.imgix.net/podcasts/fcefdd12-c5b9-11ed-9275-bf97d259cf6f/image/b5c1fdb199286606c7fc82409020b76d.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Bleacher Bunch Network:"
+    },
+    {
+      "id": "db_6889575",
+      "title": "Red Seat Radio",
+      "feed_url": "https://feeds.megaphone.fm/GIAMMARCOCO8182476819",
+      "image_url": "https://megaphone.imgix.net/podcasts/81346c50-f781-11ef-ae2a-a39998145479/image/54ea2fc0bcebbcdb66b10640554d2192.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "Red Seat Radio"
+    },
+    {
+      "id": "db_2407088",
+      "title": "Blue Jays Today",
+      "feed_url": "https://feeds.acast.com/public/shows/64c1573285617f001183de24",
+      "image_url": "https://assets.pippa.io/shows/64c1573285617f001183de24/1778849458514-887cac9e-1b2c-4338-9d91-b2230a409755.jpeg",
+      "sport": "Baseball",
+      "tags": [],
+      "language": "en",
+      "author": "The Nation Network"
+    },
+    {
+      "id": "db_13225",
+      "title": "Lakers Lounge",
+      "feed_url": "https://rss.amperwave.net/v2/feed/audacynetwork/d55b753d5962051ca3d3c1d029cc710b",
+      "image_url": "https://images.castfire.com/image/661/0/0/0/0-8382479.jpg",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "Anthony Irwin"
+    },
+    {
+      "id": "db_41496",
+      "title": "Eye On College Basketball",
+      "feed_url": "https://rss.amperwave.net/v2/feed/audacynetwork/178e658801da7cb4685560de11e5c28d",
+      "image_url": "https://images.castfire.com/image/661/0/0/0/0-8382517.jpg",
+      "sport": "Basketball",
+      "tags": [
+        "basketball"
+      ],
+      "language": "en",
+      "author": "CBS Sports"
+    },
+    {
+      "id": "db_46331",
+      "title": "Duke Basketball Roundup",
+      "feed_url": "https://feeds.megaphone.fm/RRTET7320327183",
+      "image_url": "https://megaphone.imgix.net/podcasts/afe331dc-476d-11ee-8d0c-c7cefbba3559/image/37077952-1679973350241-762bba40529f6.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Basketball",
+      "tags": [
+        "basketball"
+      ],
+      "language": "en",
+      "author": "Duke Basketball Roundup"
+    },
+    {
+      "id": "db_47033",
+      "title": "Hardwood Knocks: An NBA Podcast",
+      "feed_url": "https://www.spreaker.com/show/2916956/episodes/feed",
+      "image_url": "https://d3wo5wojvuv7l.cloudfront.net/t_rss_itunes_square_1400/images.spreaker.com/original/0e35e4bb65b157c6a017ae3c940d3204.jpg",
+      "sport": "Basketball",
+      "tags": [
+        "nba"
+      ],
+      "language": "en",
+      "author": "HardwoodKnocks: An NBA Podcast"
+    },
+    {
+      "id": "db_159053",
+      "title": "NBA Gambling Podcast",
+      "feed_url": "https://feeds.simplecast.com/uxdOBkrq",
+      "image_url": "https://image.simplecastcdn.com/images/387641c5-7fb4-4058-8f38-e377e95a49e2/a977c3a0-835b-4b2d-8bac-409dd325ede2/3000x3000/nbagambling-cover3.jpg?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [
+        "nba"
+      ],
+      "language": "en",
+      "author": "Sports Gambling Podcast Network"
+    },
+    {
+      "id": "db_164931",
+      "title": "CSG Podcast",
+      "feed_url": "https://feeds.simplecast.com/64OlXJb1",
+      "image_url": "https://image.simplecastcdn.com/images/fee9f934-0531-4f8a-9c76-38d22a11c0b5/0aca9ff9-46e5-42be-8778-4a73c97e484d/3000x3000/33ed8ce6cef1366ab91a3ede6ac9d960.jpg?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "Mile High Sports"
+    },
+    {
+      "id": "db_169477",
+      "title": "RotoWire Fantasy Basketball Podcast",
+      "feed_url": "https://feeds.simplecast.com/hLEKlnEb",
+      "image_url": "https://image.simplecastcdn.com/images/56c24876-afcd-484e-88e4-2833f6ec33f3/06fe9f3c-eef7-4ac2-a2e7-bb1559ad78ba/3000x3000/34f0cc9d_832f_4df4_bd3a_7fcf3e7359ed.jpg?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [
+        "basketball"
+      ],
+      "language": "en",
+      "author": "RotoWire.com, Nick Whalen, Alex Barutha, James Anderson, Ken Crites, Shannon McKeown"
+    },
+    {
+      "id": "db_174496",
+      "title": "Basketball Coach Unplugged (A Basketball Coaching Podcast)",
+      "feed_url": "https://feeds.megaphone.fm/BLU1636519163",
+      "image_url": "https://megaphone.imgix.net/podcasts/d624ee96-f5f1-11eb-aea4-63c25e230be3/image/59874fe5b8c8f6cb0290391e3ed5ab6c.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Basketball",
+      "tags": [
+        "basketball"
+      ],
+      "language": "en",
+      "author": "Teachhoops.com"
+    },
+    {
+      "id": "db_200755",
+      "title": "PHLY Philadelphia Sixers Podcast",
+      "feed_url": "https://feeds.simplecast.com/guhJkPIz",
+      "image_url": "https://image.simplecastcdn.com/images/32fade3b-18a3-4a82-910e-9bcefa4b54be/f02e1203-cd64-4d65-88ba-e50d61b9c934/3000x3000/bet365-podcover-sixers.jpg?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "ALLCITY Network, PHLY Sports"
+    },
+    {
+      "id": "db_424644",
+      "title": "Dunc'd On Basketball NBA Podcast",
+      "feed_url": "https://feeds.simplecast.com/JGGpY1xu",
+      "image_url": "https://image.simplecastcdn.com/images/5b7d8c77-15ba-4eff-a999-2e725db21db5/1bab0572-463c-443b-a84c-e5a378253a15/3000x3000/dunc-d-on-cover.jpg?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [
+        "nba",
+        "basketball"
+      ],
+      "language": "en",
+      "author": "Nate Duncan"
+    },
+    {
+      "id": "db_428772",
+      "title": "Light Years: A Golden State Warriors Pod",
+      "feed_url": "https://feeds.simplecast.com/ciAD22Fo",
+      "image_url": "https://image.simplecastcdn.com/images/f6809378-7c6e-4ad8-ab40-95fa315fb782/0860fa65-b51e-420c-93ce-65ef6aff9569/3000x3000/5100412df86396618f53dd4eb383f914.png?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "Blue Wire"
+    },
+    {
+      "id": "db_432514",
+      "title": "The Miami Heat Beat Podcast",
+      "feed_url": "https://feeds.simplecast.com/m4mvA9Fk",
+      "image_url": "https://image.simplecastcdn.com/images/6aed5fb1-69d3-4fbc-b07b-c1aeca04826a/bf3ab7cd-b737-4b0b-9d6d-2b036716cf43/3000x3000/heatbeat-final-web.jpg?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "Blue Wire"
+    },
+    {
+      "id": "db_457950",
+      "title": "Lakers Fast Break",
+      "feed_url": "https://anchor.fm/s/e379728/podcast/rss",
+      "image_url": "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_nologo/2285242/2285242-1696897412331-ed24b3c91e3fd.jpg",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "Lakers Fast Break"
+    },
+    {
+      "id": "db_469422",
+      "title": "Five On The Floor: Miami Heat/NBA",
+      "feed_url": "https://feeds.redcircle.com/6730172e-1209-47fa-94f4-cd1bf41313f4",
+      "image_url": "https://media.redcircle.com/images/2024/9/16/15/e66548f9-879f-45c6-b147-2b0a318c0d63_d5-887e50427718_five_on_the_floor_smaller_logo.jpg",
+      "sport": "Basketball",
+      "tags": [
+        "nba"
+      ],
+      "language": "en",
+      "author": "Five Reasons Sports Network"
+    },
+    {
+      "id": "db_488939",
+      "title": "The Ringer NBA Show",
+      "feed_url": "https://feeds.megaphone.fm/the-ringer-nba-show",
+      "image_url": "https://megaphone.imgix.net/podcasts/f9a9d960-7831-11ea-921c-ff8b2140ab24/image/80d8dffe1492f9432df2a88118401b4b.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Basketball",
+      "tags": [
+        "nba"
+      ],
+      "language": "en",
+      "author": "The Ringer"
+    },
+    {
+      "id": "db_528037",
+      "title": "Rights To Ricky Sanchez: The Sixers Podcast",
+      "feed_url": "https://anchor.fm/s/7f026528/podcast/rss",
+      "image_url": "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_nologo/21208634/21208634-1780454766381-31f2781804c1f.jpg",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "Rights to Ricky Sanchez"
+    },
+    {
+      "id": "db_529354",
+      "title": "The Athletic NBA Daily",
+      "feed_url": "https://feeds.acast.com/public/shows/6818c192eb737caf8cadd833",
+      "image_url": "https://assets.pippa.io/shows/6818c192eb737caf8cadd833/1774730840738-f98f6396-6203-4925-97bf-d79a38383850.jpeg",
+      "sport": "Basketball",
+      "tags": [
+        "nba"
+      ],
+      "language": "en",
+      "author": "The Athletic"
+    },
+    {
+      "id": "db_529362",
+      "title": "The Uncontested OKC Thunder Podcast",
+      "feed_url": "https://feeds.simplecast.com/l6y9LdIK",
+      "image_url": "https://image.simplecastcdn.com/images/3a279857-f1a8-41ab-9763-63c581d48715/b585c73d-b25d-4ade-bbbc-fcbce5a7a072/3000x3000/uncontested-final-web.jpg?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "Blue Wire"
+    },
+    {
+      "id": "db_547680",
+      "title": "Laker Film Room - Dedicated to the Study of Lakers Basketball",
+      "feed_url": "https://rss.amperwave.net/v2/feed/audacynetwork/laker-film-room",
+      "image_url": "https://images.castfire.com/image/661/0/0/0/0-8382761.jpg",
+      "sport": "Basketball",
+      "tags": [
+        "basketball"
+      ],
+      "language": "en",
+      "author": "Pete Zayas"
+    },
+    {
+      "id": "db_552805",
+      "title": "DNVR Denver Nuggets Podcast",
+      "feed_url": "https://feeds.simplecast.com/7ZVpmuZp",
+      "image_url": "https://image.simplecastcdn.com/images/32fade3b-18a3-4a82-910e-9bcefa4b54be/f25c4b70-647b-4190-a047-441f5cce9890/3000x3000/nuggetsv2.jpg?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "ALLCITY Network, DNVR Sports"
+    },
+    {
+      "id": "db_563309",
+      "title": "CHGO Chicago Bulls Podcast",
+      "feed_url": "https://feeds.simplecast.com/riMPKBGx",
+      "image_url": "https://image.simplecastcdn.com/images/82eed634-aff7-4c62-9025-43158e765a2e/e8a8048e-8ef3-41f3-b6a0-b339cd66f866/3000x3000/chgobulls.png?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "ALLCITY Network, CHGO Sports"
+    },
+    {
+      "id": "db_563573",
+      "title": "No Dunks",
+      "feed_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/170a762b-6e4b-4cb5-a181-b36a00f64617/64cb7714-6ad9-4029-887f-b36a00f64628/podcast.rss",
+      "image_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/170a762b-6e4b-4cb5-a181-b36a00f64617/64cb7714-6ad9-4029-887f-b36a00f64628/image.jpg?t=1761323404&size=Large",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "iHeartPodcasts"
+    },
+    {
+      "id": "db_842732",
+      "title": "Down to Dunk OKC Thunder Podcast",
+      "feed_url": "https://feeds.acast.com/public/shows/6818858d1d28d6231399700d",
+      "image_url": "https://assets.pippa.io/shows/6818858d1d28d6231399700d/show-cover.jpeg",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "The Athletic"
+    },
+    {
+      "id": "db_896394",
+      "title": "Knicks Film School",
+      "feed_url": "https://rss.pdrl.fm/58a028/feeds.simplecast.com/4Plw6lQm",
+      "image_url": "https://image.simplecastcdn.com/images/90fb6563-61ed-4fcf-8b5b-6af9ef38e1bd/9f9a011b-9f47-441c-b4b5-7a3411c19fea/3000x3000/new-20kfs-20pod-20logo-20sample.jpg?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "Knicks Film School"
+    },
+    {
+      "id": "db_986287",
+      "title": "Lakers Nation Podcast",
+      "feed_url": "https://feeds.simplecast.com/qQ__1SdZ",
+      "image_url": "https://image.simplecastcdn.com/images/798036b7-d544-4bc2-bd0f-c6dcc614442b/286e06cf-fec2-45d4-95e1-f3a32912bea1/3000x3000/lakers_nation.jpg?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "LakersNation.com, HMA"
+    },
+    {
+      "id": "db_1078880",
+      "title": "The Assembly Call IU Basketball Podcast and Postgame Show",
+      "feed_url": "https://anchor.fm/s/113fb3e5c/podcast/rss",
+      "image_url": "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_nologo/46201999/cd7d2d259c8774ea.jpg",
+      "sport": "Basketball",
+      "tags": [
+        "basketball"
+      ],
+      "language": "en",
+      "author": "Jerod Morris"
+    },
+    {
+      "id": "db_1087524",
+      "title": "Pull Up Tre",
+      "feed_url": "https://feeds.acast.com/public/shows/680699031da48c8a6678fb35",
+      "image_url": "https://assets.pippa.io/shows/680699031da48c8a6678fb35/1759805502173-f9439f5e-ddce-4046-9253-8f58a0660b9f.jpeg",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "The Nation Network"
+    },
+    {
+      "id": "db_1482065",
+      "title": "The Field of 68: After Dark Podcast",
+      "feed_url": "https://feeds.simplecast.com/P8n_F2gS",
+      "image_url": "https://image.simplecastcdn.com/images/92b7c83a-4d68-4bdd-ae0b-6c4b0ca4b795/b60589cf-c144-4f24-bc83-8831600fc605/3000x3000/pod-20logosart-20-1.jpg?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "The Field of 68, Blue Wire"
+    },
+    {
+      "id": "db_2753401",
+      "title": "Hoops Tonight with Jason Timpf",
+      "feed_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/90447913-4e20-4e90-aa1e-ae510011dd1d/9e36bb2c-2512-48e1-92f8-ae510011dd2b/podcast.rss",
+      "image_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/90447913-4e20-4e90-aa1e-ae510011dd1d/9e36bb2c-2512-48e1-92f8-ae510011dd2b/image.jpg?t=1771868514&size=Large",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "iHeartPodcasts and The Volume"
+    },
+    {
+      "id": "db_4017083",
+      "title": "The College Experience: Basketball",
+      "feed_url": "https://feeds.simplecast.com/CWzTxJrs",
+      "image_url": "https://image.simplecastcdn.com/images/410a767c-0797-4e43-91c3-0d778c52c7b5/3ca52d4a-d535-4fb1-ae1e-5fb8bf471e37/3000x3000/collegeexperience-bball.jpg?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [
+        "basketball"
+      ],
+      "language": "en",
+      "author": "Sports Gambling Podcast Network"
+    },
+    {
+      "id": "db_4126282",
+      "title": "Chicago Bulls Central",
+      "feed_url": "https://feeds.redcircle.com/0fdb397c-2e3a-4ee3-a990-0690404a8e95",
+      "image_url": "https://media.redcircle.com/images/2025/5/29/23/8ecdd4ad-7f60-46cc-88c0-f4eebe5157e4_66b9_74d996c6-8952-4e64-a124-6e7c6e541d53_blob.jpg",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "The B.R.E.A.K.S Media"
+    },
+    {
+      "id": "db_4370156",
+      "title": "BUCKETS",
+      "feed_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/8abd9bed-7526-4d83-8dbf-b3ec011d3fb0/083413d6-9987-45fa-9a36-b3ec011d3fb9/podcast.rss",
+      "image_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/8abd9bed-7526-4d83-8dbf-b3ec011d3fb0/083413d6-9987-45fa-9a36-b3ec011d3fb9/image.jpg?t=1770657515&size=Large",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "iHeartPodcasts"
+    },
+    {
+      "id": "db_4966960",
+      "title": "JAMODI Podcast",
+      "feed_url": "https://anchor.fm/s/5bdd1570/podcast/rss",
+      "image_url": "https://d3t3ozftmdmh3i.cloudfront.net/production/podcast_uploaded_nologo/15312156/15312156-1621444571970-2824c0d232163.jpg",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "JAMODI Podcast"
+    },
+    {
+      "id": "db_6193827",
+      "title": "The Athletic NBA Show",
+      "feed_url": "https://www.spreaker.com/show/5710607/episodes/feed",
+      "image_url": "https://d3wo5wojvuv7l.cloudfront.net/t_rss_itunes_square_1400/images.spreaker.com/original/2d376f81bfa938e010ba6aa1d9ee2ef4.jpg",
+      "sport": "Basketball",
+      "tags": [
+        "nba"
+      ],
+      "language": "en",
+      "author": "HOOODCASTERS PODCAST NETWORK"
+    },
+    {
+      "id": "db_52036",
+      "title": "Celtics Talk",
+      "feed_url": "https://feeds.simplecast.com/4haNf8c2",
+      "image_url": "https://image.simplecastcdn.com/images/f512dc56-1d77-4b0b-b79e-d96860440239/6d49581b-9777-4ee1-90f7-44d50bfca02a/3000x3000/3000x3000celticstalk2026nosponsor.jpg?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "NBC Sports Boston"
+    },
+    {
+      "id": "db_4382921",
+      "title": "NBA Today",
+      "feed_url": "https://feeds.megaphone.fm/ESP4224222588",
+      "image_url": "https://megaphone.imgix.net/podcasts/3e25e900-2abd-11ec-b800-73e4f22ee29d/image/212764886ebdd3ac86f2ec141b5ac57e.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Basketball",
+      "tags": [
+        "nba"
+      ],
+      "language": "en",
+      "author": "ESPN, Malika Andrews"
+    },
+    {
+      "id": "db_540429",
+      "title": "How 'Bout Them Celtics",
+      "feed_url": "https://feeds.megaphone.fm/NSM3378594205",
+      "image_url": "https://megaphone.imgix.net/podcasts/45bc7720-37ad-11ee-9e54-ab42e4916006/image/e04b6518-b22c-4f5b-bc76-4121dc684ebf_cafd77fa8e_2925487-1663521317198-511f2d4b0591f.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Basketball",
+      "tags": [],
+      "language": "en",
+      "author": "How ‘Bout Them Celtics"
+    },
+    {
+      "id": "db_55183",
+      "title": "The NBA Front Office Podcast",
+      "feed_url": "https://feeds.simplecast.com/jpecpS5U",
+      "image_url": "https://image.simplecastcdn.com/images/798036b7-d544-4bc2-bd0f-c6dcc614442b/3e302d15-6680-40cc-ad98-c6c29d20cf46/3000x3000/front_office.jpg?aid=rss_feed",
+      "sport": "Basketball",
+      "tags": [
+        "nba"
+      ],
+      "language": "en",
+      "author": "Medium Large LLC"
+    },
+    {
+      "id": "db_488932",
+      "title": "The NBA Podcast",
+      "feed_url": "https://www.spreaker.com/show/3240433/episodes/feed",
+      "image_url": "https://d3wo5wojvuv7l.cloudfront.net/t_rss_itunes_square_1400/images.spreaker.com/original/83695f673e2087acc79ce8f3b7d7e980.jpg",
+      "sport": "Basketball",
+      "tags": [
+        "nba"
+      ],
+      "language": "en",
+      "author": "Morten Stig Jensen"
+    },
+    {
+      "id": "db_1623415",
+      "title": "The Her Hoop Stats Podcast: WNBA & NCAA Women’s Basketball",
+      "feed_url": "https://rss.art19.com/her-hoops-stats",
+      "image_url": "https://content.production.cdn.art19.com/images/8b/89/56/7f/8b89567f-bfc6-4578-a433-5623c64c0b7c/0da36864f9eaca5affb936227e45fb2f402e18388c228ae4e78d5caab09cf654fe638c25fb9f4d048f244a40d1aa105ca0bc005d6d4b00dca4b47d7ba301bba4.jpeg",
+      "sport": "Basketball",
+      "tags": [
+        "nba",
+        "basketball"
+      ],
+      "language": "en",
+      "author": "HerHoopStats.com"
+    },
+    {
+      "id": "db_6337",
+      "title": "Huddle Up Podcast's show",
+      "feed_url": "https://feeds.megaphone.fm/BLU9650348863",
+      "image_url": "https://megaphone.imgix.net/podcasts/24d41e02-ca89-11eb-967a-3b4c31eacf36/image/HuddleUpxCoors_3000x3000.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Huddle Up Podcast"
+    },
+    {
+      "id": "db_4743",
+      "title": "Saints Happy Hour",
+      "feed_url": "https://rss.art19.com/saints-happy-hour",
+      "image_url": "https://content.production.cdn.art19.com/images/71/c0/f5/f9/71c0f5f9-18ed-4b48-b8e0-859567553fa6/0a77acb601696cfeba8f62ef33bf4f5782e22af28636a777587d0c3dbe479ea8142a83cd4dde6f476d6b76146d9cedf7af5b1b7e0ae990a44447b7db0faeac42.jpeg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Saints Happy Hour"
+    },
+    {
+      "id": "db_4863",
+      "title": "Pats Nation Network",
+      "feed_url": "https://feeds.megaphone.fm/NSM2699770329",
+      "image_url": "https://megaphone.imgix.net/podcasts/1ea86cae-28ba-11ee-a20a-b3e6c65816cd/image/bd1dc712-61ae-4bc8-9479-c8cd92abbdf5_9adfa8f9d_36938105-1679659107155-5831522b7f1e6.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Rich Hill and Alec Shane, Pat Lane and Matt St. Jean"
+    },
+    {
+      "id": "db_5009",
+      "title": "Yahoo Fantasy Forecast",
+      "feed_url": "https://feeds.simplecast.com/s3ulbOAs",
+      "image_url": "https://image.simplecastcdn.com/images/e66e4bbf-f1f2-407a-ad1b-93e70afbe9b1/9d0fe852-17b1-4833-bdca-23cd670c1819/3000x3000/pd071024fantasyforecastmainart.jpg?aid=rss_feed",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Yahoo Sports"
+    },
+    {
+      "id": "db_5571",
+      "title": "DNVR CU Buffs Podcast",
+      "feed_url": "https://feeds.simplecast.com/6b9EvGDp",
+      "image_url": "https://image.simplecastcdn.com/images/fca58a8b-14f5-40ef-88e5-015e6f349433/40b0e2bf-343b-466a-88a5-89a4586135ae/3000x3000/dnvr-podcovers-buffs.jpg?aid=rss_feed",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "ALLCITY Network, DNVR Sports"
+    },
+    {
+      "id": "db_9114",
+      "title": "Rams Talk Radio",
+      "feed_url": "https://feeds.simplecast.com/QlxrvNvL",
+      "image_url": "https://image.simplecastcdn.com/images/096ffd01-6535-456e-bb0a-a0da7db5896b/b782745e-dfce-461f-a91c-3d645abfdbaa/3000x3000/f448f1c75eaa77dadf1d7b6760e5c80f.png?aid=rss_feed",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Gridiron Media, Blue Wire"
+    },
+    {
+      "id": "db_11227",
+      "title": "Eagle Eye: A Philadelphia Eagles Podcast",
+      "feed_url": "https://feeds.simplecast.com/_ENNUG3a",
+      "image_url": "https://image.simplecastcdn.com/images/89f03cf9-e96f-4ed0-925e-ce5596152ec3/f1c3963d-481f-4bfb-a805-5a1d15d3df2c/3000x3000/5e18d82c5fade7437127a1287fb7d43570ccdf9f128d5b588ef40e3d3a6a46df936642cd7b10b463bb1e8c9b575c9a9abbdee21c4d2cc07f5edd54ffc8abd85c.jpeg?aid=rss_feed",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "NBC Sports Philadelphia"
+    },
+    {
+      "id": "db_48988",
+      "title": "DK Pittsburgh Sports: Daily podcasts on Steelers, Penguins, Pirates!",
+      "feed_url": "https://feeds.simplecast.com/OkvCKc09",
+      "image_url": "https://image.simplecastcdn.com/images/6215cda8-011d-4ccd-9fe8-c389912a62af/8ba06888-e810-4ec2-ba0c-b2a1e3eb1add/3000x3000/dk_1.jpg?aid=rss_feed",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Dejan Kovacevic"
+    },
+    {
+      "id": "db_53552",
+      "title": "Gators Breakdown",
+      "feed_url": "https://feeds.megaphone.fm/JXT4461663756",
+      "image_url": "https://megaphone.imgix.net/podcasts/0379778e-f724-11e7-bf50-3b92dd76cbb3/image/gb.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Gators Breakdown"
+    },
+    {
+      "id": "db_54696",
+      "title": "JD Talkin Sports",
+      "feed_url": "https://rss.buzzsprout.com/72183.rss",
+      "image_url": "https://storage.buzzsprout.com/8muzjxyzs3y9yauauvp2719eol52?.jpg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Jonathan Schancupp"
+    },
+    {
+      "id": "db_58107",
+      "title": "Cover 3 College Football",
+      "feed_url": "https://rss.amperwave.net/v2/feed/audacynetwork/4d511b61eff9f56a1fca4042ba77c21c",
+      "image_url": "https://images.castfire.com/image/661/0/0/0/0-8382512.jpg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "CBS Sports"
+    },
+    {
+      "id": "db_64869",
+      "title": "Texans All Access",
+      "feed_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/178d0781-85e0-4be4-8ff4-aeac0131b45b/85ddc5c0-36f8-48be-b048-aeac0131b485/podcast.rss",
+      "image_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/178d0781-85e0-4be4-8ff4-aeac0131b45b/85ddc5c0-36f8-48be-b048-aeac0131b485/image.jpg?t=1725494741&size=Large",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Houston Texans"
+    },
+    {
+      "id": "db_79141",
+      "title": "Action Sports Jax 24/7",
+      "feed_url": "https://rss-cmg.streamguys1.com/jacksonville/jac1045/action-sports-jax-247.xml",
+      "image_url": "https://od-cmg.streamguys1.com/jacksonville-market/20241206100555-ASJ247_3000X3000.jpg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Action Sports Jax"
+    },
+    {
+      "id": "db_169168",
+      "title": "Packernet Podcast: Daily Green Bay Packers Podcast",
+      "feed_url": "https://feeds.libsyn.com/545942/rss",
+      "image_url": "https://static.libsyn.com/p/assets/0/8/d/9/08d9045fb54d0a6fe55e3c100dce7605/pack_logo2-20240905-1h2ro092dm.jpg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "AC Sports"
+    },
+    {
+      "id": "db_170327",
+      "title": "Bucknuts Morning 5: An Ohio State athletics podcast",
+      "feed_url": "https://rss.amperwave.net/v2/feed/audacynetwork/35808c401461466e8a300b5fa856c059",
+      "image_url": "https://images.castfire.com/image/661/0/0/0/0-8382505.jpg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "247Sports"
+    },
+    {
+      "id": "db_177506",
+      "title": "Talking Buffalo",
+      "feed_url": "https://feeds.simplecast.com/7Q7ne1BW",
+      "image_url": "https://image.simplecastcdn.com/images/3267f3d6-944f-470b-bb94-94e6dbc83d24/68dea1bc-f547-45cf-9d38-5e99b4ef1dac/3000x3000/tb-2023-logo-3000.png?aid=rss_feed",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Blue Wire"
+    },
+    {
+      "id": "db_219968",
+      "title": "Beltway Football",
+      "feed_url": "https://rss.art19.com/beltway-football",
+      "image_url": "https://content.production.cdn.art19.com/images/e8/c8/67/a3/e8c867a3-6849-43a5-b77a-b67612636130/732184874e460b2690a8e507cd85fac0ddc57061435893ef0a25bd796cfbdf2037e658608fdf19c6b228b0d370a478ed818b1b8e22d9047df215a24ca1324ca4.jpeg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Monumental Sports Network"
+    },
+    {
+      "id": "db_225910",
+      "title": "Autzen Audibles: DuckTerritory's Oregon athletics podcast",
+      "feed_url": "https://rss.amperwave.net/v2/feed/audacynetwork/duckterritorypodcast",
+      "image_url": "https://images.castfire.com/image/661/0/0/0/0-8382502.jpg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "247Sports"
+    },
+    {
+      "id": "db_226459",
+      "title": "5 Yard Rush Fantasy Football",
+      "feed_url": "https://feeds.acast.com/public/shows/63b58fa0098b330010f837de",
+      "image_url": "https://assets.pippa.io/shows/63b58fa0098b330010f837de/1672844308145-a004cd4e572d656532c0c222aae1e8f9.jpeg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "5 Yard Rush"
+    },
+    {
+      "id": "db_233731",
+      "title": "Sports Gambling Podcast Network",
+      "feed_url": "https://feeds.simplecast.com/RkSs4uS_",
+      "image_url": "https://image.simplecastcdn.com/images/410a767c-0797-4e43-91c3-0d778c52c7b5/8cb4c156-b447-4628-bb0b-9241d6643d7a/3000x3000/sgpn-square-1200x1200.jpg?aid=rss_feed",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Sports Gambling Podcast Network"
+    },
+    {
+      "id": "db_252193",
+      "title": "Broncos Country Tonight",
+      "feed_url": "https://www.omnycontent.com/d/playlist/98a2599f-cd9b-4f2a-9be4-b22c00e585f2/c3ec75a8-e2e0-4425-97f2-b3ec01744218/750c02de-9fcf-4ebc-bd80-b3ec0174421f/podcast.rss",
+      "image_url": "https://www.omnycontent.com/d/playlist/98a2599f-cd9b-4f2a-9be4-b22c00e585f2/c3ec75a8-e2e0-4425-97f2-b3ec01744218/750c02de-9fcf-4ebc-bd80-b3ec0174421f/image.jpg?t=1770676522&size=Large",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "KOA 850 AM & 94.1 FM"
+    },
+    {
+      "id": "db_294268",
+      "title": "The Buckeye Scoop",
+      "feed_url": "https://www.spreaker.com/show/4429642/episodes/feed",
+      "image_url": "https://d3wo5wojvuv7l.cloudfront.net/t_rss_itunes_square_1400/images.spreaker.com/original/1fe86c993e000e9e2a9251300b586edc.jpg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Buckeye Scoop"
+    },
+    {
+      "id": "db_311559",
+      "title": "Inside Carolina: A UNC athletics podcast",
+      "feed_url": "https://feeds.simplecast.com/SwKzB2Nr",
+      "image_url": "https://image.simplecastcdn.com/images/810e3784-8bb2-49ae-a0c0-b29d15f3f07c/d20c8d76-2e60-47dc-b2da-7f8f436d8377/3000x3000/podcast05a.jpg?aid=rss_feed",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Inside Carolina, North Carolina Tar Heels, North Carolina, North Carolina basketball, UNC basketball"
+    },
+    {
+      "id": "db_311570",
+      "title": "Arizona Cardinals Podcasts",
+      "feed_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/484044ef-7968-4466-8867-aeac01359d01/ad6ea3ae-0e78-456a-979a-aeac01359d14/podcast.rss",
+      "image_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/484044ef-7968-4466-8867-aeac01359d01/ad6ea3ae-0e78-456a-979a-aeac01359d14/image.jpg?t=1654541255&size=Large",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Arizona Cardinals"
+    },
+    {
+      "id": "db_317579",
+      "title": "Sea Hawkers Podcast: for Seattle Seahawks fans",
+      "feed_url": "https://seahawkerspodcast.libsyn.com/rss",
+      "image_url": "https://static.libsyn.com/p/assets/5/a/3/a/5a3a36ff76ed1bd3/2020SHPSquare.jpg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Seahawks Booster: Hawkra Studios"
+    },
+    {
+      "id": "db_319837",
+      "title": "Fantasy Footballers - Fantasy Football Podcast",
+      "feed_url": "https://feeds.simplecast.com/sw7PGWfw",
+      "image_url": "https://image.simplecastcdn.com/images/7a686b61-de53-45dc-85c8-4b598a0af518/72d8e1f3-4a82-4082-ad95-47be0fafb1bf/3000x3000/tffb-main-podcast-logo-3000px.png?aid=rss_feed",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Fantasy Football"
+    },
+    {
+      "id": "db_328091",
+      "title": "That SEC Football Podcast",
+      "feed_url": "https://feeds.simplecast.com/c2XRrPVA",
+      "image_url": "https://image.simplecastcdn.com/images/752b4651-4a47-4214-8fbc-202421f815e0/26fc3f9a-9ea3-411d-a2fd-f03adbe0e1cf/3000x3000/main-sec-logo-copy.jpg?aid=rss_feed",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Michael Bratton/SEC Mike"
+    },
+    {
+      "id": "db_396336",
+      "title": "Steel Curtain Network: A Pittsburgh Steelers podcast",
+      "feed_url": "https://feeds.megaphone.fm/btsc-steelers",
+      "image_url": "https://megaphone.imgix.net/podcasts/43e9f180-e6c6-11e8-9204-a36509e2e8a7/image/340f4d4891a902ff35bede0f0570afc6.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "FFSN"
+    },
+    {
+      "id": "db_397405",
+      "title": "Daily Seahawks Podcast: HB Mornings & Real Hawk Talk",
+      "feed_url": "https://feeds.simplecast.com/9EKSl0eW",
+      "image_url": "https://image.simplecastcdn.com/images/2bad0f2a-e709-4177-8f39-3934515d9813/e2cb209a-04c7-46f7-ada3-240b1ab31ff0/3000x3000/avatars-ri1tgelbhzvmwu2o-czcvnw-original.jpg?aid=rss_feed",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Brian Nemhauser"
+    },
+    {
+      "id": "db_414100",
+      "title": "Stugotz and Company LIVE!",
+      "feed_url": "https://omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/EE1B8801-430C-4BAD-9607-AE320005B71A/6C094109-492D-4CBC-BA9F-AE320005B723/podcast.rss",
+      "image_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/ee1b8801-430c-4bad-9607-ae320005b71a/6c094109-492d-4cbc-ba9f-ae320005b723/image.jpg?t=1768932359&size=Large",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Fox Sports Radio and iHeartPodcasts"
+    },
+    {
+      "id": "db_419382",
+      "title": "The Pat McAfee Show",
+      "feed_url": "https://feeds.megaphone.fm/ESP7297553965",
+      "image_url": "https://megaphone.imgix.net/podcasts/e824c298-4364-11ee-8960-135281030851/image/3861089e955c446c6c139cbf9a0fdd56.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Pat McAfee, ESPN"
+    },
+    {
+      "id": "db_419383",
+      "title": "Another Dolphins Podcast",
+      "feed_url": "https://feeds.redcircle.com/1e180a14-2cb5-4b44-8ee3-8d8271ef13c3",
+      "image_url": "https://media.redcircle.com/images/2025/6/30/15/4c869feb-717f-45aa-ad85-6a946e6bbdad_Another_Dolphins_Podcast.jpg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "ADP"
+    },
+    {
+      "id": "db_419644",
+      "title": "Big Blue View: for New York Giants fans",
+      "feed_url": "https://feeds.megaphone.fm/big-blue-view-ny-giants",
+      "image_url": "https://megaphone.imgix.net/podcasts/7f3321d4-e6c7-11e8-94e7-3b5fc65c40ad/image/Megaphone_Podcast_Graphic.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "SB Nation"
+    },
+    {
+      "id": "db_419898",
+      "title": "TheBigSpur.com Podcasts",
+      "feed_url": "https://rss.amperwave.net/v2/feed/audacynetwork/insidethegamecocks",
+      "image_url": "https://images.castfire.com/image/661/0/0/0/0-8382539.jpg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "247Sports, South Carolina, South Carolina Gamecocks, South Carolina football, College Football"
+    },
+    {
+      "id": "db_439118",
+      "title": "The Kevin Sheehan Show",
+      "feed_url": "https://feeds.simplecast.com/WN4LInTx",
+      "image_url": "https://image.simplecastcdn.com/images/cb5c76dc-f08e-4542-82d3-d811e61cabd5/c1f3aced-315c-430f-988b-a7f1ad5d6034/3000x3000/kevin-sheehan-show.jpg?aid=rss_feed",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Kevin Sheehan, Blue Wire"
+    },
+    {
+      "id": "db_444280",
+      "title": "The Buckeye Weekly Podcast",
+      "feed_url": "https://www.spreaker.com/show/2630697/episodes/feed",
+      "image_url": "https://d3wo5wojvuv7l.cloudfront.net/t_rss_itunes_square_1400/images.spreaker.com/original/511d2221f1ae37e741a240d83fd42a94.jpg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "Buckeye Insiders Network"
+    },
+    {
+      "id": "db_454870",
+      "title": "CHGO Chicago Bears Podcast",
+      "feed_url": "https://feeds.simplecast.com/oSbdDATR",
+      "image_url": "https://image.simplecastcdn.com/images/e3e1bce3-8348-4a37-ab3f-56c70896dc41/79485560-66af-4d0b-a505-85f4f1be67e8/3000x3000/chgobears.png?aid=rss_feed",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "ALLCITY Network, CHGO Sports"
+    },
+    {
+      "id": "db_458589",
+      "title": "Peristyle Podcast - USC Trojan Football Discussion",
+      "feed_url": "https://rss.amperwave.net/v2/feed/audacynetwork/peristyle",
+      "image_url": "https://images.castfire.com/image/661/0/0/0/0-8382551.jpg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "USCFootball.com - Ryan Abraham, 247Sports, USC, USC Trojans, USC football, College Football"
+    },
+    {
+      "id": "db_459988",
+      "title": "NFL: Move the Sticks with Daniel Jeremiah & Bucky Brooks",
+      "feed_url": "https://omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/0E61FE66-E985-446F-BC46-AE27003599DA/C1B3EAA8-DB6B-4865-AC29-AE27003599F6/podcast.rss",
+      "image_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/0e61fe66-e985-446f-bc46-ae27003599da/c1b3eaa8-db6b-4865-ac29-ae27003599f6/image.jpg?t=1665238121&size=Large",
+      "sport": "American Football",
+      "tags": [
+        "nfl"
+      ],
+      "language": "en",
+      "author": "NFL"
+    },
+    {
+      "id": "db_468320",
+      "title": "Arrowhead Addict: A Kansas City Chiefs Podcast",
+      "feed_url": "https://feeds.redcircle.com/1e82f8a1-8697-44b8-9f41-a45fada500f4",
+      "image_url": "https://media.redcircle.com/images/2024/2/13/22/61f73037-6ae9-46bc-a419-ac8b7b92f487_b11_f9ee3278-6826-4160-b0e7-b1a55e9006dd_image.jpg",
+      "sport": "American Football",
+      "tags": [],
+      "language": "en",
+      "author": "FanSided Podcasts"
+    },
+    {
+      "id": "db_200424",
+      "title": "Pat Mayo Experience",
+      "feed_url": "https://feeds.simplecast.com/09AxY7vG",
+      "image_url": "https://image.simplecastcdn.com/images/d6926717-6780-4c28-b843-15f0aee59d9c/d951a8d6-c550-4a82-b240-5e94fb7a10a1/3000x3000/93c0a4db08025a6ef17b9e2a462108d6.jpg?aid=rss_feed",
+      "sport": "Golf",
+      "tags": [],
+      "language": "en",
+      "author": "Mayo Media Network"
+    },
+    {
+      "id": "db_439112",
+      "title": "The Shotgun Start",
+      "feed_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/515d2905-7975-4b85-a224-b43601500d1e/3ecdf081-be76-4016-acac-b43601500d26/podcast.rss",
+      "image_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/515d2905-7975-4b85-a224-b43601500d1e/3ecdf081-be76-4016-acac-b43601500d26/image.jpg?t=1777062214&size=Large",
+      "sport": "Golf",
+      "tags": [],
+      "language": "en",
+      "author": "Fried Egg Golf"
+    },
+    {
+      "id": "db_482367",
+      "title": "The First Cut Golf",
+      "feed_url": "https://rss.amperwave.net/v2/feed/audacynetwork/1b9ec6212b31412e62a294d83a7e3371",
+      "image_url": "https://images.castfire.com/image/661/0/0/0/0-8382576.jpg",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "CBS Sports, Golf, PGA Golf Tour, PGA, LIV Golf, Golf Picks, Golf Bets, Tiger Woods"
+    },
+    {
+      "id": "db_680075",
+      "title": "Utah Golf Radio",
+      "feed_url": "https://utahgolfdaily.libsyn.com/rss",
+      "image_url": "https://static.libsyn.com/p/assets/d/3/a/c/d3ac493b989b4502/Utah_Golf_Radio_1400x1400.jpg",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "presented by Fairways Magazine"
+    },
+    {
+      "id": "db_792054",
+      "title": "No Laying Up - Golf Podcast",
+      "feed_url": "https://feeds.megaphone.fm/nolayingup",
+      "image_url": "https://megaphone.imgix.net/podcasts/2646220c-ef7c-11ed-9222-bfc4b0a551e1/image/e9683a997b86f170b0ee1a1b770cc781.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "NoLayingUp.com"
+    },
+    {
+      "id": "db_1009835",
+      "title": "Fairways of Life with Matt Adams Golf Show",
+      "feed_url": "https://anchor.fm/s/f257914c/podcast/rss",
+      "image_url": "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_nologo/40558251/e7a757b969dca5e6.jpeg",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "Fairways of Life"
+    },
+    {
+      "id": "db_546267",
+      "title": "Next on the Tee: Where Golf Legends Live & Your Game Gets Better",
+      "feed_url": "https://feed.pod.co/next-on-the-tee-with-chris-mascaro-golf-podcast",
+      "image_url": "https://images.pod.co/wUCvidX_zFsB-G7eJpr8uhRN1Wvhy9Ynxe2MYqVxSew/resize:fill:1500:1500/plain/artwork/a19174f9-fdf3-4832-9d75-0362f99f35c4/next-on-the-tee-with-chris-mascaro-golf-podcast.jpg",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "Chris Mascaro - Golf Podcast Host"
+    },
+    {
+      "id": "db_50312",
+      "title": "PGA TOUR Replay Golf Podcast",
+      "feed_url": "http://pgatourreplay.radio.pgatour.com/rss",
+      "image_url": "https://static.libsyn.com/p/assets/a/a/9/d/aa9d1c8f3459612316c3140a3186d450/PTR_logo2.jpg",
+      "sport": "Golf",
+      "tags": [
+        "golf",
+        "pga"
+      ],
+      "language": "en",
+      "author": "PGA TOUR"
+    },
+    {
+      "id": "db_730282",
+      "title": "Fore Play",
+      "feed_url": "https://mcsorleys.barstoolsports.com/feed/fore-play",
+      "image_url": "https://chumley.barstoolsports.com/union/2024/07/09/FOREPLAY_3000-1.84337a0b.jpg?crop=3000%3A3000%2Csmart&format=jpeg",
+      "sport": "Golf",
+      "tags": [],
+      "language": "en",
+      "author": "Barstool Sports"
+    },
+    {
+      "id": "db_407607",
+      "title": "On the Mark Golf Podcast",
+      "feed_url": "http://onthemark1.radio.pgatour.com/rss",
+      "image_url": "https://static.libsyn.com/p/assets/b/0/f/2/b0f2caa7e5db5779e5bbc093207a2619/OTM_podcast_cover_2024_final_3_FOR_APPLE_PODCASTS.jpg",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "Mark Immelman"
+    },
+    {
+      "id": "db_1056664",
+      "title": "Golf Smarter",
+      "feed_url": "https://feeds.megaphone.fm/IMP2063145492",
+      "image_url": "https://megaphone.imgix.net/podcasts/d33c5b46-53b2-11f1-ad72-c767187342f9/image/9e4d25c94b1b13d46a45fe294dbe65c4.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "Josh Karp"
+    },
+    {
+      "id": "db_7224873",
+      "title": "Golf 247.eu: The Global Platform for Innovative Technologies and Teaching Concepts.",
+      "feed_url": "https://anchor.fm/s/fbc5d5a4/podcast/rss",
+      "image_url": "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_nologo/42140465/42140465-1727898679875-7149c3b163713.jpg",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "Golf247.eu"
+    },
+    {
+      "id": "db_482353",
+      "title": "The Fried Egg Golf Podcast",
+      "feed_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/ba9cf483-2469-4852-9c0e-b43601500cc8/97b66bdc-acbc-4d10-a01b-b43601500cf4/podcast.rss",
+      "image_url": "https://www.omnycontent.com/d/playlist/e73c998e-6e60-432f-8610-ae210140c5b1/ba9cf483-2469-4852-9c0e-b43601500cc8/97b66bdc-acbc-4d10-a01b-b43601500cf4/image.jpg?t=1777062212&size=Large",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "Fried Egg Golf"
+    },
+    {
+      "id": "db_1576967",
+      "title": "Hack It Out Golf",
+      "feed_url": "https://rss.art19.com/hack-it-out-golf",
+      "image_url": "https://content.production.cdn.art19.com/images/27/a5/de/7f/27a5de7f-0d1b-4669-82ff-d898494c5f23/e96bdf5a7cf046a9deb39269f2e2f0b3b51c0d6f9bf97b8c322f338e6d95db006ab99b36030eb5b817484678c165257caf9770aa30075a722a09c57f3a37d158.jpeg",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "Golf Swing Productions by Mark Crossfield Greg Chalmers and Lou Stagner"
+    },
+    {
+      "id": "db_471834",
+      "title": "The Stripe Show",
+      "feed_url": "https://anchor.fm/s/f45d724/podcast/rss",
+      "image_url": "https://d3t3ozftmdmh3i.cloudfront.net/staging/podcast_uploaded_nologo/2462353/2462353-1767470984966-93b76d7a58771.jpg",
+      "sport": "Golf",
+      "tags": [],
+      "language": "en",
+      "author": "The Stripe Show"
+    },
+    {
+      "id": "db_709211",
+      "title": "Golf Channel Podcast with Rex & Lav",
+      "feed_url": "https://feeds.simplecast.com/pArSbzdh",
+      "image_url": "https://image.simplecastcdn.com/images/05be0f6c-86d7-4b35-aaaf-effdd4f5b120/ecca9644-812e-4d2d-b6a2-ffabbe3c081d/3000x3000/golf-podcast-thumbnail-1.jpg?aid=rss_feed",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "Golf Channel"
+    },
+    {
+      "id": "db_407605",
+      "title": "Talk of the TOUR Golf Podcast",
+      "feed_url": "http://talkofthetour1.radio.pgatour.com/rss",
+      "image_url": "https://static.libsyn.com/p/assets/a/d/d/4/add4e9442ce9328527a2322813b393ee/TOTT-Neon_Sign.jpg",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "PGA TOUR"
+    },
+    {
+      "id": "db_959014",
+      "title": "Tour Junkies: PGA Tour Betting & DFS",
+      "feed_url": "https://feeds.megaphone.fm/AMPP6267146472",
+      "image_url": "https://megaphone.imgix.net/podcasts/db646b7a-d521-11f0-8007-879c169dab63/image/3e4de386bdf8949813b1ce60afb8d34d.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Golf",
+      "tags": [
+        "pga"
+      ],
+      "language": "en",
+      "author": "The Tour Junkies"
+    },
+    {
+      "id": "db_407606",
+      "title": "GOLF TALK AMERICA",
+      "feed_url": "http://golftalkamerica.radio.pgatour.com/rss",
+      "image_url": "https://static.libsyn.com/p/assets/2/c/0/5/2c050e5cc0f01fbdd959afa2a1bf1c87/GTA_1400_x_1400_smaller_TOUR_logo_for_iTunes-20250110-z4jg880585.png",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "GOLF TALK AMERICA"
+    },
+    {
+      "id": "db_5090044",
+      "title": "Wicked Smart Golf",
+      "feed_url": "https://feeds.libsyn.com/399923/rss",
+      "image_url": "https://static.libsyn.com/p/assets/f/c/0/c/fc0c203ec796c20fbafc7308ab683e82/Wicked_Smart_Golf_Podcast_Cover_Art_new.jpg",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "Michael Leonard"
+    },
+    {
+      "id": "db_1368030",
+      "title": "Golf Gambling Podcast",
+      "feed_url": "https://feeds.simplecast.com/GJtWRjwv",
+      "image_url": "https://image.simplecastcdn.com/images/410a767c-0797-4e43-91c3-0d778c52c7b5/42702947-a4f5-477e-9c3f-de5f7e0617c7/3000x3000/sgpngolf_gambling_podcastcoverartold.jpg?aid=rss_feed",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "Sports Gambling Podcast Network"
+    },
+    {
+      "id": "db_4474337",
+      "title": "Golf Today",
+      "feed_url": "https://feeds.simplecast.com/68j0_0Kx",
+      "image_url": "https://image.simplecastcdn.com/images/0f812fd0-c7e6-4a93-a9be-caa7f420b7a6/540bad01-cecb-47e2-811a-595fd053af56/3000x3000/golftoday-vert-stkd-pos-overwhitebg-1x1-white.jpg?aid=rss_feed",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "Golf Channel"
+    },
+    {
+      "id": "db_437840",
+      "title": "Those Weekend Golf Guys",
+      "feed_url": "https://feeds.simplecast.com/K5S4_I_0",
+      "image_url": "https://image.simplecastcdn.com/images/6215cda8-011d-4ccd-9fe8-c389912a62af/e72b5b0b-bee7-4076-863c-69b95a7444dc/3000x3000/those-weekend-golf-guys.jpg?aid=rss_feed",
+      "sport": "Golf",
+      "tags": [
+        "golf"
+      ],
+      "language": "en",
+      "author": "Those Weekend Golf Guys, Bleav"
+    },
+    {
+      "id": "db_5071",
+      "title": "",
+      "feed_url": "http://www.blogtalkradio.com/turfnet/podcast",
+      "sport": "Golf",
+      "tags": [],
+      "language": "en",
+      "author": ""
+    },
+    {
+      "id": "db_108754",
+      "title": "Flyers Daily with Jason Myrtetus",
+      "feed_url": "https://tunein-sgrecast2.streamguys1.com/api/sgrecast/podcasts/209/59fa0642d63fd?format=rss",
+      "image_url": "https://tunein-recast2.cachefly.net/content/flyers-podcast/20231003165600-FlyersDaily_TMArtwork.png",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Philadelphia Flyers"
+    },
+    {
+      "id": "db_239297",
+      "title": "Canucks Conversation",
+      "feed_url": "https://feeds.acast.com/public/shows/62a773e64d52070012849672",
+      "image_url": "https://assets.pippa.io/shows/62a773e64d52070012849672/1741049315306-543edc46-e8e1-4bd2-bddf-21e98272a5b3.jpeg",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "The Nation Network"
+    },
+    {
+      "id": "db_408953",
+      "title": "PHLY Philadelphia Flyers Podcast",
+      "feed_url": "https://feeds.simplecast.com/4hPjJHwU",
+      "image_url": "https://image.simplecastcdn.com/images/c4c157e8-4ab7-41cc-bf9b-6c8f0ae75474/ae42031a-8d17-4345-a61b-b6d064e89da8/3000x3000/bet365-podcover-flyers.jpg?aid=rss_feed",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "ALLCITY Network, PHLY Sports"
+    },
+    {
+      "id": "db_500791",
+      "title": "DNVR Colorado Avalanche Podcast",
+      "feed_url": "https://feeds.simplecast.com/UvRsLzkH",
+      "image_url": "https://image.simplecastcdn.com/images/32fade3b-18a3-4a82-910e-9bcefa4b54be/595e3ece-caa2-40fe-9447-928d30aee469/3000x3000/avsv2.jpg?aid=rss_feed",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "ALLCITY Network, DNVR Sports"
+    },
+    {
+      "id": "db_703145",
+      "title": "CHGO Chicago Blackhawks Podcast",
+      "feed_url": "https://feeds.simplecast.com/TQ8kH_lX",
+      "image_url": "https://image.simplecastcdn.com/images/db6422c3-2213-46b6-b983-8abae6312309/9bd939a8-8f45-45be-a2cb-5818ac2d27cb/3000x3000/chgoblackhawks.png?aid=rss_feed",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "ALLCITY Network, CHGO Sports"
+    },
+    {
+      "id": "db_1006262",
+      "title": "Let's Go Devils Podcast",
+      "feed_url": "https://www.spreaker.com/show/2862943/episodes/feed",
+      "image_url": "https://d3wo5wojvuv7l.cloudfront.net/t_rss_itunes_square_1400/images.spreaker.com/original/62036795665aac9d8b3ee2a995865047.jpg",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Primetime Radio Network"
+    },
+    {
+      "id": "db_1062383",
+      "title": "Oilers NOW with Bob Stauffer",
+      "feed_url": "https://feeds.megaphone.fm/CORU5433588678",
+      "image_url": "https://megaphone.imgix.net/podcasts/e6985828-06dd-11ed-b10a-bb7f32b7ebe9/image/24e4a14818d28db1e7f1cbe217fe01fd.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "CHED / Curiouscast"
+    },
+    {
+      "id": "db_1086000",
+      "title": "The Steve Dangle Podcast",
+      "feed_url": "https://feeds.megaphone.fm/TAMC3571499623",
+      "image_url": "https://megaphone.imgix.net/podcasts/35a70490-459d-11eb-980b-67422b8b4564/image/avatars-5HCV3fHu7g5uSI9p-GtIpUw-original.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "sdpn"
+    },
+    {
+      "id": "db_1193286",
+      "title": "The Sick Podcast with Tony Marinaro / Le Sick Podcast avec Tony Marinaro",
+      "feed_url": "https://feeds.megaphone.fm/SICMED1566158581",
+      "image_url": "https://megaphone.imgix.net/podcasts/619ab294-be05-11ed-8ecd-b7c7f154f10e/image/bc228cc17cf10f8c3f3b475298d01c0e.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "The Sick Podcast"
+    },
+    {
+      "id": "db_1370276",
+      "title": "The Athletic Hockey Show",
+      "feed_url": "https://feeds.acast.com/public/shows/6818bb89f30c20bff73c9ebc",
+      "image_url": "https://assets.pippa.io/shows/6818bb89f30c20bff73c9ebc/1759726975058-4c7afe54-632b-400c-b9d8-0477577978c0.jpeg",
+      "sport": "Hockey",
+      "tags": [
+        "hockey"
+      ],
+      "language": "en",
+      "author": "The Athletic"
+    },
+    {
+      "id": "db_2963263",
+      "title": "Winnipeg Sports Talk",
+      "feed_url": "https://feeds.acast.com/public/shows/677370b8024ebc889d3fc623",
+      "image_url": "https://assets.pippa.io/shows/677370b8024ebc889d3fc623/1735618767761-03327897-c2ca-49a0-8338-2e18a9aa7353.jpeg",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Winnipeg Sports Talk"
+    },
+    {
+      "id": "db_3124484",
+      "title": "Donnie and Dhali - The Team",
+      "feed_url": "https://www.spreaker.com/show/4836063/episodes/feed",
+      "image_url": "https://d3wo5wojvuv7l.cloudfront.net/t_rss_itunes_square_1400/images.spreaker.com/original/bac4fb8c6718a2d8bf0cf6f7fe10c81b.jpg",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "CHEK Podcasts"
+    },
+    {
+      "id": "db_3609461",
+      "title": "Sharks Gameday",
+      "feed_url": "https://sjsharks-rss.streamguys1.com/sjsharks/san-jose-sharks-gameday-apple-podcasts.xml",
+      "image_url": "https://sjsharks-rss.streamguys1.com/sjsharks/20200923095925-2019-20SharksCrest_UPDATED_white_JPEG.jpg",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "San Jose Sharks"
+    },
+    {
+      "id": "db_4474345",
+      "title": "Seattle Kraken Audio Network",
+      "feed_url": "https://www.omnycontent.com/d/playlist/98a2599f-cd9b-4f2a-9be4-b22c00e585f2/944b20a6-d65b-4c22-8836-b2f201003238/429570a0-269b-46e8-8956-b2f20100323f/podcast.rss",
+      "image_url": "https://www.omnycontent.com/d/playlist/98a2599f-cd9b-4f2a-9be4-b22c00e585f2/944b20a6-d65b-4c22-8836-b2f201003238/429570a0-269b-46e8-8956-b2f20100323f/image.jpg?t=1763063457&size=Large",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Seattle's Sports Radio 950 KJR (KJR-AM)"
+    },
+    {
+      "id": "db_5718810",
+      "title": "Oilersnation Everyday with Tyler & Liam",
+      "feed_url": "https://feeds.acast.com/public/shows/6335b3ee45963e00125bf7a2",
+      "image_url": "https://assets.pippa.io/shows/6335b3ee45963e00125bf7a2/1759287011795-ca55de89-7e29-4c09-a4ed-1a042c867b13.jpeg",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "The Nation Network"
+    },
+    {
+      "id": "db_5743083",
+      "title": "Leafs Morning Take",
+      "feed_url": "https://feeds.acast.com/public/shows/633dd1a7c875840012363e24",
+      "image_url": "https://assets.pippa.io/shows/633dd1a7c875840012363e24/1696219695426-f0e28cb3214c30dc6dcb411d8e7eca3b.jpeg",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "The Nation Network"
+    },
+    {
+      "id": "db_5783990",
+      "title": "Jets @ Noon: Winnipeg Jets Podcast",
+      "feed_url": "https://feeds.megaphone.fm/CORU9095948882",
+      "image_url": "https://megaphone.imgix.net/podcasts/fdc54d44-53c7-11ed-beb0-c387af31b797/image/a9aa7a58388a8cc15f9d586d7357667e.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Corus Radio"
+    },
+    {
+      "id": "db_6599072",
+      "title": "The Jason Gregor Show",
+      "feed_url": "https://feeds.acast.com/public/shows/64e7c97c8a084400124e31d0",
+      "image_url": "https://assets.pippa.io/shows/64e7c97c8a084400124e31d0/1747938500546-3d2d86fe-dbdd-47fd-8754-a057242a4483.jpeg",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "The Jason Gregor Show"
+    },
+    {
+      "id": "db_6600717",
+      "title": "The Tom Gazzola Show",
+      "feed_url": "https://feeds.acast.com/public/shows/64f6263ffbbc5e0011a3af01",
+      "image_url": "https://assets.pippa.io/shows/64f6263ffbbc5e0011a3af01/1784227851928-8e5c47a5-02b5-44a9-b0ad-0cd15c11c964.jpeg",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Sports 1440"
+    },
+    {
+      "id": "db_6606967",
+      "title": "The Lowdown with Lowetide",
+      "feed_url": "https://feeds.acast.com/public/shows/64f62e22d5566e0010702afc",
+      "image_url": "https://assets.pippa.io/shows/cover/1693855236787-4aad5905d2e9e17191cc0ff4984e8e47.jpeg",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "The Lowdown with Lowetide"
+    },
+    {
+      "id": "db_6915352",
+      "title": "Utah Mammoth Audio",
+      "feed_url": "https://feed.cdnstream1.com/zjb/feed/download/e9/f9/e9/e9f9e9ca-8a4a-4872-8447-7945776593d5.xml",
+      "image_url": "https://play.cdnstream1.com/zjb/image/download/16/9e/e3/169ee3e1-ce9a-4c71-afd4-dec1e77b58d4_1400.png",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "KSL Podcasts"
+    },
+    {
+      "id": "db_879594",
+      "title": "The Hockey PDOcast",
+      "feed_url": "https://feeds.simplecast.com/HBoOrnlM",
+      "image_url": "https://image.simplecastcdn.com/images/0ca66127-d6b4-43d0-8751-abb1d241aeff/68c6888c-0b83-4b30-bb22-bb1c6e56d4ea/3000x3000/microsoftteams-image-2.jpg?aid=rss_feed",
+      "sport": "Hockey",
+      "tags": [
+        "hockey"
+      ],
+      "language": "en",
+      "author": "Sportsnet"
+    },
+    {
+      "id": "db_4396048",
+      "title": "After The Whistle",
+      "feed_url": "https://feeds.megaphone.fm/AFTERW5253111644",
+      "image_url": "https://megaphone.imgix.net/podcasts/c73455ae-ee95-11ed-b67f-1f8b657beca5/image/d293f7b95004682c2a239560a236a6dd.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Andrew Peters & Craig Rivet"
+    },
+    {
+      "id": "db_1103851",
+      "title": "The Big Show",
+      "feed_url": "https://feeds.megaphone.fm/ROUST4914539451",
+      "image_url": "https://megaphone.imgix.net/podcasts/3bc8274e-af01-11ed-a8b0-431ab6b8c083/image/4922b9b8da32897267667963e64e6c75.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "The Hockey News"
+    },
+    {
+      "id": "db_190158",
+      "title": "YHH Hockey Podcasts",
+      "feed_url": "https://feed.podbean.com/youthhockeyhub/feed.xml",
+      "image_url": "https://pbcdn1.podbean.com/imglogo/image-logo/2167311/8d865c847591aed2.jpeg",
+      "sport": "Hockey",
+      "tags": [
+        "hockey"
+      ],
+      "language": "en",
+      "author": "Tony Scott"
+    },
+    {
+      "id": "db_6600742",
+      "title": "The Frenzy with Halley & Douglas",
+      "feed_url": "https://feeds.acast.com/public/shows/64f6299fed910000113458fa",
+      "image_url": "https://assets.pippa.io/shows/64f6299fed910000113458fa/1784227903310-834f00ec-7957-4018-aad7-958b9166f950.jpeg",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Connor Halley"
+    },
+    {
+      "id": "db_220542",
+      "title": "Blackhawks Breakaway",
+      "feed_url": "https://feed.podbean.com/blackhawksbreakaway/feed.xml",
+      "image_url": "https://pbcdn1.podbean.com/imglogo/image-logo/19508439/Blackhawks_Breakaway_1_1_Toyotaa5l92.png",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Chicago Sports Network"
+    },
+    {
+      "id": "db_1042952",
+      "title": "Blueshirts Breakaway: A show about the New York Rangers",
+      "feed_url": "https://feeds.megaphone.fm/AATBB5065126523",
+      "image_url": "https://megaphone.imgix.net/podcasts/74736080-21a8-11ee-a03d-5b994957fdbf/image/1f2ae185-1df9-4659-abf9-394108361dce_be0781b49_avatars-000692004929-90ye4f-original.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Ryan Mead and Greg Kaplan"
+    },
+    {
+      "id": "db_6578518",
+      "title": "Blueshirts Breakaway: A show about the New York Rangers",
+      "feed_url": "https://feeds.redcircle.com/3c487bd9-26c6-47cb-bd81-177ed87e9a68",
+      "image_url": "https://megaphone.imgix.net/podcasts/74736080-21a8-11ee-a03d-5b994957fdbf/image/1f2ae185-1df9-4659-abf9-394108361dce_be0781b49_avatars-000692004929-90ye4f-original.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Ryan Mead and Greg Kaplan"
+    },
+    {
+      "id": "db_445681",
+      "title": "Spittin Chiclets",
+      "feed_url": "https://mcsorleys.barstoolsports.com/feed/spittin-chiclets",
+      "image_url": "https://chumley.barstoolsports.com/union/2026/01/13/Corner-Tab.50d13fdb.jpeg?crop=3000%3A3000%2Csmart&format=jpeg",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Barstool Sports"
+    },
+    {
+      "id": "db_740550",
+      "title": "Bruins Beat",
+      "feed_url": "https://feeds.megaphone.fm/NSM8392442030",
+      "image_url": "https://megaphone.imgix.net/podcasts/a585b51c-5faf-11ed-8e09-23918adc7a3b/image/bb_new.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "CLNS Media Network"
+    },
+    {
+      "id": "db_4470506",
+      "title": "Apples & Ginos Fantasy Hockey Podcast",
+      "feed_url": "https://anchor.fm/s/7215b61c/podcast/rss",
+      "image_url": "https://d3t3ozftmdmh3i.cloudfront.net/production/podcast_uploaded_nologo/19040255/19040255-1642646824171-559e9eb71c5e.jpg",
+      "sport": "Hockey",
+      "tags": [
+        "hockey"
+      ],
+      "language": "en",
+      "author": "Apples & Ginos Fantasy Hockey"
+    },
+    {
+      "id": "db_4474346",
+      "title": "Hockey Gambling Podcast",
+      "feed_url": "https://feeds.simplecast.com/caDpJU1D",
+      "image_url": "https://image.simplecastcdn.com/images/a1c0a301-d5e6-488f-a030-9643573c1ba8/7bbc035e-4ab8-487d-88f0-9466b97bfefc/3000x3000/sgpn-hockey-gambling-podcast.jpg?aid=rss_feed",
+      "sport": "Hockey",
+      "tags": [
+        "hockey"
+      ],
+      "language": "en",
+      "author": "Sports Gambling Podcast Network"
+    },
+    {
+      "id": "db_159691",
+      "title": "Puck Podcast",
+      "feed_url": "https://feeds.simplecast.com/zUk_fnh2",
+      "image_url": "https://image.simplecastcdn.com/images/6215cda8-011d-4ccd-9fe8-c389912a62af/9c4d6324-483b-4640-a9dc-3f27fd5ad2f9/3000x3000/puck-20podcast.jpg?aid=rss_feed",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Eddie Garcia & Doug Stolhand, Bleav"
+    },
+    {
+      "id": "db_508725",
+      "title": "The Panthers Podcast Network",
+      "feed_url": "https://feeds.simplecast.com/gevLqI5U",
+      "image_url": "https://image.simplecastcdn.com/images/4f2b7e2e-bab9-41b8-aeba-5dc262482c92/39ee4806-96d7-41c2-a1b1-0b4a463b33f7/3000x3000/panthers-podcast-network-logo.jpg?aid=rss_feed",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "The Florida Panthers"
+    },
+    {
+      "id": "db_520176",
+      "title": "The Hockey Think Tank Podcast",
+      "feed_url": "https://feeds.simplecast.com/4_sP8xEB",
+      "image_url": "https://image.simplecastcdn.com/images/ea0e1ccb-420d-4fdd-b42f-ff747182037d/b939e480-f0b3-4b6d-a022-7e51ab180604/3000x3000/5b4ef27a361d5275e08516d15ecfca16.png?aid=rss_feed",
+      "sport": "Hockey",
+      "tags": [
+        "hockey"
+      ],
+      "language": "en",
+      "author": "thehockeythinktank"
+    },
+    {
+      "id": "db_713044",
+      "title": "Canucks Central",
+      "feed_url": "https://feeds.simplecast.com/8DHveZjg",
+      "image_url": "https://image.simplecastcdn.com/images/8937e5a4-7a4b-417c-a310-5049aa53272b/58cd7f60-a494-4af7-b536-8654f70ee6fd/3000x3000/sn-podcasts-canuckscentral-3000x3000.jpg?aid=rss_feed",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Sportsnet"
+    },
+    {
+      "id": "db_744733",
+      "title": "Starcastic Remarks",
+      "feed_url": "https://feeds.megaphone.fm/HOC7719419614",
+      "image_url": "https://image.simplecastcdn.com/images/704e2af3-3aa6-4d27-be66-fb1a5245d5f7/00ee88c6-e566-47d7-b4d6-23305418cef6/3000x3000/8a6f20cd03edf6d9ed1de63ac8578440.png?aid=rss_feed",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Ryan Chambers, Chris Chambers, James Chambers"
+    },
+    {
+      "id": "db_1020169",
+      "title": "32 Thoughts: The Podcast",
+      "feed_url": "https://feeds.simplecast.com/fYqFr5h_",
+      "image_url": "https://image.simplecastcdn.com/images/b72bc3d0-7e44-4b66-8de6-c187dbaa3a4f/292f8f31-a8f9-4a11-8aaf-ae5c3ff84f95/3000x3000/32thoughts500x500iconv2.jpg?aid=rss_feed",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "Sportsnet"
+    },
+    {
+      "id": "db_2136581",
+      "title": "The Ice Guys",
+      "feed_url": "https://feeds.simplecast.com/j21MjKd6",
+      "image_url": "https://image.simplecastcdn.com/images/353564e7-0d12-438d-97d2-2d0d8ec2eb33/c112a60c-d640-44cb-89a0-d059b0d5a358/3000x3000/ay5qcgc.jpg?aid=rss_feed",
+      "sport": "Hockey",
+      "tags": [],
+      "language": "en",
+      "author": "The Ice Guys, Bleav"
+    },
+    {
+      "id": "db_730131",
+      "title": "The Autosport F1 Podcast",
+      "feed_url": "https://feeds.megaphone.fm/COMG2534928641",
+      "image_url": "https://megaphone.imgix.net/podcasts/84e24dca-9650-11ed-b7b3-239cba1014f0/image/8bc21858896022ccd5260f82facd5fc3.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Racing",
+      "tags": [
+        "f1"
+      ],
+      "language": "en",
+      "author": "Motorsport Network"
+    },
+    {
+      "id": "db_5545000",
+      "title": "NASCAR Gambling Podcast",
+      "feed_url": "https://feeds.simplecast.com/yqeftTLW",
+      "image_url": "https://image.simplecastcdn.com/images/a0e05ee9-326a-4c73-b655-87764046ef3b/5c5fb173-599e-4a7a-8f14-615f2f09189f/3000x3000/sgpn-nascar-gambling-podcast.jpg?aid=rss_feed",
+      "sport": "Racing",
+      "tags": [
+        "nascar"
+      ],
+      "language": "en",
+      "author": "Sports Gambling Podcast Network"
+    },
+    {
+      "id": "db_1036574",
+      "title": "Missed Apex Formula 1 Podcast",
+      "feed_url": "https://rss.acast.com/missedapex",
+      "image_url": "https://assets.pippa.io/shows/611e9d1f06c05e7604f40b92/1719939020107-dc66f7fe9abfd6d48a8d320ab4fcfe95.jpeg",
+      "sport": "Racing",
+      "tags": [
+        "formula 1"
+      ],
+      "language": "en",
+      "author": "Missed Apex Formula1 podcast"
+    },
+    {
+      "id": "db_166522",
+      "title": "NASCAR Live",
+      "feed_url": "https://rss.art19.com/nascar-live",
+      "image_url": "https://content.production.cdn.art19.com/images/b3/15/ff/e6/b315ffe6-41e6-4e49-90ac-c611aed60c5d/3725fe10369015f75e51e896388701a8ba6e53c79e4d6b8cf8048daf1612a9cd38688a859af6ee0e042f44c625b90a88d1645804ae6a3a6757dc8e79e802b841.jpeg",
+      "sport": "Racing",
+      "tags": [
+        "nascar"
+      ],
+      "language": "en",
+      "author": "Motor Racing Network"
+    },
+    {
+      "id": "db_1208307",
+      "title": "The Race F1 Podcast",
+      "feed_url": "https://feeds.acast.com/public/shows/6819ae2bf30c20bff775e8a1",
+      "image_url": "https://assets.pippa.io/shows/6819ae2bf30c20bff775e8a1/1761989566632-44771151-89a0-4161-a0b7-654fa50031e8.jpeg",
+      "sport": "Racing",
+      "tags": [
+        "f1"
+      ],
+      "language": "en",
+      "author": "The Race Media Ltd"
+    },
+    {
+      "id": "db_322939",
+      "title": "Scuderia F1: a Formula 1 podcast",
+      "feed_url": "https://feeds.megaphone.fm/otscuderia",
+      "image_url": "https://megaphone.imgix.net/podcasts/0e469636-2993-11e9-a83c-b7f4be81ab3f/image/uploads_2F1549411275484-gmlov3htvrw-8db133f4c29c08f04d66368faa6d8b27_2F1500x1500+Scuderia+F1.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Racing",
+      "tags": [
+        "formula 1",
+        "f1"
+      ],
+      "language": "en",
+      "author": "AC Sports"
+    },
+    {
+      "id": "db_1147732",
+      "title": "The Late Braking F1 Podcast",
+      "feed_url": "https://feeds.simplecast.com/geLKOBMZ",
+      "image_url": "https://image.simplecastcdn.com/images/3fbd7796-103f-4bb6-88ba-c5934aab0d6b/a35cb039-fdee-45e9-8112-59d3b4260d0c/3000x3000/2bc2b46bd460c2d3a8efc96c9ae24819.jpg?aid=rss_feed",
+      "sport": "Racing",
+      "tags": [
+        "f1"
+      ],
+      "language": "en",
+      "author": "The Late Braking F1 Podcast"
+    },
+    {
+      "id": "db_57461",
+      "title": "Claret & Blue Podcast",
+      "feed_url": "https://feeds.megaphone.fm/RPSL1112526468",
+      "image_url": "https://megaphone.imgix.net/podcasts/a115fdd2-4e09-11ed-9388-27c6723d0395/image/156fd957138eca8f55f0f71fbf5afc3c.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "Reach Podcasts"
+    },
+    {
+      "id": "db_83507",
+      "title": "Bavarian Podcast Works",
+      "feed_url": "https://feeds.acast.com/public/shows/67d019e1863a5bda62933eda",
+      "image_url": "https://assets.pippa.io/shows/67d019e1863a5bda62933eda/1741713336668-2275155d-3482-42e0-9db2-deeb421f5a35.jpeg",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "The Bavarian Podcast Works Team"
+    },
+    {
+      "id": "db_172614",
+      "title": "The ArsenalVision Podcast - Arsenal FC",
+      "feed_url": "https://feeds.simplecast.com/sjbSL_pM",
+      "image_url": "https://image.simplecastcdn.com/images/d0db390c-c639-4676-abf9-b9f84ce3561c/de6f73c2-bbf8-424e-a6aa-c3d9d0153b40/3000x3000/av-20cover-202025.jpg?aid=rss_feed",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "ArsenalVision Podcast LLC"
+    },
+    {
+      "id": "db_199090",
+      "title": "Total Soccer Show: USMNT, Champions League, EPL, and more ...",
+      "feed_url": "https://feeds.acast.com/public/shows/6818cfc81d28d62313b34379",
+      "image_url": "https://assets.pippa.io/shows/6818cfc81d28d62313b34379/1784660193384-5d99712c-08b0-481a-aa9f-fa23a115201c.jpeg",
+      "sport": "Soccer",
+      "tags": [
+        "soccer"
+      ],
+      "language": "en",
+      "author": "TSS, The Athletic"
+    },
+    {
+      "id": "db_318853",
+      "title": "Touchline Fracas: A Premier League Football Podcast ( Arsenal Chelsea Liverpool Spurs Manchester United )",
+      "feed_url": "https://feeds.megaphone.fm/BLU3634663127",
+      "image_url": "https://megaphone.imgix.net/podcasts/d9372b5c-ca4b-11eb-b8e5-7b00fdecea80/image/logo__1_.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [
+        "premier league"
+      ],
+      "language": "en",
+      "author": "Touchline MG"
+    },
+    {
+      "id": "db_319711",
+      "title": "Everything is Black and White - a Newcastle United podcast",
+      "feed_url": "https://feeds.megaphone.fm/RPSL8043727527",
+      "image_url": "https://megaphone.imgix.net/podcasts/35e6a36c-4e0f-11ed-b5f0-b7cee16e7f25/image/36740b52e48e174c8a7f3080f44139f9.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "Reach Podcasts"
+    },
+    {
+      "id": "db_405085",
+      "title": "Last Word On Spurs",
+      "feed_url": "https://feeds.megaphone.fm/COMG6410538070",
+      "image_url": "https://megaphone.imgix.net/podcasts/47d9b178-e7d4-11ec-9ff7-bb87e8c4256b/image/iTunes.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "Last Word On Spurs"
+    },
+    {
+      "id": "db_432644",
+      "title": "Football Social Daily",
+      "feed_url": "https://feeds.megaphone.fm/COMG9297908545",
+      "image_url": "https://megaphone.imgix.net/podcasts/3658e2c0-7475-11ec-8fb1-df3bf58089c2/image/da2f66ec65f902b8cc1b63f14b36b9f6.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "FSD Partners"
+    },
+    {
+      "id": "db_471821",
+      "title": "A Celtic State of Mind",
+      "feed_url": "https://feeds.megaphone.fm/COMG6839484448",
+      "image_url": "https://megaphone.imgix.net/podcasts/599baaee-b2e3-11ed-8a16-972eff6f2cc9/image/1d56491a4540da881828bd64f7b0ff3a.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "A State of Mind"
+    },
+    {
+      "id": "db_491579",
+      "title": "The Square Ball: Leeds United Podcast",
+      "feed_url": "https://feeds.acast.com/public/shows/281cce9e-c490-44ba-ba78-7a7db39b60c6",
+      "image_url": "https://assets.pippa.io/shows/611f7f994804724746143e7f/1704299887578-5b3bc034ab450e13b7fbec63b0283bbc.jpeg",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "The Square Ball"
+    },
+    {
+      "id": "db_528017",
+      "title": "talkSPORT Daily",
+      "feed_url": "https://feeds.acast.com/public/shows/b1bd6409-cd75-451b-8a5d-86f0bcbc3c38",
+      "image_url": "https://assets.pippa.io/shows/62286361118c54040694e07a/1784569548876-014231de-dbce-4244-aced-7a2762133b1b.jpeg",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "talkSPORT"
+    },
+    {
+      "id": "db_550306",
+      "title": "Top Flight Time Machine",
+      "feed_url": "https://feeds.acast.com/public/shows/61d98e4b-921b-47c0-b33d-f0e97899d71a",
+      "image_url": "https://assets.pippa.io/shows/611f8d7e480472e800143eef/show-cover.png",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "Andy Dawson & Sam Delaney"
+    },
+    {
+      "id": "db_605196",
+      "title": "Soccer Down Here",
+      "feed_url": "https://www.spreaker.com/show/3118977/episodes/feed",
+      "image_url": "https://d3wo5wojvuv7l.cloudfront.net/t_rss_itunes_square_1400/images.spreaker.com/original/457a5e3f4a83f99f66a01b70b5ac2fc9.jpg",
+      "sport": "Soccer",
+      "tags": [
+        "soccer"
+      ],
+      "language": "en",
+      "author": "OSG Sports"
+    },
+    {
+      "id": "db_676891",
+      "title": "Footy Prime The Podcast",
+      "feed_url": "https://feeds.simplecast.com/5rATIjep",
+      "image_url": "https://image.simplecastcdn.com/images/9cb90889-9475-4fbe-b506-928f18b2cabd/02c7a28a-8287-4fae-ab10-2268f6f60dc6/3000x3000/23186sponsored_tile_3000x3000_v4.jpg?aid=rss_feed",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "Sharms, Craiger, Jimmy B, Dubs, JC and Wonger"
+    },
+    {
+      "id": "db_686926",
+      "title": "Arseblog Arsecast, The Arsenal Podcast",
+      "feed_url": "http://rss.acast.com/arseblog",
+      "image_url": "https://assets.pippa.io/shows/611fb7e9480472b028143f16/1714495038423-c91bab2fd7e0737eb3c5871229ebbf89.jpeg",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "arseblog.com"
+    },
+    {
+      "id": "db_714150",
+      "title": "Superscoreboard",
+      "feed_url": "https://rss.podplaystudio.com/1210.xml",
+      "image_url": "https://studio-podplay.imgix.net/img/a8b3c67fd937f97371a02ab378f8599e.jpg?auto=compress&h=1500&w=1500&s=0be7e0129a0b904cc1872edd2d9bc3d5",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "Bauer Media"
+    },
+    {
+      "id": "db_726424",
+      "title": "Soccer Betting Podcast",
+      "feed_url": "https://www.spreaker.com/show/6856415/episodes/feed",
+      "image_url": "https://d3wo5wojvuv7l.cloudfront.net/t_rss_itunes_square_1400/images.spreaker.com/original/6fa2f72e5b098d6efa2dfdab05895cbd.jpg",
+      "sport": "Soccer",
+      "tags": [
+        "soccer"
+      ],
+      "language": "en",
+      "author": "LockBetting.Com"
+    },
+    {
+      "id": "db_881705",
+      "title": "For The Love of Paul McGrath: An Aston Villa Podcast",
+      "feed_url": "https://feeds.megaphone.fm/COMG3822872284",
+      "image_url": "https://megaphone.imgix.net/podcasts/965802d2-88c0-11ec-b28a-1b0b58d9b55f/image/36f217d0d6c8e86acdadaa62dc980998.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "For the Love of Paul McGrath"
+    },
+    {
+      "id": "db_896009",
+      "title": "Managing Madrid Podcast",
+      "feed_url": "https://feeds.megaphone.fm/COMG9379771347",
+      "image_url": "https://megaphone.imgix.net/podcasts/d458d2b6-d3b3-11ed-8d76-d788aeb42110/image/mm_-_Marley_edit_-_black.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "Managing Madrid"
+    },
+    {
+      "id": "db_932306",
+      "title": "No Question About That - a Manchester United podcast",
+      "feed_url": "https://feeds.megaphone.fm/COMG4321063114",
+      "image_url": "https://megaphone.imgix.net/podcasts/63328b78-ea1c-11ef-b333-c762c6cdd9c3/image/d77b69df37a07696bf1027f10d3e3562.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "Studio 1878"
+    },
+    {
+      "id": "db_1024543",
+      "title": "The Blue Room - Everton FC Podcast",
+      "feed_url": "https://feeds.megaphone.fm/COMG3276268605",
+      "image_url": "https://megaphone.imgix.net/podcasts/7932de90-081b-11ed-98ed-7fb7b4af04ec/image/TBR_Head_1_.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "The Blue Room"
+    },
+    {
+      "id": "db_1025183",
+      "title": "Sky Sports Premier League Podcast",
+      "feed_url": "https://feeds.captivate.fm/sky-sports-premierleague/",
+      "image_url": "https://artwork.captivate.fm/59a7377a-935c-4d4a-94be-74081e0494f9/b6110f62f8de7e0bfb33ca033369e0f9.jpg",
+      "sport": "Soccer",
+      "tags": [
+        "premier league"
+      ],
+      "language": "en",
+      "author": "Sky Sports"
+    },
+    {
+      "id": "db_1043654",
+      "title": "RotoWire Fantasy Soccer Podcast",
+      "feed_url": "https://feeds.simplecast.com/JBD0kPBh",
+      "image_url": "https://image.simplecastcdn.com/images/56c24876-afcd-484e-88e4-2833f6ec33f3/7c7d8cf8-c2d2-4436-9114-c6aaba74db84/3000x3000/3b4a6834_c909_4f2a_9906_30080ae06175.jpg?aid=rss_feed",
+      "sport": "Soccer",
+      "tags": [
+        "soccer"
+      ],
+      "language": "en",
+      "author": "RotoWire.com"
+    },
+    {
+      "id": "db_1058493",
+      "title": "Royal Blue: The Everton FC Podcast",
+      "feed_url": "https://feeds.megaphone.fm/RPSL4840186255",
+      "image_url": "https://megaphone.imgix.net/podcasts/9a64e9e2-4e06-11ed-8a7b-f305e6ec9a7e/image/a6e43f1b090adab8ce9b3454ef45d3fc.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "Reach Podcasts"
+    },
+    {
+      "id": "db_1065639",
+      "title": "OTB Football",
+      "feed_url": "https://rss.podplaystudio.com/2662.xml",
+      "image_url": "https://studio-podplay.imgix.net/img/edc7a2706fc606622556b78de9fc00f1.png?auto=compress&h=1500&w=1500&s=3b7775d2f65e7db88c8a288c7a7bae6c",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "OTB Sports"
+    },
+    {
+      "id": "db_1066443",
+      "title": "The Game",
+      "feed_url": "https://feeds.acast.com/public/shows/0fc6a233-bbae-4ba5-b882-c075544353a8",
+      "image_url": "https://assets.pippa.io/shows/61ba0e501a8cbe71d83cf13e/1781622185758-e35264ad-4a4c-4124-b920-75949a523cf7.jpeg",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "The Times"
+    },
+    {
+      "id": "db_1077077",
+      "title": "The Anfield Wrap",
+      "feed_url": "https://feeds.megaphone.fm/COMG6516013185",
+      "image_url": "https://megaphone.imgix.net/podcasts/5819de50-3765-11ee-a09b-5327dbd292d1/image/TAW_pdcast_coverart.jpeg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "The Anfield Wrap"
+    },
+    {
+      "id": "db_1094567",
+      "title": "The Beesotted Brentford Pride of West London Podcast",
+      "feed_url": "https://feeds.acast.com/public/shows/6374fc81a3f4280011854bd4",
+      "image_url": "https://assets.pippa.io/shows/6374fc81a3f4280011854bd4/1689314437398-e6eebd1a3c435c967614dfe679d39ba1.jpeg",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "Beesotted"
+    },
+    {
+      "id": "db_1108962",
+      "title": "Blue Monday: An Ipswich Town Podcast",
+      "feed_url": "https://feeds.acast.com/public/shows/6822ce24-acb4-4eeb-831a-87504cf7d878",
+      "image_url": "https://assets.pippa.io/shows/60f5eca992b8225a7f194eb4/1781540541217-d02b58c5-f9ed-4710-a8db-0f076e84f988.jpeg",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "Blue Monday"
+    },
+    {
+      "id": "db_1119792",
+      "title": "1874",
+      "feed_url": "https://feeds.megaphone.fm/COMG3846388170",
+      "image_url": "https://megaphone.imgix.net/podcasts/48c87336-6da6-11ee-af2d-e79f54531f66/image/22772855-1689913277034-7be2838712ef3.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "1874: The Aston Villa Channel"
+    },
+    {
+      "id": "db_1130704",
+      "title": "The Chronicles of a Gooner - Arsenal Podcast",
+      "feed_url": "https://feeds.megaphone.fm/AUDD5255549956",
+      "image_url": "https://megaphone.imgix.net/podcasts/5c4a80ae-0881-11ef-8686-535ebacdc1d0/image/f6dd339ecdc9c3aa2b0e0a7a06cac5d2.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "AMS Media Limited"
+    },
+    {
+      "id": "db_3599710",
+      "title": "The Gooner Talk",
+      "feed_url": "https://feeds.acast.com/public/shows/6240943ecb6c90001298fb89",
+      "image_url": "https://assets.pippa.io/shows/6240943ecb6c90001298fb89/1669016830432-3efe7fccb213cd7c2df3480bc319b982.jpeg",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "The Gooner Talk"
+    },
+    {
+      "id": "db_6443555",
+      "title": "Morning Footy: A soccer show from CBS Sports Golazo Network",
+      "feed_url": "https://feeds.megaphone.fm/morningfooty",
+      "image_url": "https://megaphone.imgix.net/podcasts/63d761f0-0703-11ee-a14a-d336e53c43dc/image/Footy.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [
+        "soccer"
+      ],
+      "language": "en",
+      "author": "CBS Sports, Morning Footy, UCL, Premier League, MLS, Soccer, Serie A"
+    },
+    {
+      "id": "db_1284289",
+      "title": "The Go Radio Football Show Podcast",
+      "feed_url": "https://feed.podbean.com/thegoradiofootballshow/feed.xml",
+      "image_url": "https://pbcdn1.podbean.com/imglogo/image-logo/9182196/Screenshot_2026-04-30_at_2126308w99o.png",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "thegoradiofootballshow"
+    },
+    {
+      "id": "db_494190",
+      "title": "The Cooligans",
+      "feed_url": "https://feeds.simplecast.com/T15cXQd0",
+      "image_url": "https://image.simplecastcdn.com/images/e66e4bbf-f1f2-407a-ad1b-93e70afbe9b1/a22b737e-0382-4f82-aab7-c2afe3d8ad48/3000x3000/pd-the-cooligans-main-pod-art-3000x3000-1.jpg?aid=rss_feed",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "Alexis Guerreros & Christian Polanco"
+    },
+    {
+      "id": "db_1330355",
+      "title": "Do Not Scratch Your Eyes",
+      "feed_url": "https://feeds.megaphone.fm/COMG8195206884",
+      "image_url": "https://megaphone.imgix.net/podcasts/8e2256d2-a2a0-11f0-a4a0-c702dc359718/image/ebdc9569ee958e030fb7c8043e47b7ef.png?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "Do Not Scratch Your Eyes"
+    },
+    {
+      "id": "db_6467139",
+      "title": "Nación futvox",
+      "feed_url": "https://feeds.megaphone.fm/IMP3861030636",
+      "image_url": "https://megaphone.imgix.net/podcasts/b835806e-c144-11ee-8aef-f7a5a5de4309/image/bbead9d16e4d8a970a02eb76cd117b11.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "futvox"
+    },
+    {
+      "id": "db_491894",
+      "title": "Manchester United Podcast by Stretford Paddock",
+      "feed_url": "https://feeds.megaphone.fm/COMG2101809856",
+      "image_url": "https://megaphone.imgix.net/podcasts/61603c1a-7935-11ec-a2f1-d3a354127005/image/Podcast_Adjusted.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "Stretford Paddock"
+    },
+    {
+      "id": "db_4030276",
+      "title": "Attacking Third: A CBS Sports Women's Soccer Podcast",
+      "feed_url": "https://rss.amperwave.net/v2/feed/audacynetwork/attackingthird",
+      "image_url": "https://images.castfire.com/image/661/0/0/0/0-8382778.jpg",
+      "sport": "Soccer",
+      "tags": [
+        "soccer"
+      ],
+      "language": "en",
+      "author": "CBS Sports, USWNT, NWSL, Soccer, WSL, Women's Soccer"
+    },
+    {
+      "id": "db_458758",
+      "title": "Not The Top 20 Podcast",
+      "feed_url": "https://feeds.megaphone.fm/notthetop20",
+      "image_url": "https://megaphone.imgix.net/podcasts/2cbf7cd2-2a32-11ee-abaf-c3f53159c285/image/59b74db0de8c9fecf63724c53e6efdd5.jpg?ixlib=rails-4.3.1&max-w=3000&max-h=3000&fit=crop&auto=format,compress",
+      "sport": "Soccer",
+      "tags": [],
+      "language": "en",
+      "author": "Not The Top 20 Podcast"
+    }
+  ],
+  "source": "podcastindex_db",
+  "version": 1
+}

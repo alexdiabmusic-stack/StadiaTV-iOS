@@ -115,7 +115,7 @@ struct MatchesView: View {
             personalizedHeader
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                .background(.bar)
+                .background(Theme.background)
             Divider().overlay(Theme.hairline)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 18) {

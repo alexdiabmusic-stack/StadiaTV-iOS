@@ -1382,8 +1382,6 @@ final class HomeViewModel: ObservableObject {
         upcoming = followedMatches
             .filter { $0.state == .pre && $0.date >= now }
             .sorted { $0.date < $1.date }
-            .prefix(12)
-            .map { $0 }
         primeMatch = (liveNow + favoriteTeamUpcoming + upcoming)
             .max { score($0) < score($1) }
     }

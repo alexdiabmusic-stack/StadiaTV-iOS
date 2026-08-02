@@ -427,6 +427,7 @@ final class PodcastStore: ObservableObject {
         player = nil
         videoPlayer = nil
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        MPNowPlayingInfoCenter.default().playbackState = .stopped
     }
 
     private func saveProgress() {
@@ -445,9 +446,11 @@ final class PodcastStore: ObservableObject {
             MPMediaItemPropertyPlaybackDuration: episode.duration > 0 ? episode.duration : 0,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
             MPNowPlayingInfoPropertyPlaybackRate: Double(speed.rawValue),
+            MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
             MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue
         ]
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        MPNowPlayingInfoCenter.default().playbackState = .playing
 
         // Fetch artwork asynchronously and update once loaded
         if let artworkURL = episode.podcastArtworkURL {
@@ -455,8 +458,9 @@ final class PodcastStore: ObservableObject {
                 guard let (data, _) = try? await URLSession.shared.data(from: artworkURL),
                       let image = UIImage(data: data) else { return }
                 let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
-                info[MPMediaItemPropertyArtwork] = artwork
-                MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+                guard var current = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
+                current[MPMediaItemPropertyArtwork] = artwork
+                MPNowPlayingInfoCenter.default().nowPlayingInfo = current
             }
         }
     }
@@ -467,6 +471,7 @@ final class PodcastStore: ObservableObject {
         info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? Double(speed.rawValue) : 0.0
         if totalDuration > 0 { info[MPMediaItemPropertyPlaybackDuration] = totalDuration }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+        MPNowPlayingInfoCenter.default().playbackState = isPlaying ? .playing : .paused
     }
 
     private func tickNowPlayingTime(_ time: TimeInterval) {

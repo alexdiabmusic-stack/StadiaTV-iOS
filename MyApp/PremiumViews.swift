@@ -207,7 +207,7 @@ enum StandingsCol: Hashable {
         case .basketball:    return [.wins, .losses, .winPct, .gamesBack, .streak]
         case .hockey:        return [.gamesPlayed, .wins, .losses, .ties, .leaguePoints, .streak]
         case .soccer:        return [.gamesPlayed, .wins, .ties, .losses, .goalDiff, .leaguePoints]
-        case .golf, .racing: return [.wins, .leaguePoints]
+        case .golf, .racing, .tennis: return [.wins, .leaguePoints]
         }
     }
 }

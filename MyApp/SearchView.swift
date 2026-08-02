@@ -118,7 +118,7 @@ struct SearchView: View {
             .sheet(item: $playingChannel) { channel in
                 PlayerView(channel: channel)
             }
-            .sheet(item: $presentedArticle) { article in
+            .navigationDestination(item: $presentedArticle) { article in
                 ArticleReaderView(article: article)
             }
             .sheet(item: $presentedPodcast) { podcast in

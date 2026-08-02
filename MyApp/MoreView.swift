@@ -80,12 +80,14 @@ struct MoreView: View {
                     MoreNavigationRow(title: "Saved Articles", value: articleLibrary.savedArticles.isEmpty ? nil : "\(articleLibrary.savedArticles.count) saved")
                 }
                 NavigationLink { PrivacySyncSettingsView() } label: {
-                    MoreNavigationRow(title: "Privacy & iCloud Sync", value: "On")
+                    MoreNavigationRow(title: "Privacy & iCloud Sync", value: prefs.cloudSyncEnabled ? "On" : "Off")
                 }
                 NavigationLink { PrivacyPolicySettingsView() } label: {
                     MoreNavigationRow(title: "Privacy Policy")
                 }
-                MoreNavigationRow(title: "Watch History", value: watchStore.history.isEmpty ? nil : "\(watchStore.history.count) items")
+                NavigationLink { WatchHistorySettingsView() } label: {
+                    MoreNavigationRow(title: "Watch History", value: watchStore.history.isEmpty ? nil : "\(watchStore.history.count) items")
+                }
             }
 
             MoreNavigationGroup(title: "SUPPORT") {

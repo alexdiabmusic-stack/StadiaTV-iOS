@@ -186,7 +186,7 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
         case .football: return spread <= 8
         case .basketball: return spread <= 5
         case .baseball, .hockey, .soccer: return spread <= 1
-        case .golf, .racing: return false
+        case .golf, .racing, .tennis: return false
         }
     }
 

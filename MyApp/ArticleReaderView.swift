@@ -6,10 +6,26 @@ enum ReaderAppearance: String, CaseIterable {
     case automatic, light, dark, sepia
     var label: String {
         switch self {
-        case .automatic: return "Automatic"
+        case .automatic: return "Auto"
         case .light: return "Light"
         case .dark: return "Dark"
         case .sepia: return "Sepia"
+        }
+    }
+    var chipBackground: Color {
+        switch self {
+        case .automatic: return Color(.systemBackground)
+        case .light:     return Color(red: 0.98, green: 0.97, blue: 0.96)
+        case .dark:      return Color(red: 0.09, green: 0.09, blue: 0.10)
+        case .sepia:     return Color(red: 0.97, green: 0.93, blue: 0.84)
+        }
+    }
+    var chipForeground: Color {
+        switch self {
+        case .automatic: return Color(.label)
+        case .light:     return Color(red: 0.10, green: 0.10, blue: 0.12)
+        case .dark:      return Color(red: 0.92, green: 0.92, blue: 0.94)
+        case .sepia:     return Color(red: 0.26, green: 0.19, blue: 0.12)
         }
     }
 }
@@ -148,8 +164,8 @@ struct ArticleReaderView: View {
                         Spacer()
                         Button { showingReaderSettings = true } label: {
                             Text("Aa")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(readerText)
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(Theme.accent)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 9)
                                 .background(
@@ -495,11 +511,11 @@ struct ReaderSettingsSheet: View {
                                     get: { Double(sizeStep) },
                                     set: { sizeStep = Int($0.rounded()) }
                                 ),
-                                in: 1...6, step: 1
+                                in: 1...10, step: 1
                             )
                             .tint(Theme.accent)
 
-                            Button { sizeStep = min(6, sizeStep + 1) } label: {
+                            Button { sizeStep = min(10, sizeStep + 1) } label: {
                                 Text("A")
                                     .font(.system(size: 22, weight: .medium))
                                     .foregroundStyle(.secondary)
@@ -513,7 +529,7 @@ struct ReaderSettingsSheet: View {
                     section("Appearance") {
                         HStack(spacing: 8) {
                             ForEach(ReaderAppearance.allCases, id: \.self) { option in
-                                chip(option.label, selected: appearance == option) {
+                                appearanceChip(option, selected: appearance == option) {
                                     appearance = option
                                 }
                             }
@@ -581,6 +597,19 @@ struct ReaderSettingsSheet: View {
                 .padding(.vertical, 8)
                 .foregroundStyle(selected ? .white : .primary)
                 .background(selected ? Theme.accent : Color(.secondarySystemFill), in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func appearanceChip(_ option: ReaderAppearance, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(option.label)
+                .font(.subheadline)
+                .foregroundStyle(option.chipForeground)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(option.chipBackground, in: Capsule())
+                .overlay(Capsule().strokeBorder(selected ? Theme.accent : option.chipForeground.opacity(0.2), lineWidth: selected ? 2 : 1))
         }
         .buttonStyle(.plain)
     }

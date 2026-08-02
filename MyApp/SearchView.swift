@@ -4,11 +4,13 @@ import Combine
 struct SearchView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var playlists: PlaylistStore
+    @EnvironmentObject private var podcastStore: PodcastStore
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = SearchViewModel()
     @State private var query = ""
     @State private var playingChannel: Channel?
     @State private var presentedArticle: ESPNArticle?
+    @State private var presentedPodcast: Podcast?
 
     private var trimmedQuery: String {
         query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -36,8 +38,56 @@ struct SearchView: View {
             channels: playlists.allChannels,
             players: viewModel.players,
             articles: viewModel.articles,
+            podcasts: podcastStore.catalog,
             settings: SearchSettingDestination.allCases
         )
+    }
+
+    private var sections: [SearchSection] {
+        var teams: [UniversalSearchResult] = []
+        var liveGames: [UniversalSearchResult] = []
+        var games: [UniversalSearchResult] = []
+        var news: [UniversalSearchResult] = []
+        var highlights: [UniversalSearchResult] = []
+        var channels: [UniversalSearchResult] = []
+        var podcasts: [UniversalSearchResult] = []
+        var players: [UniversalSearchResult] = []
+        var settings: [UniversalSearchResult] = []
+
+        for result in results {
+            switch result.payload {
+            case .team, .league:
+                teams.append(result)
+            case .match(let match):
+                if match.state == .live { liveGames.append(result) } else { games.append(result) }
+            case .article(let article):
+                if article.isSearchHighlight { highlights.append(result) } else { news.append(result) }
+            case .channel:
+                channels.append(result)
+            case .podcast:
+                podcasts.append(result)
+            case .player:
+                players.append(result)
+            case .setting:
+                settings.append(result)
+            }
+        }
+
+        var out: [SearchSection] = []
+        func add(_ title: String, _ list: [UniversalSearchResult], limit: Int = 4) {
+            guard !list.isEmpty else { return }
+            out.append(SearchSection(title: title, results: Array(list.prefix(limit))))
+        }
+        add("Teams & Leagues", teams)
+        add("Live Now", liveGames, limit: 5)
+        add("Upcoming Games", games, limit: 5)
+        add("News", news, limit: 5)
+        add("Highlights", highlights, limit: 3)
+        add("Channels", channels, limit: 5)
+        add("Podcasts", podcasts, limit: 4)
+        add("Players", players, limit: 4)
+        add("Settings", settings, limit: 3)
+        return out
     }
 
     var body: some View {
@@ -71,6 +121,9 @@ struct SearchView: View {
             .sheet(item: $presentedArticle) { article in
                 ArticleReaderView(article: article)
             }
+            .sheet(item: $presentedPodcast) { podcast in
+                PodcastDetailView(podcast: podcast)
+            }
         }
         .tint(Theme.accent)
         .task(id: prefs.followedLeagues.map(\.id).joined(separator: ",") + "|" + prefs.favoriteTeams.map(\.id).joined(separator: ",")) {
@@ -85,7 +138,7 @@ struct SearchView: View {
     @ViewBuilder private var content: some View {
         if trimmedQuery.isEmpty {
             idleState
-        } else if results.isEmpty {
+        } else if sections.isEmpty {
             emptyState
         } else {
             resultsList
@@ -133,9 +186,16 @@ struct SearchView: View {
     private var resultsList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 10) {
-                SearchSectionTitle(title: "Results", count: results.count)
-                ForEach(results.prefix(30)) { result in
-                    row(for: result)
+                ForEach(Array(sections.enumerated()), id: \.element.title) { index, section in
+                    if index > 0 {
+                        Divider()
+                            .overlay(Theme.hairline)
+                            .padding(.vertical, 4)
+                    }
+                    SearchSectionTitle(title: section.title, count: section.results.count)
+                    ForEach(section.results) { result in
+                        row(for: result)
+                    }
                 }
             }
             .padding(16)
@@ -172,6 +232,13 @@ struct SearchView: View {
         case .article(let article):
             Button {
                 presentedArticle = article
+            } label: {
+                UniversalSearchRow(result: result)
+            }
+            .buttonStyle(.plain)
+        case .podcast(let podcast):
+            Button {
+                presentedPodcast = podcast
             } label: {
                 UniversalSearchRow(result: result)
             }
@@ -272,6 +339,11 @@ private struct SearchLoadResult {
     let players: [SearchPlayerResult]
 }
 
+private struct SearchSection {
+    let title: String
+    let results: [UniversalSearchResult]
+}
+
 struct SearchTeamResult: Identifiable, Hashable {
     let league: League
     let team: Team
@@ -296,6 +368,7 @@ private enum SearchResultPayload: Hashable {
     case player(SearchPlayerResult)
     case article(ESPNArticle)
     case setting(SearchSettingDestination)
+    case podcast(Podcast)
 }
 
 private struct UniversalSearchResult: Identifiable, Hashable {
@@ -395,6 +468,7 @@ private enum SearchIndex {
         channels: [Channel],
         players: [SearchPlayerResult],
         articles: [ESPNArticle],
+        podcasts: [PodcastCatalog.CatalogFeed],
         settings: [SearchSettingDestination]
     ) -> [UniversalSearchResult] {
         let query = SearchQuery(query)
@@ -407,6 +481,7 @@ private enum SearchIndex {
         results.append(contentsOf: channels.compactMap { result(for: $0, query: query) })
         results.append(contentsOf: players.compactMap { result(for: $0, query: query) })
         results.append(contentsOf: articles.compactMap { result(for: $0, query: query) })
+        results.append(contentsOf: podcasts.compactMap { result(for: $0, query: query) })
         results.append(contentsOf: settings.compactMap { result(for: $0, query: query) })
 
         return results.sorted {
@@ -429,7 +504,7 @@ private enum SearchIndex {
         return UniversalSearchResult(
             id: team.id,
             title: team.team.displayName,
-            subtitle: "Team",
+            subtitle: "Team · \(team.league.shortName)",
             systemImage: "shield.fill",
             imageURL: team.team.logoURL,
             rank: rank,
@@ -536,6 +611,26 @@ private enum SearchIndex {
             imageURL: article.imageURL,
             rank: rank,
             payload: .article(article)
+        )
+    }
+
+    private static func result(for feed: PodcastCatalog.CatalogFeed, query: SearchQuery) -> UniversalSearchResult? {
+        let fields = [
+            feed.title,
+            feed.sport,
+            feed.tags.joined(separator: " "),
+            "podcast podcasts talk show audio sports radio"
+        ]
+        guard let rank = score(query: query, title: feed.title, fields: fields, categoryBoost: 16) else { return nil }
+        let sportLabel = feed.sport.capitalized
+        return UniversalSearchResult(
+            id: "podcast-\(feed.id)",
+            title: feed.title,
+            subtitle: "Podcast · \(sportLabel)",
+            systemImage: "waveform",
+            imageURL: feed.imageURL,
+            rank: rank,
+            payload: .podcast(feed.asPodcast)
         )
     }
 
@@ -678,7 +773,7 @@ private extension UniversalSearchResult {
         switch payload {
         case .channel:
             "play.fill"
-        case .article:
+        case .article, .podcast:
             "arrow.up.right"
         default:
             "chevron.right"
@@ -716,6 +811,21 @@ private extension ESPNArticle {
     var isSearchHighlight: Bool {
         let text = "\(type ?? "") \(headline) \(categories.joined(separator: " "))".searchNormalized
         return text.contains("highlight") || text.contains("video") || text.contains("media") || text.contains("play")
+    }
+}
+
+private extension PodcastCatalog.CatalogFeed {
+    var asPodcast: Podcast {
+        Podcast(
+            id: feedURL.absoluteString,
+            title: title,
+            publisher: "",
+            feedURL: feedURL,
+            artworkURL: imageURL,
+            podcastDescription: "",
+            sport: sport,
+            tags: tags
+        )
     }
 }
 

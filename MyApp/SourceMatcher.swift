@@ -35,7 +35,6 @@ nonisolated enum SourceMatcher {
         for channel in channels {
             let haystack = normalize([channel.name, channel.group ?? "", channel.playlistName].joined(separator: " "))
             let haystackTokens = Set(haystack.split(separator: " ").map(String.init))
-            let augmentedTokens = augmentWithNumberVariants(haystackTokens, in: haystack)
             var score = 0
 
             let homeHit = matches(homeTokens, in: haystack, tokens: haystackTokens) || aliasMatches(homeAliases, in: haystack, tokens: haystackTokens)
@@ -47,8 +46,7 @@ nonisolated enum SourceMatcher {
 
             // Event-title feeds matter for non-team sports and special broadcasts
             // such as Tour de France stages.
-            let eventTitleHit = eventTitleMatches(eventTokens, in: haystack, tokens: haystackTokens)
-            if eventTitleHit {
+            if eventTitleMatches(eventTokens, in: haystack, tokens: haystackTokens) {
                 score += 80
             }
 
@@ -58,20 +56,9 @@ nonisolated enum SourceMatcher {
             if homeAbbr.count >= 3, haystackTokens.contains(homeAbbr) { score += 15 }
             if awayAbbr.count >= 3, haystackTokens.contains(awayAbbr) { score += 15 }
 
-            // ESPN-confirmed broadcast network: whole-token matching with number-variant
-            // support (e.g. "ESPN2" matches a channel named "ESPN 2 HD"). Weighted above
-            // hardcoded fallback aliases — this data comes from the source of truth.
-            var broadcastHit = false
+            // Broadcast network on the channel name.
             for network in broadcasts where !network.isEmpty {
-                if broadcastNetworkMatches(network, in: haystack, tokens: augmentedTokens) {
-                    score += 80
-                    broadcastHit = true
-                }
-            }
-
-            // Confirmed broadcast + event/team overlap → near-certain this is the feed.
-            if broadcastHit && (homeHit || awayHit || eventTitleHit) {
-                score += 50
+                if haystack.contains(network) { score += 35 }
             }
 
             // Known event-specific rights holders, used when ESPN's broadcast
@@ -437,28 +424,5 @@ nonisolated enum SourceMatcher {
 
     private static func isKnownSportsNetwork(_ haystack: String) -> Bool {
         knownNetworks.contains { haystack.contains($0) }
-    }
-
-    /// Expands the token set with letter+digit concatenations of adjacent tokens so
-    /// "espn 2 hd" gains the synthetic token "espn2", letting broadcast value "ESPN2"
-    /// match via whole-token lookup rather than a false-positive substring search.
-    private static func augmentWithNumberVariants(_ tokens: Set<String>, in haystack: String) -> Set<String> {
-        let tokenArray = haystack.split(separator: " ").map(String.init)
-        var augmented = tokens
-        for i in 0..<(tokenArray.count - 1) {
-            let a = tokenArray[i], b = tokenArray[i + 1]
-            if (a.last?.isLetter == true && b.first?.isNumber == true) ||
-               (a.last?.isNumber == true && b.first?.isLetter == true) {
-                augmented.insert(a + b)
-            }
-        }
-        return augmented
-    }
-
-    /// Matches a normalized broadcast network name against a channel haystack.
-    /// Multi-word networks (e.g. "nfl network") use phrase matching; single-word
-    /// networks use whole-token lookup against the number-variant-augmented set.
-    private static func broadcastNetworkMatches(_ network: String, in haystack: String, tokens: Set<String>) -> Bool {
-        network.contains(" ") ? haystack.contains(network) : tokens.contains(network)
     }
 }

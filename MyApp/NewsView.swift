@@ -120,6 +120,21 @@ struct NewsView: View {
                             presentedArticle = article
                         }
                     }
+
+                    if viewModel.hasMore(for: selectedLeague) {
+                        if viewModel.isLoadingMore {
+                            ProgressView()
+                                .tint(Theme.accent)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        } else {
+                            Color.clear
+                                .frame(height: 1)
+                                .onAppear {
+                                    Task { await viewModel.loadMore(league: selectedLeague) }
+                                }
+                        }
+                    }
                 }
                 .padding(16)
             }
@@ -150,11 +165,20 @@ final class NewsViewModel: ObservableObject {
     @Published private(set) var articlesByLeague: [String: [ESPNArticle]] = [:]
     @Published private(set) var isLoading = false
     @Published private(set) var loadingLeagueIDs: Set<String> = []
+    @Published private(set) var isLoadingMore = false
 
     private let service = ESPNService()
+    private var pagesByLeague: [String: Int] = [:]   // last page fetched per league (1-indexed)
+    private var exhaustedLeagues: Set<String> = []   // leagues with no more pages
+    private var followedLeagueIDs: [String] = []     // kept so loadMore("All") knows which leagues to page
 
     func isLoadingLeague(_ league: League) -> Bool {
         loadingLeagueIDs.contains(league.id) || isLoading
+    }
+
+    func hasMore(for league: League?) -> Bool {
+        if let league { return !exhaustedLeagues.contains(league.id) }
+        return exhaustedLeagues.count < followedLeagueIDs.count
     }
 
     /// Articles for one league, or every loaded league merged when nil.
@@ -168,22 +192,23 @@ final class NewsViewModel: ObservableObject {
         // De-dupe by id, then by headline so the same story from both feeds collapses.
         let byID = Dictionary(grouping: pool, by: \.id).compactMap { $0.value.first }
         let unique = Dictionary(grouping: byID, by: { $0.headline.lowercased() }).compactMap { $0.value.first }
-        return unique
-            .sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
-            .prefix(40)
-            .map { $0 }
+        return unique.sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
     }
 
     func load(leagues: [League]) async {
+        pagesByLeague = [:]
+        exhaustedLeagues = []
+        followedLeagueIDs = leagues.map(\.id)
         isLoading = true
         await withTaskGroup(of: (String, [ESPNArticle]).self) { group in
             for league in leagues {
                 group.addTask {
-                    (league.id, await self.fetch(league: league))
+                    (league.id, await self.fetch(league: league, page: 1))
                 }
             }
             for await (id, articles) in group {
                 articlesByLeague[id] = articles
+                pagesByLeague[id] = 1
             }
         }
         isLoading = false
@@ -195,14 +220,53 @@ final class NewsViewModel: ObservableObject {
         if !force, loadingLeagueIDs.contains(league.id) { return }
         loadingLeagueIDs.insert(league.id)
         defer { loadingLeagueIDs.remove(league.id) }
-        articlesByLeague[league.id] = await fetch(league: league)
+        let articles = await fetch(league: league, page: 1)
+        articlesByLeague[league.id] = articles
+        pagesByLeague[league.id] = 1
+        exhaustedLeagues.remove(league.id)
     }
 
-    private func fetch(league: League) async -> [ESPNArticle] {
+    /// Loads the next page of articles, appending to the existing set.
+    func loadMore(league: League?) async {
+        guard !isLoading && !isLoadingMore else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
+
+        let targets: [String]
+        if let league {
+            guard !exhaustedLeagues.contains(league.id) else { return }
+            targets = [league.id]
+        } else {
+            targets = followedLeagueIDs.filter { !exhaustedLeagues.contains($0) }
+            guard !targets.isEmpty else { return }
+        }
+
+        let leaguesById = Dictionary(uniqueKeysWithValues: League.all.map { ($0.id, $0) })
+        await withTaskGroup(of: (String, [ESPNArticle]).self) { group in
+            for id in targets {
+                guard let lg = leaguesById[id] else { continue }
+                let nextPage = (pagesByLeague[id] ?? 1) + 1
+                group.addTask {
+                    (id, await self.fetch(league: lg, page: nextPage))
+                }
+            }
+            for await (id, newArticles) in group {
+                let nextPage = (pagesByLeague[id] ?? 1) + 1
+                if newArticles.isEmpty {
+                    exhaustedLeagues.insert(id)
+                } else {
+                    articlesByLeague[id, default: []].append(contentsOf: newArticles)
+                    pagesByLeague[id] = nextPage
+                }
+            }
+        }
+    }
+
+    private func fetch(league: League, page: Int) async -> [ESPNArticle] {
         // Only the site feed is league-specific. ESPN's "Now" feed ignores its
         // league parameter and returns global headlines, which made every
         // filter show the same stories under a different tag.
-        (try? await service.news(for: league, limit: 20)) ?? []
+        (try? await service.news(for: league, limit: 50, page: page)) ?? []
     }
 }
 

@@ -89,10 +89,12 @@ struct ESPNService {
         return decoded.events?.compactMap { $0.toMatch(league: league) } ?? []
     }
 
-    /// Fetches recent ESPN articles for a league.
-    func news(for league: League, limit: Int = 10) async throws -> [ESPNArticle] {
+    /// Fetches recent ESPN articles for a league. `page` is 1-indexed.
+    func news(for league: League, limit: Int = 10, page: Int = 1) async throws -> [ESPNArticle] {
         var components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/news")!
-        components.queryItems = [URLQueryItem(name: "limit", value: "\(limit)")]
+        var queryItems = [URLQueryItem(name: "limit", value: "\(limit)")]
+        if page > 1 { queryItems.append(URLQueryItem(name: "page", value: "\(page)")) }
+        components.queryItems = queryItems
 
         let (data, response) = try await session.data(from: components.url!)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {

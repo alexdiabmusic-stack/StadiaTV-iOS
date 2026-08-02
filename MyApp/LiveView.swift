@@ -5,7 +5,7 @@ import Combine
 
 struct LiveView: View {
     @EnvironmentObject private var prefs: PreferencesStore
-    @StateObject private var viewModel = LiveViewModel()
+    @EnvironmentObject private var viewModel: LiveViewModel
     @AppStorage("live.filter.v1") private var savedFilterRaw: String = LiveFilter.forYou.rawValue
     @State private var filter: LiveFilter = .forYou
     @State private var selectedSport: SportGroup?
@@ -63,7 +63,7 @@ struct LiveView: View {
                 filterStrip
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
-                    .background(.bar)
+                    .background(Theme.background)
                 Divider().overlay(Theme.hairline)
                 liveList
             }
@@ -557,6 +557,7 @@ final class LiveViewModel: ObservableObject {
     private var refreshTask: Task<Void, Never>?
     private var lastLoaded: Date?
     private let cacheLifetime: TimeInterval = 60
+    private var refreshClientCount = 0
 
     func load(favoriteTeams: [FavoriteTeam], force: Bool = false) async {
         if !force, let last = lastLoaded, Date().timeIntervalSince(last) < cacheLifetime { return }
@@ -588,6 +589,8 @@ final class LiveViewModel: ObservableObject {
     }
 
     func startAutoRefresh(favoriteTeams: [FavoriteTeam]) {
+        refreshClientCount += 1
+        guard refreshClientCount == 1 else { return }
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -599,6 +602,8 @@ final class LiveViewModel: ObservableObject {
     }
 
     func stopAutoRefresh() {
+        refreshClientCount = max(0, refreshClientCount - 1)
+        guard refreshClientCount == 0 else { return }
         refreshTask?.cancel()
         refreshTask = nil
     }

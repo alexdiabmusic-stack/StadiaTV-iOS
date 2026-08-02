@@ -46,6 +46,7 @@ struct MyApp: App {
 struct RootView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var podcastStore: PodcastStore
+    @StateObject private var liveViewModel = LiveViewModel()
     @State private var showingFavoriteNotificationPrompt = false
 
     // Applying safeAreaInset to each Tab's content (not the TabView) is the correct
@@ -82,8 +83,10 @@ struct RootView: View {
         }
         .tabViewStyle(.sidebarAdaptable)
         .tint(Theme.accent)
+        .environmentObject(liveViewModel)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: podcastStore.nowPlaying != nil)
         .task { updateFavoriteNotificationPrompt() }
+        .task { await liveViewModel.load(favoriteTeams: prefs.favoriteTeams) }
         .onChange(of: prefs.favoriteTeams) { updateFavoriteNotificationPrompt() }
         .onChange(of: prefs.matchNotificationsEnabled) { updateFavoriteNotificationPrompt() }
         .alert("Get notified before your favourite teams play?", isPresented: $showingFavoriteNotificationPrompt) {

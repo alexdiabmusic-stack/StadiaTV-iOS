@@ -74,7 +74,7 @@ struct DiscoverView: View {
             }
             .navigationTitle("Discover")
             .searchToolbar()
-            .sheet(item: $presentedArticle) { article in
+            .navigationDestination(item: $presentedArticle) { article in
                 ArticleReaderView(article: article)
             }
             .sheet(isPresented: $showingPodcasts) {

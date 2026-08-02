@@ -29,7 +29,7 @@ struct NewsView: View {
             }
             .navigationTitle("News")
             .searchToolbar()
-            .sheet(item: $presentedArticle) { article in
+            .navigationDestination(item: $presentedArticle) { article in
                 ArticleReaderView(article: article)
             }
         }

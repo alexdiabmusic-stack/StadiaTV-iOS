@@ -140,7 +140,7 @@ struct StatsView: View {
     }
 
     @ViewBuilder private var teamsView: some View {
-        if selectedLeague.group == .golf || selectedLeague.group == .racing {
+        if selectedLeague.group == .golf || selectedLeague.group == .racing || selectedLeague.group == .tennis {
             fieldView
         } else if isLoadingTeams && teams.isEmpty {
             Spacer()
@@ -198,7 +198,7 @@ struct StatsView: View {
     }
 
     private func loadTeams() async {
-        guard selectedLeague.group != .golf, selectedLeague.group != .racing else {
+        guard selectedLeague.group != .golf, selectedLeague.group != .racing, selectedLeague.group != .tennis else {
             teams = []
             isLoadingTeams = false
             return
@@ -236,6 +236,8 @@ private enum StatsSection: String, CaseIterable, Identifiable {
             return [.overview, .field, .leaders]
         case .golf:
             return [.overview, .field, .leaders]
+        case .tennis:
+            return [.overview, .standings, .leaders]
         case .soccer:
             return [.overview, .standings, .leaders, .teams]
         default:
@@ -500,6 +502,7 @@ private struct StatsFormatCard: View {
         case .baseball: return "Baseball Format"
         case .hockey: return "Hockey Format"
         case .soccer: return "Soccer Format"
+        case .tennis: return "Tennis Format"
         case .golf: return "Golf Format"
         case .racing: return "Racing Format"
         }
@@ -517,6 +520,8 @@ private struct StatsFormatCard: View {
             return ["Standings emphasize points, record, and streak.", "Rosters open player profiles and season stats.", "Injury reports appear when published by ESPN."]
         case .soccer:
             return ["League table is the main standings format.", "Team rosters are available for supported clubs and competitions.", "Leaders appear when ESPN publishes competition stat boards."]
+        case .tennis:
+            return ["Tennis uses draw brackets and match results instead of team rosters.", "Rankings and player match stats appear when ESPN publishes them.", "Team standings and injuries are not applicable for this format."]
         case .golf:
             return ["Golf uses tournament fields and scoreboards instead of team rosters.", "Leader boards are shown when ESPN exposes player statistics.", "Team standings and injuries are hidden for this format."]
         case .racing:

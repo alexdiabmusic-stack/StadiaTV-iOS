@@ -130,6 +130,7 @@ final class PodcastStore: ObservableObject {
         case .baseball:   label = "Baseball"
         case .hockey:     label = "Hockey"
         case .soccer:     label = "Soccer"
+        case .tennis:     label = "Tennis"
         case .golf:       label = "Golf"
         case .racing:     label = "Racing"
         }

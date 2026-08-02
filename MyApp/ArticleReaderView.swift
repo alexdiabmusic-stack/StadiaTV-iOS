@@ -51,7 +51,6 @@ enum ReaderSpacing: String, CaseIterable {
 
 struct ArticleReaderView: View {
     let article: ESPNArticle
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
 
     // Content
@@ -126,97 +125,87 @@ struct ArticleReaderView: View {
     // MARK: Body
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                readerBackground.ignoresSafeArea()
+        ZStack {
+            readerBackground.ignoresSafeArea()
 
-                GeometryReader { viewport in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            heroSection
-                            contentSection
-                                .padding(.horizontal, 20)
-                                .padding(.bottom, 80)
+            GeometryReader { viewport in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        heroSection
+                        contentSection
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 80)
+                    }
+                    .frame(maxWidth: 720)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        GeometryReader { inner in
+                            Color.clear.preference(
+                                key: ScrollContentFrameKey.self,
+                                value: inner.frame(in: .named("readerScroll"))
+                            )
                         }
-                        .frame(maxWidth: 720)
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            GeometryReader { inner in
-                                Color.clear.preference(
-                                    key: ScrollContentFrameKey.self,
-                                    value: inner.frame(in: .named("readerScroll"))
-                                )
-                            }
-                        )
-                    }
-                    .coordinateSpace(name: "readerScroll")
-                    .onPreferenceChange(ScrollContentFrameKey.self) { frame in
-                        let scrollable = frame.height - viewport.size.height
-                        guard scrollable > 0 else { scrollProgress = 0; return }
-                        scrollProgress = min(1, max(0, -frame.minY / scrollable))
-                    }
+                    )
                 }
+                .coordinateSpace(name: "readerScroll")
+                .onPreferenceChange(ScrollContentFrameKey.self) { frame in
+                    let scrollable = frame.height - viewport.size.height
+                    guard scrollable > 0 else { scrollProgress = 0; return }
+                    scrollProgress = min(1, max(0, -frame.minY / scrollable))
+                }
+            }
 
-                // Floating Aa button
-                VStack {
+            // Floating Aa button
+            VStack {
+                Spacer()
+                HStack {
                     Spacer()
-                    HStack {
-                        Spacer()
-                        Button { showingReaderSettings = true } label: {
-                            Text("Aa")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundStyle(Theme.accent)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 9)
-                                .background(
-                                    Capsule()
-                                        .fill(readerBackground)
-                                        .shadow(color: .black.opacity(0.18), radius: 10, y: 3)
-                                        .overlay(Capsule().strokeBorder(readerText.opacity(0.12)))
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 20)
+                    Button { showingReaderSettings = true } label: {
+                        Text("Aa")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 9)
+                            .background(
+                                Capsule()
+                                    .fill(readerBackground)
+                                    .shadow(color: .black.opacity(0.18), radius: 10, y: 3)
+                                    .overlay(Capsule().strokeBorder(readerText.opacity(0.12)))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 20)
+                }
+            }
+        }
+        .overlay(alignment: .top) { progressBar }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if let url = article.url {
+                    ShareLink(item: url) {
+                        Image(systemName: "square.and.arrow.up")
+                            .foregroundStyle(Theme.accent)
                     }
                 }
             }
-            .overlay(alignment: .top) { progressBar }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(readerSecondary)
-                            .font(.title3)
-                    }
+        }
+        .sheet(isPresented: $showingReaderSettings) {
+            ReaderSettingsSheet(
+                sizeStep: $sizeStep,
+                appearance: $appearance,
+                typeface: $typeface,
+                spacing: $spacing,
+                onReset: {
+                    sizeStep = 3
+                    appearance = .automatic
+                    typeface = .system
+                    spacing = .comfortable
                 }
-                ToolbarItem(placement: .primaryAction) {
-                    if let url = article.url {
-                        ShareLink(item: url) {
-                            Image(systemName: "square.and.arrow.up")
-                                .foregroundStyle(Theme.accent)
-                        }
-                    }
-                }
-            }
-            .sheet(isPresented: $showingReaderSettings) {
-                ReaderSettingsSheet(
-                    sizeStep: $sizeStep,
-                    appearance: $appearance,
-                    typeface: $typeface,
-                    spacing: $spacing,
-                    onReset: {
-                        sizeStep = 3
-                        appearance = .automatic
-                        typeface = .system
-                        spacing = .comfortable
-                    }
-                )
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
-            }
+            )
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
         }
         .preferredColorScheme(preferredScheme)
         .tint(Theme.accent)

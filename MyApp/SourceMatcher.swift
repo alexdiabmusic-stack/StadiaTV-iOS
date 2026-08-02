@@ -210,6 +210,9 @@ nonisolated enum SourceMatcher {
         if isTourDeFrance(title) {
             aliases += ["tour de france", "le tour", "tdf", "cycling", "cyclisme", "velo"]
         }
+        if match.league.group == .tennis {
+            aliases += ["tennis", "atp", "wta", "grand slam", "wimbledon", "us open", "french open", "roland garros", "australian open"]
+        }
         return aliases
     }
 
@@ -312,6 +315,14 @@ nonisolated enum SourceMatcher {
         case "golf/eur":
             return ["sky sports golf", "sky sport golf", "eurosport", "golf channel"]
 
+        // ── Tennis ───────────────────────────────────────────────────────────
+        case "tennis/atp", "tennis/wta":
+            return [
+                "tennis channel", "espn", "bein sport", "bein sports",
+                "eurosport", "amazon prime", "prime video",
+                "sky sports", "sky sport", "wowow", "supertennis"
+            ]
+
         default:
             break
         }
@@ -406,7 +417,7 @@ nonisolated enum SourceMatcher {
     private static let knownNetworks: Set<String> = [
         // US broadcast / cable
         "espn", "fox", "cbs", "nbc", "abc", "tnt", "tbs", "fs1", "fs2",
-        "nfl network", "nba tv", "nhl network", "mlb network", "golf channel",
+        "nfl network", "nba tv", "nhl network", "mlb network", "golf channel", "tennis channel",
         "usa network", "btn", "sec", "acc", "nbcsn", "peacock", "paramount", "prime",
         "apple tv", "mls season pass", "willow", "tudn",
         // International

@@ -106,7 +106,7 @@ struct ESPNService {
 
     /// Fetches every team in a league (used by the onboarding team picker).
     func teams(for league: League) async throws -> [Team] {
-        guard league.group != .golf else { return [] }
+        guard league.group != .golf, league.group != .tennis else { return [] }
 
         var components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/teams")!
         components.queryItems = [URLQueryItem(name: "limit", value: "1000")]

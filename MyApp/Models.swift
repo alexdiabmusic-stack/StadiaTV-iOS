@@ -9,6 +9,7 @@ enum SportGroup: String, CaseIterable, Identifiable {
     case baseball = "Baseball"
     case hockey = "Hockey"
     case soccer = "Soccer"
+    case tennis = "Tennis"
     case golf = "Golf"
     case racing = "Racing"
 
@@ -21,6 +22,7 @@ enum SportGroup: String, CaseIterable, Identifiable {
         case .baseball: return "baseball.fill"
         case .hockey: return "hockey.puck.fill"
         case .soccer: return "soccerball"
+        case .tennis: return "figure.tennis"
         case .golf: return "figure.golf"
         case .racing: return "flag.checkered"
         }
@@ -117,6 +119,11 @@ struct League: Identifiable, Hashable {
                keywords: ["world cup", "fifa", "soccer"]),
         League(name: "Women's World Cup", shortName: "WWC", path: "soccer/fifa.wwc", group: .soccer,
                keywords: ["women's world cup", "fifa", "soccer"]),
+        // Tennis
+        League(name: "ATP Tour", shortName: "ATP", path: "tennis/atp", group: .tennis,
+               keywords: ["atp", "atp tour", "tennis", "men's tennis"]),
+        League(name: "WTA Tour", shortName: "WTA", path: "tennis/wta", group: .tennis,
+               keywords: ["wta", "wta tour", "tennis", "women's tennis"]),
         // Golf
         League(name: "PGA Tour", shortName: "PGA", path: "golf/pga", group: .golf,
                keywords: ["pga", "pga tour", "golf", "open championship", "masters", "us open", "pga championship"]),

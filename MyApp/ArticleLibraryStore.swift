@@ -115,6 +115,24 @@ final class ArticleLibraryStore: ObservableObject {
         return byline
     }
 
+    /// Clears hidden articles and muted sources (resets content recommendations).
+    func clearRecommendations() {
+        hiddenArticleIDs.removeAll()
+        mutedSources.removeAll()
+        UserDefaults.standard.removeObject(forKey: hiddenArticlesKey)
+        UserDefaults.standard.removeObject(forKey: mutedSourcesKey)
+    }
+
+    /// Clears all local article data (saved, hidden, muted).
+    func clearAll() {
+        savedArticles.removeAll()
+        hiddenArticleIDs.removeAll()
+        mutedSources.removeAll()
+        UserDefaults.standard.removeObject(forKey: savedArticlesKey)
+        UserDefaults.standard.removeObject(forKey: hiddenArticlesKey)
+        UserDefaults.standard.removeObject(forKey: mutedSourcesKey)
+    }
+
     private func load() {
         if let data = UserDefaults.standard.data(forKey: savedArticlesKey),
            let decoded = try? JSONDecoder().decode([SavedArticle].self, from: data) {

@@ -474,7 +474,7 @@ struct SavedArticlesSettingsView: View {
                 }
             }
         }
-        .sheet(item: $presentedArticle) { article in
+        .navigationDestination(item: $presentedArticle) { article in
             ArticleReaderView(article: article)
         }
     }
@@ -482,12 +482,16 @@ struct SavedArticlesSettingsView: View {
 
 struct PrivacySyncSettingsView: View {
     @EnvironmentObject private var prefs: PreferencesStore
+    @EnvironmentObject private var watchStore: WatchStore
+    @EnvironmentObject private var articleLibrary: ArticleLibraryStore
+    @State private var lastSyncDate: Date? = CloudSyncService.shared.lastSyncDate
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         SettingsPage(title: "Privacy & Sync") {
             SettingsPanel(title: "ICLOUD") {
                 SettingsToggleRow(title: "iCloud Sync", isOn: Binding(get: { prefs.cloudSyncEnabled }, set: { prefs.setCloudSyncEnabled($0) }))
-                Text(prefs.cloudSyncEnabled ? "Last synced 3 minutes ago" : "Not syncing")
+                Text(syncStatusText)
                     .font(.footnote)
                     .foregroundStyle(Theme.textSecondary)
                     .padding(.horizontal, 14)
@@ -522,11 +526,26 @@ struct PrivacySyncSettingsView: View {
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
 
             SettingsPanel(title: "DATA CONTROLS") {
-                SettingsDisclosureRow(title: "Clear Watch History")
+                Button {
+                    watchStore.clearHistory()
+                } label: {
+                    SettingsDisclosureRow(title: "Clear Watch History")
+                }
+                .buttonStyle(.plain)
                 Divider().overlay(Theme.hairline)
-                SettingsDisclosureRow(title: "Reset Recommendations")
+                Button {
+                    articleLibrary.clearRecommendations()
+                } label: {
+                    SettingsDisclosureRow(title: "Reset Recommendations")
+                }
+                .buttonStyle(.plain)
                 Divider().overlay(Theme.hairline)
-                SettingsDisclosureRow(title: "Delete Local Data")
+                Button {
+                    showingDeleteConfirmation = true
+                } label: {
+                    SettingsDisclosureRow(title: "Delete Local Data", destructive: true)
+                }
+                .buttonStyle(.plain)
             }
 
             SettingsPanel(title: "ADVANCED") {
@@ -535,6 +554,126 @@ struct PrivacySyncSettingsView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .stadiatvCloudSyncDidChange)) { _ in
+            lastSyncDate = CloudSyncService.shared.lastSyncDate
+        }
+        .confirmationDialog("Delete Local Data", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete All Local Data", role: .destructive) {
+                watchStore.clearHistory()
+                articleLibrary.clearAll()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will clear your watch history, saved articles, hidden articles, and muted sources. This cannot be undone.")
+        }
+    }
+
+    private var syncStatusText: String {
+        guard prefs.cloudSyncEnabled else { return "Not syncing" }
+        guard let date = lastSyncDate else { return "Not yet synced" }
+        let diff = max(0, Int(Date().timeIntervalSince(date)))
+        if diff < 60 { return "Synced just now" }
+        let minutes = diff / 60
+        if minutes < 60 { return "Last synced \(minutes) minute\(minutes == 1 ? "" : "s") ago" }
+        let hours = minutes / 60
+        return "Last synced \(hours) hour\(hours == 1 ? "" : "s") ago"
+    }
+}
+
+struct WatchHistorySettingsView: View {
+    @EnvironmentObject private var watchStore: WatchStore
+    @State private var showingClearConfirmation = false
+
+    var body: some View {
+        SettingsPage(title: "Watch History") {
+            if watchStore.history.isEmpty {
+                VStack(spacing: 12) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 34, weight: .semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                    Text("No watch history")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("Channels you watch will appear here.")
+                        .font(.callout)
+                        .foregroundStyle(Theme.textSecondary)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(28)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(watchStore.history) { entry in
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(entry.saved.name)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Theme.textPrimary)
+                                    .lineLimit(1)
+                                if let group = entry.saved.group {
+                                    Text(group)
+                                        .font(.caption)
+                                        .foregroundStyle(Theme.accent)
+                                        .lineLimit(1)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                            Text(relativeDate(entry.lastWatched))
+                                .font(.caption)
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        .padding(14)
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                watchStore.removeFromHistory(entry)
+                            } label: {
+                                Label("Remove", systemImage: "trash")
+                            }
+                        }
+                        if entry.id != watchStore.history.last?.id {
+                            Divider().overlay(Theme.hairline)
+                        }
+                    }
+                }
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+
+                Button(role: .destructive) {
+                    showingClearConfirmation = true
+                } label: {
+                    Text("Clear Watch History")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .confirmationDialog("Clear Watch History", isPresented: $showingClearConfirmation, titleVisibility: .visible) {
+            Button("Clear All History", role: .destructive) {
+                watchStore.clearHistory()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will remove all \(watchStore.history.count) items from your watch history.")
+        }
+    }
+
+    private func relativeDate(_ date: Date) -> String {
+        let diff = max(0, Int(Date().timeIntervalSince(date)))
+        if diff < 60 { return "Just now" }
+        let minutes = diff / 60
+        if minutes < 60 { return "\(minutes)m ago" }
+        let hours = minutes / 60
+        if hours < 24 { return "\(hours)h ago" }
+        let days = hours / 24
+        if days == 1 { return "Yesterday" }
+        return "\(days)d ago"
     }
 }
 
@@ -959,12 +1098,13 @@ private struct StaticSwitchRow: View {
 private struct SettingsDisclosureRow: View {
     let title: String
     var value: String? = nil
+    var destructive: Bool = false
 
     var body: some View {
         HStack(spacing: 10) {
             Text(title)
                 .font(.body)
-                .foregroundStyle(Theme.textPrimary)
+                .foregroundStyle(destructive ? Color.red : Theme.textPrimary)
             Spacer()
             if let value {
                 Text(value)

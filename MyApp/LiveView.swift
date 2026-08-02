@@ -319,7 +319,7 @@ struct LiveView: View {
         case .basketball: return diff <= 10
         case .baseball: return diff <= 3
         case .football: return diff <= 8
-        case .golf, .racing: return false
+        case .golf, .racing, .tennis: return false
         }
     }
 

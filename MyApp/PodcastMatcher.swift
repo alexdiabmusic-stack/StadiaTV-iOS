@@ -70,6 +70,8 @@ actor PodcastMatcher {
             return ["golf PGA Tour podcast", "PGA golf analysis podcast", "golf podcast weekly"]
         case .racing:
             return ["Formula 1 F1 podcast", "NASCAR racing podcast", "motorsport F1 analysis"]
+        case .tennis:
+            return ["tennis ATP WTA podcast", "tennis analysis grand slam", "tennis podcast weekly"]
         }
     }
 
@@ -180,6 +182,9 @@ actor PodcastMatcher {
         case .racing:
             return (["formula 1", "f1", "nascar", "motorsport"],
                     ["indycar", "motogp", "grand prix", "verstappen"])
+        case .tennis:
+            return (["tennis", "atp", "wta"],
+                    ["wimbledon", "us open tennis", "french open", "grand slam"])
         }
     }
 

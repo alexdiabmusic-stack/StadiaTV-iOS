@@ -6,7 +6,7 @@ enum PodcastMedium: String, Codable {
     case audio, video
 
     /// Map PodcastIndex `medium` field strings to our enum.
-    static func from(piMedium: String?) -> PodcastMedium {
+    nonisolated static func from(piMedium: String?) -> PodcastMedium {
         switch piMedium?.lowercased() {
         case "video", "film", "videol": return .video
         default: return .audio
@@ -78,7 +78,7 @@ struct Podcast: Identifiable, Hashable, Codable {
         case id, title, publisher, feedURL, artworkURL, podcastDescription, sport, tags, medium
     }
 
-    init(id: String, title: String, publisher: String, feedURL: URL, artworkURL: URL?,
+    nonisolated init(id: String, title: String, publisher: String, feedURL: URL, artworkURL: URL?,
          podcastDescription: String, sport: String?, tags: [String], medium: PodcastMedium = .audio) {
         self.id = id; self.title = title; self.publisher = publisher; self.feedURL = feedURL
         self.artworkURL = artworkURL; self.podcastDescription = podcastDescription
@@ -168,6 +168,11 @@ struct PodcastEpisode: Identifiable, Hashable, Codable {
 
 struct PISearchResponse: Decodable {
     let feeds: [PIFeed]
+    nonisolated init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        feeds = try c.decode([PIFeed].self, forKey: .feeds)
+    }
+    private enum CodingKeys: String, CodingKey { case feeds }
 }
 
 struct PIFeed: Decodable {
@@ -179,9 +184,9 @@ struct PIFeed: Decodable {
     let description: String?
     let medium: String?     // "podcast", "video", "film", etc.
 
-    var podcastMedium: PodcastMedium { PodcastMedium.from(piMedium: medium) }
+    nonisolated var podcastMedium: PodcastMedium { PodcastMedium.from(piMedium: medium) }
 
-    func toPodcast(sport: String? = nil, tags: [String] = []) -> Podcast {
+    nonisolated func toPodcast(sport: String? = nil, tags: [String] = []) -> Podcast {
         Podcast(id: url.absoluteString, title: title, publisher: author ?? "",
                 feedURL: url, artworkURL: image,
                 podcastDescription: description ?? "", sport: sport, tags: tags,
@@ -191,6 +196,11 @@ struct PIFeed: Decodable {
 
 struct PIEpisodesResponse: Decodable {
     let items: [PIEpisode]
+    nonisolated init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        items = try c.decode([PIEpisode].self, forKey: .items)
+    }
+    private enum CodingKeys: String, CodingKey { case items }
 }
 
 struct PIEpisode: Decodable {

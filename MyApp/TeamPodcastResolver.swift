@@ -19,7 +19,14 @@ struct TeamPodcastSeed: Codable, Identifiable {
     }
 }
 
-struct ApplePodcastSearchResponse: Decodable { let results: [ApplePodcast] }
+struct ApplePodcastSearchResponse: Decodable {
+    let results: [ApplePodcast]
+    nonisolated init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        results = try c.decode([ApplePodcast].self, forKey: .results)
+    }
+    private enum CodingKeys: String, CodingKey { case results }
+}
 struct ApplePodcast: Decodable, Hashable {
     let collectionId: Int?
     let collectionName: String?

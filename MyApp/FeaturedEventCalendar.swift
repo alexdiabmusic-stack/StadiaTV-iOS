@@ -60,7 +60,11 @@ struct FeaturedEventPick: Identifiable, Hashable {
         if value.contains("baseball") { return .baseball }
         if value.contains("hockey") { return .hockey }
         if value.contains("soccer") { return .soccer }
+        if value.contains("tennis") { return .tennis }
         if value.contains("golf") { return .golf }
+        if value.contains("cycling") { return .cycling }
+        if value.contains("wrestling") { return .wrestling }
+        if value.contains("esports") { return .esports }
         return .racing
     }
 

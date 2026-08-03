@@ -12,8 +12,20 @@ enum SportGroup: String, CaseIterable, Identifiable {
     case tennis = "Tennis"
     case golf = "Golf"
     case racing = "Racing"
+    // Non-ESPN sports — used for featured event icons only, not shown in league pickers
+    case cycling = "Cycling"
+    case wrestling = "Wrestling"
+    case esports = "Esports"
 
     var id: String { rawValue }
+
+    /// ESPN-backed sports that have followable leagues. Non-ESPN sports are excluded from league/sport pickers.
+    var hasEspnLeagues: Bool {
+        switch self {
+        case .cycling, .wrestling, .esports: return false
+        default: return true
+        }
+    }
 
     var systemImage: String {
         switch self {
@@ -25,6 +37,9 @@ enum SportGroup: String, CaseIterable, Identifiable {
         case .tennis: return "figure.tennis"
         case .golf: return "figure.golf"
         case .racing: return "flag.checkered"
+        case .cycling: return "figure.outdoor.cycle"
+        case .wrestling: return "figure.wrestling"
+        case .esports: return "gamecontroller.fill"
         }
     }
 }

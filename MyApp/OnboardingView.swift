@@ -80,7 +80,7 @@ struct OnboardingView: View {
                      subtitle: "We'll tailor scores and schedules to what you follow.") {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 12)], spacing: 12) {
-                    ForEach(SportGroup.allCases) { sport in
+                    ForEach(SportGroup.allCases.filter { $0.hasEspnLeagues }) { sport in
                         SelectableCard(
                             title: sport.rawValue,
                             systemImage: sport.systemImage,

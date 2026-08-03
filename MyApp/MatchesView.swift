@@ -186,7 +186,7 @@ struct MatchesView: View {
         let favoriteLeagueIDs = Set(prefs.favoriteTeams.map(\.leaguePath))
         return Array(League.all.filter {
             prefs.isLeagueSelected($0) || favoriteLeagueIDs.contains($0.id)
-        }.prefix(4))
+        }.prefix(10))
     }
 
     private func followChip(title: String, logoURL: URL?, isSelected: Bool, action: @escaping () -> Void) -> some View {

@@ -19,6 +19,8 @@ struct DiscoverView: View {
             return League.all.filter { $0.shortName == shortName }
         case .soccer:
             return League.all.filter { $0.group == .soccer }
+        case .tennis:
+            return League.all.filter { $0.group == .tennis }
         }
     }
 
@@ -262,8 +264,9 @@ private enum DiscoverSportFilter: Hashable, Identifiable, CaseIterable {
     case all
     case league(String)
     case soccer
+    case tennis
 
-    static let allCases: [DiscoverSportFilter] = [.forYou, .all, .league("NHL"), .league("MLB"), .league("NBA"), .soccer, .league("F1")]
+    static let allCases: [DiscoverSportFilter] = [.forYou, .all, .league("NHL"), .league("MLB"), .league("NBA"), .soccer, .league("F1"), .tennis]
 
     var id: String { title }
 
@@ -273,6 +276,7 @@ private enum DiscoverSportFilter: Hashable, Identifiable, CaseIterable {
         case .all: "All"
         case .league(let shortName): shortName
         case .soccer: "Soccer"
+        case .tennis: "Tennis"
         }
     }
 }
@@ -353,17 +357,16 @@ private struct TeamNewsRow: View {
     let onMute: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Text("[\(article.league.shortName)]")
-                .font(.caption.weight(.heavy))
-                .foregroundStyle(Theme.accent)
-                .frame(width: 48, alignment: .leading)
+        HStack(alignment: .center, spacing: 12) {
+            ArticleImage(url: article.imageURL)
+                .frame(width: 60, height: 46)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {
                 Text(article.headline)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(2)
-                Text(article.relativePublishedText)
+                Text(article.metadataLine(includeSource: false))
                     .font(.caption)
                     .foregroundStyle(Theme.textSecondary)
             }

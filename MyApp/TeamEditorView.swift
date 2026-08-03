@@ -13,7 +13,7 @@ struct TeamEditorView: View {
                 Theme.background.ignoresSafeArea()
                 List {
                     favoritesSection
-                    ForEach(SportGroup.allCases) { sport in
+                    ForEach(SportGroup.allCases.filter { $0.hasEspnLeagues }) { sport in
                         leagueSection(for: sport)
                     }
                 }

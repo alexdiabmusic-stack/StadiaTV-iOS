@@ -28,7 +28,7 @@ struct PreferencesView: View {
     }
 
     private var leaguesSection: some View {
-        ForEach(SportGroup.allCases) { sport in
+        ForEach(SportGroup.allCases.filter { $0.hasEspnLeagues }) { sport in
             Section {
                 ForEach(League.leagues(in: sport)) { league in
                     Button {

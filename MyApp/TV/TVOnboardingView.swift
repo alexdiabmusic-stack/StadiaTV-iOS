@@ -83,7 +83,7 @@ struct TVOnboardingView: View {
                     columns: [GridItem(.adaptive(minimum: 220, maximum: 260), spacing: 16)],
                     spacing: 16
                 ) {
-                    ForEach(SportGroup.allCases) { sport in
+                    ForEach(SportGroup.allCases.filter { $0.hasEspnLeagues }) { sport in
                         let selected = selectedSports.contains(sport)
                         Button {
                             if selectedSports.contains(sport) {

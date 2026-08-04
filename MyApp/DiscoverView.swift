@@ -181,6 +181,8 @@ struct DiscoverView: View {
                 }
 
 
+                HighlightsSection(leagues: targetLeagues)
+
                 podcastCarouselSection
 
                 if !latestArticles.isEmpty {

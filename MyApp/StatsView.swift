@@ -505,6 +505,7 @@ private struct StatsFormatCard: View {
         case .tennis: return "Tennis Format"
         case .golf: return "Golf Format"
         case .racing: return "Racing Format"
+        case .cycling, .wrestling, .esports: return "Sport Format"
         }
     }
 
@@ -526,6 +527,8 @@ private struct StatsFormatCard: View {
             return ["Golf uses tournament fields and scoreboards instead of team rosters.", "Leader boards are shown when ESPN exposes player statistics.", "Team standings and injuries are hidden for this format."]
         case .racing:
             return ["Racing uses entrants, race position, and constructor/team context.", "Race field replaces team rosters.", "Leader boards appear when supported for the series."]
+        case .cycling, .wrestling, .esports:
+            return []
         }
     }
 }

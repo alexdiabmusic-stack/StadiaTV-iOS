@@ -1063,7 +1063,7 @@ struct MatchDetailView: View {
             switch sport {
             case .basketball, .hockey: return 1.58
             case .baseball: return 1.05
-            case .football, .golf, .racing, .tennis: return 1.9
+            case .football, .golf, .racing, .tennis, .cycling, .wrestling, .esports: return 1.9
             case .soccer: return 1.52
             }
         }
@@ -1109,6 +1109,7 @@ struct MatchDetailView: View {
             case .golf: return Color(hex: 0x1B3B2A)
             case .racing: return Color(hex: 0x2A2C31)
             case .tennis: return Color(hex: 0x3B6E2A)
+            case .cycling, .wrestling, .esports: return Color(hex: 0x2A2C31)
             }
         }
 
@@ -1124,7 +1125,7 @@ struct MatchDetailView: View {
                 BaseballDiamondLines()
             case .hockey:
                 HockeyRinkLines()
-            case .golf, .racing, .tennis:
+            case .golf, .racing, .tennis, .cycling, .wrestling, .esports:
                 EmptyView()
             }
         }
@@ -1183,7 +1184,7 @@ struct MatchDetailView: View {
             case .basketball: mapped = basketballPoint(for: key)
             case .baseball: mapped = baseballPoint(for: key)
             case .hockey: mapped = hockeyPoint(for: key)
-            case .golf, .racing, .tennis: mapped = nil
+            case .golf, .racing, .tennis, .cycling, .wrestling, .esports: mapped = nil
             }
             return jitter(mapped ?? fallbackPoint(for: fallbackIndex), index: fallbackIndex)
         }

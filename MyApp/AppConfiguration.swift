@@ -4,6 +4,7 @@ enum AppConfiguration {
     private static let oddsAPIKeyName = "OddsAPIKey"
     private static let oddsAPIBaseURLName = "OddsAPIBaseURL"
     private static let backendBaseURLName = "BackendBaseURL"
+    private static let youtubeAPIKeyName = "YouTubeAPIKey"
 
     static var oddsAPIKey: String? {
         sanitizedString(for: oddsAPIKeyName)
@@ -19,8 +20,16 @@ enum AppConfiguration {
         sanitizedString(for: backendBaseURLName).flatMap(URL.init(string:))
     }
 
+    static var youtubeAPIKey: String? {
+        sanitizedString(for: youtubeAPIKeyName)
+    }
+
     static var isOddsEnabled: Bool {
         oddsAPIKey != nil
+    }
+
+    static var isYouTubeEnabled: Bool {
+        youtubeAPIKey != nil
     }
 
     private static func sanitizedString(for key: String) -> String? {

@@ -35,6 +35,8 @@
 	<string>https://mlapi.bet/v1</string>
 	<key>OddsAPIKey</key>
 	<string>ml_live_f9343cc2d553c8dd7dd7545940eeb550</string>
+	<key>YouTubeAPIKey</key>
+	<string>AIzaSyB5dzDZwSzrxDggl2Ld-gY_epS7XTQQwh0</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -133,6 +133,9 @@ final class PodcastStore: ObservableObject {
         case .tennis:     label = "Tennis"
         case .golf:       label = "Golf"
         case .racing:     label = "Racing"
+        case .cycling:    label = "Cycling"
+        case .wrestling:  label = "Wrestling"
+        case .esports:    label = "Esports"
         }
         return catalog.filter { $0.sport.lowercased() == label.lowercased() }.prefix(20).map { $0 }
     }
@@ -440,7 +443,7 @@ final class PodcastStore: ObservableObject {
     // MARK: - Now Playing info (lock screen / Control Center / Dynamic Island)
 
     private func configureNowPlaying(for episode: PodcastEpisode) {
-        var info: [String: Any] = [
+        let info: [String: Any] = [
             MPMediaItemPropertyTitle: episode.title,
             MPMediaItemPropertyArtist: episode.podcastTitle,
             MPMediaItemPropertyAlbumTitle: episode.podcastTitle,

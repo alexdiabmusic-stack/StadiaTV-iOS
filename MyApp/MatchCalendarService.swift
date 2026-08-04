@@ -60,6 +60,7 @@ final class MatchCalendarService {
         case .golf: return 4 * 60 * 60
         case .racing: return 2 * 60 * 60
         case .tennis: return 2.5 * 60 * 60
+        case .cycling, .wrestling, .esports: return 2 * 60 * 60
         }
     }
 

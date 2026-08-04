@@ -180,8 +180,8 @@ struct DiscoverView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
                 }
 
-
-                HighlightsSection(leagues: targetLeagues)
+                TopHighlightsSection(leagues: targetLeagues)
+                TeamHighlightsSection(favoriteTeams: prefs.favoriteTeams)
 
                 podcastCarouselSection
 

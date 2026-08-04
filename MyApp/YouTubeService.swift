@@ -4,12 +4,13 @@ import Foundation
 
 struct YouTubeVideoItem: Identifiable, Hashable {
     enum Source: Hashable {
-        case league, home, away
+        case league, home, away, team
         var label: String {
             switch self {
             case .league: "LEAGUE"
             case .home:   "HOME"
             case .away:   "AWAY"
+            case .team:   "TEAM"
             }
         }
     }
@@ -156,6 +157,21 @@ actor YouTubeService {
         async let teamItems   = fetchTeamHighlights(for: match)
         let (league, teams) = await (leagueItems, teamItems)
         return deduplicated(teams + league)
+    }
+
+    /// Fetches recent highlight videos from a league's core channel.
+    func fetchLatestHighlights(leagueKey: String, limit: Int = 10) async -> [YouTubeVideoItem] {
+        guard let core = manifest.coreChannels.first(where: { $0.key == leagueKey }) else { return [] }
+        let raw = (try? await fetchPlaylistItems(playlistId: core.uploadsPlaylistId)) ?? []
+        return raw.filter { isHighlight($0.title) }.prefix(limit).map { makeItem($0, source: .league) }
+    }
+
+    /// Fetches recent highlight videos from a team's own YouTube channel.
+    func fetchHighlights(teamKey: String, leagueKey: String, limit: Int = 8) async -> [YouTubeVideoItem] {
+        guard let team = manifest.teamChannels.first(where: { $0.key == teamKey && $0.league == leagueKey }),
+              let resolved = try? await resolver.resolve(team) else { return [] }
+        let raw = (try? await fetchPlaylistItems(playlistId: resolved.uploadsPlaylistId)) ?? []
+        return raw.filter { isHighlight($0.title) }.prefix(limit).map { makeItem($0, source: .team) }
     }
 
     // MARK: - Private

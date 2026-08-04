@@ -2,88 +2,40 @@ import Combine
 import SwiftUI
 import WebKit
 
-// MARK: - ViewModel
+// MARK: - Top Highlights
 
 @MainActor
-final class HighlightsViewModel: ObservableObject {
-    @Published var matches: [Match] = []
-    @Published var selectedMatch: Match?
-    @Published var highlights: [YouTubeVideoItem] = []
-    @Published var isLoadingMatches = false
-    @Published var isLoadingHighlights = false
+final class TopHighlightsViewModel: ObservableObject {
+    @Published var items: [YouTubeVideoItem] = []
+    @Published var isLoading = false
 
-    private let espnService = ESPNService()
-    private var highlightTask: Task<Void, Never>?
-
-    var supportedMatches: [Match] {
-        matches.filter { YouTubeService.supportedLeaguePaths[$0.league.path] != nil }
-    }
-
-    func loadMatches(for leagues: [League]) async {
-        let supported = leagues.filter { YouTubeService.supportedLeaguePaths[$0.path] != nil }
-        guard !supported.isEmpty else {
-            matches = []
-            selectedMatch = nil
-            highlights = []
-            return
-        }
-        isLoadingMatches = true
-        let service = espnService
-        var all: [Match] = []
-        await withTaskGroup(of: [Match].self) { group in
-            for league in supported.prefix(5) {
-                group.addTask { (try? await service.scoreboard(for: league)) ?? [] }
+    func load(leagues: [League]) async {
+        guard let service = YouTubeService.shared else { return }
+        let keys = leagues.compactMap { YouTubeService.supportedLeaguePaths[$0.path] }
+        guard !keys.isEmpty else { items = []; return }
+        isLoading = true
+        var all: [YouTubeVideoItem] = []
+        await withTaskGroup(of: [YouTubeVideoItem].self) { group in
+            for key in keys {
+                group.addTask { await service.fetchLatestHighlights(leagueKey: key) }
             }
             for await result in group { all += result }
         }
-        // Prioritize final > live > pre so recently-finished games appear first
-        matches = all.sorted { statePriority($0) < statePriority($1) }
-        isLoadingMatches = false
-        let current = selectedMatch
-        if current == nil || supportedMatches.first(where: { $0.id == current?.id }) == nil {
-            if let first = supportedMatches.first { selectMatch(first) }
-        }
-    }
-
-    func selectMatch(_ match: Match) {
-        guard YouTubeService.shared != nil else { return }
-        selectedMatch = match
-        highlights = []
-        highlightTask?.cancel()
-        isLoadingHighlights = true
-        highlightTask = Task { @MainActor [weak self] in
-            guard let self, let service = YouTubeService.shared else {
-                self?.isLoadingHighlights = false
-                return
-            }
-            let items = await service.fetchHighlights(for: match)
-            guard !Task.isCancelled else { return }
-            self.highlights = items
-            self.isLoadingHighlights = false
-        }
-    }
-
-    private func statePriority(_ match: Match) -> Int {
-        switch match.state {
-        case .final: return 0
-        case .live:  return 1
-        case .pre:   return 2
-        }
+        items = all.sorted { ($0.publishedAt ?? .distantPast) > ($1.publishedAt ?? .distantPast) }
+        isLoading = false
     }
 }
 
-// MARK: - Section
-
-struct HighlightsSection: View {
+struct TopHighlightsSection: View {
     let leagues: [League]
-    @StateObject private var viewModel = HighlightsViewModel()
+    @StateObject private var viewModel = TopHighlightsViewModel()
     @State private var playingItem: YouTubeVideoItem?
 
     var body: some View {
         if YouTubeService.shared != nil {
             sectionContent
-                .task(id: supportedLeagueIds) {
-                    await viewModel.loadMatches(for: leagues)
+                .task(id: supportedLeagueKeys) {
+                    await viewModel.load(leagues: leagues)
                 }
                 .sheet(item: $playingItem) { item in
                     YouTubePlayerSheet(item: item)
@@ -92,123 +44,132 @@ struct HighlightsSection: View {
     }
 
     @ViewBuilder private var sectionContent: some View {
-        if viewModel.isLoadingMatches && viewModel.matches.isEmpty {
+        if viewModel.isLoading && viewModel.items.isEmpty {
             highlightsShell {
                 HStack { Spacer(); ProgressView().tint(Theme.accent); Spacer() }
-                    .frame(height: 100)
+                    .frame(height: 160)
             }
-        } else if !viewModel.supportedMatches.isEmpty {
-            highlightsShell {
-                gamePickerRow
-                videoRow
-            }
+        } else if !viewModel.items.isEmpty {
+            highlightsShell { videoRow }
         }
     }
 
     private func highlightsShell<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            headerRow
+            HStack(spacing: 6) {
+                Image(systemName: "play.rectangle.fill").foregroundStyle(Theme.accent)
+                Text("TOP HIGHLIGHTS").foregroundStyle(Theme.textSecondary)
+                Spacer()
+            }
+            .font(.footnote.weight(.semibold))
+            .padding(.horizontal, 4)
             content()
         }
     }
 
-    private var headerRow: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "play.rectangle.fill")
-                .foregroundStyle(Theme.accent)
-            Text("HIGHLIGHTS")
-                .foregroundStyle(Theme.textSecondary)
-            Spacer()
-        }
-        .font(.footnote.weight(.semibold))
-        .padding(.horizontal, 4)
-    }
-
-    private var gamePickerRow: some View {
+    private var videoRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(viewModel.supportedMatches) { match in
-                    MatchChip(match: match, isSelected: viewModel.selectedMatch?.id == match.id)
-                        .onTapGesture { viewModel.selectMatch(match) }
+            LazyHStack(spacing: 12) {
+                ForEach(viewModel.items) { item in
+                    HighlightVideoCard(item: item)
+                        .onTapGesture { playingItem = item }
                 }
             }
             .padding(.horizontal, 20)
         }
     }
 
-    @ViewBuilder private var videoRow: some View {
-        if viewModel.isLoadingHighlights {
-            HStack { Spacer(); ProgressView().tint(Theme.accent); Spacer() }
-                .frame(height: 160)
-        } else if viewModel.highlights.isEmpty {
-            HStack {
-                Spacer()
-                VStack(spacing: 8) {
-                    Image(systemName: "video.slash")
-                        .font(.title2)
-                        .foregroundStyle(Theme.textSecondary.opacity(0.45))
-                    Text("No highlights found")
-                        .font(.callout)
-                        .foregroundStyle(Theme.textSecondary)
-                }
-                Spacer()
-            }
-            .frame(height: 120)
-        } else {
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(viewModel.highlights) { item in
-                        HighlightVideoCard(item: item)
-                            .onTapGesture { playingItem = item }
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-        }
-    }
-
-    private var supportedLeagueIds: String {
-        leagues
-            .filter { YouTubeService.supportedLeaguePaths[$0.path] != nil }
-            .map(\.id).sorted().joined(separator: ",")
+    private var supportedLeagueKeys: String {
+        leagues.compactMap { YouTubeService.supportedLeaguePaths[$0.path] }.sorted().joined(separator: ",")
     }
 }
 
-// MARK: - Match Chip
+// MARK: - Team Highlights
 
-private struct MatchChip: View {
-    let match: Match
-    let isSelected: Bool
+@MainActor
+final class TeamHighlightsViewModel: ObservableObject {
+    @Published var items: [YouTubeVideoItem] = []
+    @Published var isLoading = false
 
-    var body: some View {
-        VStack(spacing: 3) {
-            Text(match.shortName)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(isSelected ? .white : Theme.textPrimary)
-                .lineLimit(1)
-            stateLabel
+    func load(teams: [FavoriteTeam]) async {
+        guard let service = YouTubeService.shared else { return }
+        let pairs = teams.compactMap { team -> (String, String)? in
+            guard let leagueKey = YouTubeService.supportedLeaguePaths[team.leaguePath] else { return nil }
+            return (team.abbreviation.lowercased(), leagueKey)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(isSelected ? Theme.accent : Theme.surface,
-                    in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(isSelected ? Theme.accent : Theme.hairline)
-        )
+        guard !pairs.isEmpty else { items = []; return }
+        isLoading = true
+        var all: [YouTubeVideoItem] = []
+        await withTaskGroup(of: [YouTubeVideoItem].self) { group in
+            for (teamKey, leagueKey) in pairs {
+                group.addTask { await service.fetchHighlights(teamKey: teamKey, leagueKey: leagueKey) }
+            }
+            for await result in group { all += result }
+        }
+        items = all.sorted { ($0.publishedAt ?? .distantPast) > ($1.publishedAt ?? .distantPast) }
+        isLoading = false
+    }
+}
+
+struct TeamHighlightsSection: View {
+    let favoriteTeams: [FavoriteTeam]
+    @StateObject private var viewModel = TeamHighlightsViewModel()
+    @State private var playingItem: YouTubeVideoItem?
+
+    private var supportedTeams: [FavoriteTeam] {
+        favoriteTeams.filter { YouTubeService.supportedLeaguePaths[$0.leaguePath] != nil }
     }
 
-    @ViewBuilder private var stateLabel: some View {
-        switch match.state {
-        case .live:
-            Text("LIVE")
-                .font(.caption2.weight(.heavy))
-                .foregroundStyle(Theme.live)
-        case .final, .pre:
-            Text(match.statusDetail)
-                .font(.caption2)
-                .foregroundStyle(isSelected ? .white.opacity(0.72) : Theme.textSecondary)
+    var body: some View {
+        if YouTubeService.shared != nil && !supportedTeams.isEmpty {
+            sectionContent
+                .task(id: teamCacheKey) {
+                    await viewModel.load(teams: supportedTeams)
+                }
+                .sheet(item: $playingItem) { item in
+                    YouTubePlayerSheet(item: item)
+                }
         }
+    }
+
+    @ViewBuilder private var sectionContent: some View {
+        if viewModel.isLoading && viewModel.items.isEmpty {
+            highlightsShell {
+                HStack { Spacer(); ProgressView().tint(Theme.accent); Spacer() }
+                    .frame(height: 160)
+            }
+        } else if !viewModel.items.isEmpty {
+            highlightsShell { videoRow }
+        }
+    }
+
+    private func highlightsShell<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "star.fill").foregroundStyle(Theme.accent)
+                Text("YOUR TEAM HIGHLIGHTS").foregroundStyle(Theme.textSecondary)
+                Spacer()
+            }
+            .font(.footnote.weight(.semibold))
+            .padding(.horizontal, 4)
+            content()
+        }
+    }
+
+    private var videoRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 12) {
+                ForEach(viewModel.items) { item in
+                    HighlightVideoCard(item: item)
+                        .onTapGesture { playingItem = item }
+                }
+            }
+            .padding(.horizontal, 20)
+        }
+    }
+
+    private var teamCacheKey: String {
+        supportedTeams.map { "\($0.leaguePath)-\($0.abbreviation)" }.sorted().joined(separator: ",")
     }
 }
 
@@ -244,7 +205,7 @@ private struct HighlightVideoCard: View {
                 }
             }
         }
-        .frame(width: 180, height: 101)   // 16 : 9
+        .frame(width: 180, height: 101)   // 16:9
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(
@@ -274,6 +235,7 @@ private struct HighlightVideoCard: View {
         case .league: Theme.accent
         case .home:   .blue
         case .away:   .green
+        case .team:   .orange
         }
     }
 }

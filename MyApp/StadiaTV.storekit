@@ -36,9 +36,35 @@
       "subscriptions" : [
         {
           "adHocOffers" : [],
-          "displayPrice" : "14.99",
+          "displayPrice" : "1.99",
           "familyShareable" : false,
           "groupNumber" : 1,
+          "internalID" : "C3D4E5F6-A7B8-9C0D-1E2F-3A4B5C6D7E8F",
+          "introductoryOffer" : {
+            "displayPrice" : "0.00",
+            "offerIdentifier" : null,
+            "offerType" : 1,
+            "period" : "P7D",
+            "periodCount" : 1
+          },
+          "localizations" : [
+            {
+              "description" : "Full access to all StadiaTV Premium features with a 7-day free trial. Auto-renews monthly.",
+              "displayName" : "Premium — Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "stadiatv.premium.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Premium Monthly",
+          "subscriptionGroupID" : "D8E9F0A1-B2C3-4D5E-F6A7-B8C9D0E1F2A3",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "displayPrice" : "14.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
           "internalID" : "A1B2C3D4-E5F6-7A8B-9C0D-E1F2A3B4C5D6",
           "introductoryOffer" : null,
           "localizations" : [

@@ -2,6 +2,126 @@ import Combine
 import SwiftUI
 import WebKit
 
+// MARK: - Recent Sports Highlights
+
+@MainActor
+final class RecentSportsHighlightsViewModel: ObservableObject {
+    @Published var clips: [MatchHighlight] = []
+    @Published var isLoading = false
+
+    private let service = ESPNService()
+
+    func load(leagues: [League]) async {
+        let limitedLeagues = Array(leagues.prefix(8))
+        guard !limitedLeagues.isEmpty else {
+            clips = []
+            return
+        }
+
+        isLoading = true
+        let startDate = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        var finishedMatches: [Match] = []
+
+        await withTaskGroup(of: [Match].self) { group in
+            for league in limitedLeagues {
+                group.addTask { [service] in
+                    let matches = (try? await service.scoreboards(for: league, starting: startDate, days: 8)) ?? []
+                    return matches.filter { $0.state == .final }
+                }
+            }
+
+            for await matches in group {
+                finishedMatches.append(contentsOf: matches)
+            }
+        }
+
+        let recentMatches = finishedMatches
+            .sorted { $0.date > $1.date }
+            .prefix(10)
+
+        var loadedClips: [MatchHighlight] = []
+        await withTaskGroup(of: [MatchHighlight].self) { group in
+            for match in recentMatches {
+                group.addTask { [service] in
+                    (try? await service.gameSummary(for: match.league, eventID: match.id))?.highlights ?? []
+                }
+            }
+
+            for await matchClips in group {
+                loadedClips.append(contentsOf: matchClips)
+            }
+        }
+
+        var seen = Set<String>()
+        clips = loadedClips.filter { clip in
+            seen.insert(clip.id).inserted
+        }
+        .prefix(12)
+        .map { $0 }
+        isLoading = false
+    }
+}
+
+struct RecentSportsHighlightsSection: View {
+    let leagues: [League]
+    @StateObject private var viewModel = RecentSportsHighlightsViewModel()
+
+    var body: some View {
+        sectionContent
+            .task(id: leagueCacheKey) {
+                await viewModel.load(leagues: leagues)
+            }
+    }
+
+    @ViewBuilder private var sectionContent: some View {
+        if viewModel.isLoading && viewModel.clips.isEmpty {
+            highlightsShell {
+                HStack { Spacer(); ProgressView().tint(Theme.accent); Spacer() }
+                    .frame(height: 150)
+            }
+        } else if !viewModel.clips.isEmpty {
+            highlightsShell { clipRow }
+        }
+    }
+
+    private func highlightsShell<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "play.circle.fill")
+                    .foregroundStyle(Theme.accent)
+                Text("SPORTS HIGHLIGHTS")
+                    .foregroundStyle(Theme.textSecondary)
+                Spacer()
+                Text("RECENT")
+                    .font(.caption2.weight(.black))
+                    .foregroundStyle(Theme.accent)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Theme.accent.opacity(0.12), in: Capsule())
+            }
+            .font(.footnote.weight(.semibold))
+            .padding(.horizontal, 4)
+
+            content()
+        }
+    }
+
+    private var clipRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            LazyHStack(spacing: 12) {
+                ForEach(viewModel.clips) { clip in
+                    HighlightCard(clip: clip)
+                }
+            }
+            .padding(.horizontal, 20)
+        }
+    }
+
+    private var leagueCacheKey: String {
+        leagues.map(\.id).sorted().joined(separator: ",")
+    }
+}
+
 // MARK: - Top Highlights
 
 @MainActor

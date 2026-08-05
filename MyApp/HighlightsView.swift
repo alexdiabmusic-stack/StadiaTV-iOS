@@ -29,7 +29,9 @@ final class TopHighlightsViewModel: ObservableObject {
 struct TopHighlightsSection: View {
     let leagues: [League]
     @StateObject private var viewModel = TopHighlightsViewModel()
+    @EnvironmentObject private var entitlements: EntitlementStore
     @State private var playingItem: YouTubeVideoItem?
+    @State private var showPaywall = false
 
     var body: some View {
         if YouTubeService.shared != nil {
@@ -39,6 +41,11 @@ struct TopHighlightsSection: View {
                 }
                 .sheet(item: $playingItem) { item in
                     YouTubePlayerSheet(item: item)
+                }
+                .sheet(isPresented: $showPaywall) {
+                    PaywallView()
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
                 }
         }
     }
@@ -60,6 +67,19 @@ struct TopHighlightsSection: View {
                 Image(systemName: "play.rectangle.fill").foregroundStyle(Theme.accent)
                 Text("TOP HIGHLIGHTS").foregroundStyle(Theme.textSecondary)
                 Spacer()
+                if !entitlements.isPremium {
+                    HStack(spacing: 4) {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Color(hex: 0xFFCC00))
+                        Text("VIP")
+                            .font(.system(size: 9, weight: .black))
+                            .foregroundStyle(Color(hex: 0xFFCC00))
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Color(hex: 0xFFCC00).opacity(0.15), in: Capsule())
+                }
             }
             .font(.footnote.weight(.semibold))
             .padding(.horizontal, 4)
@@ -71,11 +91,42 @@ struct TopHighlightsSection: View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 12) {
                 ForEach(viewModel.items) { item in
-                    HighlightVideoCard(item: item)
-                        .onTapGesture { playingItem = item }
+                    lockedCard(item: item)
                 }
             }
             .padding(.horizontal, 20)
+        }
+    }
+
+    private func lockedCard(item: YouTubeVideoItem) -> some View {
+        ZStack(alignment: .top) {
+            HighlightVideoCard(item: item)
+                .blur(radius: entitlements.isPremium ? 0 : 3)
+                .saturation(entitlements.isPremium ? 1 : 0.35)
+
+            if !entitlements.isPremium {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(.black.opacity(0.55))
+                    .frame(width: 180, height: 101)
+                    .overlay {
+                        VStack(spacing: 5) {
+                            Image(systemName: "crown.fill")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(Color(hex: 0xFFCC00))
+                            Text("VIP ONLY")
+                                .font(.system(size: 10, weight: .black))
+                                .foregroundStyle(.white)
+                                .tracking(0.5)
+                        }
+                    }
+            }
+        }
+        .onTapGesture {
+            if entitlements.isPremium {
+                playingItem = item
+            } else {
+                showPaywall = true
+            }
         }
     }
 
@@ -114,7 +165,9 @@ final class TeamHighlightsViewModel: ObservableObject {
 struct TeamHighlightsSection: View {
     let favoriteTeams: [FavoriteTeam]
     @StateObject private var viewModel = TeamHighlightsViewModel()
+    @EnvironmentObject private var entitlements: EntitlementStore
     @State private var playingItem: YouTubeVideoItem?
+    @State private var showPaywall = false
 
     private var supportedTeams: [FavoriteTeam] {
         favoriteTeams.filter { YouTubeService.supportedLeaguePaths[$0.leaguePath] != nil }
@@ -128,6 +181,11 @@ struct TeamHighlightsSection: View {
                 }
                 .sheet(item: $playingItem) { item in
                     YouTubePlayerSheet(item: item)
+                }
+                .sheet(isPresented: $showPaywall) {
+                    PaywallView()
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
                 }
         }
     }
@@ -149,6 +207,19 @@ struct TeamHighlightsSection: View {
                 Image(systemName: "star.fill").foregroundStyle(Theme.accent)
                 Text("YOUR TEAM HIGHLIGHTS").foregroundStyle(Theme.textSecondary)
                 Spacer()
+                if !entitlements.isPremium {
+                    HStack(spacing: 4) {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(Color(hex: 0xFFCC00))
+                        Text("VIP")
+                            .font(.system(size: 9, weight: .black))
+                            .foregroundStyle(Color(hex: 0xFFCC00))
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Color(hex: 0xFFCC00).opacity(0.15), in: Capsule())
+                }
             }
             .font(.footnote.weight(.semibold))
             .padding(.horizontal, 4)
@@ -160,11 +231,42 @@ struct TeamHighlightsSection: View {
         ScrollView(.horizontal, showsIndicators: false) {
             LazyHStack(spacing: 12) {
                 ForEach(viewModel.items) { item in
-                    HighlightVideoCard(item: item)
-                        .onTapGesture { playingItem = item }
+                    lockedCard(item: item)
                 }
             }
             .padding(.horizontal, 20)
+        }
+    }
+
+    private func lockedCard(item: YouTubeVideoItem) -> some View {
+        ZStack(alignment: .top) {
+            HighlightVideoCard(item: item)
+                .blur(radius: entitlements.isPremium ? 0 : 3)
+                .saturation(entitlements.isPremium ? 1 : 0.35)
+
+            if !entitlements.isPremium {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(.black.opacity(0.55))
+                    .frame(width: 180, height: 101)
+                    .overlay {
+                        VStack(spacing: 5) {
+                            Image(systemName: "crown.fill")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(Color(hex: 0xFFCC00))
+                            Text("VIP ONLY")
+                                .font(.system(size: 10, weight: .black))
+                                .foregroundStyle(.white)
+                                .tracking(0.5)
+                        }
+                    }
+            }
+        }
+        .onTapGesture {
+            if entitlements.isPremium {
+                playingItem = item
+            } else {
+                showPaywall = true
+            }
         }
     }
 

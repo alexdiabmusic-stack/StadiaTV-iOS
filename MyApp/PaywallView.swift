@@ -10,7 +10,7 @@ struct PaywallView: View {
     @EnvironmentObject private var entitlements: EntitlementStore
     @Environment(\.dismiss) private var dismiss
 
-    @State private var selectedID = EntitlementStore.annualID
+    @State private var selectedID = EntitlementStore.monthlyID
     @State private var isRestoring = false
     @State private var showSuccess = false
 
@@ -29,20 +29,48 @@ struct PaywallView: View {
     // MARK: Derived
 
     private var selectedProduct: Product? {
-        selectedID == EntitlementStore.annualID ? entitlements.annualProduct : entitlements.lifetimeProduct
-    }
-
-    private var ctaLabel: String {
-        if entitlements.isPurchasing { return "Processing…" }
-        guard let product = selectedProduct else {
-            return selectedID == EntitlementStore.annualID ? "Subscribe — $14.99 / year" : "Unlock Forever — $24.99"
+        switch selectedID {
+        case EntitlementStore.monthlyID:  return entitlements.monthlyProduct
+        case EntitlementStore.annualID:   return entitlements.annualProduct
+        default:                          return entitlements.lifetimeProduct
         }
-        return selectedID == EntitlementStore.annualID
-            ? "Subscribe — \(product.displayPrice) / year"
-            : "Unlock Forever — \(product.displayPrice)"
     }
 
     private var isLifetimeSelected: Bool { selectedID == EntitlementStore.lifetimeID }
+    private var isMonthlySelected: Bool  { selectedID == EntitlementStore.monthlyID  }
+
+    private var ctaLabel: String {
+        if entitlements.isPurchasing { return "Processing…" }
+        if isMonthlySelected { return "Start 7-Day Free Trial" }
+        guard let product = selectedProduct else {
+            return isLifetimeSelected ? "Unlock Forever — $24.99" : "Subscribe — $14.99 / year"
+        }
+        return isLifetimeSelected
+            ? "Unlock Forever — \(product.displayPrice)"
+            : "Subscribe — \(product.displayPrice) / year"
+    }
+
+    private var ctaGradient: LinearGradient {
+        if isLifetimeSelected {
+            return LinearGradient(colors: [Color(hex: 0xFFD700), Color(hex: 0xE8A020)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        } else if isMonthlySelected {
+            return LinearGradient(colors: [Color(hex: 0x34C759), Color(hex: 0x1A9E40)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        } else {
+            return LinearGradient(colors: [Theme.accent, Color(hex: 0x1A6FE8)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        }
+    }
+
+    private var ctaShadowColor: Color {
+        if isLifetimeSelected { return Color(hex: 0xFFD700) }
+        if isMonthlySelected  { return Color(hex: 0x34C759) }
+        return Theme.accent
+    }
+
+    private var footerDisclosure: String {
+        if isLifetimeSelected { return "One-time purchase. No ongoing charges." }
+        if isMonthlySelected  { return "Free for 7 days, then auto-renews monthly. Cancel anytime in App Store settings." }
+        return "Auto-renews annually. Cancel anytime in App Store settings."
+    }
 
     // MARK: Body
 
@@ -123,6 +151,18 @@ struct PaywallView: View {
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
+
+            // Free trial callout
+            HStack(spacing: 6) {
+                Image(systemName: "gift.fill")
+                    .font(.caption.weight(.semibold))
+                Text("7-day free trial — no charge today")
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(Color(hex: 0x34C759))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(Color(hex: 0x34C759).opacity(0.12), in: Capsule())
         }
         .padding(.top, 8)
     }
@@ -181,29 +221,173 @@ struct PaywallView: View {
                 .foregroundStyle(.white.opacity(0.45))
                 .textCase(.uppercase)
 
+            // Monthly — featured full-width card
+            monthlyPlanCard
+
+            // Annual + Lifetime — side by side
             HStack(spacing: 12) {
                 planCard(
                     id: EntitlementStore.annualID,
-                    badge: nil,
+                    badge: "SAVE 25%",
+                    badgeColor: Theme.accent,
                     label: "ANNUAL",
                     price: entitlements.annualProduct?.displayPrice ?? "$14.99",
                     period: "per year",
-                    note: "~$1.25 / month  ·  cancel anytime"
+                    note: "~$1.25 / month · cancel anytime"
                 )
-
                 planCard(
                     id: EntitlementStore.lifetimeID,
                     badge: "BEST VALUE",
+                    badgeColor: Color(hex: 0xFFCC00),
                     label: "LIFETIME",
                     price: entitlements.lifetimeProduct?.displayPrice ?? "$24.99",
                     period: "one-time",
-                    note: "Pay once  ·  yours forever"
+                    note: "Pay once · yours forever"
                 )
+            }
+
+            // Upsell strip — shown when monthly is selected
+            if isMonthlySelected {
+                upsellStrip
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }
 
-    private func planCard(id: String, badge: String?, label: String, price: String, period: String, note: String) -> some View {
+    private var monthlyPlanCard: some View {
+        let isSelected = isMonthlySelected
+        let cardColor = Color(hex: 0x34C759)
+
+        return Button {
+            withAnimation(.spring(duration: 0.22)) { selectedID = EntitlementStore.monthlyID }
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
+        } label: {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("MOST POPULAR")
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundStyle(isSelected ? cardColor : .white.opacity(0.35))
+                    Spacer()
+                    Text("7 DAYS FREE")
+                        .font(.system(size: 9, weight: .black))
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(cardColor, in: Capsule())
+                }
+
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(entitlements.monthlyProduct?.displayPrice ?? "$1.99")
+                        .font(.system(size: 30, weight: .black, design: .rounded).monospacedDigit())
+                        .foregroundStyle(.white)
+                    Text("/ month")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+
+                Text("Free for 7 days · then billed monthly · cancel anytime")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                isSelected ? cardColor.opacity(0.12) : Color.white.opacity(0.04),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(isSelected ? cardColor : Color.white.opacity(0.1), lineWidth: isSelected ? 1.5 : 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // Shown below plan cards when monthly is selected — nudges user toward annual or lifetime
+    private var upsellStrip: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Theme.accent)
+                Text("Want to save even more?")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+
+            HStack(spacing: 10) {
+                // Annual upgrade
+                Button {
+                    withAnimation(.spring(duration: 0.22)) { selectedID = EntitlementStore.annualID }
+                    #if os(iOS)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
+                } label: {
+                    VStack(spacing: 4) {
+                        Text("SAVE 25%")
+                            .font(.system(size: 9, weight: .black))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Theme.accent, in: Capsule())
+                        Text("Annual")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white)
+                        Text(entitlements.annualProduct?.displayPrice ?? "$14.99")
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text("per year")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.45))
+                    }
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity)
+                    .background(Theme.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.accent.opacity(0.35)))
+                }
+                .buttonStyle(.plain)
+
+                // Lifetime upgrade
+                Button {
+                    withAnimation(.spring(duration: 0.22)) { selectedID = EntitlementStore.lifetimeID }
+                    #if os(iOS)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
+                } label: {
+                    VStack(spacing: 4) {
+                        Text("ONE-TIME")
+                            .font(.system(size: 9, weight: .black))
+                            .foregroundStyle(.black)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color(hex: 0xFFCC00), in: Capsule())
+                        Text("Lifetime")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.white)
+                        Text(entitlements.lifetimeProduct?.displayPrice ?? "$24.99")
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                        Text("one-time")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.45))
+                    }
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(hex: 0xFFCC00).opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color(hex: 0xFFCC00).opacity(0.35)))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(14)
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Color.white.opacity(0.07)))
+    }
+
+    private func planCard(id: String, badge: String?, badgeColor: Color, label: String, price: String, period: String, note: String) -> some View {
         let isSelected = selectedID == id
         let isLifetime = id == EntitlementStore.lifetimeID
         let accentForCard: Color = isLifetime ? Color(hex: 0xFFCC00) : Theme.accent
@@ -251,14 +435,13 @@ struct PaywallView: View {
                         .strokeBorder(isSelected ? accentForCard : Color.white.opacity(0.1), lineWidth: isSelected ? 1.5 : 1)
                 )
 
-                // Best Value badge
                 if let badge {
                     Text(badge)
                         .font(.system(size: 8, weight: .black))
                         .foregroundStyle(.black)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 4)
-                        .background(Color(hex: 0xFFCC00), in: Capsule())
+                        .background(badgeColor, in: Capsule())
                         .padding(.trailing, 10)
                         .padding(.top, -1)
                 }
@@ -288,17 +471,8 @@ struct PaywallView: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: 54)
-            .background(
-                isLifetimeSelected
-                    ? LinearGradient(colors: [Color(hex: 0xFFD700), Color(hex: 0xE8A020)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    : LinearGradient(colors: [Theme.accent, Color(hex: 0x1A6FE8)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-            )
-            .shadow(
-                color: (isLifetimeSelected ? Color(hex: 0xFFD700) : Theme.accent).opacity(0.45),
-                radius: 18,
-                y: 7
-            )
+            .background(ctaGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .shadow(color: ctaShadowColor.opacity(0.45), radius: 18, y: 7)
         }
         .disabled(entitlements.isPurchasing)
     }
@@ -345,9 +519,7 @@ struct PaywallView: View {
                     .padding(.horizontal, 8)
             }
 
-            Text(isLifetimeSelected
-                 ? "One-time purchase. No ongoing charges."
-                 : "Auto-renews annually. Cancel anytime in App Store settings.")
+            Text(footerDisclosure)
                 .font(.caption2)
                 .foregroundStyle(.white.opacity(0.28))
                 .multilineTextAlignment(.center)

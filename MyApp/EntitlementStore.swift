@@ -12,6 +12,7 @@ final class EntitlementStore: ObservableObject {
 
     // MARK: Product IDs
 
+    static let monthlyID  = "stadiatv.premium.monthly"
     static let annualID   = "stadiatv.premium.annual"
     static let lifetimeID = "stadiatv.premium.lifetime"
 
@@ -40,7 +41,8 @@ final class EntitlementStore: ObservableObject {
 
     // MARK: Convenience
 
-    var annualProduct: Product? { products.first { $0.id == Self.annualID } }
+    var monthlyProduct:  Product? { products.first { $0.id == Self.monthlyID  } }
+    var annualProduct:   Product? { products.first { $0.id == Self.annualID   } }
     var lifetimeProduct: Product? { products.first { $0.id == Self.lifetimeID } }
 
     // MARK: Public API
@@ -48,8 +50,7 @@ final class EntitlementStore: ObservableObject {
     /// Loads products and verifies current entitlements from the App Store.
     func loadAll() async {
         do {
-            products = try await Product.products(for: [Self.annualID, Self.lifetimeID])
-                .sorted { $0.id == Self.annualID && $1.id == Self.lifetimeID }
+            products = try await Product.products(for: [Self.monthlyID, Self.annualID, Self.lifetimeID])
         } catch {
             // Products are unavailable in builds without a StoreKit configuration.
         }
@@ -126,7 +127,7 @@ final class EntitlementStore: ObservableObject {
         for await result in Transaction.currentEntitlements {
             guard let transaction = try? result.payloadValue,
                   transaction.revocationDate == nil,
-                  [Self.annualID, Self.lifetimeID].contains(transaction.productID) else { continue }
+                  [Self.monthlyID, Self.annualID, Self.lifetimeID].contains(transaction.productID) else { continue }
             hasPremium = true
             break
         }

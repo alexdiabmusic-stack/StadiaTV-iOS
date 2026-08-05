@@ -38,12 +38,15 @@ struct DiscoverView: View {
         Array(displayedArticles.dropFirst())
     }
 
+    private var selectedFavoriteTeams: [FavoriteTeam] {
+        let targetLeagueIDs = Set(targetLeagues.map(\.id))
+        return prefs.favoriteTeams.filter { targetLeagueIDs.contains($0.leaguePath) }
+    }
+
     private var teamArticles: [ESPNArticle] {
-        let teamTokens = prefs.favoriteTeams.flatMap { [$0.displayName.lowercased(), $0.abbreviation.lowercased()] }
-        guard !teamTokens.isEmpty else { return [] }
+        guard !selectedFavoriteTeams.isEmpty else { return [] }
         return remainingArticles.filter { article in
-            let text = "\(article.headline) \(article.description)".lowercased()
-            return teamTokens.contains { token in !token.isEmpty && text.contains(token) }
+            selectedFavoriteTeams.contains { article.matchesFavoriteTeam($0) }
         }
         .prefix(4)
         .map { $0 }
@@ -136,8 +139,6 @@ struct DiscoverView: View {
             Spacer()
             ProgressView().tint(Theme.accent)
             Spacer()
-        } else if displayedArticles.isEmpty {
-            emptyState
         } else {
             articleList
         }
@@ -180,10 +181,15 @@ struct DiscoverView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
                 }
 
+                RecentSportsHighlightsSection(leagues: targetLeagues)
                 TopHighlightsSection(leagues: targetLeagues)
                 TeamHighlightsSection(favoriteTeams: prefs.favoriteTeams)
 
                 podcastCarouselSection
+
+                if displayedArticles.isEmpty {
+                    noStoriesCard
+                }
 
                 if !latestArticles.isEmpty {
                     VStack(spacing: 0) {
@@ -222,6 +228,20 @@ struct DiscoverView: View {
         }
     }
 
+    private var noStoriesCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("No stories yet", systemImage: "newspaper")
+                .font(.headline)
+                .foregroundStyle(Theme.textPrimary)
+            Text("Try another sport or refresh the feed.")
+                .font(.callout)
+                .foregroundStyle(Theme.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+    }
 
     private var emptyState: some View {
         VStack(spacing: 16) {
@@ -525,5 +545,68 @@ private extension ESPNArticle {
             return "\(sourceName) · \(league.shortName) · \(relativePublishedText)"
         }
         return "\(league.shortName) · \(relativePublishedText)"
+    }
+
+    func matchesFavoriteTeam(_ team: FavoriteTeam) -> Bool {
+        guard league.path == team.leaguePath else { return false }
+
+        let taggedText = categories.joined(separator: " ").normalizedForTeamMatching
+        let articleText = "\(headline) \(description)".normalizedForTeamMatching
+        let abbreviation = team.abbreviation.normalizedForTeamMatching
+
+        if team.discoverMatchPhrases.contains(where: { phrase in
+            taggedText.containsBoundedPhrase(phrase) || articleText.containsBoundedPhrase(phrase)
+        }) {
+            return true
+        }
+
+        if abbreviation.count >= 3 {
+            let articleTokens = Set(articleText.split(separator: " ").map(String.init))
+            let tagTokens = Set(taggedText.split(separator: " ").map(String.init))
+            return articleTokens.contains(abbreviation) || tagTokens.contains(abbreviation)
+        }
+
+        return false
+    }
+}
+
+private extension FavoriteTeam {
+    var discoverMatchPhrases: [String] {
+        let normalizedWords = displayName.normalizedForTeamMatching.split(separator: " ").map(String.init)
+        var phrases = [displayName.normalizedForTeamMatching]
+
+        if normalizedWords.count >= 3 {
+            phrases.append(normalizedWords.suffix(2).joined(separator: " "))
+        }
+
+        if let nickname = normalizedWords.last,
+           nickname.count >= 4,
+           !Self.genericTeamNameWords.contains(nickname) {
+            phrases.append(nickname)
+        }
+
+        var seen = Set<String>()
+        return phrases.filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+
+    private static let genericTeamNameWords: Set<String> = [
+        "city", "club", "fc", "sc", "united", "state", "college"
+    ]
+}
+
+private extension String {
+    var normalizedForTeamMatching: String {
+        let folded = folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+        let scalars = folded.unicodeScalars.map { scalar in
+            CharacterSet.alphanumerics.contains(scalar) ? Character(scalar) : " "
+        }
+        return String(scalars)
+            .split(separator: " ")
+            .joined(separator: " ")
+    }
+
+    func containsBoundedPhrase(_ phrase: String) -> Bool {
+        guard !phrase.isEmpty else { return false }
+        return " \(self) ".contains(" \(phrase) ")
     }
 }

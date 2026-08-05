@@ -320,10 +320,13 @@ private struct ArticleDTO: Decodable {
     let published: String?
     let links: ArticleLinksDTO?
     let images: [ArticleImageDTO]?
+    let categories: [ArticleCategoryDTO]?
 
     func toArticle(league: League) -> ESPNArticle? {
         guard let headline, !headline.isEmpty else { return nil }
         let urlString = links?.web?.href ?? links?.mobile?.href
+        let tags = (categories ?? []).compactMap { $0.description ?? $0.type }
+            .filter { !$0.isEmpty }
         return ESPNArticle(
             id: id.map(String.init) ?? "\(league.id)-\(headline)",
             headline: headline,
@@ -335,7 +338,8 @@ private struct ArticleDTO: Decodable {
             },
             url: urlString.flatMap(URL.init(string:)),
             imageURL: images?.first?.url.flatMap(URL.init(string:)),
-            league: league
+            league: league,
+            categories: Array(Set(tags)).sorted()
         )
     }
 }
@@ -351,6 +355,11 @@ private struct ArticleLinkDTO: Decodable {
 
 private struct ArticleImageDTO: Decodable {
     let url: String?
+}
+
+private struct ArticleCategoryDTO: Decodable {
+    let description: String?
+    let type: String?
 }
 
 // MARK: - Teams response models

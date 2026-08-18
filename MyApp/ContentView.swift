@@ -46,7 +46,9 @@ struct MyApp: App {
 struct RootView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var podcastStore: PodcastStore
+    @EnvironmentObject private var playlistStore: PlaylistStore
     @StateObject private var liveViewModel = LiveViewModel()
+    @StateObject private var epgRepository = EPGRepository()
     @State private var showingFavoriteNotificationPrompt = false
 
     // Applying safeAreaInset to each Tab's content (not the TabView) is the correct
@@ -84,9 +86,14 @@ struct RootView: View {
         .tabViewStyle(.sidebarAdaptable)
         .tint(Theme.accent)
         .environmentObject(liveViewModel)
+        .environmentObject(epgRepository)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: podcastStore.nowPlaying != nil)
         .task { updateFavoriteNotificationPrompt() }
         .task { await liveViewModel.load(favoriteTeams: prefs.favoriteTeams) }
+        .task { epgRepository.setupWithChannels(playlistStore.allChannels) }
+        .onChange(of: playlistStore.channelsByPlaylist) {
+            epgRepository.setupWithChannels(playlistStore.allChannels)
+        }
         .onChange(of: prefs.favoriteTeams) { updateFavoriteNotificationPrompt() }
         .onChange(of: prefs.matchNotificationsEnabled) { updateFavoriteNotificationPrompt() }
         .alert("Get notified before your favourite teams play?", isPresented: $showingFavoriteNotificationPrompt) {

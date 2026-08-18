@@ -56,7 +56,16 @@ struct LiveView: View {
 
     @ViewBuilder
     private var content: some View {
-        if viewModel.isLoading && viewModel.allLive.isEmpty {
+        if filter == .guide {
+            VStack(spacing: 0) {
+                filterStrip
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(Theme.background)
+                Divider().overlay(Theme.hairline)
+                TVGuideView()
+            }
+        } else if viewModel.isLoading && viewModel.allLive.isEmpty {
             loadingView
         } else {
             VStack(spacing: 0) {
@@ -204,6 +213,8 @@ struct LiveView: View {
             base = favMatches.isEmpty ? viewModel.allLive : favMatches
         case .all:
             base = viewModel.allLive
+        case .guide:
+            return []
         }
         return base.filter { !hiddenMatchIDs.contains($0.id) }
     }
@@ -534,6 +545,7 @@ struct PulsingLiveBadge: View {
 enum LiveFilter: String, CaseIterable, Identifiable {
     case forYou = "forYou"
     case all = "all"
+    case guide = "guide"
 
     var id: String { rawValue }
 
@@ -541,6 +553,7 @@ enum LiveFilter: String, CaseIterable, Identifiable {
         switch self {
         case .forYou: return "For You"
         case .all: return "All Live"
+        case .guide: return "Guide"
         }
     }
 }

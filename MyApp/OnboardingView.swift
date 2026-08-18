@@ -118,7 +118,7 @@ struct OnboardingView: View {
 
     private var teamsStep: some View {
         StepScaffold(title: "Favorite teams",
-                     subtitle: "Star teams to filter matches and improve source matching.") {
+                     subtitle: "Star teams to filter your schedule and tailor playlist matching.") {
             Group {
                 if teamsLoader.isLoading && teamsLoader.teamsByLeague.isEmpty {
                     VStack { Spacer(); ProgressView().tint(Theme.accent); Spacer() }
@@ -203,7 +203,7 @@ struct OnboardingView: View {
 
     private var playlistStep: some View {
         StepScaffold(title: "Add a playlist",
-                     subtitle: "Add an M3U link or Xtream account to stream matches. You can also do this later.") {
+                     subtitle: "Connect your subscription service using an M3U playlist or login. You can skip this for now.") {
             VStack(spacing: 16) {
                 Spacer()
                 Image(systemName: "list.and.film")

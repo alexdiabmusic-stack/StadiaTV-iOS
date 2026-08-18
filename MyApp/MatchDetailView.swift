@@ -22,6 +22,7 @@ struct MatchDetailView: View {
     @State private var multiscreenSession: MultiscreenSession?
     @State private var gameSummary: GameSummary?
     @State private var showPaywall = false
+    @State private var browsingWatchLink: WatchLink?
     // Ranking a big playlist is expensive, so it runs once off the main thread
     // instead of inside every body evaluation.
     @State private var rankedSources: [RankedSource] = []
@@ -99,7 +100,7 @@ struct MatchDetailView: View {
             }
         }
         .navigationTitle(match.league.name)
-        .sheet(item: $playingChannel) { channel in
+        .fullScreenCover(item: $playingChannel) { channel in
             PlayerView(channel: channel)
         }
         .fullScreenCover(item: $multiscreenSession) { session in
@@ -109,6 +110,11 @@ struct MatchDetailView: View {
             PaywallView()
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $browsingWatchLink) { link in
+            #if os(iOS)
+            SafariSheet(url: link.url).ignoresSafeArea()
+            #endif
         }
         .task(id: match.id) {
             await loadGameSummary()
@@ -1428,7 +1434,7 @@ struct MatchDetailView: View {
             if isPickingMultiscreen {
                 multiscreenPickerContent
             } else if playlists.allChannels.isEmpty {
-                noPlaylistsHint
+                noPlaylistWatchOptions
             } else if showingAllChannels {
                 channelSearchField
                 if filteredMatchedSources.isEmpty {
@@ -1820,15 +1826,28 @@ struct MatchDetailView: View {
     private var sourcesHeader: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(showingAllChannels ? "More Matched Sources" : "Matched Sources")
-                    .font(.headline.weight(.bold))
-                    .foregroundStyle(Theme.textPrimary)
-                Text("Only algorithm-detected game streams are shown here.")
-                    .font(.caption)
-                    .foregroundStyle(Theme.textSecondary)
+                if playlists.allChannels.isEmpty {
+                    // No playlist connected: nothing to "match", so point the
+                    // viewer to where the game officially streams instead.
+                    Text("Where to Watch")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(Theme.textPrimary)
+                    if !watchLinks.isEmpty {
+                        Text("Tap a broadcaster to open their live stream.")
+                            .font(.caption)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                } else {
+                    Text(showingAllChannels ? "More Matched Sources" : "Matched Sources")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("Only algorithm-detected game streams are shown here.")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                }
             }
             Spacer()
-            if rankedSources.count > 3 {
+            if !playlists.allChannels.isEmpty && rankedSources.count > 3 {
                 Button(showingAllChannels ? "Top" : "More") {
                     withAnimation {
                         showingAllChannels.toggle()
@@ -2007,12 +2026,64 @@ struct MatchDetailView: View {
         liveMatchesForMultiscreen = options
     }
 
+    /// Broadcasters carrying this game, each linking out to where it streams.
+    /// Only used before the viewer connects a playlist.
+    private var watchLinks: [WatchLink] {
+        var seen: Set<String> = []
+        return match.broadcasts.compactMap { broadcaster -> WatchLink? in
+            let name = broadcaster.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty, seen.insert(name.lowercased()).inserted else { return nil }
+            guard let url = Self.streamingURL(for: name) else { return nil }
+            return WatchLink(name: name, url: url)
+        }
+    }
+
+    /// Shown when no playlist is connected: broadcaster shortcuts if we know
+    /// where the game airs, otherwise the prompt to add a playlist.
+    @ViewBuilder private var noPlaylistWatchOptions: some View {
+        if watchLinks.isEmpty {
+            noPlaylistsHint
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                FlowLayout(spacing: 10) {
+                    ForEach(watchLinks) { link in
+                        broadcasterButton(link)
+                    }
+                }
+                Text("Connect a playlist in the Playlists tab to watch inside the app.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        }
+    }
+
+    private func broadcasterButton(_ link: WatchLink) -> some View {
+        Button {
+            browsingWatchLink = link
+        } label: {
+            HStack(spacing: 6) {
+                Text(link.name)
+                    .font(.subheadline.weight(.bold))
+                Image(systemName: "arrow.up.right")
+                    .font(.caption.weight(.bold))
+            }
+            .foregroundStyle(Theme.textPrimary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Theme.surface, in: Capsule())
+            .overlay(Capsule().strokeBorder(Theme.hairline))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Watch on \(link.name)")
+        .accessibilityHint("Opens the \(link.name) live stream")
+    }
+
     private var noPlaylistsHint: some View {
         VStack(spacing: 8) {
             Image(systemName: "list.and.film")
                 .font(.title)
                 .foregroundStyle(Theme.textSecondary)
-            Text("Add an M3U or Xtream playlist in the Playlists tab to unlock streaming sources.")
+            Text("Connect a personal subscription playlist in the Playlists tab.")
                 .font(.callout)
                 .foregroundStyle(Theme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -2038,6 +2109,66 @@ struct MatchDetailView: View {
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
     }
+
+    /// Maps an ESPN broadcast network name to where it streams online. Matching
+    /// is done on a lowercased substring so entries like "ESPN2" or "NBC Sports"
+    /// resolve to the right service. Unknown broadcasters fall back to a web
+    /// search so the arrow always leads somewhere useful.
+    static func streamingURL(for broadcaster: String) -> URL? {
+        let key = broadcaster.lowercased()
+        // Order matters: more specific keys (e.g. "espn+") must precede their
+        // shorter prefixes ("espn").
+        let known: [(needle: String, url: String)] = [
+            ("espn+", "https://plus.espn.com"),
+            ("espn", "https://www.espn.com/watch/"),
+            ("abc", "https://abc.com/watch-live"),
+            ("nbcsn", "https://www.nbcsports.com/live"),
+            ("nbc sports", "https://www.nbcsports.com/live"),
+            ("nbc", "https://www.nbc.com/live"),
+            ("peacock", "https://www.peacocktv.com"),
+            ("cbs", "https://www.paramountplus.com/live-tv/"),
+            ("paramount", "https://www.paramountplus.com"),
+            ("fs1", "https://www.foxsports.com/live"),
+            ("fs2", "https://www.foxsports.com/live"),
+            ("fox", "https://www.foxsports.com/live"),
+            ("tnt", "https://www.max.com"),
+            ("tbs", "https://www.max.com"),
+            ("max", "https://www.max.com"),
+            ("prime", "https://www.amazon.com/gp/video/storefront"),
+            ("amazon", "https://www.amazon.com/gp/video/storefront"),
+            ("apple", "https://tv.apple.com"),
+            ("nfl network", "https://www.nfl.com/network/watch/nfl-network-live"),
+            ("nfl", "https://www.nfl.com/plus/"),
+            ("nba tv", "https://www.nba.com/watch"),
+            ("nhl network", "https://www.nhl.com/tv"),
+            ("mlb network", "https://www.mlb.com/network"),
+            ("golf channel", "https://www.nbcsports.com/golf"),
+            ("tennis channel", "https://www.tennischannel.com"),
+            ("usa network", "https://www.usanetwork.com/live"),
+            ("sky sports", "https://www.skysports.com/watch"),
+            ("sky sport", "https://www.skysports.com/watch"),
+            ("tnt sports", "https://www.tntsports.co.uk"),
+            ("dazn", "https://www.dazn.com"),
+            ("bein", "https://www.beinsports.com"),
+            ("telemundo", "https://www.telemundo.com/now"),
+            ("univision", "https://www.univision.com"),
+            ("tudn", "https://www.tudn.com")
+        ]
+        if let hit = known.first(where: { key.contains($0.needle) }) {
+            return URL(string: hit.url)
+        }
+        let query = "\(broadcaster) live stream"
+            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        return URL(string: "https://www.google.com/search?q=\(query)")
+    }
+}
+
+/// A broadcaster carrying a match, linking out to where it streams. Surfaced
+/// before the viewer connects a playlist.
+private struct WatchLink: Identifiable {
+    let id = UUID()
+    let name: String
+    let url: URL
 }
 
 private struct MultiscreenSlot: Identifiable {

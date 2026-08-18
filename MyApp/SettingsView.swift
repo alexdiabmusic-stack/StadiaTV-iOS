@@ -21,7 +21,7 @@ struct PlaylistsSettingsView: View {
                     editingPlaylist = nil
                     showingAddPlaylist = true
                 } label: {
-                            Label("Add M3U or Xtream Playlist", systemImage: "plus")
+                            Label("Add Stream Playlist", systemImage: "plus")
                                 .foregroundStyle(Theme.accent)
                         }
                     } else {
@@ -707,7 +707,7 @@ We designed StadiaTV to minimize the collection of personal information. The App
 
 Playlist and provider information
 
-When you connect an M3U playlist, Xtream-compatible account, or another supported source, you may provide information such as:
+When you connect an M3U playlist, stream login account, or another supported source, you may provide information such as:
 
 - Playlist URLs
 - Provider server addresses
@@ -794,7 +794,7 @@ We do not share personal information except in the following circumstances:
 
 User-selected providers
 
-Information necessary to connect to an M3U, Xtream-compatible, or other source is sent to the provider selected by the user.
+Information necessary to connect to an M3U, stream login, or other source is sent to the provider selected by the user.
 
 StadiaTV does not control these providers and is not responsible for their privacy or security practices.
 

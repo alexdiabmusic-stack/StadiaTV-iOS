@@ -4,11 +4,9 @@ import SwiftUI
 struct MoreView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var playlists: PlaylistStore
-    @EnvironmentObject private var entitlements: EntitlementStore
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var articleLibrary: ArticleLibraryStore
     @Environment(\.colorScheme) private var colorScheme
-    @State private var showPaywall = false
     @State private var showingTeamEditor = false
 
     var body: some View {
@@ -17,7 +15,6 @@ struct MoreView: View {
                 Theme.background.ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
-                        PremiumSummaryCard(showPaywall: $showPaywall)
                         quickCards
                         navigationGroups
                     }
@@ -25,11 +22,6 @@ struct MoreView: View {
                 }
             }
             .navigationTitle("Settings")
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-            }
             .sheet(isPresented: $showingTeamEditor) {
                 TeamEditorView()
             }
@@ -120,52 +112,6 @@ struct MoreView: View {
     }
 }
 
-private struct PremiumSummaryCard: View {
-    @EnvironmentObject private var entitlements: EntitlementStore
-    @Binding var showPaywall: Bool
-
-    var body: some View {
-        Button { showPaywall = true } label: {
-            HStack(spacing: 14) {
-                Image(systemName: "sparkles")
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 42, height: 42)
-                    .background(Theme.accent, in: Circle())
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("StadiaTV Premium")
-                        .font(.headline.weight(.bold))
-                        .foregroundStyle(Theme.textPrimary)
-                    Text(entitlements.isPremium ? "Premium Member" : "Unlock smart alerts and premium stats")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.textSecondary)
-                }
-
-                Spacer()
-
-                HStack(spacing: 4) {
-                    Text(entitlements.isPremium ? "Manage" : "View")
-                        .font(.subheadline.weight(.semibold))
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                }
-                .foregroundStyle(Theme.accent)
-            }
-            .padding(16)
-            .background(
-                LinearGradient(
-                    colors: [Theme.surfaceElevated, Theme.accent.opacity(0.18)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-            )
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-        }
-        .buttonStyle(.plain)
-    }
-}
 
 private struct QuickManagementCard: View {
     let title: String

@@ -4,17 +4,14 @@ import SwiftUI
 struct TVSettingsView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var playlists: PlaylistStore
-    @EnvironmentObject private var entitlements: EntitlementStore
     @State private var showingAddPlaylist = false
     @State private var showingTeamEditor = false
-    @State private var showPaywall = false
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Theme.background.ignoresSafeArea()
                 List {
-                    premiumSection
                     playlistsSection
                     teamsSection
                     appearanceSection
@@ -33,56 +30,8 @@ struct TVSettingsView: View {
         .fullScreenCover(isPresented: $showingTeamEditor) {
             TeamEditorView()
         }
-        .fullScreenCover(isPresented: $showPaywall) {
-            TVPaywallView()
-        }
     }
 
-    // MARK: - Premium
-
-    private var premiumSection: some View {
-        Section {
-            Button {
-                if !entitlements.isPremium { showPaywall = true }
-            } label: {
-                HStack(spacing: 14) {
-                    Image(systemName: entitlements.isPremium ? "sparkles" : "lock.fill")
-                        .font(.title2.weight(.bold))
-                        .foregroundStyle(entitlements.isPremium ? .yellow : Theme.accent)
-                        .frame(width: 40, height: 40)
-                        .background(
-                            (entitlements.isPremium ? Color.yellow : Theme.accent).opacity(0.15),
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        )
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(entitlements.isPremium ? "StadiaTV Premium" : "Unlock Premium")
-                            .font(.headline.weight(.bold))
-                            .foregroundStyle(Theme.textPrimary)
-                        Text(entitlements.isPremium ? "Standings, leaders & injury reports unlocked" : "Unlock standings, leaders & injury reports")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-                    Spacer()
-                    if !entitlements.isPremium {
-                        Text("Upgrade")
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 16).padding(.vertical, 8)
-                            .background(Theme.accent, in: Capsule())
-                    } else {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.green)
-                    }
-                }
-                .padding(.vertical, 4)
-            }
-            .buttonStyle(.plain)
-            .listRowBackground(Theme.surface)
-        } header: {
-            Label("StadiaTV Premium", systemImage: "sparkles")
-        }
-    }
 
     // MARK: - Playlists
 

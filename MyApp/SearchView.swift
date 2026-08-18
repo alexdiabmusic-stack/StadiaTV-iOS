@@ -387,7 +387,6 @@ enum SearchSettingDestination: String, CaseIterable, Identifiable, Hashable {
     case appearancePlayback
     case notificationsCalendar
     case privacySync
-    case premium
 
     var id: String { rawValue }
 
@@ -398,7 +397,6 @@ enum SearchSettingDestination: String, CaseIterable, Identifiable, Hashable {
         case .appearancePlayback: "Appearance & Playback"
         case .notificationsCalendar: "Notifications & Calendar"
         case .privacySync: "Privacy & iCloud Sync"
-        case .premium: "StadiaTV Premium"
         }
     }
 
@@ -409,7 +407,6 @@ enum SearchSettingDestination: String, CaseIterable, Identifiable, Hashable {
         case .appearancePlayback: "Settings"
         case .notificationsCalendar: "Settings"
         case .privacySync: "Settings"
-        case .premium: "Subscription"
         }
     }
 
@@ -420,7 +417,6 @@ enum SearchSettingDestination: String, CaseIterable, Identifiable, Hashable {
         case .appearancePlayback: "paintpalette.fill"
         case .notificationsCalendar: "bell.badge.fill"
         case .privacySync: "lock.icloud.fill"
-        case .premium: "sparkles"
         }
     }
 
@@ -436,8 +432,6 @@ enum SearchSettingDestination: String, CaseIterable, Identifiable, Hashable {
             ["settings", "notifications", "alerts", "calendar", "reminders", "digest", "game starting"]
         case .privacySync:
             ["settings", "privacy", "icloud", "sync", "data", "watch history", "reset"]
-        case .premium:
-            ["settings", "premium", "subscription", "pro", "unlock", "stats", "alerts"]
         }
     }
 
@@ -453,8 +447,6 @@ enum SearchSettingDestination: String, CaseIterable, Identifiable, Hashable {
             NotificationsCalendarSettingsView()
         case .privacySync:
             PrivacySyncSettingsView()
-        case .premium:
-            PaywallView()
         }
     }
 }

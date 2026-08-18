@@ -318,8 +318,8 @@ final class PlaylistStore: ObservableObject {
         var errorDescription: String? {
             switch self {
             case .invalidConfiguration: return "The playlist details are incomplete or invalid."
-            case .unsupportedURL: return "Playlist and Xtream API URLs must begin with http:// or https://."
-            case .missingCredentials: return "Xtream credentials are missing. Remove and re-add this playlist."
+            case .unsupportedURL: return "Playlist URLs must begin with http:// or https://."
+            case .missingCredentials: return "Stream login credentials are missing. Remove and re-add this playlist."
             case .badResponse: return "The server returned an unexpected response."
             }
         }

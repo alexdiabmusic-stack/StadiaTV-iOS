@@ -53,7 +53,7 @@ struct PlaylistsView: View {
             Text("No Playlists Yet")
                 .font(.title2.weight(.bold))
                 .foregroundStyle(Theme.textPrimary)
-            Text("Add an M3U link or Xtream Codes account to start streaming matches.")
+            Text("Add an M3U link or stream login to connect your personal channels.")
                 .font(.callout)
                 .foregroundStyle(Theme.textSecondary)
                 .multilineTextAlignment(.center)
@@ -105,7 +105,7 @@ private struct PlaylistRow: View {
     private var subtitle: String {
         switch playlist.kind {
         case .m3u: return playlist.m3uURL ?? "M3U"
-        case .xtream: return playlist.host ?? "Xtream Codes"
+        case .xtream: return playlist.host ?? "Stream Login"
         }
     }
 }
@@ -113,7 +113,7 @@ private struct PlaylistRow: View {
 // MARK: - Add playlist
 
 struct AddPlaylistView: View {
-    enum Mode: String, CaseIterable { case m3u = "M3U", xtream = "Xtream" }
+    enum Mode: String, CaseIterable { case m3u = "M3U", xtream = "Stream Login" }
 
     let initialPlaylist: Playlist?
     let onAdd: (Playlist) -> Void
@@ -163,17 +163,25 @@ struct AddPlaylistView: View {
 
                 switch mode {
                 case .m3u:
-                    Section("M3U URL") {
+                    Section {
                         TextField("http://example.com/playlist.m3u", text: $m3uURL)
                             .autocorrectionDisabled()
                             .keyboardType(.URL)
+                    } header: {
+                        Text("M3U URL")
+                    } footer: {
+                        Text("Paste the M3U playlist URL provided by your subscription service — such as Plex, Channels DVR, fuboTV, or a cable/satellite provider that offers a live TV export.")
                     }
                     .listRowBackground(Theme.surface)
                 case .xtream:
-                    Section("Server") {
+                    Section {
                         TextField("http://server.com:8080", text: $host)
                             .autocorrectionDisabled()
                             .keyboardType(.URL)
+                    } header: {
+                        Text("Server")
+                    } footer: {
+                        Text("Enter the server address for your subscription service. Compatible with Plex, Channels DVR, and other services that support the Xtream Codes API.")
                     }
                     .listRowBackground(Theme.surface)
                     Section("Credentials") {
@@ -183,6 +191,13 @@ struct AddPlaylistView: View {
                     }
                     .listRowBackground(Theme.surface)
                 }
+
+                Section {
+                    Text("Stadia TV does not provide, host, or sell streaming content. This feature is intended for use with paid subscription services and personal DVR systems (such as Plex or Channels DVR) that you already subscribe to and that permit playlist export.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                .listRowBackground(Theme.background)
             }
             .hidesScrollContentBackground()
             .background(Theme.background)

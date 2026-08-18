@@ -83,7 +83,7 @@ struct LiveTVView: View {
                     }
                 }
             }
-            .sheet(item: $playingChannel) { channel in
+            .fullScreenCover(item: $playingChannel) { channel in
                 PlayerView(channel: channel)
             }
             .fullScreenCover(item: $multiscreenSession) { session in
@@ -323,7 +323,7 @@ struct LiveTVView: View {
             Text("No Playlists Added")
                 .font(.title3.weight(.bold))
                 .foregroundStyle(Theme.textPrimary)
-            Text("Add an M3U link or Xtream account in Settings to populate Live TV.")
+            Text("Add a subscription playlist in Settings to connect your personal channels.")
                 .font(.callout)
                 .foregroundStyle(Theme.textSecondary)
                 .multilineTextAlignment(.center)

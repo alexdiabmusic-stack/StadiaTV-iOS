@@ -115,7 +115,7 @@ struct SearchView: View {
                 }
             }
             .searchable(text: $query, prompt: "Teams, leagues, games, channels, players")
-            .sheet(item: $playingChannel) { channel in
+            .fullScreenCover(item: $playingChannel) { channel in
                 PlayerView(channel: channel)
             }
             .navigationDestination(item: $presentedArticle) { article in
@@ -427,7 +427,7 @@ enum SearchSettingDestination: String, CaseIterable, Identifiable, Hashable {
     var keywords: [String] {
         switch self {
         case .playlists:
-            ["settings", "channels", "m3u", "xtream", "live tv", "playlist", "source"]
+            ["settings", "channels", "m3u", "stream login", "live tv", "playlist", "source"]
         case .teamsLeagues:
             ["settings", "teams", "leagues", "following", "favorites", "sports", "setup"]
         case .appearancePlayback:

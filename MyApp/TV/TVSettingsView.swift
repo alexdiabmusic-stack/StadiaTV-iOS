@@ -90,7 +90,7 @@ struct TVSettingsView: View {
         Section {
             if playlists.playlists.isEmpty {
                 Button { showingAddPlaylist = true } label: {
-                    Label("Add M3U or Xtream Playlist", systemImage: "plus")
+                    Label("Add Stream Playlist", systemImage: "plus")
                         .foregroundStyle(Theme.accent)
                 }
                 .listRowBackground(Theme.surface)
@@ -104,7 +104,7 @@ struct TVSettingsView: View {
                             Text(playlist.name)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(Theme.textPrimary)
-                            Text(playlist.kind == .m3u ? (playlist.m3uURL ?? "M3U") : (playlist.host ?? "Xtream"))
+                            Text(playlist.kind == .m3u ? (playlist.m3uURL ?? "M3U") : (playlist.host ?? "Stream Login"))
                                 .font(.caption)
                                 .foregroundStyle(Theme.textSecondary)
                                 .lineLimit(1)

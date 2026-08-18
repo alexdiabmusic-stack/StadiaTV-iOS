@@ -40,7 +40,7 @@ struct TVLiveTVView: View {
                     TVEmptyState(
                         systemImage: "tv.slash",
                         title: "No Playlists Added",
-                        subtitle: "Add an M3U or Xtream Codes playlist in Settings to watch live channels."
+                        subtitle: "Add an M3U link or stream login in Settings to watch your personal channels."
                     )
                 } else if store.allChannels.isEmpty && !store.loadingPlaylistIDs.isEmpty {
                     ProgressView().tint(Theme.accent).scaleEffect(2)

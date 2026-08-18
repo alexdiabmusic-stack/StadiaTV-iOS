@@ -26,13 +26,20 @@ final class EntitlementStore: ObservableObject {
     // MARK: Private
 
     private static let cacheKey = "stadiatv.entitlement.premium.v1"
+    private static let unlockAllFeaturesByDefault = true
     private var updateListenerTask: Task<Void, Never>?
 
     // MARK: Init
 
     init() {
-        // Seed from cache so premium users never see a paywall flash on launch.
-        isPremium = UserDefaults.standard.bool(forKey: Self.cacheKey)
+        // Temporarily unlock all features while in-app purchases are hidden.
+        isPremium = Self.unlockAllFeaturesByDefault || UserDefaults.standard.bool(forKey: Self.cacheKey)
+
+        guard !Self.unlockAllFeaturesByDefault else {
+            UserDefaults.standard.set(true, forKey: Self.cacheKey)
+            return
+        }
+
         updateListenerTask = Task { await listenForTransactions() }
         Task { await loadAll() }
     }
@@ -49,6 +56,12 @@ final class EntitlementStore: ObservableObject {
 
     /// Loads products and verifies current entitlements from the App Store.
     func loadAll() async {
+        guard !Self.unlockAllFeaturesByDefault else {
+            products = []
+            await refreshEntitlements()
+            return
+        }
+
         do {
             products = try await Product.products(for: [Self.monthlyID, Self.annualID, Self.lifetimeID])
         } catch {
@@ -59,6 +72,12 @@ final class EntitlementStore: ObservableObject {
 
     /// Initiates a purchase for the given product.
     func purchase(_ product: Product) async {
+        guard !Self.unlockAllFeaturesByDefault else {
+            isPremium = true
+            UserDefaults.standard.set(true, forKey: Self.cacheKey)
+            return
+        }
+
         isPurchasing = true
         purchaseError = nil
         defer { isPurchasing = false }
@@ -84,6 +103,12 @@ final class EntitlementStore: ObservableObject {
 
     /// Syncs with the App Store and refreshes entitlements.
     func restore() async {
+        guard !Self.unlockAllFeaturesByDefault else {
+            isPremium = true
+            UserDefaults.standard.set(true, forKey: Self.cacheKey)
+            return
+        }
+
         isPurchasing = true
         purchaseError = nil
         defer { isPurchasing = false }
@@ -116,6 +141,12 @@ final class EntitlementStore: ObservableObject {
     }
 
     private func refreshEntitlements() async {
+        guard !Self.unlockAllFeaturesByDefault else {
+            isPremium = true
+            UserDefaults.standard.set(true, forKey: Self.cacheKey)
+            return
+        }
+
         // ⚠️ TESTFLIGHT ONLY — Remove this block before App Store submission.
         if await Self.isTestFlight {
             isPremium = true

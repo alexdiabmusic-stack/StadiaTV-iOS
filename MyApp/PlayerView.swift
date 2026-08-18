@@ -10,6 +10,7 @@ import MediaPlayer
 /// Presents a channel's stream full screen.
 struct PlayerView: View {
     let channel: Channel
+    @StateObject private var streamSelection: StreamSelectionState
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var playlistStore: PlaylistStore
@@ -39,7 +40,29 @@ struct PlayerView: View {
     @State private var isScoreDismissed = false
     @State private var scoreFetchTask: Task<Void, Never>?
     @State private var showPaywall = false
-    @State private var preferredQuality: PlaybackQuality = .auto
+
+    init(channel: Channel) {
+        self.channel = channel
+        _streamSelection = StateObject(wrappedValue: StreamSelectionState(channel: channel))
+    }
+
+    init(canonicalChannel: CanonicalChannel) {
+        let channel = canonicalChannel.playableChannel ?? Channel(
+            id: canonicalChannel.id,
+            name: canonicalChannel.name,
+            streamURL: URL(string: "about:blank")!,
+            logoURL: canonicalChannel.effectiveLogoURL,
+            group: canonicalChannel.categoryId,
+            playlistID: UUID(),
+            playlistName: "Guide"
+        )
+        self.channel = channel
+        _streamSelection = StateObject(wrappedValue: StreamSelectionState(channel: channel, canonicalChannel: canonicalChannel))
+    }
+
+    private var activeChannel: Channel {
+        streamSelection.activeChannel
+    }
 
     // Sorting and deduping a big playlist is expensive, so it runs once off
     // the main thread instead of inside every body evaluation.
@@ -54,8 +77,19 @@ struct PlayerView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            StreamTile(channel: channel, isPrimary: true, showsChrome: false, preferredQuality: preferredQuality)
-                .ignoresSafeArea()
+            StreamTile(
+                channel: activeChannel,
+                isPrimary: true,
+                showsChrome: false,
+                onFailure: { streamSelection.handlePlaybackFailure() },
+                onMetadata: { metadata in
+                    if let streamID = streamSelection.activeStream?.id {
+                        streamSelection.updateRuntimeMetadata(metadata, for: streamID)
+                    }
+                }
+            )
+            .id(activeChannel.id)
+            .ignoresSafeArea()
         }
         .contentShape(Rectangle())
         #if os(iOS)
@@ -102,6 +136,26 @@ struct PlayerView: View {
             }
         }
         .animation(.spring(duration: 0.3), value: liveScoreMatch?.id)
+        .overlay(alignment: .center) {
+            if case let .failed(message) = streamSelection.switchState {
+                StreamFailurePanel(
+                    message: message,
+                    tryAgain: { streamSelection.retryActiveStream(); revealChromeTemporarily() },
+                    chooseAnother: { revealChromeTemporarily() },
+                    switchToAuto: { streamSelection.selectAuto(); revealChromeTemporarily() }
+                )
+                .padding(24)
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
+        }
+        .overlay(alignment: .center) {
+            if streamSelection.switchState == .switching {
+                ProgressView()
+                    .tint(Theme.accent)
+                    .padding(18)
+                    .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+        }
         // Gesture onboarding hint
         #if os(iOS)
         .overlay(alignment: .center) {
@@ -128,36 +182,11 @@ struct PlayerView: View {
         .overlay(alignment: .topTrailing) {
             if isChromeVisible {
                 HStack(spacing: 8) {
-                    #if os(iOS)
-                    Menu {
-                        ForEach(PlaybackQuality.allCases) { quality in
-                            Button {
-                                preferredQuality = quality
-                                revealChromeTemporarily()
-                            } label: {
-                                if preferredQuality == quality {
-                                    Label(quality.rawValue, systemImage: "checkmark")
-                                } else {
-                                    Text(quality.rawValue)
-                                }
-                            }
+                    if streamSelection.hasSelectableStreams {
+                        StreamQualityMenu(selection: streamSelection) {
+                            revealChromeTemporarily()
                         }
-                    } label: {
-                        HStack(spacing: 7) {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.headline.weight(.bold))
-                            Text(preferredQuality.rawValue)
-                                .font(.subheadline.weight(.bold))
-                                .lineLimit(1)
-                        }
-                        .foregroundStyle(.white)
-                        .frame(height: 42)
-                        .padding(.horizontal, 13)
-                        .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
                     }
-                    .accessibilityLabel("Stream quality: \(preferredQuality.rawValue)")
-                    #endif
                     PlayerChromeButton(systemImage: preferredOrientation.systemImage,
                                        title: preferredOrientation.buttonTitle,
                                        accessibilityLabel: preferredOrientation.accessibilityLabel) {
@@ -171,7 +200,8 @@ struct PlayerView: View {
         }
         .overlay(alignment: .bottom) {
             if isChromeVisible {
-                PlayerSourceBar(channel: channel,
+                PlayerSourceBar(channel: activeChannel,
+                                streamSummary: streamSelection.hasSelectableStreams ? streamSelection.currentSummary : nil,
                                 canStartMultiscreen: canStartMultiscreen,
                                 multiscreenAction: showMultiscreenPicker)
                     .padding(16)
@@ -475,6 +505,111 @@ private enum PlaybackQuality: String, CaseIterable, Identifiable {
     }
 }
 
+private struct StreamQualityMenu: View {
+    @ObservedObject var selection: StreamSelectionState
+    let onSelect: () -> Void
+
+    var body: some View {
+        Menu {
+            Section("Stream Quality") {
+                Button {
+                    selection.selectAuto()
+                    onSelect()
+                } label: {
+                    menuLabel(title: "Auto", detail: selection.autoSummary, isSelected: selection.mode == .auto)
+                }
+            }
+
+            Section("Available Streams") {
+                ForEach(selection.displayCandidates) { candidate in
+                    Button {
+                        selection.selectManual(streamID: candidate.stream.id)
+                        onSelect()
+                    } label: {
+                        let selected = selection.mode == .manual(candidate.stream.id)
+                        menuLabel(title: candidate.primaryLabel,
+                                  detail: streamDetail(for: candidate),
+                                  isSelected: selected)
+                    }
+                    .disabled(candidate.health == .unavailable)
+                }
+            }
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.headline.weight(.bold))
+                Text(streamButtonTitle)
+                    .font(.subheadline.weight(.bold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(.white)
+            .frame(height: 42)
+            .padding(.horizontal, 13)
+            .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        }
+        .accessibilityLabel("Stream quality: \(streamButtonTitle)")
+    }
+
+    private var streamButtonTitle: String {
+        switch selection.mode {
+        case .auto:
+            return "Auto"
+        case .manual(let streamID):
+            guard let candidate = selection.displayCandidates.first(where: { $0.stream.id == streamID }) else { return "Stream" }
+            return candidate.primaryLabel
+        }
+    }
+
+    @ViewBuilder
+    private func menuLabel(title: String, detail: String?, isSelected: Bool) -> some View {
+        if isSelected {
+            Label(detail.map { "\(title) — \($0)" } ?? title, systemImage: "checkmark")
+        } else if let detail {
+            Text("\(title) — \(detail)")
+        } else {
+            Text(title)
+        }
+    }
+
+    private func streamDetail(for candidate: RankedStreamCandidate) -> String? {
+        var parts: [String] = []
+        if let detail = candidate.detailLabel { parts.append(detail) }
+        if candidate.health != .unknown { parts.append(candidate.health.rawValue) }
+        return parts.isEmpty ? nil : parts.joined(separator: " • ")
+    }
+}
+
+private struct StreamFailurePanel: View {
+    let message: String
+    let tryAgain: () -> Void
+    let chooseAnother: () -> Void
+    let switchToAuto: () -> Void
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.title2)
+                .foregroundStyle(Theme.live)
+            Text(message)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+            HStack(spacing: 10) {
+                Button("Try Again", action: tryAgain)
+                Button("Choose Another", action: chooseAnother)
+                Button("Auto", action: switchToAuto)
+            }
+            .font(.subheadline.weight(.bold))
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.accent)
+        }
+        .padding(18)
+        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+    }
+}
+
 #if os(iOS)
 private struct AirPlayButton: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {
@@ -699,9 +834,12 @@ private struct StreamTile: View {
     let isPrimary: Bool
     let showsChrome: Bool
     var preferredQuality: PlaybackQuality = .auto
+    var onFailure: (() -> Void)? = nil
+    var onMetadata: ((StreamRuntimeMetadata) -> Void)? = nil
 
     @State private var player: AVPlayer?
     @State private var failed = false
+    @State private var metadataTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
@@ -790,14 +928,25 @@ private struct StreamTile: View {
                 let playable = try await asset.load(.isPlayable)
                 if !playable {
                     failed = true
+                    onFailure?()
                 }
             } catch {
                 failed = true
+                onFailure?()
+            }
+        }
+
+        metadataTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            guard !Task.isCancelled, let item = player.currentItem else { return }
+            if let metadata = await StreamMetadataReader.metadata(from: item) {
+                onMetadata?(metadata)
             }
         }
     }
 
     private func stop() {
+        metadataTask?.cancel()
         player?.pause()
         player = nil
     }
@@ -851,6 +1000,7 @@ private struct VideoSurface: UIViewRepresentable {
 
 private struct PlayerSourceBar: View {
     let channel: Channel
+    let streamSummary: String?
     let canStartMultiscreen: Bool
     let multiscreenAction: () -> Void
     @EnvironmentObject private var watchStore: WatchStore
@@ -873,6 +1023,12 @@ private struct PlayerSourceBar: View {
                     .font(.caption)
                     .foregroundStyle(Theme.textSecondary)
                     .lineLimit(1)
+                if let streamSummary {
+                    Text("Stream: \(streamSummary)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Theme.textTertiary)
+                        .lineLimit(1)
+                }
             }
             Spacer()
             #if os(iOS)

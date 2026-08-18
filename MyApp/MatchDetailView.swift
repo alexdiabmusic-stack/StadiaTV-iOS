@@ -78,7 +78,7 @@ struct MatchDetailView: View {
                         highlightsSection
                         scoringSummarySection
                     }
-                    if match.state != .final {
+                    if match.state != .final && (!playlists.allChannels.isEmpty || !watchLinks.isEmpty) {
                         sourcesSection
                     }
                     if match.league.group == .racing {
@@ -2038,21 +2038,12 @@ struct MatchDetailView: View {
         }
     }
 
-    /// Shown when no playlist is connected: broadcaster shortcuts if we know
-    /// where the game airs, otherwise the prompt to add a playlist.
+    /// Shown when no playlist is connected: broadcaster shortcut buttons for
+    /// known networks. Only rendered when watchLinks is non-empty.
     @ViewBuilder private var noPlaylistWatchOptions: some View {
-        if watchLinks.isEmpty {
-            noPlaylistsHint
-        } else {
-            VStack(alignment: .leading, spacing: 12) {
-                FlowLayout(spacing: 10) {
-                    ForEach(watchLinks) { link in
-                        broadcasterButton(link)
-                    }
-                }
-                Text("Connect a playlist in the Playlists tab to watch inside the app.")
-                    .font(.caption)
-                    .foregroundStyle(Theme.textSecondary)
+        FlowLayout(spacing: 10) {
+            ForEach(watchLinks) { link in
+                broadcasterButton(link)
             }
         }
     }
@@ -2154,12 +2145,7 @@ struct MatchDetailView: View {
             ("univision", "https://www.univision.com"),
             ("tudn", "https://www.tudn.com")
         ]
-        if let hit = known.first(where: { key.contains($0.needle) }) {
-            return URL(string: hit.url)
-        }
-        let query = "\(broadcaster) live stream"
-            .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        return URL(string: "https://www.google.com/search?q=\(query)")
+        return known.first(where: { key.contains($0.needle) }).flatMap { URL(string: $0.url) }
     }
 }
 

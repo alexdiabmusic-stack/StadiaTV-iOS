@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Canonical Channel
 
 /// A deduplicated, normalized channel that may map to multiple raw IPTV streams.
-struct CanonicalChannel: Identifiable, Hashable {
+nonisolated struct CanonicalChannel: Identifiable, Hashable {
     let id: String              // key from curated JSON, e.g. "ca-cbc-toronto-toronto"
     let name: String
     let categoryId: String
@@ -55,7 +55,7 @@ struct CanonicalChannel: Identifiable, Hashable {
 
 // MARK: - Channel Stream
 
-struct ChannelStream: Identifiable, Hashable {
+nonisolated struct ChannelStream: Identifiable, Hashable {
     let id: String
     let providerChannelId: String
     let originalName: String
@@ -79,7 +79,7 @@ struct ChannelStream: Identifiable, Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
-enum StreamResolution: Int, Comparable, CaseIterable {
+nonisolated enum StreamResolution: Int, Comparable, CaseIterable {
     case uhd = 4
     case fhd = 3
     case hd = 2
@@ -88,7 +88,7 @@ enum StreamResolution: Int, Comparable, CaseIterable {
 
     static func < (lhs: StreamResolution, rhs: StreamResolution) -> Bool { lhs.rawValue < rhs.rawValue }
 
-    static func detect(from name: String) -> StreamResolution {
+    nonisolated static func detect(from name: String) -> StreamResolution {
         let n = name.uppercased()
         if n.contains("4K") || n.contains("UHD") || n.contains("2160") { return .uhd }
         if n.contains("FHD") || n.contains("1080") || n.contains("FULL HD") { return .fhd }
@@ -100,13 +100,13 @@ enum StreamResolution: Int, Comparable, CaseIterable {
 
 // MARK: - EPG Channel
 
-struct EPGChannel: Identifiable, Hashable {
+nonisolated struct EPGChannel: Identifiable, Hashable {
     let id: String          // XMLTV channel id
     let displayNames: [String]
     let iconURL: URL?
     let sourceId: String
 
-    var primaryName: String { displayNames.first ?? id }
+    nonisolated var primaryName: String { displayNames.first ?? id }
 
     static func == (lhs: EPGChannel, rhs: EPGChannel) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
@@ -114,7 +114,7 @@ struct EPGChannel: Identifiable, Hashable {
 
 // MARK: - EPG Programme
 
-struct EPGProgramme: Identifiable, Hashable {
+nonisolated struct EPGProgramme: Identifiable, Hashable {
     let id: String
     let epgChannelId: String
     var canonicalChannelId: String?
@@ -131,8 +131,8 @@ struct EPGProgramme: Identifiable, Hashable {
     let sourceId: String
     let sourcePriority: Int
 
-    var duration: TimeInterval { max(0, end.timeIntervalSince(start)) }
-    var isValid: Bool { start < end && duration > 60 }
+    nonisolated var duration: TimeInterval { max(0, end.timeIntervalSince(start)) }
+    nonisolated var isValid: Bool { start < end && duration > 60 }
 
     func isOnNow(at date: Date = Date()) -> Bool { start <= date && date < end }
 
@@ -152,7 +152,7 @@ struct EPGProgramme: Identifiable, Hashable {
 
 // MARK: - Match metadata
 
-enum EPGMatchMethod: String, Codable {
+nonisolated enum EPGMatchMethod: String, Codable {
     // Provider → canonical identity matching
     case exactTvgId
     case exactAlias
@@ -175,7 +175,7 @@ enum EPGMatchMethod: String, Codable {
     }
 }
 
-struct EPGChannelMapping: Codable, Hashable {
+nonisolated struct EPGChannelMapping: Codable, Hashable {
     let canonicalChannelId: String
     let xmltvChannelId: String
     let sourceId: String
@@ -186,7 +186,7 @@ struct EPGChannelMapping: Codable, Hashable {
 
 // MARK: - Guide category
 
-struct GuideCategory: Identifiable, Hashable {
+nonisolated struct GuideCategory: Identifiable, Hashable {
     let id: String
     let name: String
     let sort: Int
@@ -199,8 +199,47 @@ struct GuideCategory: Identifiable, Hashable {
 
 // MARK: - Refresh state
 
-enum EPGRefreshState: Equatable {
+nonisolated enum EPGRefreshState: Equatable {
     case idle
     case refreshing
     case failed(String)
+}
+
+nonisolated enum LiveTVImportState: Equatable {
+    case idle
+    case loadingPlaylist
+    case filtering
+    case matching
+    case deduplicating
+    case resolvingLogos
+    case loadingEPG
+    case ready
+    case failed(String)
+    case cancelled
+}
+
+nonisolated struct LiveTVImportProgress: Equatable {
+    var state: LiveTVImportState = .idle
+    var rawStreams: Int = 0
+    var filteredStreams: Int = 0
+    var matchedStreams: Int = 0
+    var canonicalChannels: Int = 0
+    var epgChannels: Int = 0
+    var programmesRetained: Int = 0
+}
+
+nonisolated struct LiveTVImportDiagnostics: Equatable {
+    var playlistDecodeDuration: TimeInterval = 0
+    var prefilterDuration: TimeInterval = 0
+    var canonicalMatchDuration: TimeInterval = 0
+    var dedupeDuration: TimeInterval = 0
+    var logoResolutionDuration: TimeInterval = 0
+    var epgDownloadDuration: TimeInterval = 0
+    var epgChannelParseDuration: TimeInterval = 0
+    var epgProgrammeParseDuration: TimeInterval = 0
+    var exactMatches: Int = 0
+    var normalizedMatches: Int = 0
+    var iptvOrgMatches: Int = 0
+    var fuzzyMatches: Int = 0
+    var unmatched: Int = 0
 }

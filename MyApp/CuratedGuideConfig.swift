@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Root config
 
-struct CuratedGuideConfig: Decodable {
+nonisolated struct CuratedGuideConfig: Decodable {
     let schemaVersion: String
     let profiles: [String: CuratedProfile]
     let categories: [CuratedCategory]
@@ -18,14 +18,14 @@ struct CuratedGuideConfig: Decodable {
         case deduplication, channels
     }
 
-    static func load() -> CuratedGuideConfig? {
+    nonisolated static func load() -> CuratedGuideConfig? {
         guard let url = Bundle.main.url(forResource: "curated_tv_guide_filter", withExtension: "json"),
               let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(CuratedGuideConfig.self, from: data)
     }
 }
 
-struct CuratedProfile: Decodable {
+nonisolated struct CuratedProfile: Decodable {
     let description: String
     let includeTiers: [String]
     let includeOptional: Bool
@@ -39,7 +39,7 @@ struct CuratedProfile: Decodable {
     }
 }
 
-struct CuratedCategory: Decodable, Identifiable {
+nonisolated struct CuratedCategory: Decodable, Identifiable {
     let id: String
     let name: String
     let defaultEnabled: Bool
@@ -51,7 +51,7 @@ struct CuratedCategory: Decodable, Identifiable {
     }
 }
 
-struct CuratedNormalization: Decodable {
+nonisolated struct CuratedNormalization: Decodable {
     let caseInsensitive: Bool
     let stripPrefixRegex: [String]
     let stripQualityTokensRegex: [String]
@@ -69,7 +69,7 @@ struct CuratedNormalization: Decodable {
     }
 }
 
-struct CuratedFilterRules: Decodable {
+nonisolated struct CuratedFilterRules: Decodable {
     let alwaysHideNamePatterns: [String]
     let vodLikeNamePatterns: [String]
 
@@ -85,7 +85,7 @@ struct CuratedFilterRules: Decodable {
     }
 }
 
-struct CuratedDeduplication: Decodable {
+nonisolated struct CuratedDeduplication: Decodable {
     let fuzzyThreshold: Double
     let neverMergeIfDifferentMarket: Bool
     let neverMergeIfDifferentRegionalFeed: Bool
@@ -97,7 +97,7 @@ struct CuratedDeduplication: Decodable {
     }
 }
 
-struct CuratedChannel: Decodable, Identifiable {
+nonisolated struct CuratedChannel: Decodable, Identifiable {
     let key: String
     let name: String
     let country: String
@@ -111,7 +111,7 @@ struct CuratedChannel: Decodable, Identifiable {
     let network: String?
     let epgId: String?
 
-    var id: String { key }
+    nonisolated var id: String { key }
 
     private enum CodingKeys: String, CodingKey {
         case key, name, country, languages, category, tier, priority

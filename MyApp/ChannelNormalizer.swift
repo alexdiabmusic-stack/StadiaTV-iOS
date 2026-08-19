@@ -46,7 +46,10 @@ nonisolated final class ChannelNormalizer {
     }
 
     private func compile(_ patterns: [String], options: NSRegularExpression.Options) -> [NSRegularExpression] {
-        patterns.compactMap { try? NSRegularExpression(pattern: $0, options: options) }
+        patterns.compactMap {
+            let pattern = $0.replacingOccurrences(of: "\\\\", with: "\\")
+            return try? NSRegularExpression(pattern: pattern, options: options)
+        }
     }
 
     // MARK: - Normalization

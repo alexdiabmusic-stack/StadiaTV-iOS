@@ -9,11 +9,13 @@ struct EPGParseResult {
 
 // MARK: - Streaming XMLTV parser
 
-final class EPGXMLParser: NSObject, XMLParserDelegate {
+nonisolated final class EPGXMLParser: NSObject, XMLParserDelegate {
 
     private let sourceId: String
     private let sourcePriority: Int
     private var allowedChannelIds: Set<String>?
+    private var programmeWindow: ClosedRange<Date>?
+    private var channelsOnly = false
 
     // Parse outputs
     private var channels: [EPGChannel] = []
@@ -48,8 +50,15 @@ final class EPGXMLParser: NSObject, XMLParserDelegate {
         self.sourcePriority = priority
     }
 
-    func parse(data: Data, allowedChannelIds: Set<String>? = nil) -> EPGParseResult {
+    func parse(
+        data: Data,
+        allowedChannelIds: Set<String>? = nil,
+        programmeWindow: ClosedRange<Date>? = nil,
+        channelsOnly: Bool = false
+    ) -> EPGParseResult {
         self.allowedChannelIds = allowedChannelIds
+        self.programmeWindow = programmeWindow
+        self.channelsOnly = channelsOnly
         channels = []; programmes = []
         let parser = XMLParser(data: data)
         parser.delegate = self
@@ -75,6 +84,7 @@ final class EPGXMLParser: NSObject, XMLParserDelegate {
             channelIconURL = nil
 
         case "programme":
+            guard !channelsOnly else { return }
             guard
                 let chId = attributes["channel"],
                 let startStr = attributes["start"],
@@ -85,6 +95,7 @@ final class EPGXMLParser: NSObject, XMLParserDelegate {
             else { return }
 
             if let allowed = allowedChannelIds, !allowed.contains(chId) { return }
+            if let window = programmeWindow, stop < window.lowerBound || start > window.upperBound { return }
 
             progActive = true
             progChannelId = chId

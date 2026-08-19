@@ -1,10 +1,11 @@
 import Foundation
 import Compression
 import Combine
+import OSLog
 
 // MARK: - Gzip helper
 
-private extension Data {
+nonisolated private extension Data {
     /// Attempts to decompress gzip data. Returns self unchanged if not gzip or decompression fails.
     func tryGunzip() -> Data {
         guard count > 10, self[0] == 0x1f, self[1] == 0x8b else { return self }
@@ -53,6 +54,8 @@ final class EPGRepository: ObservableObject {
     @Published private(set) var canonicalChannels: [CanonicalChannel] = []
     @Published private(set) var refreshState: EPGRefreshState = .idle
     @Published private(set) var lastUpdated: Date?
+    @Published private(set) var importProgress = LiveTVImportProgress()
+    @Published private(set) var importDiagnostics = LiveTVImportDiagnostics()
 
     // Programme index: canonicalChannelId -> [EPGProgramme] sorted by start
     private var programmeIndex: [String: [EPGProgramme]] = [:]
@@ -64,7 +67,12 @@ final class EPGRepository: ObservableObject {
     private var matcher: CanonicalChannelMatcher?
     private var currentIPTVChannels: [Channel] = []
     private var refreshTask: Task<Void, Never>?
+    private var setupTask: Task<Void, Never>?
     private var isRefreshing = false
+    private var importGeneration = UUID()
+    private var lastChannelFingerprint: String?
+
+    private let logger = Logger(subsystem: "StadiaTV", category: "LiveTVImport")
 
     // Cache keys
     private let channelCacheKey = "epg.canonical.channels.v1"
@@ -101,50 +109,42 @@ final class EPGRepository: ObservableObject {
     /// Called when IPTV channels are available. Rebuilds canonical lineup and refreshes EPG if needed.
     func setupWithChannels(_ channels: [Channel]) {
         guard !channels.isEmpty else { return }
+        let fingerprint = Self.channelFingerprint(channels)
+        if fingerprint == lastChannelFingerprint, setupTask != nil || !canonicalChannels.isEmpty {
+            return
+        }
+        lastChannelFingerprint = fingerprint
         currentIPTVChannels = channels
 
-        guard let matcher, let normalizer else { return }
+        setupTask?.cancel()
+        let generation = UUID()
+        importGeneration = generation
+        importProgress = LiveTVImportProgress(state: .filtering, rawStreams: channels.count)
+        logger.info("Live TV import started raw_streams=\(channels.count, privacy: .public)")
 
-        Task(priority: .userInitiated) { [weak self] in
+        setupTask = Task(priority: .userInitiated) { [weak self] in
             guard let self else { return }
-
-            // Load IPTV-org indexes if not yet loaded, and pass them to the matcher
+            defer { self.setupTask = nil }
             let iptvOrg = IPTVOrgMetadataService.shared
             let iptvIndexes = await iptvOrg.indexes
-            if iptvIndexes.isLoaded {
-                matcher.updateIPTVOrgIndexes(iptvIndexes)
-            }
 
-            let streams = channels.map { ch -> ChannelStream in
-                let normName = normalizer.normalize(ch.name)
-                let countryHint = normalizer.extractCountryHint(from: ch.name)
-                var stream = ChannelStream(
-                    id: ch.id,
-                    providerChannelId: ch.id,
-                    originalName: ch.name,
-                    normalizedName: normName,
-                    streamURL: ch.streamURL,
-                    tvgId: nil,
-                    tvgName: ch.name,
-                    tvgLogoURL: ch.logoURL,
-                    groupTitle: ch.group,
-                    resolution: StreamResolution.detect(from: ch.name),
-                    playlistID: ch.playlistID,
-                    playlistName: ch.playlistName
-                )
-                stream.countryHint = countryHint
-                return stream
-            }
+            let buildResult = await Task.detached(priority: .userInitiated) {
+                Self.buildCanonicalLineup(channels: channels, iptvIndexes: iptvIndexes)
+            }.value
 
-            // Filter hidden channels
-            let visible = streams.filter { !normalizer.shouldHide(channelName: $0.originalName) }
+            guard !Task.isCancelled, self.importGeneration == generation else { return }
+            self.importDiagnostics = buildResult.diagnostics
+            self.importProgress = LiveTVImportProgress(
+                state: .resolvingLogos,
+                rawStreams: channels.count,
+                filteredStreams: buildResult.filteredStreams,
+                matchedStreams: buildResult.matchedStreams,
+                canonicalChannels: buildResult.channels.count
+            )
 
-            // Match to canonical
-            let matchResults = visible.compactMap { matcher.match($0) }
-            var canonicals = matcher.buildCanonicalChannels(from: matchResults)
-
-            // Resolve logos using available metadata
-            if iptvIndexes.isLoaded {
+            var canonicals = buildResult.channels
+            if iptvIndexes.isLoaded, !canonicals.isEmpty {
+                let started = Date()
                 let resolver = ChannelLogoResolver(iptvOrg: iptvOrg)
                 let logos = await resolver.resolveAll(channels: canonicals)
                 for i in canonicals.indices {
@@ -155,10 +155,17 @@ final class EPGRepository: ObservableObject {
                         }
                     }
                 }
+                self.importDiagnostics.logoResolutionDuration = Date().timeIntervalSince(started)
             }
 
+            guard !Task.isCancelled, self.importGeneration == generation else { return }
             self.canonicalChannels = canonicals
+            self.importProgress.state = .loadingEPG
+            self.importProgress.canonicalChannels = canonicals.count
+            self.logger.info("Live TV lineup ready filtered=\(buildResult.filteredStreams, privacy: .public) matched=\(buildResult.matchedStreams, privacy: .public) canonical=\(canonicals.count, privacy: .public)")
             await self.refreshIfNeeded()
+            guard !Task.isCancelled, self.importGeneration == generation else { return }
+            self.importProgress.state = .ready
         }
     }
 
@@ -178,6 +185,101 @@ final class EPGRepository: ObservableObject {
         }
     }
 
+    struct CanonicalLineupBuildResult {
+        let channels: [CanonicalChannel]
+        let filteredStreams: Int
+        let matchedStreams: Int
+        var diagnostics: LiveTVImportDiagnostics
+    }
+
+    nonisolated private static func channelFingerprint(_ channels: [Channel]) -> String {
+        var hasher = Hasher()
+        hasher.combine(channels.count)
+        for channel in channels {
+            hasher.combine(channel.id)
+            hasher.combine(channel.name)
+            hasher.combine(channel.group)
+        }
+        return "\(channels.count)-\(hasher.finalize())"
+    }
+
+    nonisolated static func buildCanonicalLineup(
+        channels: [Channel],
+        iptvIndexes: IPTVOrgIndexes
+    ) -> CanonicalLineupBuildResult {
+        var diagnostics = LiveTVImportDiagnostics()
+        guard let config = CuratedGuideConfig.load() else {
+            diagnostics.unmatched = channels.count
+            return CanonicalLineupBuildResult(channels: [], filteredStreams: 0, matchedStreams: 0, diagnostics: diagnostics)
+        }
+
+        let normalizer = ChannelNormalizer(config: config)
+        let matcher = CanonicalChannelMatcher(config: config, normalizer: normalizer, iptvOrgIndexes: iptvIndexes)
+
+        let prefilterStart = Date()
+        var visible: [ChannelStream] = []
+        visible.reserveCapacity(channels.count)
+        for channel in channels {
+            if Task.isCancelled { break }
+            let filterText = [channel.name, channel.group].compactMap { $0 }.joined(separator: " ")
+            guard !normalizer.shouldHide(channelName: filterText) else { continue }
+            let normName = normalizer.normalize(channel.name)
+            var stream = ChannelStream(
+                id: channel.id,
+                providerChannelId: channel.id,
+                originalName: channel.name,
+                normalizedName: normName,
+                streamURL: channel.streamURL,
+                tvgId: nil,
+                tvgName: channel.name,
+                tvgLogoURL: channel.logoURL,
+                groupTitle: channel.group,
+                resolution: StreamResolution.detect(from: channel.name),
+                playlistID: channel.playlistID,
+                playlistName: channel.playlistName
+            )
+            stream.countryHint = normalizer.extractCountryHint(from: channel.name)
+            visible.append(stream)
+        }
+        diagnostics.prefilterDuration = Date().timeIntervalSince(prefilterStart)
+
+        let matchStart = Date()
+        var matches: [ChannelMatchResult] = []
+        matches.reserveCapacity(min(visible.count, config.channels.count * 4))
+        for stream in visible {
+            if Task.isCancelled { break }
+            if let result = matcher.match(stream) {
+                matches.append(result)
+                switch result.matchMethod {
+                case .providerEpgExact, .providerEpgCaseInsensitive, .exactTvgId, .exactAlias:
+                    diagnostics.exactMatches += 1
+                case .normalizedExact:
+                    diagnostics.normalizedMatches += 1
+                case .iptvOrgExactId, .iptvOrgCaseInsensitiveId, .iptvOrgAltName, .replacementChain:
+                    diagnostics.iptvOrgMatches += 1
+                case .fuzzy:
+                    diagnostics.fuzzyMatches += 1
+                default:
+                    break
+                }
+            } else {
+                diagnostics.unmatched += 1
+            }
+        }
+        diagnostics.canonicalMatchDuration = Date().timeIntervalSince(matchStart)
+
+        let dedupeStart = Date()
+        let canonicals = matcher.buildCanonicalChannels(from: matches)
+        diagnostics.dedupeDuration = Date().timeIntervalSince(dedupeStart)
+
+        return CanonicalLineupBuildResult(
+            channels: canonicals,
+            filteredStreams: visible.count,
+            matchedStreams: matches.count,
+            diagnostics: diagnostics
+        )
+    }
+
     // MARK: - Refresh
 
     func refreshIfNeeded() async {
@@ -190,32 +292,55 @@ final class EPGRepository: ObservableObject {
         guard !isRefreshing else { return }
         isRefreshing = true
         refreshState = .refreshing
+        importProgress.state = .loadingEPG
         defer { isRefreshing = false }
 
         let activeCategoryIds = Set(canonicalChannels.map(\.categoryId))
         let sources = EPGSourceRegistry.sources(for: activeCategoryIds)
 
         var allEPGChannels: [EPGChannel] = []
-        var allProgrammes: [EPGProgramme] = []
+        let now = Date()
+        let programmeWindow = now.addingTimeInterval(-2 * 3600)...now.addingTimeInterval(48 * 3600)
 
-        await withTaskGroup(of: EPGParseResult?.self) { group in
-            for source in sources {
-                group.addTask { [weak self] in
-                    await self?.downloadAndParse(source: source)
-                }
+        for source in sources {
+            guard !Task.isCancelled else {
+                refreshState = .idle
+                importProgress.state = .cancelled
+                return
             }
-            for await result in group {
-                guard let result else { continue }
-                allEPGChannels.append(contentsOf: result.channels)
-                allProgrammes.append(contentsOf: result.programmes)
-            }
+            guard let data = await epgData(for: source) else { continue }
+            let started = Date()
+            let result = await Task.detached(priority: .utility) {
+                EPGXMLParser(sourceId: source.id, priority: source.priority)
+                    .parse(data: data, channelsOnly: true)
+            }.value
+            importDiagnostics.epgChannelParseDuration += Date().timeIntervalSince(started)
+            allEPGChannels.append(contentsOf: result.channels)
         }
 
         // Match EPG channels to canonical channels
         matchEPGChannels(allEPGChannels)
+        let wantedEPGIds = Set(epgToCanonical.keys)
+        importProgress.epgChannels = wantedEPGIds.count
 
-        // Build programme index
-        buildProgrammeIndex(from: allProgrammes)
+        var programmeIndex: [String: [EPGProgramme]] = [:]
+        for source in sources {
+            guard !Task.isCancelled else {
+                refreshState = .idle
+                importProgress.state = .cancelled
+                return
+            }
+            guard let data = cachedEPGData(for: source), !wantedEPGIds.isEmpty else { continue }
+            let started = Date()
+            let parseResult = await Task.detached(priority: .utility) {
+                EPGXMLParser(sourceId: source.id, priority: source.priority)
+                    .parse(data: data, allowedChannelIds: wantedEPGIds, programmeWindow: programmeWindow)
+            }.value
+            importDiagnostics.epgProgrammeParseDuration += Date().timeIntervalSince(started)
+            mergeProgrammes(parseResult.programmes, into: &programmeIndex)
+        }
+        finalizeProgrammeIndex(programmeIndex)
+        importProgress.programmesRetained = programmeIndex.values.reduce(0) { $0 + $1.count }
 
         lastUpdated = Date()
         persistState()
@@ -228,7 +353,7 @@ final class EPGRepository: ObservableObject {
 
     // MARK: - Download + Parse
 
-    private func downloadAndParse(source: EPGSource) async -> EPGParseResult? {
+    private func epgData(for source: EPGSource) async -> Data? {
         let cacheFile = cacheDir.appendingPathComponent("\(source.id).xml")
 
         // Check disk cache freshness
@@ -236,27 +361,28 @@ final class EPGRepository: ObservableObject {
            let modified = attrs[.modificationDate] as? Date,
            Date().timeIntervalSince(modified) < source.cacheTTL,
            let data = try? Data(contentsOf: cacheFile) {
-            return parseXML(data: data, source: source)
+            return data
         }
 
         // Download
         do {
+            let downloadStart = Date()
             let (data, _) = try await session.data(from: source.url)
-            let decompressed = data.tryGunzip()
+            importDiagnostics.epgDownloadDuration += Date().timeIntervalSince(downloadStart)
+            let decompressed = await Task.detached(priority: .utility) {
+                data.tryGunzip()
+            }.value
             try decompressed.write(to: cacheFile)
-            return parseXML(data: decompressed, source: source)
+            return decompressed
         } catch {
             // Network failure: try cached file even if stale
-            if let data = try? Data(contentsOf: cacheFile) {
-                return parseXML(data: data, source: source)
-            }
-            return nil
+            return try? Data(contentsOf: cacheFile)
         }
     }
 
-    private func parseXML(data: Data, source: EPGSource) -> EPGParseResult {
-        let parser = EPGXMLParser(sourceId: source.id, priority: source.priority)
-        return parser.parse(data: data)
+    private func cachedEPGData(for source: EPGSource) -> Data? {
+        let cacheFile = cacheDir.appendingPathComponent("\(source.id).xml")
+        return try? Data(contentsOf: cacheFile)
     }
 
     // MARK: - EPG Channel Matching
@@ -338,6 +464,23 @@ final class EPGRepository: ObservableObject {
         }
 
         programmeIndex = index
+    }
+
+    private func mergeProgrammes(_ programmes: [EPGProgramme], into index: inout [String: [EPGProgramme]]) {
+        for var prog in programmes {
+            guard prog.isValid, let canonId = epgToCanonical[prog.epgChannelId] else { continue }
+            prog.canonicalChannelId = canonId
+            index[canonId, default: []].append(prog)
+        }
+    }
+
+    private func finalizeProgrammeIndex(_ index: [String: [EPGProgramme]]) {
+        var finalized: [String: [EPGProgramme]] = [:]
+        finalized.reserveCapacity(index.count)
+        for (key, programmes) in index {
+            finalized[key] = deduplicate(programmes.sorted { $0.start < $1.start })
+        }
+        programmeIndex = finalized
     }
 
     private func deduplicate(_ sorted: [EPGProgramme]) -> [EPGProgramme] {

@@ -13,6 +13,8 @@ final class TVGuideViewModel: ObservableObject {
     @Published var visibleChannels: [CanonicalChannel] = []
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
+    /// Incremented by scrollToNow() so EPGGuideGrid can observe and react.
+    @Published private(set) var scrollToNowToken: Int = 0
 
     private weak var repository: EPGRepository?
     private var refreshTimer: Timer?
@@ -100,6 +102,13 @@ final class TVGuideViewModel: ObservableObject {
         guard let repository else { return }
         selectedCategoryId = id
         filterChannels(repository: repository)
+    }
+
+    /// Resets the selected date to today and signals EPGGuideGrid to scroll to NOW.
+    func scrollToNow() {
+        selectedDate = Calendar.current.startOfDay(for: Date())
+        if let repository { filterChannels(repository: repository) }
+        scrollToNowToken += 1
     }
 
     // MARK: - Programme queries

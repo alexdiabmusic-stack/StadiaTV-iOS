@@ -17,7 +17,7 @@ struct ChannelMatchResult {
 
 /// Matches raw IPTV ChannelStreams to canonical channels defined in the curated JSON,
 /// optionally enriched with IPTV-org identity metadata.
-final class CanonicalChannelMatcher {
+nonisolated final class CanonicalChannelMatcher {
 
     private let config: CuratedGuideConfig
     private let normalizer: ChannelNormalizer
@@ -28,9 +28,19 @@ final class CanonicalChannelMatcher {
     private var normalizedNameToKey: [String: String] = [:]
     private var networkMarketToKey: [String: String] = [:]
     private var epgIdToKey: [String: String] = [:]
+    private var curatedByKey: [String: CuratedChannel] = [:]
+    private var fuzzyCandidates: [FuzzyCandidate] = []
+    private let maxFuzzyCandidatesPerStream = 100
 
     // Optional IPTV-org indexes for extended matching
     private var iptvOrgIndexes: IPTVOrgIndexes = .empty
+
+    private struct FuzzyCandidate {
+        let name: String
+        let key: String
+        let firstToken: String
+        let bigrams: Set<String>
+    }
 
     init(config: CuratedGuideConfig, normalizer: ChannelNormalizer, iptvOrgIndexes: IPTVOrgIndexes = .empty) {
         self.config = config
@@ -46,6 +56,7 @@ final class CanonicalChannelMatcher {
 
     private func buildLookups() {
         for channel in config.channels {
+            curatedByKey[channel.key] = channel
             let normName = normalizer.normalize(channel.name).lowercased()
             normalizedNameToKey[normName] = channel.key
             // Also index the space-augmented variant (e.g. "RDS2" ↔ "RDS 2")
@@ -70,6 +81,15 @@ final class CanonicalChannelMatcher {
             if let epgId = channel.epgId {
                 epgIdToKey[epgId.lowercased()] = channel.key
             }
+        }
+        let candidates = normalizedNameToKey.merging(aliasToCandidateKey) { first, _ in first }
+        fuzzyCandidates = candidates.map { name, key in
+            FuzzyCandidate(
+                name: name,
+                key: key,
+                firstToken: name.split(separator: " ").first.map(String.init) ?? name,
+                bigrams: bigrams(name)
+            )
         }
     }
 
@@ -229,7 +249,7 @@ final class CanonicalChannelMatcher {
         var conflicts: [IdentityConflict] = []
 
         // Country agreement check
-        let curatedChannel = config.channels.first { $0.key == canonKey }
+        let curatedChannel = curatedByKey[canonKey]
         if let curated = curatedChannel {
             let iptvCountry = iptvChannel.country.uppercased()
             let curatedCountry = curated.country.uppercased()
@@ -308,7 +328,7 @@ final class CanonicalChannelMatcher {
 
     private func countryConfidence(forKey key: String, countryHint: String?, base: Double) -> Double {
         guard let hint = countryHint,
-              let curated = config.channels.first(where: { $0.key == key }) else { return base }
+              let curated = curatedByKey[key] else { return base }
         return hint.uppercased() == curated.country.uppercased() ? base : base - 0.10
     }
 
@@ -319,12 +339,24 @@ final class CanonicalChannelMatcher {
     private func fuzzyMatch(_ input: String) -> FuzzyResult? {
         guard !input.isEmpty else { return nil }
         let inputBigrams = bigrams(input)
+        let inputFirstToken = input.split(separator: " ").first.map(String.init) ?? input
+        let narrowed = fuzzyCandidates.filter {
+            $0.firstToken == inputFirstToken ||
+            $0.name.hasPrefix(inputFirstToken) ||
+            input.hasPrefix($0.firstToken)
+        }
+        let candidates: [FuzzyCandidate]
+        if narrowed.isEmpty {
+            guard fuzzyCandidates.count <= maxFuzzyCandidatesPerStream else { return nil }
+            candidates = fuzzyCandidates
+        } else {
+            candidates = Array(narrowed.prefix(maxFuzzyCandidatesPerStream))
+        }
         var best = fuzzyThreshold
         var bestKey: String?
-        let candidates = normalizedNameToKey.merging(aliasToCandidateKey) { first, _ in first }
-        for (candidate, key) in candidates {
-            let score = jaccard(inputBigrams, bigrams(candidate))
-            if score > best { best = score; bestKey = key }
+        for candidate in candidates {
+            let score = jaccard(inputBigrams, candidate.bigrams)
+            if score > best { best = score; bestKey = candidate.key }
         }
         return bestKey.map { FuzzyResult(key: $0, score: best) }
     }

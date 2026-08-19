@@ -158,6 +158,7 @@ final class PlaylistStore: ObservableObject {
     // MARK: - Loading channels
 
     func refresh(_ playlist: Playlist) async {
+        guard !loadingPlaylistIDs.contains(playlist.id) else { return }
         loadingPlaylistIDs.insert(playlist.id)
         defer { loadingPlaylistIDs.remove(playlist.id) }
         do {
@@ -184,12 +185,14 @@ final class PlaylistStore: ObservableObject {
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw PlaylistError.badResponse
         }
-        let text = String(decoding: data, as: UTF8.self)
-        return Self.parseM3U(text, playlist: playlist)
+        return await Task.detached(priority: .userInitiated) {
+            let text = String(decoding: data, as: UTF8.self)
+            return Self.parseM3U(text, playlist: playlist)
+        }.value
     }
 
     /// Parses an M3U/M3U8 playlist body into channels.
-    static func parseM3U(_ text: String, playlist: Playlist) -> [Channel] {
+    nonisolated static func parseM3U(_ text: String, playlist: Playlist) -> [Channel] {
         var channels: [Channel] = []
         var pendingName: String?
         var pendingLogo: String?
@@ -228,7 +231,7 @@ final class PlaylistStore: ObservableObject {
     }
 
     /// Extracts an attribute like tvg-logo="..." from an #EXTINF line.
-    private static func attribute(_ key: String, in line: String) -> String? {
+    nonisolated private static func attribute(_ key: String, in line: String) -> String? {
         guard let range = line.range(of: "\(key)=\"") else { return nil }
         let after = line[range.upperBound...]
         guard let end = after.firstIndex(of: "\"") else { return nil }
@@ -260,7 +263,9 @@ final class PlaylistStore: ObservableObject {
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw PlaylistError.badResponse
         }
-        let streams = try JSONDecoder().decode([XtreamStream].self, from: data)
+        let streams = try await Task.detached(priority: .userInitiated) {
+            try JSONDecoder().decode([XtreamStream].self, from: data)
+        }.value
 
         // Base host without path for building stream URLs.
         var streamHost = URLComponents(string: host)
@@ -268,19 +273,21 @@ final class PlaylistStore: ObservableObject {
         streamHost?.path = ""
         let hostString = streamHost?.string ?? host
 
-        return streams.map { stream in
-            let urlString = "\(hostString)/live/\(user)/\(pass)/\(stream.stream_id).m3u8"
-            let group = stream.category_id.flatMap { categories[$0] }
-            return Channel(
-                id: "\(playlist.id)-\(stream.stream_id)",
-                name: stream.name,
-                streamURL: URL(string: urlString) ?? URL(string: hostString)!,
-                logoURL: stream.stream_icon.flatMap(URL.init(string:)),
-                group: group,
-                playlistID: playlist.id,
-                playlistName: playlist.name
-            )
-        }
+        return await Task.detached(priority: .userInitiated) {
+            streams.map { stream in
+                let urlString = "\(hostString)/live/\(user)/\(pass)/\(stream.stream_id).m3u8"
+                let group = stream.category_id.flatMap { categories[$0] }
+                return Channel(
+                    id: "\(playlist.id)-\(stream.stream_id)",
+                    name: stream.name,
+                    streamURL: URL(string: urlString) ?? URL(string: hostString)!,
+                    logoURL: stream.stream_icon.flatMap(URL.init(string:)),
+                    group: group,
+                    playlistID: playlist.id,
+                    playlistName: playlist.name
+                )
+            }
+        }.value
     }
 
     private func xtreamCategories(base: URLComponents, user: String, pass: String) async throws -> [String: String] {

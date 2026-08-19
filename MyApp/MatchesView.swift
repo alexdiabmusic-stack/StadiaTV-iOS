@@ -69,14 +69,14 @@ struct MatchesView: View {
 
     private var loadKey: String {
         [
-            prefs.followedLeagues.map(\.id).sorted().joined(separator: ","),
+            prefs.explicitlyFollowedLeagues.map(\.id).sorted().joined(separator: ","),
             prefs.favoriteTeams.map(\.id).sorted().joined(separator: ","),
         ].joined(separator: "|")
     }
 
     private func loadAll() async {
         async let newsTask: Void = loadNews()
-        await viewModel.loadFollowing(leagues: prefs.followedLeagues, favorites: prefs.favoriteTeams)
+        await viewModel.loadFollowing(leagues: prefs.explicitlyFollowedLeagues, favorites: prefs.favoriteTeams)
         predictions.resolveAll(from: viewModel.allFollowedMatches)
         await newsTask
         if prefs.matchNotificationsEnabled {
@@ -110,7 +110,7 @@ struct MatchesView: View {
 
     @ViewBuilder
     private var content: some View {
-        if prefs.favoriteTeams.isEmpty {
+        if prefs.favoriteTeams.isEmpty && prefs.explicitlyFollowedLeagues.isEmpty {
             FollowingEmptyStateView { showingTeamEditor = true }
         } else if viewModel.isLoadingFollowing && viewModel.allFollowedMatches.isEmpty {
             FollowingSkeletonView()
@@ -140,7 +140,8 @@ struct MatchesView: View {
                     .padding(.bottom, 28)
 
                 FollowingComingUpSection(
-                    matches: comingUpMatches,
+                    matches: comingUpPreviewMatches,
+                    fullScheduleMatches: comingUpMatches,
                     sportFilter: $comingUpSportFilter,
                     availableSports: comingUpAvailableSports
                 )
@@ -291,6 +292,10 @@ struct MatchesView: View {
         return result.sorted { $0.date < $1.date }
     }
 
+    private var comingUpPreviewMatches: [Match] {
+        Array(comingUpMatches.prefix(6))
+    }
+
     private var comingUpAvailableSports: [SportGroup] {
         var seen = Set<SportGroup>()
         return visibleMatches
@@ -300,7 +305,7 @@ struct MatchesView: View {
 
     private var newsLeagues: [League] {
         let favPaths = Set(prefs.favoriteTeams.map(\.leaguePath))
-        let explicitIDs = Set(prefs.followedLeagues.map(\.id))
+        let explicitIDs = Set(prefs.explicitlyFollowedLeagues.map(\.id))
         return League.all.filter { favPaths.contains($0.id) || explicitIDs.contains($0.id) }
     }
 
@@ -730,6 +735,7 @@ private struct FollowingNoEventsCard: View {
 
 private struct FollowingComingUpSection: View {
     let matches: [Match]
+    let fullScheduleMatches: [Match]
     @Binding var sportFilter: SportGroup?
     let availableSports: [SportGroup]
 
@@ -806,6 +812,26 @@ private struct FollowingComingUpSection: View {
                     }
                     .padding(.bottom, 10)
                 }
+
+                NavigationLink {
+                    FollowingFullScheduleView(
+                        matches: fullScheduleMatches,
+                        availableSports: availableSports,
+                        initialSportFilter: sportFilter
+                    )
+                } label: {
+                    HStack(spacing: 4) {
+                        Spacer()
+                        Text("View Full Schedule")
+                        Image(systemName: "arrow.right")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 2)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -838,6 +864,129 @@ private struct FollowingComingUpSection: View {
             .padding(.vertical, 5)
             .background(Theme.surfaceElevated, in: Capsule())
         }
+    }
+}
+
+// MARK: - Full schedule
+
+private struct FollowingFullScheduleView: View {
+    let matches: [Match]
+    let availableSports: [SportGroup]
+    @State private var sportFilter: SportGroup?
+
+    init(matches: [Match], availableSports: [SportGroup], initialSportFilter: SportGroup?) {
+        self.matches = matches
+        self.availableSports = availableSports
+        _sportFilter = State(initialValue: initialSportFilter)
+    }
+
+    private struct DateGroup: Identifiable {
+        let title: String
+        let matches: [Match]
+        var id: String { title }
+    }
+
+    private var filteredMatches: [Match] {
+        guard let sportFilter else { return matches }
+        return matches.filter { $0.league.group == sportFilter }
+    }
+
+    private var dateGroups: [DateGroup] {
+        var order: [String] = []
+        var byTitle: [String: [Match]] = [:]
+        for match in filteredMatches.sorted(by: { $0.date < $1.date }) {
+            let title = dateGroupTitle(for: match)
+            if byTitle[title] == nil { order.append(title) }
+            byTitle[title, default: []].append(match)
+        }
+        return order.compactMap { title in
+            guard let matches = byTitle[title] else { return nil }
+            return DateGroup(title: title, matches: matches)
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Theme.background.ignoresSafeArea()
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Text("COMING UP")
+                            .font(.caption.weight(.heavy))
+                            .foregroundStyle(Theme.textSecondary)
+                            .tracking(0.5)
+                        Spacer()
+                        if availableSports.count > 1 { sportFilterMenu }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+
+                    if filteredMatches.isEmpty {
+                        Text("No upcoming events scheduled.")
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.textSecondary)
+                            .padding(.horizontal, 20)
+                    } else {
+                        ForEach(dateGroups) { group in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(group.title)
+                                    .font(.caption2.weight(.heavy))
+                                    .foregroundStyle(Theme.textSecondary)
+                                    .tracking(0.5)
+                                    .padding(.horizontal, 20)
+                                ForEach(group.matches) { match in
+                                    NavigationLink(value: match) {
+                                        FollowingEventRow(match: match)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(.horizontal, 20)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.bottom, 120)
+            }
+        }
+        .navigationTitle("Full Schedule")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Theme.background, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+    }
+
+    private var sportFilterMenu: some View {
+        Menu {
+            Button { sportFilter = nil } label: {
+                if sportFilter == nil { Label("All Sports", systemImage: "checkmark") }
+                else { Text("All Sports") }
+            }
+            ForEach(availableSports, id: \.self) { sport in
+                Button { sportFilter = sport } label: {
+                    if sportFilter == sport { Label(sport.rawValue, systemImage: "checkmark") }
+                    else { Text(sport.rawValue) }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(sportFilter?.rawValue ?? "All Sports")
+                    .font(.caption.weight(.semibold))
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+            }
+            .foregroundStyle(Theme.accent)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(Theme.surfaceElevated, in: Capsule())
+        }
+    }
+
+    private func dateGroupTitle(for match: Match) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(match.date) { return "TODAY" }
+        if calendar.isDateInTomorrow(match.date) { return "TOMORROW" }
+        let weekday = match.date.formatted(.dateTime.weekday(.wide)).uppercased()
+        let month = match.date.formatted(.dateTime.month(.abbreviated)).uppercased()
+        return "\(weekday) · \(month) \(calendar.component(.day, from: match.date))"
     }
 }
 

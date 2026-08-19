@@ -282,10 +282,15 @@ final class PreferencesStore: ObservableObject {
 
     // MARK: Leagues
 
+    /// The leagues the user explicitly follows, in the catalog's canonical order.
+    var explicitlyFollowedLeagues: [League] {
+        League.all.filter { prefs.selectedLeagueIDs.contains($0.path) }
+    }
+
     /// The leagues the user follows, in the catalog's canonical order.
     /// Falls back to the full catalog when nothing has been chosen yet.
     var followedLeagues: [League] {
-        let selected = League.all.filter { prefs.selectedLeagueIDs.contains($0.path) }
+        let selected = explicitlyFollowedLeagues
         return selected.isEmpty ? League.all : selected
     }
 

@@ -86,14 +86,30 @@ struct TVGuideView: View {
     // MARK: - Category bar
 
     private var categoryBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(vm.categories) { cat in
-                    categoryChip(cat)
+        HStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(vm.categories) { cat in
+                        categoryChip(cat)
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                vm.scrollToNow()
+            } label: {
+                Text("Now")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Theme.live)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(Theme.surface, in: Capsule())
+                    .overlay(Capsule().strokeBorder(Theme.live.opacity(0.5)))
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 14)
         }
         .background(Theme.background)
     }
@@ -120,11 +136,15 @@ struct TVGuideView: View {
 
 struct EPGGuideGrid: View {
     @ObservedObject var vm: TVGuideViewModel
+    @EnvironmentObject private var repository: EPGRepository
     let onChannelTap: (CanonicalChannel) -> Void
     let onProgramTap: (EPGProgramme, CanonicalChannel) -> Void
 
     @State private var scrollOffset: CGPoint = .zero
+    @State private var scrollPos = ScrollPosition(x: 0, y: 0)
     @State private var viewSize: CGSize = .zero
+    @State private var bottomInset: CGFloat = 0
+    @State private var hasScrolledToNow = false
     @State private var now: Date = Date()
 
     private let rowH = TVGuideViewModel.rowHeight
@@ -142,8 +162,18 @@ struct EPGGuideGrid: View {
             }
             .onAppear {
                 viewSize = geo.size
-                let targetX = vm.initialScrollOffset
-                scrollOffset = CGPoint(x: targetX, y: 0)
+                bottomInset = geo.safeAreaInsets.bottom
+                triggerScrollToNow()
+            }
+            .onChange(of: geo.size) { _, size in
+                viewSize = size
+                triggerScrollToNow()
+            }
+            .onChange(of: vm.visibleChannels.count) { _, _ in
+                triggerScrollToNow()
+            }
+            .onChange(of: vm.scrollToNowToken) { _, _ in
+                scrollPos = ScrollPosition(x: vm.initialScrollOffset, y: 0)
             }
         }
         .onReceive(
@@ -151,12 +181,23 @@ struct EPGGuideGrid: View {
         ) { _ in now = Date() }
     }
 
-    // MARK: - Main scrollable content
+    private func triggerScrollToNow() {
+        guard !hasScrolledToNow,
+              !vm.visibleChannels.isEmpty,
+              viewSize.width > 0 else { return }
+        hasScrolledToNow = true
+        let targetX = vm.initialScrollOffset
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            scrollPos = ScrollPosition(x: targetX, y: 0)
+        }
+    }
+
+    // MARK: - Main 2-D scroll view
 
     private var mainScrollView: some View {
         ScrollView([.horizontal, .vertical], showsIndicators: false) {
             ZStack(alignment: .topLeading) {
-                // Content size placeholder
+                // Content size driver
                 Color.clear
                     .frame(
                         width: colW + vm.guideWindowWidth,
@@ -175,16 +216,14 @@ struct EPGGuideGrid: View {
                     let rowY = rulerH + CGFloat(i) * rowH
                     programCells(for: ch, rowIndex: i, rowY: rowY)
                 }
-
-                // Spacer for channel column & ruler (so content area doesn't render behind them)
-                Color.clear.frame(width: colW, height: rulerH + CGFloat(vm.visibleChannels.count) * rowH)
             }
         }
         .defaultScrollAnchor(.topLeading)
+        .scrollPosition($scrollPos)
         .onScrollGeometryChange(for: CGPoint.self, of: { $0.contentOffset }) { _, offset in
             scrollOffset = offset
         }
-        .scrollPosition(id: .constant(Optional<String>.none))
+        .contentMargins(.bottom, bottomInset + 16, for: .scrollContent)
     }
 
     // MARK: - Programme cells for one channel row
@@ -194,23 +233,25 @@ struct EPGGuideGrid: View {
         let window = vm.guideWindowStart...vm.guideWindowEnd
         let progs = vm.programmes(for: channel, in: window)
         if progs.isEmpty {
-            noEPGCell(channel: channel, rowY: rowY)
+            if repository.refreshState == .refreshing {
+                // EPG still loading — subtle skeleton
+                Rectangle()
+                    .fill(Theme.surface.opacity(0.35))
+                    .frame(width: max(120, vm.guideWindowWidth), height: rowH - 2)
+                    .offset(x: colW, y: rowY + 1)
+            } else {
+                noEPGCell(channel: channel, rowY: rowY)
+            }
         } else {
             ForEach(progs) { prog in
                 let x = colW + vm.xOffset(for: prog.start)
                 let w = vm.width(for: prog)
-                ProgrammeCell(
-                    programme: prog,
-                    width: w,
-                    now: now
-                ) {
+                ProgrammeCell(programme: prog, width: w, now: now) {
                     onProgramTap(prog, channel)
                 }
                 .frame(width: w, height: rowH - 2)
                 .offset(x: x, y: rowY + 1)
             }
-
-            // Fill gaps between programmes
             gapCells(progs: progs, rowY: rowY)
         }
     }
@@ -253,46 +294,49 @@ struct EPGGuideGrid: View {
         }
     }
 
-    // MARK: - Sticky overlays (counteract scroll to stay fixed)
+    // MARK: - Fixed overlays
 
+    /// Channel column: pinned at x=0, scrolls vertically in sync with the content.
     private var channelColumnOverlay: some View {
         VStack(spacing: 0) {
-            Color.clear.frame(height: rulerH)
-            LazyVStack(spacing: 0) {
-                ForEach(Array(visibleChannels.enumerated()), id: \.element.id) { _, ch in
-                    ChannelLogoCell(channel: ch) { onChannelTap(ch) }
-                        .frame(width: colW, height: rowH)
-                    Divider().overlay(Theme.hairline)
-                }
+            ForEach(Array(visibleChannels.enumerated()), id: \.element.id) { _, ch in
+                ChannelLogoCell(channel: ch) { onChannelTap(ch) }
+                    .frame(width: colW, height: rowH)
+                Divider().overlay(Theme.hairline)
             }
         }
         .frame(width: colW)
         .background(Theme.background)
-        .offset(x: scrollOffset.x, y: 0)  // counteract horizontal scroll only
+        // When scrollOffset.y == 0 the column starts at y=rulerH (below the ruler).
+        // As the user scrolls down scrollOffset.y grows and the column moves up in sync.
+        .offset(x: 0, y: rulerH - scrollOffset.y)
     }
 
+    /// Time ruler: pinned at y=0, labels positioned at their absolute timeline x minus current scroll offset.
     private var timeRulerOverlay: some View {
-        ZStack(alignment: .leading) {
+        ZStack(alignment: .topLeading) {
             Theme.background
-            HStack(spacing: 0) {
-                Color.clear.frame(width: colW)
-                ForEach(timeLabels, id: \.0.timeIntervalSince1970) { date, label, x in
+            ForEach(timeLabels, id: \.0.timeIntervalSince1970) { _, label, x in
+                let screenX = colW + x - scrollOffset.x
+                // Only render labels whose left edge is inside (or just entering) the viewport
+                if screenX < viewSize.width + 4 {
                     Text(label)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Theme.textSecondary)
-                        .frame(minWidth: 60, alignment: .leading)
-                        .offset(x: x)
+                        .fixedSize()
+                        .frame(height: rulerH, alignment: .center)
+                        .offset(x: screenX)
                 }
-                Spacer()
             }
-            Divider().overlay(Theme.hairline)
-                .frame(maxWidth: .infinity)
-                .position(x: 0, y: rulerH)
         }
         .frame(height: rulerH)
-        .offset(x: 0, y: scrollOffset.y)  // counteract vertical scroll only
+        .overlay(alignment: .bottom) { Divider().overlay(Theme.hairline) }
+        .clipped()
+        .allowsHitTesting(false) // let scroll gesture pass through to mainScrollView
+        // No y offset — stays fixed at y=0 in the outer ZStack
     }
 
+    /// Corner CH cell: pinned at (0,0), covers the top-left intersection.
     private var cornerOverlay: some View {
         ZStack {
             Theme.background
@@ -301,35 +345,38 @@ struct EPGGuideGrid: View {
                 .foregroundStyle(Theme.textTertiary)
         }
         .frame(width: colW, height: rulerH)
-        .offset(x: scrollOffset.x, y: scrollOffset.y)  // counteract both scrolls
+        .allowsHitTesting(false)
+        // No offset — stays at (0,0) in the outer ZStack
     }
 
+    /// NOW line: vertical indicator for current time, rendered only for today.
     private var nowLineOverlay: some View {
         Group {
             if vm.nowIsVisible {
                 let nowX = colW + vm.xOffset(for: now) - scrollOffset.x
-                let totalH = rulerH + CGFloat(vm.visibleChannels.count) * rowH - scrollOffset.y
-                ZStack(alignment: .top) {
-                    Rectangle()
-                        .fill(Theme.live)
-                        .frame(width: 2, height: max(0, totalH))
-                    Circle()
-                        .fill(Theme.live)
-                        .frame(width: 8, height: 8)
-                        .offset(y: -4)
+                if nowX >= colW && nowX <= viewSize.width {
+                    let lineH = CGFloat(vm.visibleChannels.count) * rowH
+                    ZStack(alignment: .top) {
+                        Rectangle()
+                            .fill(Theme.live)
+                            .frame(width: 2, height: max(0, lineH))
+                        Circle()
+                            .fill(Theme.live)
+                            .frame(width: 8, height: 8)
+                            .offset(y: -4)
+                    }
+                    .frame(width: 2)
+                    // Start the line at the bottom edge of the time ruler
+                    .offset(x: nowX, y: rulerH)
+                    .allowsHitTesting(false)
                 }
-                .frame(width: 2)
-                .offset(x: nowX, y: scrollOffset.y)
-                .allowsHitTesting(false)
             }
         }
     }
 
     // MARK: - Helpers
 
-    private var visibleChannels: [CanonicalChannel] {
-        vm.visibleChannels
-    }
+    private var visibleChannels: [CanonicalChannel] { vm.visibleChannels }
 
     private var timeLabels: [(Date, String, CGFloat)] {
         let window = vm.guideWindowStart...vm.guideWindowEnd

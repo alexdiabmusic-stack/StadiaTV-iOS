@@ -300,7 +300,8 @@ final class EPGRepository: ObservableObject {
 
         var allEPGChannels: [EPGChannel] = []
         let now = Date()
-        let programmeWindow = now.addingTimeInterval(-2 * 3600)...now.addingTimeInterval(48 * 3600)
+        // Keep 14h of past data so the guide shows programmes from midnight today
+        let programmeWindow = now.addingTimeInterval(-14 * 3600)...now.addingTimeInterval(36 * 3600)
 
         for source in sources {
             guard !Task.isCancelled else {
@@ -401,26 +402,42 @@ final class EPGRepository: ObservableObject {
             }
         }
 
-        // Also build a lookup from the curated config's aliases
+        // Also build a lookup from the curated config's aliases and explicit epg_id fields
         if let config {
             for curatedCh in config.channels {
+                // Direct epg_id match: XMLTV channel id → canonical key
+                if let epgId = curatedCh.epgId {
+                    aliasToCanon[epgId.lowercased()] = curatedCh.key
+                    let normEpgId = normalizer.normalize(epgId).lowercased()
+                    if !normEpgId.isEmpty { aliasToCanon[normEpgId] = curatedCh.key }
+                }
                 for alias in curatedCh.aliases {
                     let norm = normalizer.normalize(alias).lowercased()
                     aliasToCanon[norm] = curatedCh.key
+                    aliasToCanon[alias.lowercased()] = curatedCh.key
                 }
             }
         }
 
         for epgCh in epgChannels {
-            // Try each display name to find a canonical match
             var matched: String?
-            for displayName in epgCh.displayNames {
-                let norm = normalizer.normalize(displayName).lowercased()
-                if let canonId = aliasToCanon[norm] {
-                    matched = canonId
-                    break
+
+            // 1. Try XMLTV channel id itself against the alias table (catches epg_id matches)
+            let xmltvIdLow = epgCh.id.lowercased()
+            matched = aliasToCanon[xmltvIdLow]
+                ?? aliasToCanon[normalizer.normalize(epgCh.id).lowercased()]
+
+            // 2. Try each display name
+            if matched == nil {
+                for displayName in epgCh.displayNames {
+                    let norm = normalizer.normalize(displayName).lowercased()
+                    if let canonId = aliasToCanon[norm] ?? aliasToCanon[displayName.lowercased()] {
+                        matched = canonId
+                        break
+                    }
                 }
             }
+
             if let canonId = matched {
                 newMapping[epgCh.id] = canonId
             }

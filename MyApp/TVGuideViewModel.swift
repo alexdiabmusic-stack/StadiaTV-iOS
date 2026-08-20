@@ -93,15 +93,23 @@ final class TVGuideViewModel: ObservableObject {
     }
 
     private func featuredChannels(from all: [CanonicalChannel], repository: EPGRepository) -> [CanonicalChannel] {
-        let withEPG = all.filter { repository.hasProgrammes(for: $0.id) }
-        // While EPG is still loading withEPG is empty; show top-priority channels so the
-        // guide is never blank — programme cells will fill in once the index is ready.
-        let pool = withEPG.isEmpty ? all : withEPG
-        return Array(pool.sorted { $0.priority > $1.priority }.prefix(40))
+        Array(all.sorted { $0.priority > $1.priority }.prefix(80))
     }
 
     private func prefetchVisibleProgrammes(repository: EPGRepository) {
-        repository.prefetchProgrammes(for: Array(visibleChannels.prefix(30)))
+        prefetchProgrammes(in: 0..<min(30, visibleChannels.count), repository: repository)
+    }
+
+    func prefetchProgrammesAround(rowIndex: Int, visibleRowCount: Int) {
+        guard let repository else { return }
+        let start = max(0, rowIndex - 8)
+        let end = min(visibleChannels.count, rowIndex + visibleRowCount + 16)
+        guard start < end else { return }
+        prefetchProgrammes(in: start..<end, repository: repository)
+    }
+
+    private func prefetchProgrammes(in range: Range<Int>, repository: EPGRepository) {
+        repository.prefetchProgrammes(for: Array(visibleChannels[range]))
     }
 
     // MARK: - Category selection

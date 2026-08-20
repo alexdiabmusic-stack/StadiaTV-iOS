@@ -87,6 +87,7 @@ struct TVGuideView: View {
 
     private var categoryBar: some View {
         HStack(spacing: 0) {
+            categoryMenu
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(vm.categories) { cat in
@@ -112,6 +113,31 @@ struct TVGuideView: View {
             .padding(.trailing, 14)
         }
         .background(Theme.background)
+    }
+
+    private var categoryMenu: some View {
+        Menu {
+            ForEach(vm.categories) { cat in
+                Button {
+                    withAnimation(.snappy) { vm.selectCategory(cat.id) }
+                } label: {
+                    if cat.id == vm.selectedCategoryId {
+                        Label(cat.name, systemImage: "checkmark")
+                    } else {
+                        Text(cat.name)
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Theme.textPrimary)
+                .frame(width: 36, height: 32)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        }
+        .padding(.leading, 12)
+        .accessibilityLabel("Live TV category")
     }
 
     private func categoryChip(_ cat: GuideCategory) -> some View {
@@ -245,6 +271,9 @@ struct EPGGuideGrid: View {
         .scrollPosition($scrollPos)
         .onScrollGeometryChange(for: CGPoint.self, of: { $0.contentOffset }) { _, offset in
             scrollOffset = offset
+            let firstRow = max(0, Int((offset.y - rulerH) / rowH))
+            let visibleRows = max(1, Int(viewSize.height / rowH) + 2)
+            vm.prefetchProgrammesAround(rowIndex: firstRow, visibleRowCount: visibleRows)
         }
         .contentMargins(.bottom, bottomInset + 16, for: .scrollContent)
     }

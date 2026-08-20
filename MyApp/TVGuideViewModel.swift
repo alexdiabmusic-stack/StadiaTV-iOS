@@ -92,8 +92,10 @@ final class TVGuideViewModel: ObservableObject {
 
     private func featuredChannels(from all: [CanonicalChannel], repository: EPGRepository) -> [CanonicalChannel] {
         let withEPG = all.filter { repository.hasProgrammes(for: $0.id) }
-        let byPriority = withEPG.sorted { $0.priority > $1.priority }
-        return Array(byPriority.prefix(40))
+        // While EPG is still loading withEPG is empty; show top-priority channels so the
+        // guide is never blank — programme cells will fill in once the index is ready.
+        let pool = withEPG.isEmpty ? all : withEPG
+        return Array(pool.sorted { $0.priority > $1.priority }.prefix(40))
     }
 
     // MARK: - Category selection

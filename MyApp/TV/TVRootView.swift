@@ -3,12 +3,22 @@ import SwiftUI
 
 struct TVRootView: View {
     @EnvironmentObject private var prefs: PreferencesStore
-    @State private var showingFavoriteNotificationPrompt = false
+    @EnvironmentObject private var playlistStore: PlaylistStore
+    @StateObject private var liveViewModel = LiveViewModel()
+    @StateObject private var epgRepository = EPGRepository()
 
     var body: some View {
         TabView {
             Tab("Home", systemImage: "house.fill") {
                 TVHomeView()
+            }
+
+            Tab("Following", systemImage: "star.circle.fill") {
+                TVFollowingView()
+            }
+
+            Tab("Live", systemImage: "dot.radiowaves.left.and.right") {
+                TVLiveSportsView()
             }
 
             Tab("Live TV", systemImage: "play.tv.fill") {
@@ -32,6 +42,13 @@ struct TVRootView: View {
             }
         }
         .tint(Theme.accent)
+        .environmentObject(liveViewModel)
+        .environmentObject(epgRepository)
+        .task { await liveViewModel.load(favoriteTeams: prefs.favoriteTeams) }
+        .task { epgRepository.setupWithChannels(playlistStore.allChannels) }
+        .onChange(of: playlistStore.channelsByPlaylist) {
+            epgRepository.setupWithChannels(playlistStore.allChannels)
+        }
     }
 }
 

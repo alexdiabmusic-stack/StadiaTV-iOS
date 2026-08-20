@@ -19,6 +19,8 @@ struct MoreView: View {
                         navigationGroups
                     }
                     .padding(20)
+                    .frame(maxWidth: Theme.isPad ? 680 : .infinity)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
             .navigationTitle("Settings")

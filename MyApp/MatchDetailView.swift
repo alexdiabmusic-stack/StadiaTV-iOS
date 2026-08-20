@@ -21,6 +21,8 @@ struct MatchDetailView: View {
     @State private var multiscreenSportFilter: SportGroup? = nil
     @State private var multiscreenSession: MultiscreenSession?
     @State private var gameSummary: GameSummary?
+    @State private var isLoadingGameSummary = false
+    @State private var didAttemptGameSummaryLoad = false
     @State private var showPaywall = false
     @State private var browsingWatchLink: WatchLink?
     // Ranking a big playlist is expensive, so it runs once off the main thread
@@ -35,7 +37,7 @@ struct MatchDetailView: View {
     @State private var odds: MatchOddsDisplay?
     @State private var isLoadingOdds = false
     @State private var showPickCelebration = false
-    @State private var gameCenterTab: GameCenterTab = .gameStats
+    @State private var gameCenterTab: GameCenterTab = .players
 
     private enum GameCenterTab: String, CaseIterable, Identifiable {
         case players = "Players"
@@ -60,6 +62,19 @@ struct MatchDetailView: View {
 
     private var selectedTeamID: String? {
         (selectedGameCenterTeam == .away ? match.away : match.home).teamID
+    }
+
+    private var hasAvailableGameStats: Bool {
+        guard let gameSummary else { return false }
+        return !gameSummary.isEmpty
+    }
+
+    private var availableGameCenterTabs: [GameCenterTab] {
+        hasAvailableGameStats ? [.players, .gameStats, .standings] : [.players, .standings]
+    }
+
+    private var effectiveGameCenterTab: GameCenterTab {
+        availableGameCenterTabs.contains(gameCenterTab) ? gameCenterTab : .players
     }
 
     private var selectedMultiscreenChannels: [Channel] {
@@ -166,13 +181,22 @@ struct MatchDetailView: View {
 
     /// Loads boxscore stats once, then keeps polling while the game is live.
     private func loadGameSummary() async {
+        gameSummary = nil
+        gameCenterTab = .players
+        didAttemptGameSummaryLoad = false
         guard match.state != .pre else { return }
+
         let service = ESPNService()
         while !Task.isCancelled {
-            if let summary = try? await service.gameSummary(for: match.league, eventID: match.id),
-               !summary.isEmpty {
+            isLoadingGameSummary = gameSummary == nil
+            let summary = try? await service.gameSummary(for: match.league, eventID: match.id)
+            didAttemptGameSummaryLoad = true
+            isLoadingGameSummary = false
+
+            if let summary, !summary.isEmpty {
                 gameSummary = summary
             }
+
             guard match.state == .live else { break }
             try? await Task.sleep(nanoseconds: 45_000_000_000)
             if Task.isCancelled { break }
@@ -746,7 +770,7 @@ struct MatchDetailView: View {
 
             // Tab bar
             HStack(spacing: 0) {
-                ForEach(GameCenterTab.allCases) { tab in
+                ForEach(availableGameCenterTabs) { tab in
                     Button {
                         withAnimation(.snappy) { gameCenterTab = tab }
                     } label: {
@@ -768,7 +792,7 @@ struct MatchDetailView: View {
             .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.hairline))
 
             Group {
-                switch gameCenterTab {
+                switch effectiveGameCenterTab {
                 case .players: gameCenterPlayersTab
                 case .gameStats: gameCenterStatsTab
                 case .standings: gameCenterStandingsTab
@@ -810,15 +834,36 @@ struct MatchDetailView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-        } else {
+        } else if isLoadingGameSummary && !didAttemptGameSummaryLoad {
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small).tint(Theme.accent)
-                Text("Loading stats…")
+                Text("Loading stats...")
                     .font(.callout)
                     .foregroundStyle(Theme.textSecondary)
             }
             .padding(14)
+        } else {
+            gameStatsUnavailableState
         }
+    }
+
+    private var gameStatsUnavailableState: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "chart.bar.xaxis")
+                .foregroundStyle(Theme.textSecondary)
+            Text(match.state == .live ? "Stats are not available yet." : "Stats are not available for this game.")
+                .font(.callout)
+                .foregroundStyle(Theme.textSecondary)
+            Spacer()
+            Button("Try Again") {
+                Task { await loadGameSummary() }
+            }
+            .buttonStyle(.bordered)
+            .tint(Theme.accent)
+        }
+        .padding(14)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     private var gameCenterStandingsTab: some View {

@@ -114,7 +114,7 @@ nonisolated struct EPGChannel: Identifiable, Hashable {
 
 // MARK: - EPG Programme
 
-nonisolated struct EPGProgramme: Identifiable, Hashable {
+nonisolated struct EPGProgramme: Identifiable, Hashable, Sendable {
     let id: String
     let epgChannelId: String
     var canonicalChannelId: String?
@@ -130,6 +130,7 @@ nonisolated struct EPGProgramme: Identifiable, Hashable {
     let rating: String?
     let sourceId: String
     let sourcePriority: Int
+    let endTimeIsInferred: Bool
 
     nonisolated var duration: TimeInterval { max(0, end.timeIntervalSince(start)) }
     nonisolated var isValid: Bool { start < end && duration > 60 }

@@ -170,7 +170,8 @@ nonisolated final class EPGXMLParser: NSObject, XMLParserDelegate {
                 episode: progEpisode,
                 rating: progRating,
                 sourceId: sourceId,
-                sourcePriority: sourcePriority
+                sourcePriority: sourcePriority,
+                endTimeIsInferred: false
             )
             if prog.isValid { programmes.append(prog) }
             progActive = false

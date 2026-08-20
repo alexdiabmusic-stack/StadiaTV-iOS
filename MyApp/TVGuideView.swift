@@ -160,6 +160,13 @@ struct EPGGuideGrid: View {
                 cornerOverlay
                 nowLineOverlay
             }
+            // Clip overlays (NOW line, channel column) to the guide viewport.
+            // Without this the NOW line draws behind the floating tab bar.
+            .clipped()
+            // Tap gestures in the channel column are routed here rather than
+            // through the non-interactive channelColumnOverlay, so that drag
+            // gestures pass straight through to the scroll view below.
+            .simultaneousGesture(channelColumnTapGesture)
             .onAppear {
                 viewSize = geo.size
                 bottomInset = geo.safeAreaInsets.bottom
@@ -179,6 +186,22 @@ struct EPGGuideGrid: View {
         .onReceive(
             Timer.publish(every: 60, on: .main, in: .common).autoconnect()
         ) { _ in now = Date() }
+    }
+
+    /// SpatialTapGesture that fires only for taps (not drags), so vertical drag gestures
+    /// fall through to the underlying ScrollView for correct vertical scrolling.
+    private var channelColumnTapGesture: some Gesture {
+        SpatialTapGesture()
+            .onEnded { value in
+                let loc = value.location
+                // Only act on taps in the channel column area, below the time ruler.
+                guard loc.x < colW, loc.y >= rulerH else { return }
+                let channelY = loc.y + scrollOffset.y - rulerH
+                let idx = Int(channelY / rowH)
+                guard idx >= 0, idx < visibleChannels.count else { return }
+                let ch = visibleChannels[idx]
+                if ch.playableChannel != nil { onChannelTap(ch) }
+            }
     }
 
     private func triggerScrollToNow() {
@@ -296,20 +319,21 @@ struct EPGGuideGrid: View {
 
     // MARK: - Fixed overlays
 
-    /// Channel column: pinned at x=0, scrolls vertically in sync with the content.
+    /// Channel column: purely visual, non-interactive.
+    /// Tap handling is done by channelColumnTapGesture on the outer ZStack so that
+    /// vertical drag gestures pass through to mainScrollView unobstructed.
     private var channelColumnOverlay: some View {
         VStack(spacing: 0) {
             ForEach(Array(visibleChannels.enumerated()), id: \.element.id) { _, ch in
-                ChannelLogoCell(channel: ch) { onChannelTap(ch) }
+                ChannelLogoCell(channel: ch) { }  // no-op; taps handled by simultaneousGesture
                     .frame(width: colW, height: rowH)
                 Divider().overlay(Theme.hairline)
             }
         }
         .frame(width: colW)
         .background(Theme.background)
-        // When scrollOffset.y == 0 the column starts at y=rulerH (below the ruler).
-        // As the user scrolls down scrollOffset.y grows and the column moves up in sync.
         .offset(x: 0, y: rulerH - scrollOffset.y)
+        .allowsHitTesting(false)  // all touches pass through to the scroll view below
     }
 
     /// Time ruler: pinned at y=0, labels positioned at their absolute timeline x minus current scroll offset.
@@ -350,23 +374,24 @@ struct EPGGuideGrid: View {
     }
 
     /// NOW line: vertical indicator for current time, rendered only for today.
+    /// Height is capped to the visible guide area so it doesn't bleed behind the tab bar.
     private var nowLineOverlay: some View {
         Group {
             if vm.nowIsVisible {
                 let nowX = colW + vm.xOffset(for: now) - scrollOffset.x
                 if nowX >= colW && nowX <= viewSize.width {
-                    let lineH = CGFloat(vm.visibleChannels.count) * rowH
+                    let maxLineH = max(0, viewSize.height - rulerH - bottomInset)
+                    let lineH = min(CGFloat(vm.visibleChannels.count) * rowH, maxLineH)
                     ZStack(alignment: .top) {
                         Rectangle()
                             .fill(Theme.live)
-                            .frame(width: 2, height: max(0, lineH))
+                            .frame(width: 2, height: lineH)
                         Circle()
                             .fill(Theme.live)
                             .frame(width: 8, height: 8)
                             .offset(y: -4)
                     }
                     .frame(width: 2)
-                    // Start the line at the bottom edge of the time ruler
                     .offset(x: nowX, y: rulerH)
                     .allowsHitTesting(false)
                 }

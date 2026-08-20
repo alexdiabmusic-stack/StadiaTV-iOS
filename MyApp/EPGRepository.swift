@@ -6,10 +6,13 @@ import OSLog
 // MARK: - Gzip helper
 
 nonisolated private extension Data {
-    /// Attempts to decompress gzip data. Returns self unchanged if not gzip or decompression fails.
+    /// Decompresses gzip data. Returns self unchanged if not gzip or decompression fails.
+    /// Uses the gzip ISIZE footer field to allocate an exact-size destination buffer,
+    /// avoiding the silent truncation that a fixed 10× heuristic can cause for large files.
     func tryGunzip() -> Data {
         guard count > 10, self[0] == 0x1f, self[1] == 0x8b else { return self }
 
+        // Walk the variable-length gzip header to find the DEFLATE payload start.
         var offset = 10
         if count > 3 {
             let flags = self[3]
@@ -23,11 +26,16 @@ nonisolated private extension Data {
         }
         guard offset < count - 8 else { return self }
 
-        // Extract raw DEFLATE bytes and prepend minimal zlib header for the Compression framework
+        // ISIZE: last 4 bytes of the gzip file are the original size mod 2^32 (little-endian).
+        // Accurate for files < 4 GB; EPG XML is always < 4 GB.
+        let isize = Int(self[count - 4]) | (Int(self[count - 3]) << 8)
+                  | (Int(self[count - 2]) << 16) | (Int(self[count - 1]) << 24)
+        let destCapacity = isize > 0 ? isize + 512 : Swift.max(count * 20, 32 * 1024 * 1024)
+
+        // COMPRESSION_ZLIB expects a 2-byte zlib header before the raw DEFLATE payload.
         var wrapped = Data([0x78, 0x9c])
         wrapped.append(self[offset..<(count - 8)])
 
-        let destCapacity = Swift.max(count * 10, 8 * 1024 * 1024)
         var dest = Data(repeating: 0, count: destCapacity)
         let written = dest.withUnsafeMutableBytes { dPtr in
             wrapped.withUnsafeBytes { sPtr in
@@ -283,6 +291,11 @@ final class EPGRepository: ObservableObject {
     // MARK: - Refresh
 
     func refreshIfNeeded() async {
+        // programmeIndex is never persisted — always rebuild from disk cache after a cold start.
+        if programmeIndex.isEmpty {
+            await forceRefresh()
+            return
+        }
         let staleness: TimeInterval = 6 * 3600
         if let last = lastUpdated, Date().timeIntervalSince(last) < staleness { return }
         await forceRefresh()

@@ -177,11 +177,13 @@ final class EPGRepository: ObservableObject {
             self.logger.info("Live TV lineup ready filtered=\(buildResult.filteredStreams, privacy: .public) matched=\(buildResult.matchedStreams, privacy: .public) canonical=\(canonicals.count, privacy: .public)")
             await self.loadInitialEPGPWProgrammes(for: canonicals)
             guard !Task.isCancelled, self.importGeneration == generation else { return }
-            if self.programmeIndex.isEmpty, EPGPWSourcePolicy.epgShareFallbackEnabled {
-                await self.refreshIfNeeded()
-            }
-            guard !Task.isCancelled, self.importGeneration == generation else { return }
             self.importProgress.state = .ready
+            if EPGPWSourcePolicy.epgShareFallbackEnabled {
+                self.refreshTask?.cancel()
+                self.refreshTask = Task(priority: .utility) { [weak self] in
+                    await self?.forceRefresh()
+                }
+            }
         }
     }
 
@@ -423,7 +425,7 @@ final class EPGRepository: ObservableObject {
         let wantedEPGIds = Set(epgToCanonical.keys)
         importProgress.epgChannels = wantedEPGIds.count
 
-        var programmeIndex: [String: [EPGProgramme]] = [:]
+        var programmeIndex = self.programmeIndex
         for source in sources {
             guard !Task.isCancelled else {
                 refreshState = .idle

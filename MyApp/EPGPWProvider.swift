@@ -270,8 +270,8 @@ actor EPGPWProvider {
 
         let stale = readCache(for: mapping)
         let task = Task<EPGPWFetchResult, Error> { [configuration, session, cacheDir] in
-            try await Self.waitForTurn(configuration: configuration, activeRequests: { await self.activeRequests }, setActive: { await self.setActiveRequests($0) }, lastStart: { await self.lastRequestStart }, setLastStart: { await self.setLastRequestStart($0) })
-            defer { Task { await self.finishRequest() } }
+            try await self.waitForTurn()
+            defer { Task { self.finishRequest() } }
             return try await Self.fetch(mapping: mapping, configuration: configuration, session: session, cacheDir: cacheDir, stale: stale)
         }
         inFlight[mapping.epgpwChannelId] = task
@@ -288,35 +288,21 @@ actor EPGPWProvider {
         }
     }
 
-    private func setActiveRequests(_ value: Int) {
-        activeRequests = value
-    }
-
-    private func setLastRequestStart(_ value: Date) {
-        lastRequestStart = value
+    private func waitForTurn() async throws {
+        while activeRequests >= configuration.maximumConcurrentRequests {
+            try Task.checkCancellation()
+            try await Task.sleep(nanoseconds: 80_000_000)
+        }
+        let elapsed = Date().timeIntervalSince(lastRequestStart)
+        if elapsed < configuration.requestPacing {
+            try await Task.sleep(nanoseconds: UInt64((configuration.requestPacing - elapsed) * 1_000_000_000))
+        }
+        activeRequests += 1
+        lastRequestStart = Date()
     }
 
     private func finishRequest() {
         activeRequests = max(0, activeRequests - 1)
-    }
-
-    private static func waitForTurn(
-        configuration: EPGPWConfiguration,
-        activeRequests: () async -> Int,
-        setActive: (Int) async -> Void,
-        lastStart: () async -> Date,
-        setLastStart: (Date) async -> Void
-    ) async throws {
-        while await activeRequests() >= configuration.maximumConcurrentRequests {
-            try Task.checkCancellation()
-            try await Task.sleep(nanoseconds: 80_000_000)
-        }
-        let elapsed = Date().timeIntervalSince(await lastStart())
-        if elapsed < configuration.requestPacing {
-            try await Task.sleep(nanoseconds: UInt64((configuration.requestPacing - elapsed) * 1_000_000_000))
-        }
-        await setActive(await activeRequests() + 1)
-        await setLastStart(Date())
     }
 
     private static func fetch(

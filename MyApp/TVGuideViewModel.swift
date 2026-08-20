@@ -51,10 +51,12 @@ final class TVGuideViewModel: ObservableObject {
         self.repository = repository
         buildCategories(from: repository)
         filterChannels(repository: repository)
+        prefetchVisibleProgrammes(repository: repository)
     }
 
     func update(repository: EPGRepository) {
         filterChannels(repository: repository)
+        prefetchVisibleProgrammes(repository: repository)
     }
 
     private func buildCategories(from repository: EPGRepository) {
@@ -98,18 +100,26 @@ final class TVGuideViewModel: ObservableObject {
         return Array(pool.sorted { $0.priority > $1.priority }.prefix(40))
     }
 
+    private func prefetchVisibleProgrammes(repository: EPGRepository) {
+        repository.prefetchProgrammes(for: Array(visibleChannels.prefix(30)))
+    }
+
     // MARK: - Category selection
 
     func selectCategory(_ id: String) {
         guard let repository else { return }
         selectedCategoryId = id
         filterChannels(repository: repository)
+        prefetchVisibleProgrammes(repository: repository)
     }
 
     /// Resets the selected date to today and signals EPGGuideGrid to scroll to NOW.
     func scrollToNow() {
         selectedDate = Calendar.current.startOfDay(for: Date())
-        if let repository { filterChannels(repository: repository) }
+        if let repository {
+            filterChannels(repository: repository)
+            prefetchVisibleProgrammes(repository: repository)
+        }
         scrollToNowToken += 1
     }
 

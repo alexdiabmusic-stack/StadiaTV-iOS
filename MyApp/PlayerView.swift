@@ -10,10 +10,12 @@ import MediaPlayer
 /// Presents a channel's stream full screen.
 struct PlayerView: View {
     let channel: Channel
+    let canonicalChannel: CanonicalChannel?
     @StateObject private var streamSelection: StreamSelectionState
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var playlistStore: PlaylistStore
+    @EnvironmentObject private var epgRepository: EPGRepository
     @EnvironmentObject private var entitlements: EntitlementStore
     @EnvironmentObject private var prefs: PreferencesStore
     @State private var isChromeVisible = true
@@ -43,6 +45,7 @@ struct PlayerView: View {
 
     init(channel: Channel) {
         self.channel = channel
+        self.canonicalChannel = nil
         _streamSelection = StateObject(wrappedValue: StreamSelectionState(channel: channel))
     }
 
@@ -57,6 +60,7 @@ struct PlayerView: View {
             playlistName: "Guide"
         )
         self.channel = channel
+        self.canonicalChannel = canonicalChannel
         _streamSelection = StateObject(wrappedValue: StreamSelectionState(channel: channel, canonicalChannel: canonicalChannel))
     }
 
@@ -195,6 +199,18 @@ struct PlayerView: View {
                 }
                 .padding(.top, 16)
                 .padding(.trailing, 16)
+                .transition(.opacity)
+            }
+        }
+        .overlay(alignment: .bottomLeading) {
+            if isChromeVisible, let canonicalChannel, let programme = epgRepository.currentProgramme(for: canonicalChannel.id) {
+                PlayerNowOnOverlay(
+                    channelName: canonicalChannel.name,
+                    currentProgramme: programme,
+                    nextProgramme: epgRepository.nextProgramme(for: canonicalChannel.id)
+                )
+                .padding(.leading, 16)
+                .padding(.bottom, 84)
                 .transition(.opacity)
             }
         }
@@ -1519,6 +1535,37 @@ private struct PlayerChromeButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+private struct PlayerNowOnOverlay: View {
+    let channelName: String
+    let currentProgramme: EPGProgramme
+    let nextProgramme: EPGProgramme?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(channelName)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white.opacity(0.72))
+                .lineLimit(1)
+            Text("Now On: \(currentProgramme.title)")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+            if let nextProgramme {
+                Text("Next: \(nextProgramme.title)")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.68))
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(maxWidth: 340, alignment: .leading)
+        .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.white.opacity(0.14)))
+        .accessibilityElement(children: .combine)
     }
 }
 

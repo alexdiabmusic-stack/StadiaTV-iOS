@@ -76,10 +76,14 @@ final class EPGRepository: ObservableObject {
     private var currentIPTVChannels: [Channel] = []
     private var refreshTask: Task<Void, Never>?
     private var setupTask: Task<Void, Never>?
+    private var epgpwPrefetchTasks: [String: Task<Void, Never>] = [:]
+    private var epgpwDiagnostics: [String: EPGPWFetchResult] = [:]
     private var isRefreshing = false
     private var importGeneration = UUID()
     private var lastChannelFingerprint: String?
 
+    private let epgpwMappings = EPGPWMappingRepository()
+    private lazy var epgpwProvider = EPGPWProvider(cacheDir: cacheDir)
     private let logger = Logger(subsystem: "StadiaTV", category: "LiveTVImport")
 
     // Cache keys
@@ -171,7 +175,11 @@ final class EPGRepository: ObservableObject {
             self.importProgress.state = .loadingEPG
             self.importProgress.canonicalChannels = canonicals.count
             self.logger.info("Live TV lineup ready filtered=\(buildResult.filteredStreams, privacy: .public) matched=\(buildResult.matchedStreams, privacy: .public) canonical=\(canonicals.count, privacy: .public)")
-            await self.refreshIfNeeded()
+            await self.loadInitialEPGPWProgrammes(for: canonicals)
+            guard !Task.isCancelled, self.importGeneration == generation else { return }
+            if self.programmeIndex.isEmpty, EPGPWSourcePolicy.epgShareFallbackEnabled {
+                await self.refreshIfNeeded()
+            }
             guard !Task.isCancelled, self.importGeneration == generation else { return }
             self.importProgress.state = .ready
         }
@@ -288,6 +296,83 @@ final class EPGRepository: ObservableObject {
         )
     }
 
+    // MARK: - EPG.pw Lazy Loading
+
+    private func loadInitialEPGPWProgrammes(for channels: [CanonicalChannel]) async {
+        guard EPGPWSourcePolicy.epgPWEnabled else { return }
+        let prioritized = channels.sorted { $0.priority > $1.priority }
+        await loadEPGPWProgrammes(for: Array(prioritized.prefix(24)), forceRefresh: false)
+    }
+
+    func prefetchProgrammes(for channels: [CanonicalChannel], forceRefresh: Bool = false) {
+        guard EPGPWSourcePolicy.epgPWEnabled else { return }
+        let mapped = channels.filter { epgpwMappings.mapping(for: $0.id) != nil }
+        guard !mapped.isEmpty else { return }
+        let key = mapped.map(\.id).joined(separator: "|") + "-\(forceRefresh)"
+        if epgpwPrefetchTasks[key] != nil { return }
+        epgpwPrefetchTasks[key] = Task { [weak self] in
+            guard let self else { return }
+            await self.loadEPGPWProgrammes(for: mapped, forceRefresh: forceRefresh)
+            await MainActor.run { self.epgpwPrefetchTasks[key] = nil }
+        }
+    }
+
+    private func requestEPGPWIfNeeded(channelId: String, from: Date, to: Date) {
+        guard EPGPWSourcePolicy.epgPWEnabled,
+              let channel = canonicalChannels.first(where: { $0.id == channelId }),
+              epgpwMappings.mapping(for: channelId) != nil else { return }
+        let hasCoverage = programmeIndex[channelId]?.contains { programme in
+            programme.end > from && programme.start < to
+        } ?? false
+        guard !hasCoverage else { return }
+        prefetchProgrammes(for: [channel])
+    }
+
+    private func loadEPGPWProgrammes(for channels: [CanonicalChannel], forceRefresh: Bool) async {
+        let mappings = channels.compactMap { epgpwMappings.mapping(for: $0.id) }
+        guard !mappings.isEmpty else { return }
+        importProgress.epgChannels = max(importProgress.epgChannels, mappings.count)
+        await withTaskGroup(of: EPGPWFetchResult?.self) { group in
+            for mapping in mappings {
+                group.addTask { [epgpwProvider] in
+                    do {
+                        return try await epgpwProvider.programmes(for: mapping, forceRefresh: forceRefresh)
+                    } catch {
+                        #if DEBUG
+                        print("EPG.pw failed canonical=\(mapping.canonicalChannelId) id=\(mapping.epgpwChannelId): \(error.localizedDescription)")
+                        #endif
+                        return nil
+                    }
+                }
+            }
+
+            var merged = programmeIndex
+            var retained = 0
+            for await result in group {
+                guard let result else { continue }
+                epgpwDiagnostics[result.mapping.canonicalChannelId] = result
+                if !result.programmes.isEmpty {
+                    mergeEPGPWProgrammes(result.programmes, into: &merged)
+                    retained += result.programmes.count
+                }
+            }
+            if retained > 0 {
+                finalizeProgrammeIndex(merged)
+                importProgress.programmesRetained = programmeIndex.values.reduce(0) { $0 + $1.count }
+                lastUpdated = Date()
+                persistState()
+                objectWillChange.send()
+            }
+        }
+    }
+
+    private func mergeEPGPWProgrammes(_ programmes: [EPGProgramme], into index: inout [String: [EPGProgramme]]) {
+        for prog in programmes {
+            guard prog.isValid, let canonId = prog.canonicalChannelId else { continue }
+            index[canonId, default: []].append(prog)
+        }
+    }
+
     // MARK: - Refresh
 
     func refreshIfNeeded() async {
@@ -302,6 +387,7 @@ final class EPGRepository: ObservableObject {
     }
 
     func forceRefresh() async {
+        guard EPGPWSourcePolicy.epgShareFallbackEnabled else { return }
         guard !isRefreshing else { return }
         isRefreshing = true
         refreshState = .refreshing
@@ -531,15 +617,18 @@ final class EPGRepository: ObservableObject {
     // MARK: - Query Interface
 
     func currentProgramme(for channelId: String, at date: Date = Date()) -> EPGProgramme? {
-        programmeIndex[channelId]?.first { $0.isOnNow(at: date) }
+        requestEPGPWIfNeeded(channelId: channelId, from: date.addingTimeInterval(-3600), to: date.addingTimeInterval(6 * 3600))
+        return programmeIndex[channelId]?.first { $0.isOnNow(at: date) }
     }
 
     func nextProgramme(for channelId: String, after date: Date = Date()) -> EPGProgramme? {
-        programmeIndex[channelId]?.first { $0.start > date }
+        requestEPGPWIfNeeded(channelId: channelId, from: date, to: date.addingTimeInterval(12 * 3600))
+        return programmeIndex[channelId]?.first { $0.start > date }
     }
 
     func programmes(for channelId: String, from: Date, to: Date) -> [EPGProgramme] {
-        programmeIndex[channelId]?.filter { $0.end > from && $0.start < to } ?? []
+        requestEPGPWIfNeeded(channelId: channelId, from: from, to: to)
+        return programmeIndex[channelId]?.filter { $0.end > from && $0.start < to } ?? []
     }
 
     func hasProgrammes(for channelId: String) -> Bool {
@@ -560,11 +649,38 @@ final class EPGRepository: ObservableObject {
 
     // MARK: - Debug info
 
+    func epgpwDiagnostics(for channelId: String) -> EPGPWChannelDiagnostics? {
+        guard let mapping = epgpwMappings.mapping(for: channelId) else { return nil }
+        let result = epgpwDiagnostics[channelId]
+        let programmes = programmeIndex[channelId] ?? []
+        let now = Date()
+        return EPGPWChannelDiagnostics(
+            canonicalName: mapping.canonicalName,
+            canonicalChannelId: mapping.canonicalChannelId,
+            epgpwChannelId: mapping.epgpwChannelId,
+            epgpwName: mapping.epgpwName,
+            country: mapping.country,
+            matchMethod: mapping.matchMethod,
+            confidence: mapping.confidence,
+            verified: mapping.verified,
+            lastFetch: result?.lastFetch,
+            lastSuccessfulFetch: result?.lastSuccessfulFetch,
+            coverageStart: result?.coverageStart,
+            coverageEnd: result?.coverageEnd,
+            programmeCount: programmes.count,
+            current: programmes.first { $0.isOnNow(at: now) }?.title,
+            next: programmes.first { $0.start > now }?.title,
+            cacheState: result?.cacheState.rawValue ?? "missing",
+            requestState: epgpwPrefetchTasks.values.contains { !$0.isCancelled } ? "fetching" : "idle"
+        )
+    }
+
     var diagnostics: String {
         """
         Canonical channels: \(canonicalChannels.count)
-        With EPG mapping: \(canonicalChannels.filter { $0.epgChannelId != nil }.count)
-        EPG channel mappings: \(epgToCanonical.count)
+        With XMLTV EPG mapping: \(canonicalChannels.filter { $0.epgChannelId != nil }.count)
+        With EPG.pw mapping: \(canonicalChannels.filter { epgpwMappings.mapping(for: $0.id) != nil }.count)
+        XMLTV EPG channel mappings: \(epgToCanonical.count)
         Indexed channel schedules: \(programmeIndex.count)
         Last updated: \(lastUpdated?.formatted() ?? "never")
         """

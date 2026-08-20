@@ -1,0 +1,79 @@
+[
+  {
+    "canonical_id": "ca-tsn-1",
+    "canonical_name": "TSN 1",
+    "epgpw_channel_id": 470446,
+    "epgpw_name": "TSN 1",
+    "country": "CA",
+    "match_method": "manual_verified",
+    "confidence": 1.0,
+    "verified": true,
+    "last_validated": "2026-08-20"
+  },
+  {
+    "canonical_id": "ca-sportsnet-360",
+    "canonical_name": "Sportsnet 360",
+    "epgpw_channel_id": 470392,
+    "epgpw_name": "Sportsnet 360 HD",
+    "country": "CA",
+    "match_method": "manual_verified",
+    "confidence": 1.0,
+    "verified": true,
+    "last_validated": "2026-08-20"
+  },
+  {
+    "canonical_id": "ca-sportsnet-pacific",
+    "canonical_name": "Sportsnet Pacific",
+    "epgpw_channel_id": 470817,
+    "epgpw_name": "Sportsnet Pacific HD",
+    "country": "CA",
+    "match_method": "manual_verified",
+    "confidence": 1.0,
+    "verified": true,
+    "last_validated": "2026-08-20"
+  },
+  {
+    "canonical_id": "ca-sportsnet-west",
+    "canonical_name": "Sportsnet West",
+    "epgpw_channel_id": 470443,
+    "epgpw_name": "Sportsnet West HD",
+    "country": "CA",
+    "match_method": "manual_verified",
+    "confidence": 1.0,
+    "verified": true,
+    "last_validated": "2026-08-20"
+  },
+  {
+    "canonical_id": "ca-sportsnet-world",
+    "canonical_name": "Sportsnet World",
+    "epgpw_channel_id": 470920,
+    "epgpw_name": "Sportsnet World HD",
+    "country": "CA",
+    "match_method": "manual_verified",
+    "confidence": 1.0,
+    "verified": true,
+    "last_validated": "2026-08-20"
+  },
+  {
+    "canonical_id": "ca-visiontv",
+    "canonical_name": "VisionTV",
+    "epgpw_channel_id": 470912,
+    "epgpw_name": "Vision TV",
+    "country": "CA",
+    "match_method": "manual_verified",
+    "confidence": 1.0,
+    "verified": true,
+    "last_validated": "2026-08-20"
+  },
+  {
+    "canonical_id": "ca-usa-network-canada",
+    "canonical_name": "USA Network Canada",
+    "epgpw_channel_id": 470515,
+    "epgpw_name": "USA Network Canada",
+    "country": "CA",
+    "match_method": "manual_verified",
+    "confidence": 1.0,
+    "verified": true,
+    "last_validated": "2026-08-20"
+  }
+]

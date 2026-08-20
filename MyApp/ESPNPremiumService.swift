@@ -23,7 +23,12 @@ extension ESPNService {
 
     /// Fetches `url` and decodes JSON into `T`, throwing `ServiceError.badResponse` on failure.
     private func fetch<T: Decodable>(_ type: T.Type, from url: URL) async throws -> T {
-        let (data, response) = try await premiumSession.data(from: url)
+        let request = URLRequest(url: url)
+        return try await fetch(type, from: request)
+    }
+
+    private func fetch<T: Decodable>(_ type: T.Type, from request: URLRequest) async throws -> T {
+        let (data, response) = try await premiumSession.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw ServiceError.badResponse
         }
@@ -120,7 +125,9 @@ extension ESPNService {
     func gameSummary(for league: League, eventID: String) async throws -> GameSummary {
         var components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/summary")!
         components.queryItems = [URLQueryItem(name: "event", value: eventID)]
-        let response = try await fetch(GameSummaryResponse.self, from: components.url!)
+        var request = URLRequest(url: components.url!)
+        request.timeoutInterval = 8
+        let response = try await fetch(GameSummaryResponse.self, from: request)
         return response.toSummary()
     }
 }
@@ -223,6 +230,22 @@ private struct PlayDTO: Decodable {
     let awayScore: String?
     let scoringPlay: Bool?
 
+    private enum CodingKeys: String, CodingKey {
+        case id, clock, period, text, team, homeScore, awayScore, scoringPlay
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id)
+        clock = try container.decodeIfPresent(PlayClockDTO.self, forKey: .clock)
+        period = try container.decodeIfPresent(PlayPeriodDTO.self, forKey: .period)
+        text = try container.decodeIfPresent(String.self, forKey: .text)
+        team = try container.decodeIfPresent(SummaryTeamInfoDTO.self, forKey: .team)
+        homeScore = try container.decodeFlexibleStringIfPresent(forKey: .homeScore)
+        awayScore = try container.decodeFlexibleStringIfPresent(forKey: .awayScore)
+        scoringPlay = try container.decodeIfPresent(Bool.self, forKey: .scoringPlay)
+    }
+
     func toEntry() -> PlayByPlayEntry? {
         guard let text, !text.isEmpty else { return nil }
         return PlayByPlayEntry(
@@ -236,6 +259,21 @@ private struct PlayDTO: Decodable {
             homeScore: homeScore,
             isScoringPlay: scoringPlay ?? false
         )
+    }
+}
+
+private extension KeyedDecodingContainer {
+    func decodeFlexibleStringIfPresent(forKey key: Key) throws -> String? {
+        if let value = try decodeIfPresent(String.self, forKey: key) {
+            return value
+        }
+        if let value = try decodeIfPresent(Int.self, forKey: key) {
+            return String(value)
+        }
+        if let value = try decodeIfPresent(Double.self, forKey: key) {
+            return value.rounded() == value ? String(Int(value)) : String(value)
+        }
+        return nil
     }
 }
 

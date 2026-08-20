@@ -3,14 +3,17 @@ import Combine
 
 // MARK: - TVGuideView
 
-/// Top-level container for the Live TV Guide / EPG feature.
 struct TVGuideView: View {
     @EnvironmentObject private var repository: EPGRepository
     @EnvironmentObject private var watchStore: WatchStore
+    @EnvironmentObject private var guideStore: GuideChannelStore
     @StateObject private var vm = TVGuideViewModel()
+
     @State private var playingChannel: CanonicalChannel?
     @State private var selectedProgramme: EPGProgramme?
     @State private var selectedProgrammeChannel: CanonicalChannel?
+    @State private var showingBuildGuide = false
+    @State private var showingFilters = false
 
     var body: some View {
         Group {
@@ -26,135 +29,190 @@ struct TVGuideView: View {
         .sheet(item: $selectedProgramme) { prog in
             if let ch = selectedProgrammeChannel {
                 ProgrammeDetailSheet(programme: prog, channel: ch) {
-                    if ch.playableChannel != nil {
-                        playingChannel = ch
-                    }
+                    if ch.playableChannel != nil { playingChannel = ch }
                 }
             }
         }
+        .sheet(isPresented: $showingBuildGuide) {
+            BuildGuideSheet()
+        }
+        .sheet(isPresented: $showingFilters) {
+            GuideFilterSheet(vm: vm, showingBuildGuide: $showingBuildGuide)
+        }
         .onAppear {
             vm.setup(repository: repository)
+            vm.applyGuideStore(guideStore, repository: repository)
         }
-        .onChange(of: repository.canonicalChannels.count) {
+        .onChange(of: repository.canonicalChannels.count) { _, _ in
             vm.update(repository: repository)
+            vm.applyGuideStore(guideStore, repository: repository)
+        }
+        .onChange(of: guideStore.selectedChannelIDs) { _, _ in
+            vm.applyGuideStore(guideStore, repository: repository)
+        }
+        .onChange(of: guideStore.guideMode) { _, _ in
+            vm.applyGuideStore(guideStore, repository: repository)
         }
     }
+
+    // MARK: - Empty state
 
     private var emptyState: some View {
         VStack(spacing: 16) {
             if repository.refreshState == .refreshing {
                 ProgressView().tint(Theme.accent)
-                Text("Building your channel guide…").foregroundStyle(Theme.textSecondary)
+                Text("Building your channel guide…")
+                    .foregroundStyle(Theme.textSecondary)
                     .font(.callout)
             } else {
-                Image(systemName: "tv.slash").font(.system(size: 44)).foregroundStyle(Theme.textSecondary)
-                Text("No Guide Available").font(.headline).foregroundStyle(Theme.textPrimary)
+                Image(systemName: "tv.slash")
+                    .font(.system(size: 44))
+                    .foregroundStyle(Theme.textSecondary)
+                Text("No Guide Available")
+                    .font(.headline)
+                    .foregroundStyle(Theme.textPrimary)
                 Text("Add an IPTV playlist in Settings to see a TV guide.")
-                    .font(.callout).foregroundStyle(Theme.textSecondary)
-                    .multilineTextAlignment(.center).padding(.horizontal, 32)
+                    .font(.callout)
+                    .foregroundStyle(Theme.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // MARK: - Guide content
+
     private var guideContent: some View {
         VStack(spacing: 0) {
-            categoryBar
+            guideHeader
             Divider().overlay(Theme.hairline)
-            EPGGuideGrid(vm: vm) { channel in
-                // Channel logo tapped → play
-                if let ch = channel.playableChannel {
-                    watchStore.recordWatch(ch)
-                    playingChannel = channel
-                }
-            } onProgramTap: { programme, channel in
-                if programme.isOnNow() {
-                    // Current program → play
+            if guideStore.guideMode == .myGuide && !guideStore.hasConfigured {
+                myGuideSetupPrompt
+            } else {
+                EPGGuideGrid(vm: vm) { channel in
                     if let ch = channel.playableChannel {
                         watchStore.recordWatch(ch)
                         playingChannel = channel
                     }
-                } else {
-                    // Future program → show details
-                    selectedProgramme = programme
-                    selectedProgrammeChannel = channel
+                } onProgramTap: { programme, channel in
+                    if programme.isOnNow() {
+                        if let ch = channel.playableChannel {
+                            watchStore.recordWatch(ch)
+                            playingChannel = channel
+                        }
+                    } else {
+                        selectedProgramme = programme
+                        selectedProgrammeChannel = channel
+                    }
                 }
             }
         }
     }
 
-    // MARK: - Category bar
+    // MARK: - Guide header
 
-    private var categoryBar: some View {
-        HStack(spacing: 0) {
-            categoryMenu
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(vm.categories) { cat in
-                        categoryChip(cat)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+    private var guideHeader: some View {
+        HStack(spacing: 10) {
+            GuideModeControl(
+                mode: guideStore.guideMode,
+                myGuideCount: guideStore.selectedCount
+            ) { newMode in
+                vm.setGuideMode(newMode, store: guideStore)
             }
+
+            Spacer()
+
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                vm.scrollToNow()
+                showingFilters = true
             } label: {
-                Text("Now")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Theme.live)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(Theme.surface, in: Capsule())
-                    .overlay(Capsule().strokeBorder(Theme.live.opacity(0.5)))
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(vm.filterCategoryId != nil ? Theme.accent : Theme.textPrimary)
+                    .frame(width: 36, height: 34)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .strokeBorder(vm.filterCategoryId != nil ? Theme.accent.opacity(0.5) : Theme.hairline)
+                    )
             }
             .buttonStyle(.plain)
-            .padding(.trailing, 14)
+            .accessibilityLabel("Guide filters")
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(Theme.background)
     }
 
-    private var categoryMenu: some View {
-        Menu {
-            ForEach(vm.categories) { cat in
-                Button {
-                    withAnimation(.snappy) { vm.selectCategory(cat.id) }
-                } label: {
-                    if cat.id == vm.selectedCategoryId {
-                        Label(cat.name, systemImage: "checkmark")
-                    } else {
-                        Text(cat.name)
-                    }
-                }
+    // MARK: - My Guide setup prompt
+
+    private var myGuideSetupPrompt: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            Image(systemName: "list.star")
+                .font(.system(size: 48, weight: .light))
+                .foregroundStyle(Theme.accent)
+            VStack(spacing: 8) {
+                Text("Build Your Guide")
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(Theme.textPrimary)
+                Text("Choose what you actually watch.\nYou can change this anytime.")
+                    .font(.callout)
+                    .foregroundStyle(Theme.textSecondary)
+                    .multilineTextAlignment(.center)
             }
-        } label: {
-            Image(systemName: "line.3.horizontal.decrease.circle")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Theme.textPrimary)
-                .frame(width: 36, height: 32)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+            Button("Get Started") {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                showingBuildGuide = true
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.accent)
+            .font(.headline)
+            Button("Browse All Channels") {
+                vm.setGuideMode(.allChannels, store: guideStore)
+            }
+            .font(.subheadline)
+            .foregroundStyle(Theme.textSecondary)
+            Spacer()
         }
-        .padding(.leading, 12)
-        .accessibilityLabel("Live TV category")
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Guide Mode Control
+
+struct GuideModeControl: View {
+    let mode: GuideMode
+    let myGuideCount: Int
+    let onSelect: (GuideMode) -> Void
+
+    var body: some View {
+        HStack(spacing: 2) {
+            modeButton(.myGuide, label: "My Guide")
+            modeButton(.allChannels, label: "All Channels")
+        }
+        .padding(3)
+        .background(Theme.surface, in: Capsule())
+        .overlay(Capsule().strokeBorder(Theme.hairline))
     }
 
-    private func categoryChip(_ cat: GuideCategory) -> some View {
-        let isSelected = cat.id == vm.selectedCategoryId
+    private func modeButton(_ target: GuideMode, label: String) -> some View {
+        let selected = mode == target
         return Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            withAnimation(.snappy) { vm.selectCategory(cat.id) }
+            withAnimation(.snappy) { onSelect(target) }
         } label: {
-            Text(cat.name)
+            Text(label)
                 .font(.caption.weight(.bold))
-                .foregroundStyle(isSelected ? .white : Theme.textPrimary)
-                .padding(.horizontal, 12)
+                .foregroundStyle(selected ? .white : Theme.textSecondary)
+                .padding(.horizontal, 13)
                 .padding(.vertical, 7)
-                .background(isSelected ? Theme.accent : Theme.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Theme.hairline))
+                .background(selected ? Theme.accent : Color.clear, in: Capsule())
         }
         .buttonStyle(.plain)
+        .animation(.snappy, value: selected)
     }
 }
 
@@ -177,6 +235,15 @@ struct EPGGuideGrid: View {
     private let colW = TVGuideViewModel.channelColumnWidth
     private let rulerH = TVGuideViewModel.timeRulerHeight
 
+    // Whether the NOW indicator is off the visible horizontal viewport.
+    private var isNowOffScreen: Bool {
+        guard vm.nowIsVisible, viewSize.width > 0 else { return false }
+        let nowContentX = vm.xOffset(for: now)
+        let viewportStart = scrollOffset.x
+        let viewportEnd = scrollOffset.x + max(0, viewSize.width - colW)
+        return nowContentX < viewportStart || nowContentX > viewportEnd
+    }
+
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .topLeading) {
@@ -185,13 +252,9 @@ struct EPGGuideGrid: View {
                 timeRulerOverlay
                 cornerOverlay
                 nowLineOverlay
+                jumpToNowButton
             }
-            // Clip overlays (NOW line, channel column) to the guide viewport.
-            // Without this the NOW line draws behind the floating tab bar.
             .clipped()
-            // Tap gestures in the channel column are routed here rather than
-            // through the non-interactive channelColumnOverlay, so that drag
-            // gestures pass straight through to the scroll view below.
             .simultaneousGesture(channelColumnTapGesture)
             .onAppear {
                 viewSize = geo.size
@@ -214,13 +277,10 @@ struct EPGGuideGrid: View {
         ) { _ in now = Date() }
     }
 
-    /// SpatialTapGesture that fires only for taps (not drags), so vertical drag gestures
-    /// fall through to the underlying ScrollView for correct vertical scrolling.
     private var channelColumnTapGesture: some Gesture {
         SpatialTapGesture()
             .onEnded { value in
                 let loc = value.location
-                // Only act on taps in the channel column area, below the time ruler.
                 guard loc.x < colW, loc.y >= rulerH else { return }
                 let channelY = loc.y + scrollOffset.y - rulerH
                 let idx = Int(channelY / rowH)
@@ -253,7 +313,7 @@ struct EPGGuideGrid: View {
                         height: rulerH + CGFloat(vm.visibleChannels.count) * rowH
                     )
 
-                // Row dividers
+                // Row dividers (full width)
                 ForEach(Array(vm.visibleChannels.enumerated()), id: \.element.id) { i, _ in
                     Divider().overlay(Theme.hairline)
                         .frame(width: colW + vm.guideWindowWidth)
@@ -286,7 +346,6 @@ struct EPGGuideGrid: View {
         let progs = vm.programmes(for: channel, in: window)
         if progs.isEmpty {
             if repository.refreshState == .refreshing {
-                // EPG still loading — subtle skeleton
                 Rectangle()
                     .fill(Theme.surface.opacity(0.35))
                     .frame(width: max(120, vm.guideWindowWidth), height: rowH - 2)
@@ -311,7 +370,8 @@ struct EPGGuideGrid: View {
     @ViewBuilder
     private func noEPGCell(channel: CanonicalChannel, rowY: CGFloat) -> some View {
         Text("No guide data")
-            .font(.caption).foregroundStyle(Theme.textTertiary)
+            .font(.caption)
+            .foregroundStyle(Theme.textTertiary)
             .frame(width: max(120, vm.guideWindowWidth), height: rowH - 2, alignment: .leading)
             .padding(.leading, 12)
             .offset(x: colW, y: rowY + 1)
@@ -348,30 +408,40 @@ struct EPGGuideGrid: View {
 
     // MARK: - Fixed overlays
 
-    /// Channel column: purely visual, non-interactive.
-    /// Tap handling is done by channelColumnTapGesture on the outer ZStack so that
-    /// vertical drag gestures pass through to mainScrollView unobstructed.
+    /// Channel column: only renders rows visible in the current viewport + a buffer,
+    /// avoiding SwiftUI layout work for thousands of offscreen cells.
     private var channelColumnOverlay: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(visibleChannels.enumerated()), id: \.element.id) { _, ch in
-                ChannelLogoCell(channel: ch) { }  // no-op; taps handled by simultaneousGesture
+        let firstRow = max(0, Int(scrollOffset.y / rowH) - 1)
+        let visibleRowCount = max(1, Int(viewSize.height / rowH)) + 4
+        let lastRow = min(visibleChannels.count, firstRow + visibleRowCount)
+
+        return ZStack(alignment: .topLeading) {
+            Theme.background
+                .frame(width: colW, height: viewSize.height)
+
+            ForEach(firstRow..<lastRow, id: \.self) { i in
+                let ch = visibleChannels[i]
+                let cellY = rulerH + CGFloat(i) * rowH - scrollOffset.y
+                ChannelLogoCell(channel: ch) { }
                     .frame(width: colW, height: rowH)
-                Divider().overlay(Theme.hairline)
+                    .offset(y: cellY)
+                Divider()
+                    .overlay(Theme.hairline)
+                    .frame(width: colW)
+                    .offset(y: cellY + rowH - 0.5)
             }
         }
-        .frame(width: colW)
-        .background(Theme.background)
-        .offset(x: 0, y: rulerH - scrollOffset.y)
-        .allowsHitTesting(false)  // all touches pass through to the scroll view below
+        .frame(width: colW, height: viewSize.height)
+        .clipped()
+        .allowsHitTesting(false)
     }
 
-    /// Time ruler: pinned at y=0, labels positioned at their absolute timeline x minus current scroll offset.
+    /// Time ruler: pinned at y=0, labels positioned relative to scroll offset.
     private var timeRulerOverlay: some View {
         ZStack(alignment: .topLeading) {
             Theme.background
             ForEach(timeLabels, id: \.0.timeIntervalSince1970) { _, label, x in
                 let screenX = colW + x - scrollOffset.x
-                // Only render labels whose left edge is inside (or just entering) the viewport
                 if screenX < viewSize.width + 4 {
                     Text(label)
                         .font(.system(size: 11, weight: .medium))
@@ -385,11 +455,9 @@ struct EPGGuideGrid: View {
         .frame(height: rulerH)
         .overlay(alignment: .bottom) { Divider().overlay(Theme.hairline) }
         .clipped()
-        .allowsHitTesting(false) // let scroll gesture pass through to mainScrollView
-        // No y offset — stays fixed at y=0 in the outer ZStack
+        .allowsHitTesting(false)
     }
 
-    /// Corner CH cell: pinned at (0,0), covers the top-left intersection.
     private var cornerOverlay: some View {
         ZStack {
             Theme.background
@@ -399,11 +467,8 @@ struct EPGGuideGrid: View {
         }
         .frame(width: colW, height: rulerH)
         .allowsHitTesting(false)
-        // No offset — stays at (0,0) in the outer ZStack
     }
 
-    /// NOW line: vertical indicator for current time, rendered only for today.
-    /// Height is capped to the visible guide area so it doesn't bleed behind the tab bar.
     private var nowLineOverlay: some View {
         Group {
             if vm.nowIsVisible {
@@ -428,6 +493,40 @@ struct EPGGuideGrid: View {
         }
     }
 
+    /// "Jump to Now" button — appears when the current-time line is off-screen.
+    @ViewBuilder
+    private var jumpToNowButton: some View {
+        if isNowOffScreen {
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        vm.scrollToNow()
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "clock.badge.fill")
+                                .font(.system(size: 11, weight: .bold))
+                            Text("Now")
+                                .font(.caption.weight(.bold))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Theme.live, in: Capsule())
+                        .shadow(color: Theme.live.opacity(0.4), radius: 6, y: 3)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 16)
+                    .padding(.bottom, 20 + bottomInset)
+                }
+            }
+            .transition(.scale(scale: 0.85).combined(with: .opacity))
+            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isNowOffScreen)
+        }
+    }
+
     // MARK: - Helpers
 
     private var visibleChannels: [CanonicalChannel] { vm.visibleChannels }
@@ -448,6 +547,13 @@ struct ProgrammeCell: View {
 
     private var isCurrent: Bool { programme.isOnNow(at: now) }
 
+    // Static formatter to avoid re-creating DateFormatter on every cell render.
+    nonisolated static let timeFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "h:mm a"
+        return f
+    }()
+
     var body: some View {
         Button(action: onTap) {
             ZStack(alignment: .leading) {
@@ -458,6 +564,7 @@ struct ProgrammeCell: View {
                             .strokeBorder(isCurrent ? Theme.accent.opacity(0.4) : Theme.hairline)
                     )
 
+                // Thin progress bar for currently-airing programmes
                 if isCurrent {
                     GeometryReader { g in
                         Rectangle()
@@ -467,25 +574,34 @@ struct ProgrammeCell: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(programme.title)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(1)
-                    if width > 90 {
-                        Text(timeSubtitle)
-                            .font(.system(size: 10))
-                            .foregroundStyle(isCurrent ? Theme.accent : Theme.textSecondary)
-                            .lineLimit(1)
-                    }
+                // Text content — responsive to card width
+                if width >= 36 {
+                    cellContent
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    @ViewBuilder
+    private var cellContent: some View {
+        let narrow = width < 70
+        VStack(alignment: .leading, spacing: 2) {
+            Text(programme.title)
+                .font(.system(size: narrow ? 10 : 12, weight: .semibold))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+            if width > 90 {
+                Text(timeSubtitle)
+                    .font(.system(size: 10))
+                    .foregroundStyle(isCurrent ? Theme.accent : Theme.textSecondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, narrow ? 4 : 8)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var timeSubtitle: String {
@@ -494,20 +610,16 @@ struct ProgrammeCell: View {
             if mins < 60 { return "\(mins)m left" }
             return "\(mins / 60)h \(mins % 60)m left"
         } else {
-            let fmt = DateFormatter()
-            fmt.dateFormat = "h:mm a"
-            return "\(fmt.string(from: programme.start)) – \(fmt.string(from: programme.end))"
+            return "\(Self.timeFmt.string(from: programme.start)) – \(Self.timeFmt.string(from: programme.end))"
         }
     }
 
     private var accessibilityLabel: String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "h:mm a"
         if isCurrent {
             let mins = programme.minutesRemaining(from: now)
-            return "\(programme.title), \(fmt.string(from: programme.start)) to \(fmt.string(from: programme.end)), now playing, \(mins) minutes remaining."
+            return "\(programme.title), \(Self.timeFmt.string(from: programme.start)) to \(Self.timeFmt.string(from: programme.end)), now playing, \(mins) minutes remaining."
         }
-        return "\(programme.title), \(fmt.string(from: programme.start)) to \(fmt.string(from: programme.end))."
+        return "\(programme.title), \(Self.timeFmt.string(from: programme.start)) to \(Self.timeFmt.string(from: programme.end))."
     }
 }
 
@@ -595,7 +707,6 @@ struct ProgrammeDetailSheet: View {
                             Spacer()
                         }
 
-                        // Programme art if available
                         if let imgURL = programme.imageURL {
                             AsyncImage(url: imgURL) { phase in
                                 if case .success(let img) = phase {
@@ -608,7 +719,6 @@ struct ProgrammeDetailSheet: View {
                             }
                         }
 
-                        // Title
                         VStack(alignment: .leading, spacing: 6) {
                             Text(programme.title)
                                 .font(.title2.weight(.bold))
@@ -647,6 +757,21 @@ struct ProgrammeDetailSheet: View {
                                 .fixedSize(horizontal: false, vertical: true)
                         }
 
+                        if channel.playableChannel != nil {
+                            Button {
+                                dismiss()
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { onPlay() }
+                            } label: {
+                                Label("Watch Channel", systemImage: "play.fill")
+                                    .font(.headline)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 12))
+                                    .foregroundStyle(.white)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
                         Spacer(minLength: 0)
                     }
                     .padding(20)
@@ -664,9 +789,394 @@ struct ProgrammeDetailSheet: View {
     }
 
     private var timeRange: String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "h:mm a"
-        return "\(fmt.string(from: programme.start)) – \(fmt.string(from: programme.end))"
+        "\(ProgrammeCell.timeFmt.string(from: programme.start)) – \(ProgrammeCell.timeFmt.string(from: programme.end))"
+    }
+}
+
+// MARK: - Build Guide Sheet
+
+struct BuildGuideSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var guideStore: GuideChannelStore
+    @EnvironmentObject private var repository: EPGRepository
+
+    @State private var step = 1
+    @State private var selectedCategoryIds: Set<String> = []
+    @State private var localSelectedIDs: Set<String>
+    @State private var searchText = ""
+
+    private let config = CuratedGuideConfig.load()
+
+    init() {
+        _localSelectedIDs = State(initialValue: [])
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if step == 1 {
+                    categoryStep
+                } else {
+                    channelStep
+                }
+            }
+        }
+        .tint(Theme.accent)
+        .onAppear {
+            // Prefill with existing selections
+            localSelectedIDs = guideStore.selectedChannelIDs
+            // Pre-select categories that have selected channels
+            let existingCats = Set(
+                repository.canonicalChannels
+                    .filter { guideStore.isSelected($0.id) }
+                    .map { $0.categoryId }
+            )
+            if !existingCats.isEmpty {
+                selectedCategoryIds = existingCats
+            }
+        }
+    }
+
+    // MARK: Step 1 — Categories
+
+    private var categoryStep: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Choose what you actually watch.")
+                        .font(.callout)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+
+                let cats = config?.categories.sorted { $0.sort < $1.sort } ?? []
+                LazyVGrid(
+                    columns: [GridItem(.flexible()), GridItem(.flexible())],
+                    spacing: 12
+                ) {
+                    ForEach(cats) { cat in
+                        CategoryToggleCard(
+                            name: cat.name,
+                            isSelected: selectedCategoryIds.contains(cat.id)
+                        ) {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            if selectedCategoryIds.contains(cat.id) {
+                                selectedCategoryIds.remove(cat.id)
+                            } else {
+                                selectedCategoryIds.insert(cat.id)
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 16)
+            }
+            .padding(.bottom, 100)
+        }
+        .background(Theme.background.ignoresSafeArea())
+        .navigationTitle("Build Your Guide")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { dismiss() }
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button("Next") {
+                    // Pre-select all channels in chosen categories
+                    let toAdd = repository.canonicalChannels.filter { selectedCategoryIds.contains($0.categoryId) }
+                    localSelectedIDs = Set(toAdd.map { $0.id })
+                    withAnimation { step = 2 }
+                }
+                .font(.headline)
+                .disabled(selectedCategoryIds.isEmpty)
+            }
+        }
+    }
+
+    // MARK: Step 2 — Channels
+
+    private var channelStep: some View {
+        Group {
+            if repository.canonicalChannels.isEmpty {
+                VStack(spacing: 16) {
+                    ProgressView().tint(Theme.accent)
+                    Text("Loading channels…")
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                channelList
+            }
+        }
+        .background(Theme.background.ignoresSafeArea())
+        .navigationTitle("Select Channels")
+        .navigationBarTitleDisplayMode(.large)
+        .searchable(text: $searchText, prompt: "Search channels")
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Back") { withAnimation { step = 1 } }
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        }
+        .safeAreaInset(edge: .bottom) { confirmBar }
+    }
+
+    private var channelList: some View {
+        let grouped = groupedChannels
+        return List {
+            ForEach(grouped, id: \.categoryId) { group in
+                Section {
+                    ForEach(group.channels) { ch in
+                        ChannelSelectRow(
+                            channel: ch,
+                            isSelected: localSelectedIDs.contains(ch.id)
+                        ) {
+                            if localSelectedIDs.contains(ch.id) {
+                                localSelectedIDs.remove(ch.id)
+                            } else {
+                                localSelectedIDs.insert(ch.id)
+                            }
+                        }
+                    }
+                } header: {
+                    HStack {
+                        Text(group.categoryName)
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Theme.textSecondary)
+                        Spacer()
+                        let catIds = group.channels.map { $0.id }
+                        let allSelected = catIds.allSatisfy { localSelectedIDs.contains($0) }
+                        Button(allSelected ? "Deselect All" : "Select All") {
+                            if allSelected {
+                                catIds.forEach { localSelectedIDs.remove($0) }
+                            } else {
+                                catIds.forEach { localSelectedIDs.insert($0) }
+                            }
+                        }
+                        .font(.caption)
+                        .foregroundStyle(Theme.accent)
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .hidesScrollContentBackground()
+        .scrollContentBackground(.hidden)
+    }
+
+    private var confirmBar: some View {
+        VStack(spacing: 0) {
+            Divider().overlay(Theme.hairline)
+            HStack {
+                Text("\(localSelectedIDs.count) channels selected")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.textSecondary)
+                Spacer()
+                Button("View My Guide") {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    guideStore.setChannels(localSelectedIDs)
+                    guideStore.markConfigured()
+                    guideStore.setGuideMode(.myGuide)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.accent)
+                .disabled(localSelectedIDs.isEmpty)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
+            .background(Theme.background)
+        }
+    }
+
+    // MARK: - Helpers
+
+    private var groupedChannels: [(categoryId: String, categoryName: String, channels: [CanonicalChannel])] {
+        let catNames: [String: String] = config?.categories.reduce(into: [:]) { $0[$1.id] = $1.name } ?? [:]
+
+        let filtered = repository.canonicalChannels.filter { ch in
+            selectedCategoryIds.contains(ch.categoryId) &&
+            (searchText.isEmpty || ch.name.localizedCaseInsensitiveContains(searchText))
+        }
+
+        var result: [(categoryId: String, categoryName: String, channels: [CanonicalChannel])] = []
+        var seen: Set<String> = []
+        for ch in filtered {
+            guard !seen.contains(ch.categoryId) else { continue }
+            seen.insert(ch.categoryId)
+            let catChannels = filtered
+                .filter { $0.categoryId == ch.categoryId }
+                .sorted { $0.priority > $1.priority }
+            let name = catNames[ch.categoryId] ?? ch.categoryId
+            result.append((ch.categoryId, name, catChannels))
+        }
+        return result
+    }
+}
+
+// MARK: - Category Toggle Card
+
+private struct CategoryToggleCard: View {
+    let name: String
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 8) {
+                Text(name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(isSelected ? .white : Theme.textPrimary)
+                Spacer()
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isSelected ? .white : Theme.textTertiary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(isSelected ? Theme.accent : Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(isSelected ? Theme.accent : Theme.hairline)
+            )
+        }
+        .buttonStyle(.plain)
+        .animation(.snappy, value: isSelected)
+    }
+}
+
+// MARK: - Channel Select Row
+
+private struct ChannelSelectRow: View {
+    let channel: CanonicalChannel
+    let isSelected: Bool
+    let onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            HStack(spacing: 12) {
+                if let logoURL = channel.effectiveLogoURL {
+                    AsyncImage(url: logoURL) { phase in
+                        if case .success(let img) = phase {
+                            img.resizable().scaledToFit()
+                        } else {
+                            channelInitials
+                        }
+                    }
+                    .frame(width: 36, height: 24)
+                } else {
+                    channelInitials.frame(width: 36, height: 24)
+                }
+
+                Text(channel.name)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.textPrimary)
+
+                Spacer()
+
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isSelected ? Theme.accent : Theme.textTertiary)
+                    .font(.system(size: 20))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var channelInitials: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 4).fill(Theme.surfaceElevated)
+            Text(channel.name.prefix(2).uppercased())
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(Theme.accent)
+        }
+    }
+}
+
+// MARK: - Guide Filter Sheet
+
+struct GuideFilterSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var guideStore: GuideChannelStore
+    @ObservedObject var vm: TVGuideViewModel
+    @Binding var showingBuildGuide: Bool
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if vm.guideMode == .allChannels {
+                    Section("Category") {
+                        Button {
+                            vm.setFilterCategory(nil)
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Text("All Categories")
+                                    .foregroundStyle(Theme.textPrimary)
+                                Spacer()
+                                if vm.filterCategoryId == nil {
+                                    Image(systemName: "checkmark").foregroundStyle(Theme.accent)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        ForEach(vm.categories.filter { !$0.isVirtual }) { cat in
+                            Button {
+                                vm.setFilterCategory(cat.id)
+                                dismiss()
+                            } label: {
+                                HStack {
+                                    Text(cat.name)
+                                        .foregroundStyle(Theme.textPrimary)
+                                    Spacer()
+                                    if vm.filterCategoryId == cat.id {
+                                        Image(systemName: "checkmark").foregroundStyle(Theme.accent)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                Section("My Guide") {
+                    Button {
+                        showingBuildGuide = true
+                        dismiss()
+                    } label: {
+                        HStack {
+                            Label(
+                                guideStore.hasConfigured ? "Edit My Guide" : "Build My Guide",
+                                systemImage: "list.star"
+                            )
+                            .foregroundStyle(Theme.textPrimary)
+                            if guideStore.selectedCount > 0 {
+                                Spacer()
+                                Text("\(guideStore.selectedCount) channels")
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.textTertiary)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .hidesScrollContentBackground()
+            .scrollContentBackground(.hidden)
+            .background(Theme.background.ignoresSafeArea())
+            .navigationTitle("Filters")
+            .inlineNavigationTitle()
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .tint(Theme.accent)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }
 
@@ -675,6 +1185,7 @@ struct ProgrammeDetailSheet: View {
 /// Grid of currently airing programmes across all guide channels.
 struct WhatsOnView: View {
     @EnvironmentObject private var repository: EPGRepository
+    @EnvironmentObject private var guideStore: GuideChannelStore
     @StateObject private var vm = TVGuideViewModel()
     @State private var playingChannel: CanonicalChannel?
     @EnvironmentObject private var watchStore: WatchStore
@@ -707,7 +1218,10 @@ struct WhatsOnView: View {
             }
         }
         .fullScreenCover(item: $playingChannel) { ch in PlayerView(canonicalChannel: ch) }
-        .onAppear { vm.setup(repository: repository) }
+        .onAppear {
+            vm.setup(repository: repository)
+            vm.applyGuideStore(guideStore, repository: repository)
+        }
     }
 
     private var currentItems: [WhatsOnItem] {

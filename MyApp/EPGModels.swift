@@ -114,7 +114,7 @@ nonisolated struct EPGChannel: Identifiable, Hashable {
 
 // MARK: - EPG Programme
 
-nonisolated struct EPGProgramme: Identifiable, Hashable, Sendable {
+nonisolated struct EPGProgramme: Identifiable, Hashable, Sendable, Codable {
     let id: String
     let epgChannelId: String
     var canonicalChannelId: String?

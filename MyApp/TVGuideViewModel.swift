@@ -7,7 +7,8 @@ import Combine
 @MainActor
 final class TVGuideViewModel: ObservableObject {
 
-    @Published var selectedCategoryId: String = "featured"
+    @Published var guideMode: GuideMode = .myGuide
+    @Published var filterCategoryId: String? = nil     // active category filter in All Channels mode
     @Published var selectedDate: Date = Calendar.current.startOfDay(for: Date())
     @Published var categories: [GuideCategory] = []
     @Published var visibleChannels: [CanonicalChannel] = []
@@ -17,7 +18,7 @@ final class TVGuideViewModel: ObservableObject {
     @Published private(set) var scrollToNowToken: Int = 0
 
     private weak var repository: EPGRepository?
-    private var refreshTimer: Timer?
+    private var myGuideIDs: Set<String> = []
 
     // Guide geometry constants (shared with UI)
     static let ptsPerMinute: CGFloat = 3.0
@@ -26,7 +27,15 @@ final class TVGuideViewModel: ObservableObject {
     static let timeRulerHeight: CGFloat = 44
     static let minProgramWidth: CGFloat = 20
 
-    // Guide window: show -3h to +21h from start of selected day
+    // Reused formatter — creating DateFormatter is expensive.
+    nonisolated private static let rulerFmt: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "h:mm a"
+        f.timeZone = .current
+        return f
+    }()
+
+    // Guide window: full selected day
     var guideWindowStart: Date { selectedDate }
     var guideWindowEnd: Date { selectedDate.addingTimeInterval(24 * 3600) }
     var guideWindowWidth: CGFloat {
@@ -59,11 +68,18 @@ final class TVGuideViewModel: ObservableObject {
         prefetchVisibleProgrammes(repository: repository)
     }
 
+    /// Applies guide mode and channel selections from the GuideChannelStore.
+    func applyGuideStore(_ store: GuideChannelStore, repository: EPGRepository) {
+        guideMode = store.guideMode
+        myGuideIDs = store.selectedChannelIDs
+        filterChannels(repository: repository)
+        prefetchVisibleProgrammes(repository: repository)
+    }
+
     private func buildCategories(from repository: EPGRepository) {
         guard let config = CuratedGuideConfig.load() else { return }
 
         var cats: [GuideCategory] = [
-            GuideCategory(id: "featured", name: "Featured", sort: -10, isVirtual: true, isEnabled: true),
             GuideCategory(id: "all", name: "All Channels", sort: -5, isVirtual: true, isEnabled: true),
         ]
 
@@ -82,13 +98,21 @@ final class TVGuideViewModel: ObservableObject {
 
     private func filterChannels(repository: EPGRepository) {
         let all = repository.canonicalChannels
-        switch selectedCategoryId {
-        case "featured":
-            visibleChannels = featuredChannels(from: all, repository: repository)
-        case "all":
-            visibleChannels = all
-        default:
-            visibleChannels = all.filter { $0.categoryId == selectedCategoryId }
+        switch guideMode {
+        case .myGuide:
+            if myGuideIDs.isEmpty {
+                // Nothing selected yet — show top-priority channels as a preview.
+                visibleChannels = featuredChannels(from: all, repository: repository)
+            } else {
+                visibleChannels = all.filter { myGuideIDs.contains($0.id) }
+                    .sorted { $0.priority > $1.priority }
+            }
+        case .allChannels:
+            if let catId = filterCategoryId {
+                visibleChannels = all.filter { $0.categoryId == catId }
+            } else {
+                visibleChannels = all
+            }
         }
     }
 
@@ -112,13 +136,20 @@ final class TVGuideViewModel: ObservableObject {
         repository.prefetchProgrammes(for: Array(visibleChannels[range]))
     }
 
-    // MARK: - Category selection
+    // MARK: - Filter controls
 
-    func selectCategory(_ id: String) {
-        guard let repository else { return }
-        selectedCategoryId = id
-        filterChannels(repository: repository)
-        prefetchVisibleProgrammes(repository: repository)
+    func setFilterCategory(_ catId: String?) {
+        filterCategoryId = catId
+        if let repository { filterChannels(repository: repository) }
+    }
+
+    func setGuideMode(_ mode: GuideMode, store: GuideChannelStore) {
+        store.setGuideMode(mode)
+        guideMode = mode
+        if let repository {
+            filterChannels(repository: repository)
+            prefetchVisibleProgrammes(repository: repository)
+        }
     }
 
     /// Resets the selected date to today and signals EPGGuideGrid to scroll to NOW.
@@ -152,7 +183,6 @@ final class TVGuideViewModel: ObservableObject {
         let now = Date()
         guard now >= guideWindowStart, now <= guideWindowEnd else { return 0 }
         let nowX = xOffset(for: now)
-        // Position now at 20% from left edge of visible area
         let screenWidth: CGFloat = UIScreen.main.bounds.width - Self.channelColumnWidth
         return max(0, nowX - screenWidth * 0.20)
     }
@@ -163,22 +193,14 @@ final class TVGuideViewModel: ObservableObject {
         let cal = Calendar.current
         var cur = cal.dateInterval(of: .hour, for: range.lowerBound)?.start ?? range.lowerBound
 
-        // Round up to next 30-min mark
         let mins = cal.component(.minute, from: cur)
         if mins > 0 {
             cur = cur.addingTimeInterval(TimeInterval((60 - mins) * 60))
-            if cal.component(.minute, from: cur) == 30 {
-                // already on a 30-min mark
-            }
         }
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        formatter.timeZone = .current
-
         while cur <= range.upperBound {
-            labels.append((date: cur, label: formatter.string(from: cur), x: xOffset(for: cur)))
-            cur = cur.addingTimeInterval(1800)  // 30 min
+            labels.append((date: cur, label: Self.rulerFmt.string(from: cur), x: xOffset(for: cur)))
+            cur = cur.addingTimeInterval(1800)
         }
         return labels
     }

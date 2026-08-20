@@ -599,6 +599,7 @@ final class EPGRepository: ObservableObject {
             finalized[key] = deduplicate(programmes.sorted { $0.start < $1.start })
         }
         programmeIndex = finalized
+        saveProgrammeIndex()
     }
 
     private func deduplicate(_ sorted: [EPGProgramme]) -> [EPGProgramme] {
@@ -639,14 +640,53 @@ final class EPGRepository: ObservableObject {
 
     // MARK: - Persistence
 
+    private var programmeCacheURL: URL {
+        cacheDir.appendingPathComponent("programmeIndex.v2.json")
+    }
+
     private func loadCachedState() {
         if let ts = UserDefaults.standard.object(forKey: lastUpdatedKey) as? Date {
             lastUpdated = ts
+        }
+        // Load persisted programme index from disk in the background so the guide
+        // can show cached data immediately without blocking the main thread.
+        let url = programmeCacheURL
+        Task { [weak self] in
+            let index = await Task.detached(priority: .userInitiated) {
+                Self.loadIndexFromDisk(url: url)
+            }.value
+            guard let self, !index.isEmpty else { return }
+            self.programmeIndex = index
+            self.objectWillChange.send()
         }
     }
 
     private func persistState() {
         UserDefaults.standard.set(lastUpdated, forKey: lastUpdatedKey)
+    }
+
+    nonisolated private static func loadIndexFromDisk(url: URL) -> [String: [EPGProgramme]] {
+        guard let data = try? Data(contentsOf: url),
+              let index = try? JSONDecoder().decode([String: [EPGProgramme]].self, from: data) else {
+            return [:]
+        }
+        // Discard programmes from more than 14 hours in the past.
+        let cutoff = Date().addingTimeInterval(-14 * 3600)
+        var result: [String: [EPGProgramme]] = [:]
+        for (key, progs) in index {
+            let valid = progs.filter { $0.end > cutoff }
+            if !valid.isEmpty { result[key] = valid }
+        }
+        return result
+    }
+
+    private func saveProgrammeIndex() {
+        let index = programmeIndex
+        let url = programmeCacheURL
+        Task.detached(priority: .background) {
+            guard let data = try? JSONEncoder().encode(index) else { return }
+            try? data.write(to: url, options: .atomic)
+        }
     }
 
     // MARK: - Debug info

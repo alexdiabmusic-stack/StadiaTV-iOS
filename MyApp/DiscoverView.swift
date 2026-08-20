@@ -4,6 +4,7 @@ struct DiscoverView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var articleLibrary: ArticleLibraryStore
     @EnvironmentObject private var podcastStore: PodcastStore
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @StateObject private var viewModel = NewsViewModel()
     @State private var selectedSport: DiscoverSportFilter = .forYou
     @State private var presentedArticle: ESPNArticle?
@@ -192,10 +193,10 @@ struct DiscoverView: View {
                 }
 
                 if !latestArticles.isEmpty {
-                    VStack(spacing: 0) {
-                        ForEach(Array(latestArticles.enumerated()), id: \.element.id) { index, article in
-                            Button { open(article: article) } label: {
-                                if index.isMultiple(of: 3) {
+                    if sizeClass == .regular {
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                            ForEach(latestArticles) { article in
+                                Button { open(article: article) } label: {
                                     StandardArticleCard(
                                         article: article,
                                         isSaved: articleLibrary.isSaved(article),
@@ -203,22 +204,42 @@ struct DiscoverView: View {
                                         onHide: { articleLibrary.hide(article) },
                                         onMute: { articleLibrary.muteSource(for: article) }
                                     )
-                                } else {
-                                    CompactArticleRow(
-                                        article: article,
-                                        isSaved: articleLibrary.isSaved(article),
-                                        onToggleSaved: { articleLibrary.toggleSaved(article) },
-                                        onHide: { articleLibrary.hide(article) },
-                                        onMute: { articleLibrary.muteSource(for: article) }
-                                    )
+                                    .frame(maxHeight: .infinity, alignment: .top)
                                 }
+                                .buttonStyle(.plain)
+                                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
                             }
-                            .buttonStyle(.plain)
-                            if article.id != latestArticles.last?.id { Divider().overlay(Theme.hairline) }
                         }
+                    } else {
+                        VStack(spacing: 0) {
+                            ForEach(Array(latestArticles.enumerated()), id: \.element.id) { index, article in
+                                Button { open(article: article) } label: {
+                                    if index.isMultiple(of: 3) {
+                                        StandardArticleCard(
+                                            article: article,
+                                            isSaved: articleLibrary.isSaved(article),
+                                            onToggleSaved: { articleLibrary.toggleSaved(article) },
+                                            onHide: { articleLibrary.hide(article) },
+                                            onMute: { articleLibrary.muteSource(for: article) }
+                                        )
+                                    } else {
+                                        CompactArticleRow(
+                                            article: article,
+                                            isSaved: articleLibrary.isSaved(article),
+                                            onToggleSaved: { articleLibrary.toggleSaved(article) },
+                                            onHide: { articleLibrary.hide(article) },
+                                            onMute: { articleLibrary.muteSource(for: article) }
+                                        )
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                if article.id != latestArticles.last?.id { Divider().overlay(Theme.hairline) }
+                            }
+                        }
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
                     }
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
                 }
             }
             .padding(20)

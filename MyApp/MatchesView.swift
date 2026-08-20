@@ -1139,7 +1139,7 @@ private struct FollowingNewsCard: View {
             }
             .padding(10)
         }
-        .frame(width: 200)
+        .frame(width: Theme.isPad ? 260 : 200)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))

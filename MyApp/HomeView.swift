@@ -390,7 +390,7 @@ private struct TeamMatchupHero: View {
     let match: Match?
     let now: Date
 
-    private static let cardHeight: CGFloat = 300
+    private static var cardHeight: CGFloat { Theme.isPad ? 400 : 300 }
     private var isLive: Bool { match?.state == .live }
     private var eventDate: Date? { match?.date ?? pick.startDate }
     private var homeSide: TeamSide { match?.home ?? pick.streamMatch.home }
@@ -603,7 +603,7 @@ private struct EventHero: View {
     let match: Match?
     let now: Date
 
-    private static let cardHeight: CGFloat = 300
+    private static var cardHeight: CGFloat { Theme.isPad ? 400 : 300 }
     private var isLive: Bool { match?.state == .live }
     private var eventDate: Date? { match?.date ?? pick.startDate }
 

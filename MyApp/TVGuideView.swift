@@ -216,6 +216,42 @@ struct GuideModeControl: View {
     }
 }
 
+// MARK: - Scroll State
+
+/// Reference-type container for the EPG grid's current scroll offset.
+/// Stored separately from EPGGuideGrid so that programme cells (ProgrammeGridView)
+/// are NOT re-rendered on every scroll frame — only the lightweight overlay views
+/// observe this and re-render when the offset changes.
+@MainActor
+final class EPGScrollState: ObservableObject {
+    @Published var offset: CGPoint = .zero
+    var viewSize: CGSize = .zero
+    var bottomInset: CGFloat = 0
+}
+
+// MARK: - Directional Lock
+
+/// Introspects the SwiftUI ScrollView's backing UIScrollView and enables
+/// isDirectionalLockEnabled so that diagonal finger movement locks to one axis.
+private struct DirectionalLockModifier: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let v = UIView()
+        v.backgroundColor = .clear
+        DispatchQueue.main.async {
+            var parent: UIView? = v.superview
+            while let p = parent {
+                if let sv = p as? UIScrollView {
+                    sv.isDirectionalLockEnabled = true
+                    break
+                }
+                parent = p.superview
+            }
+        }
+        return v
+    }
+    func updateUIView(_ uiView: UIView, context: Context) {}
+}
+
 // MARK: - EPG Guide Grid
 
 struct EPGGuideGrid: View {
@@ -224,10 +260,9 @@ struct EPGGuideGrid: View {
     let onChannelTap: (CanonicalChannel) -> Void
     let onProgramTap: (EPGProgramme, CanonicalChannel) -> Void
 
-    @State private var scrollOffset: CGPoint = .zero
-    @State private var scrollPos = ScrollPosition(x: 0, y: 0)
-    @State private var viewSize: CGSize = .zero
-    @State private var bottomInset: CGFloat = 0
+    @StateObject private var scrollState = EPGScrollState()
+    /// Incrementing triggers ProgrammeGridView to animate-scroll to current time.
+    @State private var scrollToNowTrigger: Int = 0
     @State private var hasScrolledToNow = false
     @State private var now: Date = Date()
 
@@ -235,46 +270,55 @@ struct EPGGuideGrid: View {
     private let colW = TVGuideViewModel.channelColumnWidth
     private let rulerH = TVGuideViewModel.timeRulerHeight
 
-    // Whether the NOW indicator is off the visible horizontal viewport.
-    private var isNowOffScreen: Bool {
-        guard vm.nowIsVisible, viewSize.width > 0 else { return false }
-        let nowContentX = vm.xOffset(for: now)
-        let viewportStart = scrollOffset.x
-        let viewportEnd = scrollOffset.x + max(0, viewSize.width - colW)
-        return nowContentX < viewportStart || nowContentX > viewportEnd
-    }
-
     var body: some View {
+        // IMPORTANT: this body does NOT read scrollState.offset.
+        // Only the lightweight overlay sub-views observe EPGScrollState, so the
+        // expensive programme cell grid is NOT re-rendered on every scroll frame.
         GeometryReader { geo in
             ZStack(alignment: .topLeading) {
-                mainScrollView
-                channelColumnOverlay
-                timeRulerOverlay
+                ProgrammeGridView(
+                    vm: vm,
+                    scrollState: scrollState,
+                    scrollToNowTrigger: scrollToNowTrigger,
+                    now: now,
+                    onProgramTap: onProgramTap
+                )
+                ChannelColumnOverlayView(vm: vm, scrollState: scrollState)
+                TimeRulerOverlayView(vm: vm, scrollState: scrollState)
                 cornerOverlay
-                nowLineOverlay
-                jumpToNowButton
+                NowLineOverlayView(vm: vm, scrollState: scrollState, now: now)
+                JumpToNowOverlayView(vm: vm, scrollState: scrollState, now: now) {
+                    vm.scrollToNow()
+                }
             }
             .clipped()
             .simultaneousGesture(channelColumnTapGesture)
             .onAppear {
-                viewSize = geo.size
-                bottomInset = geo.safeAreaInsets.bottom
+                scrollState.viewSize = geo.size
+                scrollState.bottomInset = geo.safeAreaInsets.bottom
                 triggerScrollToNow()
             }
             .onChange(of: geo.size) { _, size in
-                viewSize = size
+                scrollState.viewSize = size
                 triggerScrollToNow()
-            }
-            .onChange(of: vm.visibleChannels.count) { _, _ in
-                triggerScrollToNow()
-            }
-            .onChange(of: vm.scrollToNowToken) { _, _ in
-                scrollPos = ScrollPosition(x: vm.initialScrollOffset, y: 0)
             }
         }
-        .onReceive(
-            Timer.publish(every: 60, on: .main, in: .common).autoconnect()
-        ) { _ in now = Date() }
+        .onChange(of: vm.visibleChannels.count) { _, _ in triggerScrollToNow() }
+        .onChange(of: vm.scrollToNowToken) { _, _ in scrollToNowTrigger += 1 }
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+            now = Date()
+        }
+    }
+
+    private var cornerOverlay: some View {
+        ZStack {
+            Theme.background
+            Text("CH")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Theme.textTertiary)
+        }
+        .frame(width: colW, height: rulerH)
+        .allowsHitTesting(false)
     }
 
     private var channelColumnTapGesture: some Gesture {
@@ -282,10 +326,10 @@ struct EPGGuideGrid: View {
             .onEnded { value in
                 let loc = value.location
                 guard loc.x < colW, loc.y >= rulerH else { return }
-                let channelY = loc.y + scrollOffset.y - rulerH
+                let channelY = loc.y + scrollState.offset.y - rulerH
                 let idx = Int(channelY / rowH)
-                guard idx >= 0, idx < visibleChannels.count else { return }
-                let ch = visibleChannels[idx]
+                guard idx >= 0, idx < vm.visibleChannels.count else { return }
+                let ch = vm.visibleChannels[idx]
                 if ch.playableChannel != nil { onChannelTap(ch) }
             }
     }
@@ -293,35 +337,48 @@ struct EPGGuideGrid: View {
     private func triggerScrollToNow() {
         guard !hasScrolledToNow,
               !vm.visibleChannels.isEmpty,
-              viewSize.width > 0 else { return }
+              scrollState.viewSize.width > 0 else { return }
         hasScrolledToNow = true
-        let targetX = vm.initialScrollOffset
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-            scrollPos = ScrollPosition(x: targetX, y: 0)
-        }
+        scrollToNowTrigger += 1
     }
+}
 
-    // MARK: - Main 2-D scroll view
+// MARK: - Programme Grid View
 
-    private var mainScrollView: some View {
+/// The scrollable programme cell content. Deliberately passes EPGScrollState as a plain
+/// reference (not @ObservedObject) so it WRITES offset updates but does NOT re-render
+/// when the offset changes — only the overlay views observe it.
+private struct ProgrammeGridView: View {
+    @ObservedObject var vm: TVGuideViewModel
+    @EnvironmentObject var repository: EPGRepository
+    let scrollState: EPGScrollState
+    let scrollToNowTrigger: Int
+    let now: Date
+    let onProgramTap: (EPGProgramme, CanonicalChannel) -> Void
+
+    @State private var scrollPos = ScrollPosition(x: 0, y: 0)
+
+    private let rowH = TVGuideViewModel.rowHeight
+    private let colW = TVGuideViewModel.channelColumnWidth
+    private let rulerH = TVGuideViewModel.timeRulerHeight
+
+    var body: some View {
         ScrollView([.horizontal, .vertical], showsIndicators: false) {
             ZStack(alignment: .topLeading) {
-                // Content size driver
                 Color.clear
                     .frame(
                         width: colW + vm.guideWindowWidth,
                         height: rulerH + CGFloat(vm.visibleChannels.count) * rowH
                     )
+                    .background(DirectionalLockModifier())
 
-                // Row dividers (full width)
                 ForEach(Array(vm.visibleChannels.enumerated()), id: \.element.id) { i, _ in
                     Divider().overlay(Theme.hairline)
                         .frame(width: colW + vm.guideWindowWidth)
                         .offset(x: 0, y: rulerH + CGFloat(i) * rowH)
                 }
 
-                // Programme cells per channel
-                ForEach(Array(visibleChannels.enumerated()), id: \.element.id) { i, ch in
+                ForEach(Array(vm.visibleChannels.enumerated()), id: \.element.id) { i, ch in
                     let rowY = rulerH + CGFloat(i) * rowH
                     programCells(for: ch, rowIndex: i, rowY: rowY)
                 }
@@ -330,15 +387,19 @@ struct EPGGuideGrid: View {
         .defaultScrollAnchor(.topLeading)
         .scrollPosition($scrollPos)
         .onScrollGeometryChange(for: CGPoint.self, of: { $0.contentOffset }) { _, offset in
-            scrollOffset = offset
+            scrollState.offset = offset
             let firstRow = max(0, Int((offset.y - rulerH) / rowH))
-            let visibleRows = max(1, Int(viewSize.height / rowH) + 2)
+            let visibleRows = max(1, Int(scrollState.viewSize.height / rowH) + 2)
             vm.prefetchProgrammesAround(rowIndex: firstRow, visibleRowCount: visibleRows)
         }
-        .contentMargins(.bottom, bottomInset + 16, for: .scrollContent)
+        .contentMargins(.bottom, scrollState.bottomInset + 16, for: .scrollContent)
+        .onChange(of: scrollToNowTrigger) { _, _ in
+            let target = vm.initialScrollOffset
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                scrollPos = ScrollPosition(x: target, y: 0)
+            }
+        }
     }
-
-    // MARK: - Programme cells for one channel row
 
     @ViewBuilder
     private func programCells(for channel: CanonicalChannel, rowIndex: Int, rowY: CGFloat) -> some View {
@@ -405,44 +466,71 @@ struct EPGGuideGrid: View {
             }
         }
     }
+}
 
-    // MARK: - Fixed overlays
+// MARK: - Channel Column Overlay
 
-    /// Channel column: only renders rows visible in the current viewport + a buffer,
-    /// avoiding SwiftUI layout work for thousands of offscreen cells.
-    private var channelColumnOverlay: some View {
-        let firstRow = max(0, Int(scrollOffset.y / rowH) - 1)
-        let visibleRowCount = max(1, Int(viewSize.height / rowH)) + 4
-        let lastRow = min(visibleChannels.count, firstRow + visibleRowCount)
+private struct ChannelColumnOverlayView: View {
+    @ObservedObject var vm: TVGuideViewModel
+    @ObservedObject var scrollState: EPGScrollState
 
-        return ZStack(alignment: .topLeading) {
+    private let rowH = TVGuideViewModel.rowHeight
+    private let colW = TVGuideViewModel.channelColumnWidth
+    private let rulerH = TVGuideViewModel.timeRulerHeight
+
+    var body: some View {
+        let offsetY = scrollState.offset.y
+        let viewH = scrollState.viewSize.height
+        let firstRow = max(0, Int(offsetY / rowH) - 1)
+        let visibleRowCount = max(1, Int(viewH / rowH)) + 4
+        let lastRow = min(vm.visibleChannels.count, firstRow + visibleRowCount)
+
+        ZStack(alignment: .topLeading) {
             Theme.background
-                .frame(width: colW, height: viewSize.height)
+                .frame(width: colW, height: viewH)
 
-            ForEach(firstRow..<lastRow, id: \.self) { i in
-                let ch = visibleChannels[i]
-                let cellY = rulerH + CGFloat(i) * rowH - scrollOffset.y
-                ChannelLogoCell(channel: ch) { }
-                    .frame(width: colW, height: rowH)
-                    .offset(y: cellY)
-                Divider()
-                    .overlay(Theme.hairline)
-                    .frame(width: colW)
-                    .offset(y: cellY + rowH - 0.5)
+            if lastRow > firstRow {
+                ForEach(firstRow..<lastRow, id: \.self) { i in
+                    let ch = vm.visibleChannels[i]
+                    let cellY = rulerH + CGFloat(i) * rowH - offsetY
+                    ChannelLogoCell(channel: ch) { }
+                        .frame(width: colW, height: rowH)
+                        .offset(y: cellY)
+                    Divider()
+                        .overlay(Theme.hairline)
+                        .frame(width: colW)
+                        .offset(y: cellY + rowH - 0.5)
+                }
             }
         }
-        .frame(width: colW, height: viewSize.height)
+        .frame(width: colW, height: viewH)
         .clipped()
         .allowsHitTesting(false)
     }
+}
 
-    /// Time ruler: pinned at y=0, labels positioned relative to scroll offset.
-    private var timeRulerOverlay: some View {
+// MARK: - Time Ruler Overlay
+
+private struct TimeRulerOverlayView: View {
+    @ObservedObject var vm: TVGuideViewModel
+    @ObservedObject var scrollState: EPGScrollState
+
+    private let colW = TVGuideViewModel.channelColumnWidth
+    private let rulerH = TVGuideViewModel.timeRulerHeight
+
+    private var timeLabels: [(Date, String, CGFloat)] {
+        let window = vm.guideWindowStart...vm.guideWindowEnd
+        return vm.timeLabels(in: window).map { ($0.date, $0.label, $0.x) }
+    }
+
+    var body: some View {
+        let offsetX = scrollState.offset.x
+        let viewW = scrollState.viewSize.width
         ZStack(alignment: .topLeading) {
             Theme.background
             ForEach(timeLabels, id: \.0.timeIntervalSince1970) { _, label, x in
-                let screenX = colW + x - scrollOffset.x
-                if screenX < viewSize.width + 4 {
+                let screenX = colW + x - offsetX
+                if screenX < viewW + 4 {
                     Text(label)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Theme.textSecondary)
@@ -457,83 +545,92 @@ struct EPGGuideGrid: View {
         .clipped()
         .allowsHitTesting(false)
     }
+}
 
-    private var cornerOverlay: some View {
-        ZStack {
-            Theme.background
-            Text("CH")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(Theme.textTertiary)
+// MARK: - Now Line Overlay
+
+private struct NowLineOverlayView: View {
+    @ObservedObject var vm: TVGuideViewModel
+    @ObservedObject var scrollState: EPGScrollState
+    let now: Date
+
+    private let colW = TVGuideViewModel.channelColumnWidth
+    private let rulerH = TVGuideViewModel.timeRulerHeight
+    private let rowH = TVGuideViewModel.rowHeight
+
+    var body: some View {
+        if vm.nowIsVisible {
+            let nowX = colW + vm.xOffset(for: now) - scrollState.offset.x
+            if nowX >= colW && nowX <= scrollState.viewSize.width {
+                let maxLineH = max(0, scrollState.viewSize.height - rulerH - scrollState.bottomInset)
+                let lineH = min(CGFloat(vm.visibleChannels.count) * rowH, maxLineH)
+                ZStack(alignment: .top) {
+                    Rectangle()
+                        .fill(Theme.live)
+                        .frame(width: 2, height: lineH)
+                    Circle()
+                        .fill(Theme.live)
+                        .frame(width: 8, height: 8)
+                        .offset(y: -4)
+                }
+                .frame(width: 2)
+                .offset(x: nowX, y: rulerH)
+                .allowsHitTesting(false)
+            }
         }
-        .frame(width: colW, height: rulerH)
-        .allowsHitTesting(false)
+    }
+}
+
+// MARK: - Jump to Now Overlay
+
+private struct JumpToNowOverlayView: View {
+    @ObservedObject var vm: TVGuideViewModel
+    @ObservedObject var scrollState: EPGScrollState
+    let now: Date
+    let onJump: () -> Void
+
+    private let colW = TVGuideViewModel.channelColumnWidth
+
+    private var isNowOffScreen: Bool {
+        guard vm.nowIsVisible, scrollState.viewSize.width > 0 else { return false }
+        let nowContentX = vm.xOffset(for: now)
+        let viewportStart = scrollState.offset.x
+        let viewportEnd = scrollState.offset.x + max(0, scrollState.viewSize.width - colW)
+        return nowContentX < viewportStart || nowContentX > viewportEnd
     }
 
-    private var nowLineOverlay: some View {
+    var body: some View {
         Group {
-            if vm.nowIsVisible {
-                let nowX = colW + vm.xOffset(for: now) - scrollOffset.x
-                if nowX >= colW && nowX <= viewSize.width {
-                    let maxLineH = max(0, viewSize.height - rulerH - bottomInset)
-                    let lineH = min(CGFloat(vm.visibleChannels.count) * rowH, maxLineH)
-                    ZStack(alignment: .top) {
-                        Rectangle()
-                            .fill(Theme.live)
-                            .frame(width: 2, height: lineH)
-                        Circle()
-                            .fill(Theme.live)
-                            .frame(width: 8, height: 8)
-                            .offset(y: -4)
-                    }
-                    .frame(width: 2)
-                    .offset(x: nowX, y: rulerH)
-                    .allowsHitTesting(false)
-                }
-            }
-        }
-    }
-
-    /// "Jump to Now" button — appears when the current-time line is off-screen.
-    @ViewBuilder
-    private var jumpToNowButton: some View {
-        if isNowOffScreen {
-            VStack {
-                Spacer()
-                HStack {
+            if isNowOffScreen {
+                VStack {
                     Spacer()
-                    Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        vm.scrollToNow()
-                    } label: {
-                        HStack(spacing: 5) {
-                            Image(systemName: "clock.badge.fill")
-                                .font(.system(size: 11, weight: .bold))
-                            Text("Now")
-                                .font(.caption.weight(.bold))
+                    HStack {
+                        Spacer()
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            onJump()
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "clock.badge.fill")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text("Now")
+                                    .font(.caption.weight(.bold))
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Theme.live, in: Capsule())
+                            .shadow(color: Theme.live.opacity(0.4), radius: 6, y: 3)
                         }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Theme.live, in: Capsule())
-                        .shadow(color: Theme.live.opacity(0.4), radius: 6, y: 3)
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 20 + scrollState.bottomInset)
                     }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, 16)
-                    .padding(.bottom, 20 + bottomInset)
                 }
+                .transition(.scale(scale: 0.85).combined(with: .opacity))
             }
-            .transition(.scale(scale: 0.85).combined(with: .opacity))
-            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isNowOffScreen)
         }
-    }
-
-    // MARK: - Helpers
-
-    private var visibleChannels: [CanonicalChannel] { vm.visibleChannels }
-
-    private var timeLabels: [(Date, String, CGFloat)] {
-        let window = vm.guideWindowStart...vm.guideWindowEnd
-        return vm.timeLabels(in: window).map { ($0.date, $0.label, $0.x) }
+        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isNowOffScreen)
     }
 }
 

@@ -55,6 +55,9 @@ struct PlayerView: View {
     let channel: Channel
     let canonicalChannel: CanonicalChannel?
     let zapChannels: [Channel]
+    /// When false, hides the Guide button (and other IPTV-only controls) from the control bar.
+    /// Set to false when opening from a sports match context where EPG navigation is irrelevant.
+    let showsLiveTVControls: Bool
     @StateObject private var streamSelection: StreamSelectionState
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var watchStore: WatchStore
@@ -108,9 +111,10 @@ struct PlayerView: View {
     @State private var scoreFetchTask: Task<Void, Never>?
     @State private var showPaywall = false
 
-    init(channel: Channel, zapChannels: [Channel] = [], currentIndex: Int = 0) {
+    init(channel: Channel, zapChannels: [Channel] = [], currentIndex: Int = 0, showsLiveTVControls: Bool = true) {
         self.channel = channel
         self.canonicalChannel = nil
+        self.showsLiveTVControls = showsLiveTVControls
         let zap = zapChannels.isEmpty ? [channel] : zapChannels
         self.zapChannels = zap
         let idx = zap.indices.contains(currentIndex) ? currentIndex : 0
@@ -131,6 +135,7 @@ struct PlayerView: View {
         )
         self.channel = channel
         self.canonicalChannel = canonicalChannel
+        self.showsLiveTVControls = true
         self.zapChannels = [channel]
         _currentZapChannel = State(initialValue: channel)
         _zapIndex = State(initialValue: 0)
@@ -174,6 +179,7 @@ struct PlayerView: View {
         }
         .contentShape(Rectangle())
         #if os(iOS)
+        .gesture(swipeDownToDismiss)
         .overlay { playerGestureZones }
         .overlay {
             ZStack {
@@ -298,9 +304,9 @@ struct PlayerView: View {
                     hasNext: zapIndex < zapChannels.count - 1,
                     onPrev: { zapTo(index: zapIndex - 1) },
                     onNext: { zapTo(index: zapIndex + 1) },
-                    onGuide: { showingGuideFromPlayer = true },
+                    onGuide: showsLiveTVControls ? { showingGuideFromPlayer = true } : nil,
                     onChannels: zapChannels.count > 1 ? { showingChannelList = true } : nil,
-                    onRecent: { showingRecents = true },
+                    onRecent: showsLiveTVControls ? { showingRecents = true } : nil,
                     onMore: { showingMore = true }
                 )
                 .padding(16)
@@ -439,6 +445,22 @@ struct PlayerView: View {
             }
             .ignoresSafeArea()
         }
+    }
+    /// Swipe down from the centre of the screen to exit the player.
+    /// The gesture only triggers in the middle vertical third of the screen,
+    /// leaving the top and bottom thirds free for brightness/volume adjustments.
+    private var swipeDownToDismiss: some Gesture {
+        DragGesture(minimumDistance: 30, coordinateSpace: .local)
+            .onEnded { value in
+                let isDownward = value.translation.height > 90
+                let startedInMiddle = value.startLocation.y > UIScreen.main.bounds.height * 0.25
+                    && value.startLocation.y < UIScreen.main.bounds.height * 0.75
+                // Require mostly-vertical drag (less than 45° off vertical)
+                let isVertical = abs(value.translation.height) > abs(value.translation.width)
+                if isDownward && startedInMiddle && isVertical {
+                    dismiss()
+                }
+            }
     }
     #endif
 
@@ -1941,9 +1963,9 @@ private struct PlayerControlBar: View {
     let hasNext: Bool
     let onPrev: () -> Void
     let onNext: () -> Void
-    let onGuide: () -> Void
+    let onGuide: (() -> Void)?
     let onChannels: (() -> Void)?
-    let onRecent: () -> Void
+    let onRecent: (() -> Void)?
     let onMore: () -> Void
 
     var body: some View {
@@ -1954,12 +1976,18 @@ private struct PlayerControlBar: View {
             if hasNext {
                 PlayerChromeButton(systemImage: "chevron.down", accessibilityLabel: "Next channel", action: onNext)
             }
-            if hasPrev || hasNext { Divider().frame(height: 28).overlay(Theme.hairline) }
-            PlayerChromeButton(systemImage: "rectangle.grid.1x2.fill", title: "Guide", accessibilityLabel: "Open guide", action: onGuide)
+            if (hasPrev || hasNext) && (onGuide != nil || onChannels != nil || onRecent != nil) {
+                Divider().frame(height: 28).overlay(Theme.hairline)
+            }
+            if let onGuide {
+                PlayerChromeButton(systemImage: "rectangle.grid.1x2.fill", title: "Guide", accessibilityLabel: "Open guide", action: onGuide)
+            }
             if let onChannels {
                 PlayerChromeButton(systemImage: "list.bullet", title: "Channels", accessibilityLabel: "Channel list", action: onChannels)
             }
-            PlayerChromeButton(systemImage: "clock.arrow.circlepath", title: "Recent", accessibilityLabel: "Recent channels", action: onRecent)
+            if let onRecent {
+                PlayerChromeButton(systemImage: "clock.arrow.circlepath", title: "Recent", accessibilityLabel: "Recent channels", action: onRecent)
+            }
             Spacer()
             PlayerChromeButton(systemImage: "ellipsis", title: "More", accessibilityLabel: "More options", action: onMore)
         }

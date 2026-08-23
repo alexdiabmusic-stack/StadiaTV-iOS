@@ -9,6 +9,7 @@ final class TVGuideViewModel: ObservableObject {
 
     @Published var guideMode: GuideMode = .myGuide
     @Published var filterCategoryId: String? = nil     // active category filter in All Channels mode
+    @Published var channelNameFilter: String = ""      // text search across channel names
     @Published var selectedDate: Date = Calendar.current.startOfDay(for: Date())
     @Published var categories: [GuideCategory] = []
     @Published var visibleChannels: [CanonicalChannel] = []
@@ -98,24 +99,33 @@ final class TVGuideViewModel: ObservableObject {
         categories = cats
     }
 
+    func setChannelNameFilter(_ text: String) {
+        channelNameFilter = text
+        if let repository { filterChannels(repository: repository) }
+    }
+
     private func filterChannels(repository: EPGRepository) {
         let all = repository.canonicalChannels
+        var result: [CanonicalChannel]
         switch guideMode {
         case .myGuide:
             if myGuideIDs.isEmpty {
-                // Nothing selected yet — show top-priority channels as a preview.
-                visibleChannels = featuredChannels(from: all, repository: repository)
+                result = featuredChannels(from: all, repository: repository)
             } else {
-                visibleChannels = all.filter { myGuideIDs.contains($0.id) }
+                result = all.filter { myGuideIDs.contains($0.id) }
                     .sorted { $0.priority > $1.priority }
             }
         case .allChannels:
             if let catId = filterCategoryId {
-                visibleChannels = all.filter { $0.categoryId == catId }
+                result = all.filter { $0.categoryId == catId }
             } else {
-                visibleChannels = all
+                result = all
             }
         }
+        if !channelNameFilter.isEmpty {
+            result = result.filter { $0.name.localizedCaseInsensitiveContains(channelNameFilter) }
+        }
+        visibleChannels = result
     }
 
     private func featuredChannels(from all: [CanonicalChannel], repository: EPGRepository) -> [CanonicalChannel] {

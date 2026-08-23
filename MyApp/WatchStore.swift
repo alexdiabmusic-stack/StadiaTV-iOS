@@ -38,6 +38,19 @@ struct SavedChannel: Codable, Hashable, Identifiable {
     }
 }
 
+/// A dwell-confirmed recent channel for fast channel navigation.
+struct RecentEntry: Codable, Hashable, Identifiable {
+    let id: String
+    let saved: SavedChannel
+    var watchedAt: Date
+
+    init(channel: Channel) {
+        self.id = channel.id
+        self.saved = SavedChannel(channel: channel)
+        self.watchedAt = Date()
+    }
+}
+
 /// One "continue watching" entry.
 struct WatchHistoryEntry: Codable, Hashable, Identifiable {
     var saved: SavedChannel
@@ -46,15 +59,19 @@ struct WatchHistoryEntry: Codable, Hashable, Identifiable {
     var id: String { saved.id }
 }
 
-/// Owns favorite channels and recently watched channels, persisted to UserDefaults.
+/// Owns favorite channels, recently watched channels, and dwell-confirmed recents.
 @MainActor
 final class WatchStore: ObservableObject {
     @Published private(set) var favorites: [SavedChannel] = []
     @Published private(set) var history: [WatchHistoryEntry] = []
+    /// Dwell-confirmed recent channels for fast channel navigation (device-local, not cloud-synced).
+    @Published private(set) var recents: [RecentEntry] = []
 
     private let favoritesKey = "stadiatv.favoritechannels.v1"
     private let historyKey = "stadiatv.watchhistory.v1"
+    private let recentsKey = "stadiatv.recents.v1"
     private let historyLimit = 20
+    private let recentsLimit = 20
 
     init() {
         CloudSyncService.shared.start()
@@ -69,6 +86,10 @@ final class WatchStore: ObservableObject {
             history = decoded
         } else if let cloud: [WatchHistoryEntry] = CloudSyncService.shared.load([WatchHistoryEntry].self, for: .watchHistory) {
             history = cloud
+        }
+        if let data = UserDefaults.standard.data(forKey: recentsKey),
+           let decoded = try? JSONDecoder().decode([RecentEntry].self, from: data) {
+            recents = decoded
         }
         NotificationCenter.default.addObserver(
             forName: .stadiatvCloudSyncDidChange,
@@ -117,6 +138,23 @@ final class WatchStore: ObservableObject {
         persistHistory()
     }
 
+    // MARK: Recents (dwell-confirmed)
+
+    /// Records a channel as recently watched. Called after the dwell threshold has elapsed.
+    func recordRecent(_ channel: Channel) {
+        recents.removeAll { $0.id == channel.id }
+        recents.insert(RecentEntry(channel: channel), at: 0)
+        if recents.count > recentsLimit {
+            recents.removeLast(recents.count - recentsLimit)
+        }
+        persistRecents()
+    }
+
+    /// The most recent dwell-confirmed channel other than the given one (for Previous Channel toggle).
+    func previousChannel(relativeTo current: Channel) -> Channel? {
+        recents.first { $0.id != current.id }?.saved.channel
+    }
+
     // MARK: Persistence
 
     private func persistFavorites() {
@@ -131,6 +169,12 @@ final class WatchStore: ObservableObject {
             UserDefaults.standard.set(data, forKey: historyKey)
         }
         CloudSyncService.shared.save(history, for: .watchHistory)
+    }
+
+    private func persistRecents() {
+        if let data = try? JSONEncoder().encode(recents) {
+            UserDefaults.standard.set(data, forKey: recentsKey)
+        }
     }
 
     private func applyCloudStateIfNeeded() {

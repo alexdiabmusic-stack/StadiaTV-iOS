@@ -4,16 +4,21 @@ import Combine
 // MARK: - TVGuideView
 
 struct TVGuideView: View {
+    /// When non-nil, channel taps call this closure instead of presenting a new PlayerView.
+    var onChannelSelected: ((CanonicalChannel) -> Void)? = nil
+
     @EnvironmentObject private var repository: EPGRepository
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var guideStore: GuideChannelStore
     @StateObject private var vm = TVGuideViewModel()
 
     @State private var playingChannel: CanonicalChannel?
+    @State private var catchupChannel: Channel?
     @State private var selectedProgramme: EPGProgramme?
     @State private var selectedProgrammeChannel: CanonicalChannel?
     @State private var showingBuildGuide = false
     @State private var showingFilters = false
+    @State private var channelForOffset: CanonicalChannel?
 
     var body: some View {
         Group {
@@ -26,11 +31,33 @@ struct TVGuideView: View {
         .fullScreenCover(item: $playingChannel) { ch in
             PlayerView(canonicalChannel: ch)
         }
+        .fullScreenCover(item: $catchupChannel) { ch in
+            PlayerView(channel: ch)
+        }
         .sheet(item: $selectedProgramme) { prog in
             if let ch = selectedProgrammeChannel {
-                ProgrammeDetailSheet(programme: prog, channel: ch) {
-                    if ch.playableChannel != nil { playingChannel = ch }
-                }
+                ProgrammeDetailSheet(
+                    programme: prog,
+                    channel: ch,
+                    onPlayLive: {
+                        if ch.playableChannel != nil {
+                            watchStore.recordWatch(ch.playableChannel!)
+                            playingChannel = ch
+                        }
+                    },
+                    onPlayCatchup: { url in
+                        guard let playable = ch.playableChannel else { return }
+                        catchupChannel = Channel(
+                            id: "\(playable.id)-catchup",
+                            name: ch.name,
+                            streamURL: url,
+                            logoURL: ch.effectiveLogoURL,
+                            group: ch.categoryId,
+                            playlistID: playable.playlistID,
+                            playlistName: playable.playlistName
+                        )
+                    }
+                )
             }
         }
         .sheet(isPresented: $showingBuildGuide) {
@@ -38,6 +65,9 @@ struct TVGuideView: View {
         }
         .sheet(isPresented: $showingFilters) {
             GuideFilterSheet(vm: vm, showingBuildGuide: $showingBuildGuide)
+        }
+        .sheet(item: $channelForOffset) { ch in
+            EPGOffsetSheet(channel: ch, vm: vm)
         }
         .onAppear {
             vm.setup(repository: repository)
@@ -91,20 +121,28 @@ struct TVGuideView: View {
                 myGuideSetupPrompt
             } else {
                 EPGGuideGrid(vm: vm) { channel in
-                    if let ch = channel.playableChannel {
-                        watchStore.recordWatch(ch)
+                    guard channel.playableChannel != nil else { return }
+                    if let onChannelSelected {
+                        onChannelSelected(channel)
+                    } else {
+                        if let ch = channel.playableChannel { watchStore.recordWatch(ch) }
                         playingChannel = channel
                     }
                 } onProgramTap: { programme, channel in
                     if programme.isOnNow() {
-                        if let ch = channel.playableChannel {
-                            watchStore.recordWatch(ch)
+                        guard channel.playableChannel != nil else { return }
+                        if let onChannelSelected {
+                            onChannelSelected(channel)
+                        } else {
+                            if let ch = channel.playableChannel { watchStore.recordWatch(ch) }
                             playingChannel = channel
                         }
                     } else {
                         selectedProgramme = programme
                         selectedProgrammeChannel = channel
                     }
+                } onSetOffset: { channel in
+                    channelForOffset = channel
                 }
             }
         }
@@ -259,6 +297,7 @@ struct EPGGuideGrid: View {
     @EnvironmentObject private var repository: EPGRepository
     let onChannelTap: (CanonicalChannel) -> Void
     let onProgramTap: (EPGProgramme, CanonicalChannel) -> Void
+    let onSetOffset: ((CanonicalChannel) -> Void)?
 
     @StateObject private var scrollState = EPGScrollState()
     /// Incrementing triggers ProgrammeGridView to animate-scroll to current time.
@@ -283,7 +322,12 @@ struct EPGGuideGrid: View {
                     now: now,
                     onProgramTap: onProgramTap
                 )
-                ChannelColumnOverlayView(vm: vm, scrollState: scrollState)
+                ChannelColumnOverlayView(
+                    vm: vm,
+                    scrollState: scrollState,
+                    onChannelTap: onChannelTap,
+                    onSetOffset: onSetOffset
+                )
                 TimeRulerOverlayView(vm: vm, scrollState: scrollState)
                 cornerOverlay
                 NowLineOverlayView(vm: vm, scrollState: scrollState, now: now)
@@ -292,7 +336,6 @@ struct EPGGuideGrid: View {
                 }
             }
             .clipped()
-            .simultaneousGesture(channelColumnTapGesture)
             .onAppear {
                 scrollState.viewSize = geo.size
                 scrollState.bottomInset = geo.safeAreaInsets.bottom
@@ -319,19 +362,6 @@ struct EPGGuideGrid: View {
         }
         .frame(width: colW, height: rulerH)
         .allowsHitTesting(false)
-    }
-
-    private var channelColumnTapGesture: some Gesture {
-        SpatialTapGesture()
-            .onEnded { value in
-                let loc = value.location
-                guard loc.x < colW, loc.y >= rulerH else { return }
-                let channelY = loc.y + scrollState.offset.y - rulerH
-                let idx = Int(channelY / rowH)
-                guard idx >= 0, idx < vm.visibleChannels.count else { return }
-                let ch = vm.visibleChannels[idx]
-                if ch.playableChannel != nil { onChannelTap(ch) }
-            }
     }
 
     private func triggerScrollToNow() {
@@ -418,7 +448,12 @@ private struct ProgrammeGridView: View {
             ForEach(progs) { prog in
                 let x = colW + vm.xOffset(for: prog.start)
                 let w = vm.width(for: prog)
-                ProgrammeCell(programme: prog, width: w, now: now) {
+                ProgrammeCell(
+                    programme: prog,
+                    width: w,
+                    now: now,
+                    hasCatchup: channel.hasCatchup
+                ) {
                     onProgramTap(prog, channel)
                 }
                 .frame(width: w, height: rowH - 2)
@@ -473,6 +508,9 @@ private struct ProgrammeGridView: View {
 private struct ChannelColumnOverlayView: View {
     @ObservedObject var vm: TVGuideViewModel
     @ObservedObject var scrollState: EPGScrollState
+    @EnvironmentObject var guideStore: GuideChannelStore
+    let onChannelTap: (CanonicalChannel) -> Void
+    let onSetOffset: ((CanonicalChannel) -> Void)?
 
     private let rowH = TVGuideViewModel.rowHeight
     private let colW = TVGuideViewModel.channelColumnWidth
@@ -493,19 +531,58 @@ private struct ChannelColumnOverlayView: View {
                 ForEach(firstRow..<lastRow, id: \.self) { i in
                     let ch = vm.visibleChannels[i]
                     let cellY = rulerH + CGFloat(i) * rowH - offsetY
-                    ChannelLogoCell(channel: ch) { }
-                        .frame(width: colW, height: rowH)
-                        .offset(y: cellY)
+                    let inGuide = guideStore.isSelected(ch.id)
+                    let offsetMinutes = vm.epgOffsetMinutes(for: ch)
+                    ChannelLogoCell(channel: ch) {
+                        if ch.playableChannel != nil { onChannelTap(ch) }
+                    }
+                    .frame(width: colW, height: rowH)
+                    .offset(y: cellY)
+                    .contextMenu {
+                        Button {
+                            guideStore.toggle(ch.id)
+                            if !guideStore.hasConfigured { guideStore.markConfigured() }
+                        } label: {
+                            Label(inGuide ? "Remove from My Guide" : "Add to My Guide",
+                                  systemImage: inGuide ? "star.slash" : "star")
+                        }
+                        Divider()
+                        Button {
+                            onSetOffset?(ch)
+                        } label: {
+                            Label(
+                                offsetMinutes == 0
+                                    ? "Set EPG Offset…"
+                                    : "EPG Offset: \(formattedOffset(offsetMinutes))",
+                                systemImage: "clock.badge"
+                            )
+                        }
+                        if offsetMinutes != 0 {
+                            Button(role: .destructive) {
+                                guideStore.setEPGOffset(0, for: ch.id)
+                            } label: {
+                                Label("Clear EPG Offset", systemImage: "clock.badge.xmark")
+                            }
+                        }
+                    }
                     Divider()
                         .overlay(Theme.hairline)
                         .frame(width: colW)
                         .offset(y: cellY + rowH - 0.5)
+                        .allowsHitTesting(false)
                 }
             }
         }
         .frame(width: colW, height: viewH)
         .clipped()
-        .allowsHitTesting(false)
+    }
+
+    private func formattedOffset(_ minutes: Int) -> String {
+        let sign = minutes > 0 ? "+" : ""
+        let abs = Swift.abs(minutes)
+        if abs < 60 { return "\(sign)\(minutes)m" }
+        let h = abs / 60, m = abs % 60
+        return m == 0 ? "\(sign)\(minutes > 0 ? h : -h)h" : "\(sign)\(minutes > 0 ? h : -h)h \(m)m"
     }
 }
 
@@ -640,9 +717,12 @@ struct ProgrammeCell: View {
     let programme: EPGProgramme
     let width: CGFloat
     let now: Date
+    var hasCatchup: Bool = false
     let onTap: () -> Void
 
     private var isCurrent: Bool { programme.isOnNow(at: now) }
+    private var isPast: Bool { programme.isPast(at: now) }
+    private var showCatchupBadge: Bool { isPast && hasCatchup && width >= 80 }
 
     // Static formatter to avoid re-creating DateFormatter on every cell render.
     nonisolated static let timeFmt: DateFormatter = {
@@ -655,7 +735,7 @@ struct ProgrammeCell: View {
         Button(action: onTap) {
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(isCurrent ? Theme.accent.opacity(0.18) : Theme.surface)
+                    .fill(isCurrent ? Theme.accent.opacity(0.18) : isPast ? Theme.surface.opacity(0.6) : Theme.surface)
                     .overlay(
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
                             .strokeBorder(isCurrent ? Theme.accent.opacity(0.4) : Theme.hairline)
@@ -674,6 +754,15 @@ struct ProgrammeCell: View {
                 // Text content — responsive to card width
                 if width >= 36 {
                     cellContent
+                }
+
+                // Catch-up available badge
+                if showCatchupBadge {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Theme.accent.opacity(0.8))
+                        .padding(3)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 }
             }
         }
@@ -771,8 +860,26 @@ struct ChannelLogoCell: View {
 struct ProgrammeDetailSheet: View {
     let programme: EPGProgramme
     let channel: CanonicalChannel
-    let onPlay: () -> Void
+    let onPlayLive: () -> Void
+    var onPlayCatchup: ((URL) -> Void)? = nil
+
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var guideStore: GuideChannelStore
+    @EnvironmentObject private var reminderStore: ProgrammeReminderStore
+    @EnvironmentObject private var recordingService: RecordingService
+
+    @State private var catchupState: CatchupState = .idle
+    @State private var selectedLeadTime: Int = 5
+    @State private var reminderAdding = false
+    @State private var showingRecordingSchedule = false
+    @State private var recordingScheduled = false
+
+    private enum CatchupState {
+        case idle, loading, available(URL), failed, notEligible
+    }
+
+    private let resolver = CatchupResolver()
+    private let now = Date()
 
     var body: some View {
         NavigationStack {
@@ -780,95 +887,11 @@ struct ProgrammeDetailSheet: View {
                 Theme.background.ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        // Channel info
-                        HStack(spacing: 12) {
-                            if let logoURL = channel.effectiveLogoURL {
-                                AsyncImage(url: logoURL) { phase in
-                                    if case .success(let img) = phase {
-                                        img.resizable().scaledToFit()
-                                    } else {
-                                        Image(systemName: "tv").foregroundStyle(Theme.accent)
-                                    }
-                                }
-                                .frame(width: 48, height: 48)
-                                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8))
-                            }
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(channel.name)
-                                    .font(.headline)
-                                    .foregroundStyle(Theme.textPrimary)
-                                Text(timeRange)
-                                    .font(.subheadline)
-                                    .foregroundStyle(Theme.textSecondary)
-                            }
-                            Spacer()
-                        }
-
-                        if let imgURL = programme.imageURL {
-                            AsyncImage(url: imgURL) { phase in
-                                if case .success(let img) = phase {
-                                    img.resizable().scaledToFill()
-                                        .frame(maxWidth: .infinity)
-                                        .frame(height: 180)
-                                        .clipped()
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                }
-                            }
-                        }
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(programme.title)
-                                .font(.title2.weight(.bold))
-                                .foregroundStyle(Theme.textPrimary)
-                            if let sub = programme.subtitle {
-                                Text(sub)
-                                    .font(.subheadline)
-                                    .foregroundStyle(Theme.textSecondary)
-                            }
-
-                            HStack(spacing: 12) {
-                                if let s = programme.season, let e = programme.episode {
-                                    Label("S\(s)E\(e)", systemImage: "list.number")
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(Theme.textSecondary)
-                                }
-                                if let rating = programme.rating {
-                                    Text(rating)
-                                        .font(.caption.weight(.bold))
-                                        .padding(.horizontal, 6).padding(.vertical, 2)
-                                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 4))
-                                        .foregroundStyle(Theme.textSecondary)
-                                }
-                                if !programme.categories.isEmpty {
-                                    Text(programme.categories.first!)
-                                        .font(.caption)
-                                        .foregroundStyle(Theme.textTertiary)
-                                }
-                            }
-                        }
-
-                        if let desc = programme.description, !desc.isEmpty {
-                            Text(desc)
-                                .font(.callout)
-                                .foregroundStyle(Theme.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        if channel.playableChannel != nil {
-                            Button {
-                                dismiss()
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { onPlay() }
-                            } label: {
-                                Label("Watch Channel", systemImage: "play.fill")
-                                    .font(.headline)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 12))
-                                    .foregroundStyle(.white)
-                            }
-                            .buttonStyle(.plain)
-                        }
-
+                        channelHeader
+                        programmeImage
+                        programmeMetadata
+                        programmeDescription
+                        actionButtons
                         Spacer(minLength: 0)
                     }
                     .padding(20)
@@ -883,7 +906,300 @@ struct ProgrammeDetailSheet: View {
             }
         }
         .tint(Theme.accent)
+        .task {
+            await resolveCatchupIfNeeded()
+        }
+        .sheet(isPresented: $showingRecordingSchedule) {
+            RecordingScheduleSheet(
+                programme: programme,
+                channel: channel,
+                onScheduled: { _ in recordingScheduled = true }
+            )
+        }
     }
+
+    // MARK: - Subviews
+
+    private var channelHeader: some View {
+        HStack(spacing: 12) {
+            if let logoURL = channel.effectiveLogoURL {
+                AsyncImage(url: logoURL) { phase in
+                    if case .success(let img) = phase {
+                        img.resizable().scaledToFit()
+                    } else {
+                        Image(systemName: "tv").foregroundStyle(Theme.accent)
+                    }
+                }
+                .frame(width: 48, height: 48)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8))
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(channel.name)
+                    .font(.headline)
+                    .foregroundStyle(Theme.textPrimary)
+                Text(timeRange)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.textSecondary)
+                programmeStateBadge
+            }
+            Spacer()
+        }
+    }
+
+    @ViewBuilder
+    private var programmeStateBadge: some View {
+        if programme.isOnNow(at: now) {
+            Label("LIVE", systemImage: "dot.radiowaves.left.and.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Theme.live)
+        } else if programme.isFuture(at: now) {
+            Label("Upcoming", systemImage: "clock")
+                .font(.caption)
+                .foregroundStyle(Theme.textTertiary)
+        } else if case .available = catchupState {
+            Label("Catch-up available", systemImage: "clock.arrow.circlepath")
+                .font(.caption)
+                .foregroundStyle(Theme.accent)
+        }
+    }
+
+    @ViewBuilder
+    private var programmeImage: some View {
+        if let imgURL = programme.imageURL {
+            AsyncImage(url: imgURL) { phase in
+                if case .success(let img) = phase {
+                    img.resizable().scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 180)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            }
+        }
+    }
+
+    private var programmeMetadata: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(programme.title)
+                .font(.title2.weight(.bold))
+                .foregroundStyle(Theme.textPrimary)
+            if let sub = programme.subtitle {
+                Text(sub)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            HStack(spacing: 12) {
+                if let s = programme.season, let e = programme.episode {
+                    Label("S\(s)E\(e)", systemImage: "list.number")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                if let rating = programme.rating {
+                    Text(rating)
+                        .font(.caption.weight(.bold))
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 4))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                if !programme.categories.isEmpty {
+                    Text(programme.categories.first!)
+                        .font(.caption)
+                        .foregroundStyle(Theme.textTertiary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var programmeDescription: some View {
+        if let desc = programme.description, !desc.isEmpty {
+            Text(desc)
+                .font(.callout)
+                .foregroundStyle(Theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private var actionButtons: some View {
+        VStack(spacing: 12) {
+            // Live or catch-up playback button
+            if programme.isOnNow(at: now), channel.playableChannel != nil {
+                watchLiveButton
+            } else if programme.isPast(at: now) {
+                catchupButton
+            }
+
+            // Future programme: Remind Me
+            if programme.isFuture(at: now) {
+                reminderSection
+            }
+
+            // Recording: available for live and future programmes
+            if programme.isOnNow(at: now) || programme.isFuture(at: now) {
+                recordingSection
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var recordingSection: some View {
+        let mode = recordingService.preferredMode(for: channel)
+        if mode != .unavailable {
+            if recordingScheduled {
+                Label("Recording scheduled", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.green)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+            } else {
+                Button { showingRecordingSchedule = true } label: {
+                    Label(
+                        programme.isOnNow(at: now) ? "Record Now" : "Schedule Recording",
+                        systemImage: "record.circle"
+                    )
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Theme.live.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(Theme.live)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var watchLiveButton: some View {
+        Button {
+            dismiss()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { onPlayLive() }
+        } label: {
+            Label("Watch Live", systemImage: "play.fill")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 12))
+                .foregroundStyle(.white)
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var catchupButton: some View {
+        switch catchupState {
+        case .idle:
+            EmptyView()
+        case .loading:
+            HStack {
+                ProgressView().tint(Theme.accent)
+                Text("Checking archive…")
+                    .font(.callout)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+        case .available(let url):
+            Button {
+                dismiss()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    onPlayCatchup?(url)
+                }
+            } label: {
+                Label("Watch from Beginning", systemImage: "clock.arrow.circlepath")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 12))
+                    .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+        case .failed:
+            Text("Archive unavailable — stream failed to load.")
+                .font(.caption)
+                .foregroundStyle(Theme.textTertiary)
+                .frame(maxWidth: .infinity, alignment: .center)
+        case .notEligible:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private var reminderSection: some View {
+        let hasReminder = reminderStore.hasReminder(for: programme)
+        VStack(spacing: 10) {
+            if !hasReminder {
+                Picker("Remind me", selection: $selectedLeadTime) {
+                    Text("5 min before").tag(5)
+                    Text("10 min before").tag(10)
+                    Text("15 min before").tag(15)
+                    Text("30 min before").tag(30)
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Button {
+                if hasReminder {
+                    if let id = reminderStore.reminderID(for: programme) {
+                        reminderStore.removeReminder(id: id)
+                    }
+                } else {
+                    reminderAdding = true
+                    Task {
+                        _ = await reminderStore.addReminder(
+                            for: programme,
+                            channel: channel,
+                            leadTimeMinutes: selectedLeadTime
+                        )
+                        reminderAdding = false
+                    }
+                }
+            } label: {
+                Group {
+                    if reminderAdding {
+                        ProgressView().tint(.white)
+                    } else if hasReminder {
+                        Label("Cancel Reminder", systemImage: "bell.slash.fill")
+                    } else {
+                        Label("Remind Me", systemImage: "bell.fill")
+                    }
+                }
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    hasReminder ? Theme.surfaceElevated : Theme.accent,
+                    in: RoundedRectangle(cornerRadius: 12)
+                )
+                .foregroundStyle(hasReminder ? Theme.textPrimary : .white)
+            }
+            .buttonStyle(.plain)
+            .disabled(reminderAdding)
+        }
+    }
+
+    // MARK: - Catch-up resolution
+
+    private func resolveCatchupIfNeeded() async {
+        guard programme.isPast(at: now) else { return }
+        guard resolver.isEligible(programme: programme, channel: channel, now: now) else {
+            catchupState = .notEligible
+            return
+        }
+        catchupState = .loading
+        let offset = guideStore.epgOffset(for: channel.id)
+        do {
+            let url = try await resolver.resolveURL(
+                programme: programme,
+                channel: channel,
+                epgOffsetMinutes: offset
+            )
+            catchupState = .available(url)
+        } catch {
+            catchupState = .notEligible
+        }
+    }
+
+    // MARK: - Helpers
 
     private var timeRange: String {
         "\(ProgrammeCell.timeFmt.string(from: programme.start)) – \(ProgrammeCell.timeFmt.string(from: programme.end))"
@@ -1274,6 +1590,108 @@ struct GuideFilterSheet: View {
         .tint(Theme.accent)
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+    }
+}
+
+// MARK: - EPG Offset Sheet
+
+struct EPGOffsetSheet: View {
+    let channel: CanonicalChannel
+    @ObservedObject var vm: TVGuideViewModel
+    @EnvironmentObject private var guideStore: GuideChannelStore
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var offsetMinutes: Int = 0
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Theme.background.ignoresSafeArea()
+                VStack(spacing: 28) {
+                    // Channel identity
+                    VStack(spacing: 6) {
+                        if let logoURL = channel.effectiveLogoURL {
+                            AsyncImage(url: logoURL) { phase in
+                                if case .success(let img) = phase {
+                                    img.resizable().scaledToFit()
+                                } else {
+                                    Image(systemName: "tv").foregroundStyle(Theme.accent)
+                                }
+                            }
+                            .frame(width: 56, height: 56)
+                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10))
+                        }
+                        Text(channel.name)
+                            .font(.headline)
+                            .foregroundStyle(Theme.textPrimary)
+                    }
+                    .padding(.top, 8)
+
+                    VStack(spacing: 8) {
+                        Text("EPG Offset")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.textSecondary)
+                        Text(offsetMinutes == 0 ? "No offset" : formattedOffset(offsetMinutes))
+                            .font(.system(size: 36, weight: .bold, design: .rounded))
+                            .foregroundStyle(offsetMinutes == 0 ? Theme.textTertiary : Theme.accent)
+                            .animation(.snappy, value: offsetMinutes)
+                            .contentTransition(.numericText())
+                    }
+
+                    Stepper(value: $offsetMinutes, in: -720...720, step: 15) {
+                        Text("Adjust in 15-minute steps")
+                            .font(.callout)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                    .padding(.horizontal, 20)
+
+                    Text("Positive offset: your stream is ahead of the EPG listing.\nNegative offset: your stream is behind the EPG listing.")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textTertiary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+
+                    if offsetMinutes != 0 {
+                        Button("Clear Offset") {
+                            withAnimation(.snappy) { offsetMinutes = 0 }
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.textSecondary)
+                    }
+
+                    Spacer()
+                }
+                .padding()
+            }
+            .navigationTitle("EPG Offset")
+            .inlineNavigationTitle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        guideStore.setEPGOffset(offsetMinutes, for: channel.id)
+                        dismiss()
+                    }
+                    .font(.headline)
+                }
+            }
+        }
+        .tint(Theme.accent)
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+        .onAppear {
+            offsetMinutes = guideStore.epgOffset(for: channel.id)
+        }
+    }
+
+    private func formattedOffset(_ minutes: Int) -> String {
+        let sign = minutes > 0 ? "+" : ""
+        let abs = Swift.abs(minutes)
+        if abs < 60 { return "\(sign)\(minutes)m" }
+        let h = abs / 60, m = abs % 60
+        return m == 0 ? "\(sign)\(minutes > 0 ? h : -h)h" : "\(sign)\(minutes > 0 ? h : -h)h \(m)m"
     }
 }
 

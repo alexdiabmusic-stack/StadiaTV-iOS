@@ -29,6 +29,12 @@ nonisolated struct CanonicalChannel: Identifiable, Hashable {
     /// Best available logo URL: resolved logo > provider logo
     var effectiveLogoURL: URL? { resolvedLogo?.url ?? logoURL }
 
+    /// True if any stream for this channel has archive/catch-up enabled.
+    var hasCatchup: Bool { allStreams.contains { $0.archiveEnabled } }
+
+    /// Maximum catch-up retention days across all streams. 0 if unknown.
+    var catchupDays: Int { allStreams.map(\.archiveDuration).max() ?? 0 }
+
     var allStreams: [ChannelStream] {
         var result: [ChannelStream] = []
         if let p = primaryStream { result.append(p) }
@@ -136,6 +142,8 @@ nonisolated struct EPGProgramme: Identifiable, Hashable, Sendable, Codable {
     nonisolated var isValid: Bool { start < end && duration > 60 }
 
     func isOnNow(at date: Date = Date()) -> Bool { start <= date && date < end }
+    func isPast(at date: Date = Date()) -> Bool { end < date }
+    func isFuture(at date: Date = Date()) -> Bool { start > date }
 
     func minutesRemaining(from date: Date = Date()) -> Int {
         max(0, Int(end.timeIntervalSince(date) / 60))
@@ -149,6 +157,22 @@ nonisolated struct EPGProgramme: Identifiable, Hashable, Sendable, Codable {
 
     static func == (lhs: EPGProgramme, rhs: EPGProgramme) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+
+    /// Returns a copy with start/end shifted by the given number of minutes.
+    /// Applied non-destructively in the UI to correct EPG timing offsets.
+    func shifted(by minutes: Int) -> EPGProgramme {
+        guard minutes != 0 else { return self }
+        let delta = TimeInterval(minutes * 60)
+        return EPGProgramme(
+            id: id, epgChannelId: epgChannelId, canonicalChannelId: canonicalChannelId,
+            title: title, subtitle: subtitle, description: description,
+            categories: categories,
+            start: start.addingTimeInterval(delta), end: end.addingTimeInterval(delta),
+            imageURL: imageURL, season: season, episode: episode, rating: rating,
+            sourceId: sourceId, sourcePriority: sourcePriority,
+            endTimeIsInferred: endTimeIsInferred
+        )
+    }
 }
 
 // MARK: - Match metadata

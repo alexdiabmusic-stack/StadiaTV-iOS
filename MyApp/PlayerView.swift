@@ -7,10 +7,54 @@ import UIKit
 import MediaPlayer
 #endif
 
+// MARK: - Keyboard command handler
+
+/// Maps hardware keyboard shortcuts to semantic Live player actions.
+/// Returns EmptyView on tvOS; does not affect touch interactions.
+private struct LiveCommandKeyboardHandler: View {
+    let onChannelUp: () -> Void
+    let onChannelDown: () -> Void
+    let onToggleChrome: () -> Void
+    let onOpenGuide: () -> Void
+    let onOpenChannelList: () -> Void
+    let onOpenRecents: () -> Void
+    let onExit: () -> Void
+
+    var body: some View {
+        #if !os(tvOS)
+        ZStack {
+            keyButton("chUp",    shortcut: .init(.upArrow,   modifiers: []), action: onChannelUp)
+            keyButton("chDown",  shortcut: .init(.downArrow, modifiers: []), action: onChannelDown)
+            keyButton("chrome",  shortcut: .init(.space,     modifiers: []), action: onToggleChrome)
+            keyButton("guide",   shortcut: .init("g",        modifiers: []), action: onOpenGuide)
+            keyButton("chList",  shortcut: .init("l",        modifiers: []), action: onOpenChannelList)
+            keyButton("recents", shortcut: .init("r",        modifiers: []), action: onOpenRecents)
+            keyButton("exit",    shortcut: .init(.escape,    modifiers: []), action: onExit)
+        }
+        .frame(width: 0, height: 0)
+        .opacity(0)
+        .accessibilityHidden(true)
+        #else
+        EmptyView()
+        #endif
+    }
+
+    #if !os(tvOS)
+    private func keyButton(_ id: String, shortcut: KeyboardShortcut, action: @escaping () -> Void) -> some View {
+        Button(action: action) { EmptyView() }
+            .keyboardShortcut(shortcut)
+            .frame(width: 0, height: 0)
+    }
+    #endif
+}
+
+// MARK: - Player
+
 /// Presents a channel's stream full screen.
 struct PlayerView: View {
     let channel: Channel
     let canonicalChannel: CanonicalChannel?
+    let zapChannels: [Channel]
     @StateObject private var streamSelection: StreamSelectionState
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var watchStore: WatchStore
@@ -18,6 +62,27 @@ struct PlayerView: View {
     @EnvironmentObject private var epgRepository: EPGRepository
     @EnvironmentObject private var entitlements: EntitlementStore
     @EnvironmentObject private var prefs: PreferencesStore
+
+    // Zap / channel navigation state
+    @State private var currentZapChannel: Channel
+    @State private var zapIndex: Int
+    @State private var dwellTask: Task<Void, Never>?
+
+    // Playback options
+    @State private var bufferProfile: PlayerBufferProfile = .normal
+    @State private var activeStreamMetadata: StreamRuntimeMetadata?
+    @State private var currentPlayerItem: AVPlayerItem?
+    @State private var audioGroup: AVMediaSelectionGroup?
+    @State private var subtitleGroup: AVMediaSelectionGroup?
+    @State private var selectedAudioIndex: Int?
+    @State private var selectedSubtitleIndex: Int?
+
+    // Player chrome panels
+    @State private var showingMore = false
+    @State private var showingChannelList = false
+    @State private var showingRecents = false
+    @State private var showingGuideFromPlayer = false
+
     @State private var isChromeVisible = true
     @State private var chromeHideTask: Task<Void, Never>?
     @State private var preferredOrientation: PlayerOrientation = .portrait
@@ -43,10 +108,15 @@ struct PlayerView: View {
     @State private var scoreFetchTask: Task<Void, Never>?
     @State private var showPaywall = false
 
-    init(channel: Channel) {
+    init(channel: Channel, zapChannels: [Channel] = [], currentIndex: Int = 0) {
         self.channel = channel
         self.canonicalChannel = nil
-        _streamSelection = StateObject(wrappedValue: StreamSelectionState(channel: channel))
+        let zap = zapChannels.isEmpty ? [channel] : zapChannels
+        self.zapChannels = zap
+        let idx = zap.indices.contains(currentIndex) ? currentIndex : 0
+        _currentZapChannel = State(initialValue: zap[idx])
+        _zapIndex = State(initialValue: idx)
+        _streamSelection = StateObject(wrappedValue: StreamSelectionState(channel: zap[idx]))
     }
 
     init(canonicalChannel: CanonicalChannel) {
@@ -61,11 +131,10 @@ struct PlayerView: View {
         )
         self.channel = channel
         self.canonicalChannel = canonicalChannel
+        self.zapChannels = [channel]
+        _currentZapChannel = State(initialValue: channel)
+        _zapIndex = State(initialValue: 0)
         _streamSelection = StateObject(wrappedValue: StreamSelectionState(channel: channel, canonicalChannel: canonicalChannel))
-    }
-
-    private var activeChannel: Channel {
-        streamSelection.activeChannel
     }
 
     // Sorting and deduping a big playlist is expensive, so it runs once off
@@ -74,7 +143,7 @@ struct PlayerView: View {
 
     private var canStartMultiscreen: Bool {
         playlistStore.channelsByPlaylist.values.contains { channels in
-            channels.contains { $0.id != channel.id }
+            channels.contains { $0.id != currentZapChannel.id }
         }
     }
 
@@ -82,17 +151,25 @@ struct PlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             StreamTile(
-                channel: activeChannel,
+                channel: currentZapChannel,
                 isPrimary: true,
                 showsChrome: false,
-                onFailure: { streamSelection.handlePlaybackFailure() },
+                bufferProfile: bufferProfile,
+                onFailure: {
+                    guard currentZapChannel.id == channel.id else { return }
+                    streamSelection.handlePlaybackFailure()
+                },
                 onMetadata: { metadata in
-                    if let streamID = streamSelection.activeStream?.id {
+                    activeStreamMetadata = metadata
+                    if currentZapChannel.id == channel.id, let streamID = streamSelection.activeStream?.id {
                         streamSelection.updateRuntimeMetadata(metadata, for: streamID)
                     }
+                },
+                onPlayerItemReady: { item in
+                    handlePlayerItemReady(item)
                 }
             )
-            .id(activeChannel.id)
+            .id(currentZapChannel.id)
             .ignoresSafeArea()
         }
         .contentShape(Rectangle())
@@ -141,7 +218,7 @@ struct PlayerView: View {
         }
         .animation(.spring(duration: 0.3), value: liveScoreMatch?.id)
         .overlay(alignment: .center) {
-            if case let .failed(message) = streamSelection.switchState {
+            if currentZapChannel.id == channel.id, case let .failed(message) = streamSelection.switchState {
                 StreamFailurePanel(
                     message: message,
                     tryAgain: { streamSelection.retryActiveStream(); revealChromeTemporarily() },
@@ -153,7 +230,7 @@ struct PlayerView: View {
             }
         }
         .overlay(alignment: .center) {
-            if streamSelection.switchState == .switching {
+            if currentZapChannel.id == channel.id, streamSelection.switchState == .switching {
                 ProgressView()
                     .tint(Theme.accent)
                     .padding(18)
@@ -186,7 +263,7 @@ struct PlayerView: View {
         .overlay(alignment: .topTrailing) {
             if isChromeVisible {
                 HStack(spacing: 8) {
-                    if streamSelection.hasSelectableStreams {
+                    if streamSelection.hasSelectableStreams && currentZapChannel.id == channel.id {
                         StreamQualityMenu(selection: streamSelection) {
                             revealChromeTemporarily()
                         }
@@ -216,19 +293,74 @@ struct PlayerView: View {
         }
         .overlay(alignment: .bottom) {
             if isChromeVisible {
-                PlayerSourceBar(channel: activeChannel,
-                                streamSummary: streamSelection.hasSelectableStreams ? streamSelection.currentSummary : nil,
-                                canStartMultiscreen: canStartMultiscreen,
-                                multiscreenAction: showMultiscreenPicker)
-                    .padding(16)
-                    .transition(.opacity)
+                PlayerControlBar(
+                    hasPrev: zapIndex > 0,
+                    hasNext: zapIndex < zapChannels.count - 1,
+                    onPrev: { zapTo(index: zapIndex - 1) },
+                    onNext: { zapTo(index: zapIndex + 1) },
+                    onGuide: { showingGuideFromPlayer = true },
+                    onChannels: zapChannels.count > 1 ? { showingChannelList = true } : nil,
+                    onRecent: { showingRecents = true },
+                    onMore: { showingMore = true }
+                )
+                .padding(16)
+                .transition(.opacity)
             }
         }
         .sheet(isPresented: $isShowingMultiscreenPicker) {
-            PlayerMultiscreenPicker(currentChannel: channel,
+            PlayerMultiscreenPicker(currentChannel: currentZapChannel,
                                     allChannels: multiscreenChannels,
                                     selectedChannelIDs: $selectedMultiChannelIDs,
                                     startAction: startMultiscreen)
+        }
+        .sheet(isPresented: $showingMore) {
+            PlayerMoreSheet(
+                channel: currentZapChannel,
+                bufferProfile: $bufferProfile,
+                audioGroup: audioGroup,
+                selectedAudioIndex: $selectedAudioIndex,
+                subtitleGroup: subtitleGroup,
+                selectedSubtitleIndex: $selectedSubtitleIndex,
+                streamMetadata: activeStreamMetadata,
+                canStartMultiscreen: canStartMultiscreen,
+                multiscreenAction: { showingMore = false; showMultiscreenPicker() }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingChannelList) {
+            PlayerChannelListSheet(
+                channels: zapChannels,
+                currentChannelID: currentZapChannel.id,
+                onSelect: { _, index in zapTo(index: index) }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingRecents) {
+            PlayerRecentsSheet(
+                currentChannelID: currentZapChannel.id,
+                onSelect: { ch in
+                    let idx = zapChannels.firstIndex(where: { $0.id == ch.id })
+                    if let idx {
+                        zapTo(index: idx)
+                    } else {
+                        currentZapChannel = ch
+                        startDwellTimer()
+                    }
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .fullScreenCover(isPresented: $showingGuideFromPlayer) {
+            TVGuideView(onChannelSelected: { canonicalChannel in
+                if let ch = canonicalChannel.playableChannel {
+                    let idx = zapChannels.firstIndex(where: { $0.id == ch.id })
+                    if let idx { zapTo(index: idx) } else { currentZapChannel = ch; startDwellTimer() }
+                }
+                showingGuideFromPlayer = false
+            })
         }
         .fullScreenCover(item: $multiscreenSession) { session in
             MultiScreenPlayerView(channels: session.channels)
@@ -238,9 +370,11 @@ struct PlayerView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .overlay { keyboardCommandHandler }
         .animation(.easeInOut(duration: 0.22), value: isChromeVisible)
         .onAppear {
             watchStore.recordWatch(channel)
+            startDwellTimer()
             revealChromeTemporarily()
             #if os(iOS)
             if !UserDefaults.standard.bool(forKey: Self.gestureOnboardingKey) {
@@ -255,6 +389,7 @@ struct PlayerView: View {
             #endif
         }
         .onDisappear {
+            dwellTask?.cancel()
             chromeHideTask?.cancel()
             scoreFetchTask?.cancel()
             #if os(iOS)
@@ -263,11 +398,14 @@ struct PlayerView: View {
             #endif
             requestOrientation(.portrait)
         }
-        .task(id: channel.id) {
+        .onChange(of: selectedAudioIndex) { _, idx in applyAudioTrack(index: idx) }
+        .onChange(of: selectedSubtitleIndex) { _, idx in applySubtitleTrack(index: idx) }
+        .task(id: currentZapChannel.id) {
             isScoreDismissed = false
             isScoreExpanded = false
             scoreFetchTask?.cancel()
-            scoreFetchTask = Task { await findAndPollLiveMatch() }
+            let zapChannel = currentZapChannel
+            scoreFetchTask = Task { await findAndPollLiveMatch(for: zapChannel) }
         }
         .task(id: playlistStore.allChannels.count) {
             let channels = playlistStore.allChannels
@@ -303,6 +441,18 @@ struct PlayerView: View {
         }
     }
     #endif
+
+    private var keyboardCommandHandler: some View {
+        LiveCommandKeyboardHandler(
+            onChannelUp:       { zapTo(index: zapIndex - 1) },
+            onChannelDown:     { zapTo(index: zapIndex + 1) },
+            onToggleChrome:    { toggleChromeVisibility() },
+            onOpenGuide:       { showingGuideFromPlayer = true; revealChromeTemporarily() },
+            onOpenChannelList: { showingChannelList = true; revealChromeTemporarily() },
+            onOpenRecents:     { showingRecents = true; revealChromeTemporarily() },
+            onExit:            { dismiss() }
+        )
+    }
 
     private func toggleOrientation() {
         preferredOrientation = preferredOrientation.toggled
@@ -365,17 +515,76 @@ struct PlayerView: View {
 
     private func scheduleChromeHide() {
         chromeHideTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 3_500_000_000)
+            let ns = UInt64(prefs.playerPanelTimeoutSeconds) * 1_000_000_000
+            try? await Task.sleep(nanoseconds: ns)
             guard !Task.isCancelled else { return }
             isChromeVisible = false
         }
     }
 
+    // MARK: Channel zapping
+
+    private func zapTo(index: Int) {
+        guard zapChannels.indices.contains(index), zapChannels[index].id != currentZapChannel.id else { return }
+        dwellTask?.cancel()
+        currentPlayerItem = nil
+        audioGroup = nil
+        subtitleGroup = nil
+        selectedAudioIndex = nil
+        selectedSubtitleIndex = nil
+        zapIndex = index
+        currentZapChannel = zapChannels[index]
+        startDwellTimer()
+        revealChromeTemporarily()
+    }
+
+    private func startDwellTimer() {
+        dwellTask?.cancel()
+        let ch = currentZapChannel
+        dwellTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(10))
+            guard !Task.isCancelled else { return }
+            watchStore.recordRecent(ch)
+        }
+    }
+
+    // MARK: Track selection
+
+    private func handlePlayerItemReady(_ item: AVPlayerItem) {
+        currentPlayerItem = item
+        let asset = item.asset
+        Task { @MainActor in
+            if let audio = try? await asset.loadMediaSelectionGroup(for: .audible),
+               audio.options.count > 1 {
+                audioGroup = audio
+            }
+            if let subs = try? await asset.loadMediaSelectionGroup(for: .legible),
+               !subs.options.isEmpty {
+                subtitleGroup = subs
+            }
+        }
+    }
+
+    private func applyAudioTrack(index: Int?) {
+        guard let item = currentPlayerItem, let group = audioGroup, let idx = index,
+              group.options.indices.contains(idx) else { return }
+        item.select(group.options[idx], in: group)
+    }
+
+    private func applySubtitleTrack(index: Int?) {
+        guard let item = currentPlayerItem, let group = subtitleGroup else { return }
+        if let idx = index, group.options.indices.contains(idx) {
+            item.select(group.options[idx], in: group)
+        } else {
+            item.select(nil, in: group)
+        }
+    }
+
     // MARK: Live score tracking
 
-    private func findAndPollLiveMatch() async {
+    private func findAndPollLiveMatch(for targetChannel: Channel) async {
         let service = ESPNService()
-        let channel = self.channel
+        let channel = targetChannel
         let leaguePaths = [
             "football/nfl", "basketball/nba", "hockey/nhl", "baseball/mlb",
             "soccer/eng.1", "soccer/esp.1", "soccer/ger.1", "soccer/ita.1",
@@ -850,8 +1059,10 @@ private struct StreamTile: View {
     let isPrimary: Bool
     let showsChrome: Bool
     var preferredQuality: PlaybackQuality = .auto
+    var bufferProfile: PlayerBufferProfile = .normal
     var onFailure: (() -> Void)? = nil
     var onMetadata: ((StreamRuntimeMetadata) -> Void)? = nil
+    var onPlayerItemReady: ((AVPlayerItem) -> Void)? = nil
 
     @State private var player: AVPlayer?
     @State private var failed = false
@@ -931,6 +1142,7 @@ private struct StreamTile: View {
         let asset = AVURLAsset(url: channel.streamURL)
         let item = AVPlayerItem(asset: asset)
         item.preferredPeakBitRate = preferredQuality.peakBitRate
+        item.preferredForwardBufferDuration = bufferProfile.forwardBufferDuration
         let player = AVPlayer(playerItem: item)
         player.allowsExternalPlayback = true
         player.appliesMediaSelectionCriteriaAutomatically = true
@@ -955,6 +1167,7 @@ private struct StreamTile: View {
         metadataTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             guard !Task.isCancelled, let item = player.currentItem else { return }
+            onPlayerItemReady?(item)
             if let metadata = await StreamMetadataReader.metadata(from: item) {
                 onMetadata?(metadata)
             }
@@ -1692,6 +1905,360 @@ private struct PulsingDot: View {
             .opacity(pulsing ? 0.4 : 1)
             .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: pulsing)
             .onAppear { pulsing = true }
+    }
+}
+
+// MARK: - Buffer Profile
+
+enum PlayerBufferProfile: String, CaseIterable, Identifiable {
+    case small = "Small"
+    case normal = "Normal"
+    case large = "Large"
+
+    var id: String { rawValue }
+
+    var forwardBufferDuration: TimeInterval {
+        switch self {
+        case .small: return 2
+        case .normal: return 10
+        case .large: return 30
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .small: return "Fastest channel switching"
+        case .normal: return "Balanced (default)"
+        case .large: return "Most stable playback"
+        }
+    }
+}
+
+// MARK: - Player Control Bar
+
+private struct PlayerControlBar: View {
+    let hasPrev: Bool
+    let hasNext: Bool
+    let onPrev: () -> Void
+    let onNext: () -> Void
+    let onGuide: () -> Void
+    let onChannels: (() -> Void)?
+    let onRecent: () -> Void
+    let onMore: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if hasPrev {
+                PlayerChromeButton(systemImage: "chevron.up", accessibilityLabel: "Previous channel", action: onPrev)
+            }
+            if hasNext {
+                PlayerChromeButton(systemImage: "chevron.down", accessibilityLabel: "Next channel", action: onNext)
+            }
+            if hasPrev || hasNext { Divider().frame(height: 28).overlay(Theme.hairline) }
+            PlayerChromeButton(systemImage: "rectangle.grid.1x2.fill", title: "Guide", accessibilityLabel: "Open guide", action: onGuide)
+            if let onChannels {
+                PlayerChromeButton(systemImage: "list.bullet", title: "Channels", accessibilityLabel: "Channel list", action: onChannels)
+            }
+            PlayerChromeButton(systemImage: "clock.arrow.circlepath", title: "Recent", accessibilityLabel: "Recent channels", action: onRecent)
+            Spacer()
+            PlayerChromeButton(systemImage: "ellipsis", title: "More", accessibilityLabel: "More options", action: onMore)
+        }
+        .padding(12)
+        .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+    }
+}
+
+// MARK: - Player More Sheet
+
+private struct PlayerMoreSheet: View {
+    let channel: Channel
+    @Binding var bufferProfile: PlayerBufferProfile
+    let audioGroup: AVMediaSelectionGroup?
+    @Binding var selectedAudioIndex: Int?
+    let subtitleGroup: AVMediaSelectionGroup?
+    @Binding var selectedSubtitleIndex: Int?
+    let streamMetadata: StreamRuntimeMetadata?
+    let canStartMultiscreen: Bool
+    let multiscreenAction: () -> Void
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var watchStore: WatchStore
+    @EnvironmentObject private var entitlements: EntitlementStore
+
+    var body: some View {
+        NavigationStack {
+            List {
+                // Channel info header
+                Section {
+                    HStack(spacing: 12) {
+                        AsyncImage(url: channel.logoURL) { phase in
+                            if case .success(let img) = phase { img.resizable().scaledToFit() }
+                            else { Image(systemName: "play.tv.fill").font(.title3).foregroundStyle(Theme.accent) }
+                        }
+                        .frame(width: 44, height: 44)
+                        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(channel.name).font(.headline).foregroundStyle(Theme.textPrimary).lineLimit(1)
+                            Text(channel.group ?? channel.playlistName).font(.caption).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                        }
+                        Spacer()
+                        Text("LIVE").font(.caption2.weight(.heavy)).foregroundStyle(.white)
+                            .padding(.horizontal, 8).padding(.vertical, 4).background(Theme.live, in: Capsule())
+                    }
+                }
+                .listRowBackground(Theme.surface)
+
+                // Actions
+                Section {
+                    #if os(iOS)
+                    HStack {
+                        Label("AirPlay", systemImage: "airplayvideo")
+                            .foregroundStyle(Theme.textPrimary)
+                        Spacer()
+                        AirPlayButton().frame(width: 44, height: 34)
+                    }
+                    #endif
+                    Button {
+                        watchStore.toggleFavorite(channel)
+                        dismiss()
+                    } label: {
+                        Label(watchStore.isFavorite(channel) ? "Remove from Favourites" : "Add to Favourites",
+                              systemImage: watchStore.isFavorite(channel) ? "heart.slash" : "heart")
+                            .foregroundStyle(Theme.textPrimary)
+                    }
+                    Button(action: multiscreenAction) {
+                        HStack {
+                            Label("Multiscreen", systemImage: "rectangle.grid.2x2").foregroundStyle(canStartMultiscreen ? Theme.textPrimary : Theme.textSecondary)
+                            if !entitlements.isPremium { Spacer(); Image(systemName: "lock.fill").foregroundStyle(Theme.accent) }
+                        }
+                    }
+                    .disabled(!canStartMultiscreen)
+                }
+                .listRowBackground(Theme.surface)
+
+                // Audio tracks
+                if let group = audioGroup, group.options.count > 1 {
+                    Section("Audio Track") {
+                        ForEach(group.options.indices, id: \.self) { idx in
+                            Button {
+                                selectedAudioIndex = idx
+                                dismiss()
+                            } label: {
+                                HStack {
+                                    Text(group.options[idx].displayName).foregroundStyle(Theme.textPrimary)
+                                    Spacer()
+                                    if selectedAudioIndex == idx { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
+                                }
+                            }
+                        }
+                    }
+                    .listRowBackground(Theme.surface)
+                }
+
+                // Subtitle tracks
+                if let group = subtitleGroup {
+                    Section("Subtitles") {
+                        Button {
+                            selectedSubtitleIndex = nil
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Text("Off").foregroundStyle(Theme.textPrimary)
+                                Spacer()
+                                if selectedSubtitleIndex == nil { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
+                            }
+                        }
+                        ForEach(group.options.indices, id: \.self) { idx in
+                            Button {
+                                selectedSubtitleIndex = idx
+                                dismiss()
+                            } label: {
+                                HStack {
+                                    Text(group.options[idx].displayName).foregroundStyle(Theme.textPrimary)
+                                    Spacer()
+                                    if selectedSubtitleIndex == idx { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
+                                }
+                            }
+                        }
+                    }
+                    .listRowBackground(Theme.surface)
+                }
+
+                // Buffer profile
+                Section("Buffer") {
+                    ForEach(PlayerBufferProfile.allCases) { profile in
+                        Button { bufferProfile = profile } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(profile.rawValue).foregroundStyle(Theme.textPrimary)
+                                    Text(profile.description).font(.caption).foregroundStyle(Theme.textSecondary)
+                                }
+                                Spacer()
+                                if bufferProfile == profile { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
+                            }
+                        }
+                    }
+                }
+                .listRowBackground(Theme.surface)
+
+                // Stream diagnostics
+                if let meta = streamMetadata {
+                    Section("Stream Info") {
+                        if let w = meta.width, let h = meta.height, w > 0 {
+                            LabeledContent("Resolution", value: "\(w)×\(h)")
+                        }
+                        if let fr = meta.frameRate, fr > 0 {
+                            LabeledContent("Frame Rate", value: String(format: "%.0f fps", fr))
+                        }
+                        if let codec = meta.codec, !codec.isEmpty {
+                            LabeledContent("Video Codec", value: codec)
+                        }
+                        if let bitrate = meta.bitrate, bitrate > 0 {
+                            LabeledContent("Bitrate", value: formatBitrate(bitrate))
+                        }
+                    }
+                    .listRowBackground(Theme.surface)
+                    .foregroundStyle(Theme.textPrimary)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle("Options")
+            #if !os(tvOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .tint(Theme.accent)
+    }
+
+    private func formatBitrate(_ bps: Double) -> String {
+        if bps >= 1_000_000 { return String(format: "%.1f Mbps", bps / 1_000_000) }
+        if bps >= 1_000 { return String(format: "%.0f Kbps", bps / 1_000) }
+        return String(format: "%.0f bps", bps)
+    }
+}
+
+// MARK: - Player Channel List Sheet
+
+private struct PlayerChannelListSheet: View {
+    let channels: [Channel]
+    let currentChannelID: String
+    let onSelect: (Channel, Int) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(Array(channels.enumerated()), id: \.element.id) { index, ch in
+                    Button {
+                        onSelect(ch, index)
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 12) {
+                            AsyncImage(url: ch.logoURL) { phase in
+                                if case .success(let img) = phase { img.resizable().scaledToFit() }
+                                else { Image(systemName: "play.tv.fill").font(.title3).foregroundStyle(Theme.accent) }
+                            }
+                            .frame(width: 38, height: 38)
+                            .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 6))
+                            Text(ch.name).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.textPrimary).lineLimit(1)
+                            Spacer()
+                            if ch.id == currentChannelID {
+                                Image(systemName: "play.fill").foregroundStyle(Theme.accent).font(.caption)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(ch.id == currentChannelID ? Theme.accent.opacity(0.12) : Theme.surface)
+                }
+            }
+            .listStyle(.plain)
+            .hidesScrollContentBackground()
+            .navigationTitle("Channels")
+            #if !os(tvOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+            }
+        }
+        .tint(Theme.accent)
+    }
+}
+
+// MARK: - Player Recents Sheet
+
+private struct PlayerRecentsSheet: View {
+    let currentChannelID: String
+    let onSelect: (Channel) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var watchStore: WatchStore
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if watchStore.recents.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "clock.arrow.circlepath").font(.system(size: 40)).foregroundStyle(Theme.textSecondary)
+                        Text("No recent channels yet").font(.callout).foregroundStyle(Theme.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Theme.background)
+                } else {
+                    List {
+                        ForEach(watchStore.recents) { entry in
+                            if let ch = entry.saved.channel {
+                                Button {
+                                    onSelect(ch)
+                                    dismiss()
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        AsyncImage(url: ch.logoURL) { phase in
+                                            if case .success(let img) = phase { img.resizable().scaledToFit() }
+                                            else { Image(systemName: "play.tv.fill").font(.title3).foregroundStyle(Theme.accent) }
+                                        }
+                                        .frame(width: 38, height: 38)
+                                        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 6))
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(ch.name).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.textPrimary).lineLimit(1)
+                                            Text(relativeTime(entry.watchedAt)).font(.caption).foregroundStyle(Theme.textSecondary)
+                                        }
+                                        Spacer()
+                                        if ch.id == currentChannelID {
+                                            Image(systemName: "play.fill").foregroundStyle(Theme.accent).font(.caption)
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .listRowBackground(ch.id == currentChannelID ? Theme.accent.opacity(0.12) : Theme.surface)
+                            }
+                        }
+                    }
+                    .listStyle(.plain)
+                    .hidesScrollContentBackground()
+                }
+            }
+            .navigationTitle("Recent Channels")
+            #if !os(tvOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+            }
+        }
+        .tint(Theme.accent)
+    }
+
+    private func relativeTime(_ date: Date) -> String {
+        let s = Date().timeIntervalSince(date)
+        if s < 60 { return "Just now" }
+        if s < 3600 { return "\(Int(s / 60))m ago" }
+        if s < 86400 { return "\(Int(s / 3600))h ago" }
+        return "\(Int(s / 86400))d ago"
     }
 }
 

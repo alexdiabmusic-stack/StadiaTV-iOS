@@ -18,6 +18,7 @@ final class TVGuideViewModel: ObservableObject {
     @Published private(set) var scrollToNowToken: Int = 0
 
     private weak var repository: EPGRepository?
+    private var guideStore: GuideChannelStore?
     private var myGuideIDs: Set<String> = []
 
     // Guide geometry constants (shared with UI)
@@ -70,6 +71,7 @@ final class TVGuideViewModel: ObservableObject {
 
     /// Applies guide mode and channel selections from the GuideChannelStore.
     func applyGuideStore(_ store: GuideChannelStore, repository: EPGRepository) {
+        guideStore = store
         guideMode = store.guideMode
         myGuideIDs = store.selectedChannelIDs
         filterChannels(repository: repository)
@@ -162,18 +164,39 @@ final class TVGuideViewModel: ObservableObject {
         scrollToNowToken += 1
     }
 
+    // MARK: - EPG Offset
+
+    /// Per-channel EPG offset in minutes stored in GuideChannelStore (keyed by canonical channel ID).
+    func epgOffsetMinutes(for channel: CanonicalChannel) -> Int {
+        guideStore?.epgOffset(for: channel.id) ?? 0
+    }
+
     // MARK: - Programme queries
 
+    /// Returns programmes for the given channel adjusted by any user-configured EPG offset.
     func programmes(for channel: CanonicalChannel, in window: ClosedRange<Date>) -> [EPGProgramme] {
-        repository?.programmes(for: channel.id, from: window.lowerBound, to: window.upperBound) ?? []
+        let offsetMinutes = epgOffsetMinutes(for: channel)
+        let offsetInterval = TimeInterval(offsetMinutes * 60)
+        // Invert the offset when querying: if the stream is 30m ahead, look at EPG 30m earlier.
+        let adjustedFrom = window.lowerBound.addingTimeInterval(-offsetInterval)
+        let adjustedTo   = window.upperBound.addingTimeInterval(-offsetInterval)
+        let progs = repository?.programmes(for: channel.id, from: adjustedFrom, to: adjustedTo) ?? []
+        guard offsetMinutes != 0 else { return progs }
+        return progs.map { $0.shifted(by: offsetMinutes) }
     }
 
     func currentProgramme(for channel: CanonicalChannel) -> EPGProgramme? {
-        repository?.currentProgramme(for: channel.id)
+        let offsetMinutes = epgOffsetMinutes(for: channel)
+        let adjustedNow = Date().addingTimeInterval(-TimeInterval(offsetMinutes * 60))
+        guard let prog = repository?.currentProgramme(for: channel.id, at: adjustedNow) else { return nil }
+        return offsetMinutes != 0 ? prog.shifted(by: offsetMinutes) : prog
     }
 
     func nextProgramme(for channel: CanonicalChannel) -> EPGProgramme? {
-        repository?.nextProgramme(for: channel.id)
+        let offsetMinutes = epgOffsetMinutes(for: channel)
+        let adjustedNow = Date().addingTimeInterval(-TimeInterval(offsetMinutes * 60))
+        guard let prog = repository?.nextProgramme(for: channel.id, after: adjustedNow) else { return nil }
+        return offsetMinutes != 0 ? prog.shifted(by: offsetMinutes) : prog
     }
 
     // MARK: - Time helpers

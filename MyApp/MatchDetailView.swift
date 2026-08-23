@@ -116,7 +116,7 @@ struct MatchDetailView: View {
         }
         .navigationTitle(match.league.name)
         .fullScreenCover(item: $playingChannel) { channel in
-            PlayerView(channel: channel)
+            PlayerView(channel: channel, showsLiveTVControls: false)
         }
         .fullScreenCover(item: $multiscreenSession) { session in
             MultiScreenPlayerView(channels: session.channels)

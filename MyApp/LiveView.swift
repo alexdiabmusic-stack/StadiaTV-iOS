@@ -65,15 +65,6 @@ struct LiveView: View {
                 Divider().overlay(Theme.hairline)
                 TVGuideView()
             }
-        } else if filter == .recordings {
-            VStack(spacing: 0) {
-                filterStrip
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(Theme.background)
-                Divider().overlay(Theme.hairline)
-                RecordingsView()
-            }
         } else if viewModel.isLoading && viewModel.allLive.isEmpty {
             loadingView
         } else {
@@ -222,7 +213,7 @@ struct LiveView: View {
             base = favMatches.isEmpty ? viewModel.allLive : favMatches
         case .all:
             base = viewModel.allLive
-        case .guide, .recordings:
+        case .guide:
             return []
         }
         return base.filter { !hiddenMatchIDs.contains($0.id) }
@@ -552,19 +543,17 @@ struct PulsingLiveBadge: View {
 // MARK: - Filter
 
 enum LiveFilter: String, CaseIterable, Identifiable {
-    case forYou     = "forYou"
-    case all        = "all"
-    case guide      = "guide"
-    case recordings = "recordings"
+    case forYou = "forYou"
+    case all    = "all"
+    case guide  = "guide"
 
     var id: String { rawValue }
 
     var label: String {
         switch self {
-        case .forYou:     return "For You"
-        case .all:        return "All Live"
-        case .guide:      return "Guide"
-        case .recordings: return "Recordings"
+        case .forYou: return "For You"
+        case .all:    return "All Live"
+        case .guide:  return "Guide"
         }
     }
 }

@@ -12,6 +12,8 @@ struct TVGuideView: View {
     @EnvironmentObject private var guideStore: GuideChannelStore
     @StateObject private var vm = TVGuideViewModel()
 
+    @Environment(\.dismiss) private var dismiss
+
     @State private var playingChannel: CanonicalChannel?
     @State private var catchupChannel: Channel?
     @State private var selectedProgramme: EPGProgramme?
@@ -19,6 +21,7 @@ struct TVGuideView: View {
     @State private var showingBuildGuide = false
     @State private var showingFilters = false
     @State private var channelForOffset: CanonicalChannel?
+    @State private var channelSearchQuery: String = ""
 
     var body: some View {
         Group {
@@ -151,35 +154,86 @@ struct TVGuideView: View {
     // MARK: - Guide header
 
     private var guideHeader: some View {
-        HStack(spacing: 10) {
-            GuideModeControl(
-                mode: guideStore.guideMode,
-                myGuideCount: guideStore.selectedCount
-            ) { newMode in
-                vm.setGuideMode(newMode, store: guideStore)
+        VStack(spacing: 6) {
+            HStack(spacing: 10) {
+                GuideModeControl(
+                    mode: guideStore.guideMode,
+                    myGuideCount: guideStore.selectedCount
+                ) { newMode in
+                    vm.setGuideMode(newMode, store: guideStore)
+                }
+
+                Spacer()
+
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showingFilters = true
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(vm.filterCategoryId != nil ? Theme.accent : Theme.textPrimary)
+                        .frame(width: 36, height: 34)
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .strokeBorder(vm.filterCategoryId != nil ? Theme.accent.opacity(0.5) : Theme.hairline)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Guide filters")
+
+                if onChannelSelected != nil {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Theme.textPrimary)
+                            .frame(width: 36, height: 34)
+                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .strokeBorder(Theme.hairline)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close guide")
+                }
             }
 
-            Spacer()
-
-            Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                showingFilters = true
-            } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(vm.filterCategoryId != nil ? Theme.accent : Theme.textPrimary)
-                    .frame(width: 36, height: 34)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .strokeBorder(vm.filterCategoryId != nil ? Theme.accent.opacity(0.5) : Theme.hairline)
-                    )
+            // Channel name search
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.textSecondary)
+                TextField("Search channels…", text: $channelSearchQuery)
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.textPrimary)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .onChange(of: channelSearchQuery) { _, q in
+                        vm.setChannelNameFilter(q)
+                    }
+                if !channelSearchQuery.isEmpty {
+                    Button {
+                        channelSearchQuery = ""
+                        vm.setChannelNameFilter("")
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Guide filters")
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.hairline))
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.top, 8)
+        .padding(.bottom, 6)
         .background(Theme.background)
     }
 

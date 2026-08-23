@@ -3,240 +3,81 @@ import SwiftUI
 struct LiveTVView: View {
     @EnvironmentObject private var store: PlaylistStore
     @EnvironmentObject private var watchStore: WatchStore
-    @State private var query = ""
+    @EnvironmentObject private var channelPrefs: ChannelPreferencesStore
+    @EnvironmentObject private var parentalControl: ParentalControlStore
+
     @State private var playingChannel: Channel?
+    @State private var zapChannels: [Channel] = []
     @State private var isPickingMultiscreen = false
     @State private var selectedMultiChannels: [Channel] = []
     @State private var multiscreenSession: MultiscreenSession?
-    @State private var filter = ChannelFilter()
-    @State private var showingFilters = false
-
-    private var availableCategories: [ChannelCategory] {
-        ChannelFilterEngine.availableOptions(in: store.allChannels).categories
-    }
-
-    private var filteredChannels: [Channel] {
-        let channels = store.allChannels.sorted {
-            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
-        }
-        return ChannelFilterEngine.apply(filter, query: query, to: channels,
-                                         favoriteChannelIDs: Set(favoriteChannels.map(\.id)))
-    }
-
-    private var groupedChannels: [(String, [Channel])] {
-        let grouped = Dictionary(grouping: filteredChannels) { channel in
-            channel.group?.isEmpty == false ? channel.group! : channel.playlistName
-        }
-        return grouped.keys.sorted().map { ($0, grouped[$0] ?? []) }
-    }
-
-    private var favoriteChannels: [Channel] {
-        watchStore.favorites.compactMap(\.channel)
-    }
-
-    private var selectedChannelIDs: Set<String> {
-        Set(selectedMultiChannels.map(\.id))
-    }
-
-    private var isSearching: Bool {
-        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
+    @State private var pendingRestrictedChannel: Channel?
+    @State private var pendingRestrictedZapChannels: [Channel] = []
+    @State private var showingPINPrompt = false
 
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottom) {
                 Theme.background.ignoresSafeArea()
-                if store.playlists.isEmpty {
-                    emptyPlaylistState
-                } else if store.allChannels.isEmpty && !store.loadingPlaylistIDs.isEmpty {
-                    ProgressView().tint(Theme.accent)
-                } else if store.allChannels.isEmpty {
-                    noChannelsState
-                } else {
-                    VStack(spacing: 0) {
-                        filterBar
-                        if filteredChannels.isEmpty {
-                            noFilterResultsState
-                        } else {
-                            channelList
-                        }
-                    }
-                }
-
-                if isPickingMultiscreen {
-                    multiscreenFooter
-                }
+                content
+                if isPickingMultiscreen { multiscreenFooter }
             }
             .navigationTitle("Live TV")
-            .searchToolbar()
-            .searchable(text: $query, prompt: "Search channels")
-            .refreshable { await store.refreshAll() }
-            .toolbar {
-                if store.allChannels.count >= 2 {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            toggleMultiscreenPicking()
-                        } label: {
-                            Image(systemName: isPickingMultiscreen ? "checkmark.rectangle.stack" : "rectangle.grid.2x2")
-                        }
-                        .accessibilityLabel(isPickingMultiscreen ? "Finish multiscreen selection" : "Select multiscreen sources")
-                    }
-                }
-            }
+            .toolbar { multiscreenToolbarItem }
             .fullScreenCover(item: $playingChannel) { channel in
-                PlayerView(channel: channel)
+                PlayerView(
+                    channel: channel,
+                    zapChannels: zapChannels,
+                    currentIndex: zapChannels.firstIndex(where: { $0.id == channel.id }) ?? 0
+                )
             }
-            .fullScreenCover(item: $multiscreenSession) { session in
-                MultiScreenPlayerView(channels: session.channels)
-            }
-            .sheet(isPresented: $showingFilters) {
-                ChannelFiltersSheet(filter: $filter,
-                                    channels: store.allChannels,
-                                    playlists: store.playlists)
+            .fullScreenCover(item: $multiscreenSession) { MultiScreenPlayerView(channels: $0.channels) }
+            .fullScreenCover(isPresented: $showingPINPrompt) {
+                PINPromptView(
+                    title: "Parental Controls",
+                    message: pendingRestrictedChannel.map { "\"\($0.name)\" is restricted." } ?? "This channel is restricted.",
+                    onUnlock: { playPendingRestrictedChannel() },
+                    onCancel: { pendingRestrictedChannel = nil; pendingRestrictedZapChannels = [] }
+                )
+                .environmentObject(parentalControl)
             }
         }
         .tint(Theme.accent)
     }
 
-    /// Compact bar with the filter entry point and quick toggles, so long
-    /// playlists can be narrowed without endless scrolling.
-    private var filterBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(availableCategories.prefix(10)) { category in
-                    filterChip(title: category.rawValue,
-                               systemImage: category.systemImage,
-                               isSelected: filter.categories.contains(category)) {
-                        withAnimation(.snappy) { toggleCategory(category) }
-                    }
-                }
-                filterChip(title: filter.activeCount > 0 ? "Filters · \(filter.activeCount)" : "Filters",
-                           systemImage: "line.3.horizontal.decrease.circle.fill",
-                           isSelected: filter.activeCount > 0) {
-                    showingFilters = true
-                }
-                filterChip(title: "Favourites",
-                           systemImage: filter.favoritesOnly ? "heart.fill" : "heart",
-                           isSelected: filter.favoritesOnly) {
-                    withAnimation(.snappy) { filter.favoritesOnly.toggle() }
-                }
-                if filter.isActive {
-                    filterChip(title: "Clear", systemImage: "xmark.circle.fill", isSelected: false) {
-                        withAnimation(.snappy) { filter = ChannelFilter() }
-                    }
-                }
-                Spacer(minLength: 0)
-                Text("\(filteredChannels.count) channels")
-                    .font(.caption.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(Theme.textSecondary)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-        }
-        .background(Theme.background)
-    }
-
-    private func toggleCategory(_ category: ChannelCategory) {
-        if filter.categories.contains(category) {
-            filter.categories.remove(category)
+    @ViewBuilder
+    private var content: some View {
+        if store.playlists.isEmpty {
+            emptyPlaylistState
+        } else if store.allChannels.isEmpty && !store.loadingPlaylistIDs.isEmpty {
+            ProgressView().tint(Theme.accent)
+        } else if store.allChannels.isEmpty {
+            noChannelsState
         } else {
-            filter.categories.insert(category)
+            LiveBrowserView(
+                onPlay: { handleTap($0, scopeChannels: $1) },
+                refreshAction: { await store.refreshAll() },
+                isPickingMultiscreen: $isPickingMultiscreen,
+                selectedMultiChannels: $selectedMultiChannels
+            )
         }
     }
 
-    private func filterChip(title: String, systemImage: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(isSelected ? .white : Theme.textPrimary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(isSelected ? Theme.accent : Theme.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Theme.hairline))
-        }
-        .buttonStyle(.plain)
-    }
+    // MARK: - Multiscreen
 
-    private var noFilterResultsState: some View {
-        VStack(spacing: 12) {
-            Spacer()
-            Image(systemName: "line.3.horizontal.decrease.circle")
-                .font(.system(size: Theme.scaled(40)))
-                .foregroundStyle(Theme.textSecondary)
-            Text("No channels match your filters.")
-                .font(.callout)
-                .foregroundStyle(Theme.textSecondary)
-            Button("Clear Filters") {
-                withAnimation(.snappy) {
-                    filter = ChannelFilter()
-                    query = ""
+    @ToolbarContentBuilder
+    private var multiscreenToolbarItem: some ToolbarContent {
+        if store.allChannels.count >= 2 {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { toggleMultiscreenPicking() } label: {
+                    Image(systemName: isPickingMultiscreen
+                          ? "checkmark.rectangle.stack" : "rectangle.grid.2x2")
                 }
+                .accessibilityLabel(isPickingMultiscreen
+                                    ? "Finish multiscreen selection" : "Select multiscreen sources")
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Theme.accent)
-            Spacer()
         }
     }
-
-    private var channelList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 18, pinnedViews: [.sectionHeaders]) {
-                if !isSearching && !filter.isActive && !watchStore.history.isEmpty {
-                    ContinueWatchingSection(entries: watchStore.history) { channel in
-                        handleTap(channel)
-                    }
-                }
-
-                if !isSearching && !filter.isActive && !favoriteChannels.isEmpty {
-                    Section {
-                        ForEach(favoriteChannels) { channel in
-                            row(for: channel)
-                        }
-                    } header: {
-                        sectionHeader(title: "Favourites", count: favoriteChannels.count)
-                    }
-                }
-
-                ForEach(groupedChannels, id: \.0) { group, channels in
-                    Section {
-                        ForEach(channels) { channel in
-                            row(for: channel)
-                        }
-                    } header: {
-                        sectionHeader(title: group, count: channels.count)
-                    }
-                }
-            }
-            .padding(16)
-            .padding(.bottom, isPickingMultiscreen ? 92 : 0)
-        }
-    }
-
-    private func row(for channel: Channel) -> some View {
-        ChannelListRow(
-            channel: channel,
-            action: { handleTap(channel) },
-            isFavorite: watchStore.isFavorite(channel),
-            isPicking: isPickingMultiscreen,
-            isSelected: selectedChannelIDs.contains(channel.id),
-            onToggleFavorite: { watchStore.toggleFavorite(channel) }
-        )
-    }
-
-    private func sectionHeader(title: String, count: Int) -> some View {
-        HStack {
-            Text(title.uppercased())
-            Spacer()
-            Text("\(count)")
-                .monospacedDigit()
-        }
-        .font(.footnote.weight(.bold))
-        .foregroundStyle(Theme.textSecondary)
-        .padding(.vertical, 6)
-        .background(Theme.background)
-    }
-
-    // MARK: Multiscreen
 
     private var multiscreenFooter: some View {
         VStack(spacing: 10) {
@@ -249,7 +90,6 @@ struct LiveTVView: View {
                     .foregroundStyle(Theme.textSecondary)
                 Spacer()
             }
-
             HStack(spacing: 10) {
                 Button("Cancel") {
                     withAnimation { resetMultiscreenSelection() }
@@ -258,11 +98,10 @@ struct LiveTVView: View {
                 .foregroundStyle(Theme.textSecondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 13)
-                .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(Theme.surfaceElevated,
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-                Button {
-                    startMultiscreen()
-                } label: {
+                Button { startMultiscreen() } label: {
                     Label("Watch", systemImage: "play.fill")
                         .font(.headline)
                         .frame(maxWidth: .infinity)
@@ -275,31 +114,42 @@ struct LiveTVView: View {
             }
         }
         .padding(12)
-        .background(.black.opacity(0.88), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+        .background(.black.opacity(0.88),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .strokeBorder(Theme.hairline))
         .padding(.horizontal, 16)
         .padding(.bottom, 10)
     }
 
-    private func handleTap(_ channel: Channel) {
+    private func handleTap(_ channel: Channel, scopeChannels: [Channel]) {
         if isPickingMultiscreen {
-            if let index = selectedMultiChannels.firstIndex(where: { $0.id == channel.id }) {
-                selectedMultiChannels.remove(at: index)
+            if let idx = selectedMultiChannels.firstIndex(where: { $0.id == channel.id }) {
+                selectedMultiChannels.remove(at: idx)
             } else if selectedMultiChannels.count < 4 {
                 selectedMultiChannels.append(channel)
             }
+        } else if parentalControl.isRestricted(channel) {
+            pendingRestrictedZapChannels = scopeChannels.isEmpty ? [channel] : scopeChannels
+            pendingRestrictedChannel = channel
+            showingPINPrompt = true
         } else {
+            zapChannels = scopeChannels.isEmpty ? [channel] : scopeChannels
             playingChannel = channel
         }
     }
 
+    private func playPendingRestrictedChannel() {
+        guard let ch = pendingRestrictedChannel else { return }
+        zapChannels = pendingRestrictedZapChannels
+        playingChannel = ch
+        pendingRestrictedChannel = nil
+        pendingRestrictedZapChannels = []
+    }
+
     private func toggleMultiscreenPicking() {
         withAnimation {
-            if isPickingMultiscreen {
-                resetMultiscreenSelection()
-            } else {
-                isPickingMultiscreen = true
-            }
+            if isPickingMultiscreen { resetMultiscreenSelection() } else { isPickingMultiscreen = true }
         }
     }
 
@@ -314,6 +164,8 @@ struct LiveTVView: View {
         isPickingMultiscreen = false
         selectedMultiChannels.removeAll()
     }
+
+    // MARK: - Empty states
 
     private var emptyPlaylistState: some View {
         VStack(spacing: 14) {
@@ -348,180 +200,14 @@ struct LiveTVView: View {
     }
 }
 
+// MARK: - MultiscreenSession
+
 private struct MultiscreenSession: Identifiable {
     let id = UUID()
     let channels: [Channel]
 }
 
-// MARK: - Filter sheet
-
-/// Multi-select filter editor. Only offers values that exist in the loaded
-/// channels, so every row visibly narrows the list.
-private struct ChannelFiltersSheet: View {
-    @Binding var filter: ChannelFilter
-    let channels: [Channel]
-    let playlists: [Playlist]
-    @Environment(\.dismiss) private var dismiss
-    @State private var options = ChannelFilterOptions()
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                Theme.background.ignoresSafeArea()
-                List {
-                    favoritesSection
-                    if playlists.count > 1 { playlistsSection }
-                    if !options.categories.isEmpty { categoriesSection }
-                    if !options.groups.isEmpty { groupsSection }
-                    if !options.languages.isEmpty { languagesSection }
-                    if !options.qualities.isEmpty { qualitiesSection }
-                }
-                .listStyle(.plain)
-                .hidesScrollContentBackground()
-            }
-            .navigationTitle("Filter Channels")
-            .inlineNavigationTitle()
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Reset") { filter = ChannelFilter() }
-                        .disabled(!filter.isActive)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
-        .tint(Theme.accent)
-        .onAppear {
-            options = ChannelFilterEngine.availableOptions(in: channels)
-        }
-    }
-
-    private var favoritesSection: some View {
-        Section {
-            toggleRow(title: "Favourites only",
-                      systemImage: "heart.fill",
-                      isOn: filter.favoritesOnly) {
-                filter.favoritesOnly.toggle()
-            }
-        } header: {
-            Label("Quick", systemImage: "bolt.fill")
-        }
-    }
-
-    private var playlistsSection: some View {
-        Section {
-            ForEach(playlists) { playlist in
-                selectableRow(title: playlist.name,
-                              isSelected: filter.playlistIDs.contains(playlist.id)) {
-                    toggle(playlist.id, in: &filter.playlistIDs)
-                }
-            }
-        } header: {
-            Label("Playlists", systemImage: "list.and.film")
-        }
-    }
-
-    private var categoriesSection: some View {
-        Section {
-            ForEach(options.categories) { category in
-                selectableRow(title: category.rawValue,
-                              isSelected: filter.categories.contains(category)) {
-                    toggle(category, in: &filter.categories)
-                }
-            }
-        } header: {
-            Label("Channel Type", systemImage: "tag.fill")
-        }
-    }
-
-    private var groupsSection: some View {
-        Section {
-            ForEach(options.groups, id: \.self) { group in
-                selectableRow(title: group,
-                              isSelected: filter.groups.contains(group)) {
-                    toggle(group, in: &filter.groups)
-                }
-            }
-        } header: {
-            Label("Categories", systemImage: "square.grid.2x2")
-        } footer: {
-            Text("Categories come from your playlists' group tags.")
-        }
-    }
-
-    private var languagesSection: some View {
-        Section {
-            ForEach(options.languages) { language in
-                selectableRow(title: language.name,
-                              detail: language.code.uppercased(),
-                              isSelected: filter.languages.contains(language.code)) {
-                    toggle(language.code, in: &filter.languages)
-                }
-            }
-        } header: {
-            Label("Languages", systemImage: "globe")
-        } footer: {
-            Text("Detected from tags in channel names, e.g. \"EN\" marks an English stream.")
-        }
-    }
-
-    private var qualitiesSection: some View {
-        Section {
-            ForEach(options.qualities) { quality in
-                selectableRow(title: quality.rawValue,
-                              isSelected: filter.qualities.contains(quality)) {
-                    toggle(quality, in: &filter.qualities)
-                }
-            }
-        } header: {
-            Label("Quality", systemImage: "sparkles.tv")
-        }
-    }
-
-    private func toggle<Value: Hashable>(_ value: Value, in set: inout Set<Value>) {
-        if set.contains(value) {
-            set.remove(value)
-        } else {
-            set.insert(value)
-        }
-    }
-
-    private func toggleRow(title: String, systemImage: String, isOn: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Label(title, systemImage: systemImage)
-                    .foregroundStyle(Theme.textPrimary)
-                Spacer()
-                Text(isOn ? "On" : "Off")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(isOn ? Theme.accent : Theme.textSecondary)
-            }
-        }
-        .listRowBackground(Theme.surface)
-    }
-
-    private func selectableRow(title: String, detail: String? = nil, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Text(title)
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(1)
-                Spacer()
-                if let detail {
-                    Text(detail)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Theme.textSecondary)
-                }
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .foregroundStyle(Theme.accent)
-                }
-            }
-        }
-        .listRowBackground(Theme.surface)
-    }
-}
+// MARK: - ChannelListRow
 
 struct ChannelListRow: View {
     let channel: Channel
@@ -544,7 +230,8 @@ struct ChannelListRow: View {
                     }
                 }
                 .frame(width: 42, height: 42)
-                .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(Theme.surfaceElevated,
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(channel.name)

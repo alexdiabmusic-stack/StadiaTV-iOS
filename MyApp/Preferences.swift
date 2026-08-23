@@ -91,12 +91,22 @@ struct UserPreferences: Codable, Equatable {
     var showLiveScoreBadge = true
     var showLiveScoreBar = false
 
+    // Live TV display preferences
+    var showChannelNumbers: Bool = false
+    var guideProgrammeTitleLines: Int = 1
+    var epgHighlightCurrentProgramme: Bool = true
+    var playerPanelTimeoutSeconds: Int = 4
+    var guideTimeScaleMinutes: Int = 60
+    var playerBarActions: [String] = PlayerBarAction.defaultOrder.map(\.rawValue)
+
     init() {}
 
     private enum CodingKeys: String, CodingKey {
         case hasCompletedOnboarding, selectedLeagueIDs, favoriteTeams
         case matchNotificationsEnabled, matchReminderLeadTime, morningDigestEnabled, cloudSyncEnabled
         case appearance, preferredStreamLanguages, spoilerFreeMode, showLiveScoreBadge, showLiveScoreBar
+        case showChannelNumbers, guideProgrammeTitleLines, epgHighlightCurrentProgramme
+        case playerPanelTimeoutSeconds, guideTimeScaleMinutes, playerBarActions
     }
 
     /// Decodes leniently so preferences saved by older app versions
@@ -115,6 +125,13 @@ struct UserPreferences: Codable, Equatable {
         spoilerFreeMode = try container.decodeIfPresent(Bool.self, forKey: .spoilerFreeMode) ?? false
         showLiveScoreBadge = try container.decodeIfPresent(Bool.self, forKey: .showLiveScoreBadge) ?? true
         showLiveScoreBar = try container.decodeIfPresent(Bool.self, forKey: .showLiveScoreBar) ?? false
+        showChannelNumbers = try container.decodeIfPresent(Bool.self, forKey: .showChannelNumbers) ?? false
+        guideProgrammeTitleLines = try container.decodeIfPresent(Int.self, forKey: .guideProgrammeTitleLines) ?? 1
+        epgHighlightCurrentProgramme = try container.decodeIfPresent(Bool.self, forKey: .epgHighlightCurrentProgramme) ?? true
+        playerPanelTimeoutSeconds = try container.decodeIfPresent(Int.self, forKey: .playerPanelTimeoutSeconds) ?? 4
+        guideTimeScaleMinutes = try container.decodeIfPresent(Int.self, forKey: .guideTimeScaleMinutes) ?? 60
+        playerBarActions = try container.decodeIfPresent([String].self, forKey: .playerBarActions)
+            ?? PlayerBarAction.defaultOrder.map(\.rawValue)
     }
 }
 
@@ -279,6 +296,29 @@ final class PreferencesStore: ObservableObject {
         prefs.showLiveScoreBar = enabled
         persist()
     }
+
+    // MARK: Live TV display preferences
+
+    var showChannelNumbers: Bool { prefs.showChannelNumbers }
+    func setShowChannelNumbers(_ v: Bool) { prefs.showChannelNumbers = v; persist() }
+
+    var guideProgrammeTitleLines: Int { prefs.guideProgrammeTitleLines }
+    func setGuideProgrammeTitleLines(_ v: Int) { prefs.guideProgrammeTitleLines = max(1, min(2, v)); persist() }
+
+    var epgHighlightCurrentProgramme: Bool { prefs.epgHighlightCurrentProgramme }
+    func setEPGHighlightCurrentProgramme(_ v: Bool) { prefs.epgHighlightCurrentProgramme = v; persist() }
+
+    var playerPanelTimeoutSeconds: Int { prefs.playerPanelTimeoutSeconds }
+    func setPlayerPanelTimeoutSeconds(_ v: Int) { prefs.playerPanelTimeoutSeconds = max(2, min(30, v)); persist() }
+
+    var guideTimeScaleMinutes: Int { prefs.guideTimeScaleMinutes }
+    func setGuideTimeScaleMinutes(_ v: Int) { prefs.guideTimeScaleMinutes = v; persist() }
+
+    var playerBarActions: [String] { prefs.playerBarActions }
+    var playerActionConfiguration: PlayerActionConfiguration {
+        PlayerActionConfiguration(rawIDs: prefs.playerBarActions)
+    }
+    func setPlayerBarActions(_ ids: [String]) { prefs.playerBarActions = ids; persist() }
 
     // MARK: Leagues
 

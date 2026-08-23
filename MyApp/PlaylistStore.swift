@@ -2,8 +2,11 @@ import Foundation
 import SwiftUI
 import Combine
 
-/// Owns the user's playlists, persists their configuration, and loads channels
-/// (parsing M3U files and querying Xtream Codes servers).
+/// Owns the user's playlist configurations, persists them, and coordinates channel loading
+/// via the Live data layer (LiveChannelRepository → adapters → SQLite cache).
+///
+/// Public surface is unchanged: all callers still read from `channelsByPlaylist`
+/// and `allChannels`; provider-specific logic lives in the adapters.
 @MainActor
 final class PlaylistStore: ObservableObject {
 
@@ -14,13 +17,10 @@ final class PlaylistStore: ObservableObject {
     @Published private(set) var defaultPlaylistID: UUID?
     @Published var lastError: String?
 
-    private let defaultsKey = "stadiatv.playlists.v1"
+    private let defaultsKey      = "stadiatv.playlists.v1"
     private let defaultPlaylistKey = "stadiatv.defaultplaylist.v1"
-    private let session = URLSession(configuration: {
-        let c = URLSessionConfiguration.default
-        c.timeoutIntervalForRequest = 30
-        return c
-    }())
+
+    private let repository = LiveChannelRepository()
 
     /// All channels across every loaded playlist — the pool the matcher searches.
     var allChannels: [Channel] {
@@ -34,7 +34,8 @@ final class PlaylistStore: ObservableObject {
     // MARK: - Persistence
 
     private func load() {
-        defaultPlaylistID = UserDefaults.standard.string(forKey: defaultPlaylistKey).flatMap(UUID.init(uuidString:))
+        defaultPlaylistID = UserDefaults.standard.string(forKey: defaultPlaylistKey)
+            .flatMap(UUID.init(uuidString:))
         guard let data = UserDefaults.standard.data(forKey: defaultsKey),
               let decoded = try? JSONDecoder().decode([Playlist].self, from: data) else { return }
         playlists = decoded.map { migrateCredentialsIfNeeded(for: $0) }
@@ -43,6 +44,19 @@ final class PlaylistStore: ObservableObject {
             UserDefaults.standard.removeObject(forKey: defaultPlaylistKey)
         }
         persist()
+        // Populate the channel grid from the SQLite cache before any network calls.
+        Task { await loadCachedChannels() }
+    }
+
+    /// Reads channels from the local SQLite cache for each known playlist.
+    /// Runs without touching the network so the UI has data on cold start.
+    private func loadCachedChannels() async {
+        for playlist in playlists {
+            guard channelsByPlaylist[playlist.id] == nil else { continue }
+            if let cached = await repository.cachedChannels(for: playlist) {
+                channelsByPlaylist[playlist.id] = cached
+            }
+        }
     }
 
     private func persist() {
@@ -51,6 +65,8 @@ final class PlaylistStore: ObservableObject {
             UserDefaults.standard.set(data, forKey: defaultsKey)
         }
     }
+
+    // MARK: - Credential migration
 
     private func migrateCredentialsIfNeeded(for playlist: Playlist) -> Playlist {
         guard playlist.kind == .xtream,
@@ -125,6 +141,7 @@ final class PlaylistStore: ObservableObject {
         for index in offsets {
             let playlist = playlists[index]
             channelsByPlaylist[playlist.id] = nil
+            repository.removeChannels(for: playlist.id)
             if playlist.kind == .xtream {
                 KeychainStore.deleteXtreamCredentials(for: playlist.credentialID)
             }
@@ -155,235 +172,28 @@ final class PlaylistStore: ObservableObject {
         loadingPlaylistIDs.contains(playlist.id)
     }
 
-    // MARK: - Loading channels
+    /// Looks up a playlist by ID — used for provider credential resolution.
+    func playlist(for id: UUID) -> Playlist? { playlists.first { $0.id == id } }
 
+    /// Returns the LiveChannel from the SQLite cache for a given stable channel ID.
+    func liveChannel(for id: String) async -> LiveChannel? {
+        await repository.liveChannel(for: id)
+    }
+
+    // MARK: - Channel loading
+
+    /// Fetches fresh channels from the provider via the appropriate adapter,
+    /// persists them to the SQLite cache, and publishes the result.
+    /// Existing cached channels remain visible while the refresh is in flight.
     func refresh(_ playlist: Playlist) async {
         guard !loadingPlaylistIDs.contains(playlist.id) else { return }
         loadingPlaylistIDs.insert(playlist.id)
         defer { loadingPlaylistIDs.remove(playlist.id) }
         do {
-            let channels: [Channel]
-            switch playlist.kind {
-            case .m3u:
-                channels = try await loadM3U(playlist)
-            case .xtream:
-                channels = try await loadXtream(playlist)
-            }
+            let channels = try await repository.refreshChannels(for: playlist)
             channelsByPlaylist[playlist.id] = channels
         } catch {
             lastError = "\(playlist.name): \(error.localizedDescription)"
         }
-    }
-
-    // MARK: M3U
-
-    private func loadM3U(_ playlist: Playlist) async throws -> [Channel] {
-        guard let urlString = playlist.m3uURL, let url = URL(string: urlString), Self.isSupportedPlaylistURL(url) else {
-            throw PlaylistError.unsupportedURL
-        }
-        let (data, response) = try await session.data(from: url)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw PlaylistError.badResponse
-        }
-        return await Task.detached(priority: .userInitiated) {
-            let text = String(decoding: data, as: UTF8.self)
-            return Self.parseM3U(text, playlist: playlist)
-        }.value
-    }
-
-    /// Parses an M3U/M3U8 playlist body into channels.
-    nonisolated static func parseM3U(_ text: String, playlist: Playlist) -> [Channel] {
-        var channels: [Channel] = []
-        var pendingName: String?
-        var pendingLogo: String?
-        var pendingGroup: String?
-
-        let lines = text.split(whereSeparator: \.isNewline)
-        for rawLine in lines {
-            let line = rawLine.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("#EXTINF") {
-                pendingLogo = attribute("tvg-logo", in: line)
-                pendingGroup = attribute("group-title", in: line)
-                // Channel display name follows the last comma.
-                if let commaIndex = line.lastIndex(of: ",") {
-                    pendingName = String(line[line.index(after: commaIndex)...]).trimmingCharacters(in: .whitespaces)
-                }
-                if pendingName?.isEmpty ?? true {
-                    pendingName = attribute("tvg-name", in: line)
-                }
-            } else if line.hasPrefix("#") {
-                continue // other directives
-            } else if !line.isEmpty, let streamURL = URL(string: line) {
-                let name = pendingName ?? streamURL.lastPathComponent
-                channels.append(Channel(
-                    id: "\(playlist.id)-\(channels.count)-\(line.hashValue)",
-                    name: name,
-                    streamURL: streamURL,
-                    logoURL: pendingLogo.flatMap(URL.init(string:)),
-                    group: pendingGroup,
-                    playlistID: playlist.id,
-                    playlistName: playlist.name
-                ))
-                pendingName = nil; pendingLogo = nil; pendingGroup = nil
-            }
-        }
-        return channels
-    }
-
-    /// Extracts an attribute like tvg-logo="..." from an #EXTINF line.
-    nonisolated private static func attribute(_ key: String, in line: String) -> String? {
-        guard let range = line.range(of: "\(key)=\"") else { return nil }
-        let after = line[range.upperBound...]
-        guard let end = after.firstIndex(of: "\"") else { return nil }
-        return String(after[..<end])
-    }
-
-    // MARK: Xtream Codes
-
-    private func loadXtream(_ playlist: Playlist) async throws -> [Channel] {
-        guard let host = playlist.host, var base = URLComponents(string: host), Self.isSupportedPlaylistScheme(base.scheme) else {
-            throw PlaylistError.unsupportedURL
-        }
-        guard let credentials = try KeychainStore.xtreamCredentials(for: playlist.credentialID) else {
-            throw PlaylistError.missingCredentials
-        }
-        let user = credentials.username
-        let pass = credentials.password
-        // Categories (for group names) then live streams.
-        let categories = try await xtreamCategories(base: base, user: user, pass: pass)
-
-        base.path = "/player_api.php"
-        base.queryItems = [
-            URLQueryItem(name: "username", value: user),
-            URLQueryItem(name: "password", value: pass),
-            URLQueryItem(name: "action", value: "get_live_streams"),
-        ]
-        guard let url = base.url else { throw PlaylistError.invalidConfiguration }
-        let (data, response) = try await session.data(from: url)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw PlaylistError.badResponse
-        }
-        let streams = try await Task.detached(priority: .userInitiated) {
-            try JSONDecoder().decode([XtreamStream].self, from: data)
-        }.value
-
-        // Base host without path for building stream URLs.
-        var streamHost = URLComponents(string: host)
-        streamHost?.queryItems = nil
-        streamHost?.path = ""
-        let hostString = streamHost?.string ?? host
-
-        return await Task.detached(priority: .userInitiated) {
-            streams.map { stream in
-                let urlString = "\(hostString)/live/\(user)/\(pass)/\(stream.stream_id).m3u8"
-                let group = stream.category_id.flatMap { categories[$0] }
-                return Channel(
-                    id: "\(playlist.id)-\(stream.stream_id)",
-                    name: stream.name,
-                    streamURL: URL(string: urlString) ?? URL(string: hostString)!,
-                    logoURL: stream.stream_icon.flatMap(URL.init(string:)),
-                    group: group,
-                    playlistID: playlist.id,
-                    playlistName: playlist.name
-                )
-            }
-        }.value
-    }
-
-    private func xtreamCategories(base: URLComponents, user: String, pass: String) async throws -> [String: String] {
-        var comps = base
-        comps.path = "/player_api.php"
-        comps.queryItems = [
-            URLQueryItem(name: "username", value: user),
-            URLQueryItem(name: "password", value: pass),
-            URLQueryItem(name: "action", value: "get_live_categories"),
-        ]
-        guard let url = comps.url else { return [:] }
-        do {
-            let (data, _) = try await session.data(from: url)
-            let cats = try JSONDecoder().decode([XtreamCategory].self, from: data)
-            return Dictionary(uniqueKeysWithValues: cats.map { ($0.category_id, $0.category_name) })
-        } catch {
-            return [:]
-        }
-    }
-
-    private static func isSupportedPlaylistURL(_ url: URL) -> Bool {
-        isSupportedPlaylistScheme(url.scheme)
-    }
-
-    private static func isSupportedPlaylistScheme(_ scheme: String?) -> Bool {
-        guard let scheme = scheme?.lowercased() else { return false }
-        return scheme == "http" || scheme == "https"
-    }
-
-    enum PlaylistError: LocalizedError {
-        case invalidConfiguration
-        case unsupportedURL
-        case missingCredentials
-        case badResponse
-        var errorDescription: String? {
-            switch self {
-            case .invalidConfiguration: return "The playlist details are incomplete or invalid."
-            case .unsupportedURL: return "Playlist URLs must begin with http:// or https://."
-            case .missingCredentials: return "Stream login credentials are missing. Remove and re-add this playlist."
-            case .badResponse: return "The server returned an unexpected response."
-            }
-        }
-    }
-}
-
-// MARK: - Xtream DTOs
-
-private struct XtreamStream: Decodable {
-    let name: String
-    let stream_id: Int
-    let stream_icon: String?
-    let category_id: String?
-
-    private enum CodingKeys: String, CodingKey {
-        case name, stream_id, stream_icon, category_id
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        name = (try? c.decode(String.self, forKey: .name)) ?? "Channel"
-        // stream_id may be a number or a string depending on provider.
-        if let intID = try? c.decode(Int.self, forKey: .stream_id) {
-            stream_id = intID
-        } else if let strID = try? c.decode(String.self, forKey: .stream_id), let i = Int(strID) {
-            stream_id = i
-        } else {
-            stream_id = 0
-        }
-        stream_icon = try? c.decode(String.self, forKey: .stream_icon)
-        if let strCat = try? c.decode(String.self, forKey: .category_id) {
-            category_id = strCat
-        } else if let intCat = try? c.decode(Int.self, forKey: .category_id) {
-            category_id = String(intCat)
-        } else {
-            category_id = nil
-        }
-    }
-}
-
-private struct XtreamCategory: Decodable {
-    let category_id: String
-    let category_name: String
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        if let s = try? c.decode(String.self, forKey: .category_id) {
-            category_id = s
-        } else if let i = try? c.decode(Int.self, forKey: .category_id) {
-            category_id = String(i)
-        } else {
-            category_id = ""
-        }
-        category_name = (try? c.decode(String.self, forKey: .category_name)) ?? ""
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case category_id, category_name
     }
 }

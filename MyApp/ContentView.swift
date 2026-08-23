@@ -9,6 +9,9 @@ struct MyApp: App {
     @StateObject private var predictions = PredictionsStore()
     @StateObject private var articleLibrary = ArticleLibraryStore()
     @StateObject private var podcastStore = PodcastStore()
+    @StateObject private var channelPrefsStore = ChannelPreferencesStore()
+    @StateObject private var customGroupStore = CustomGroupStore()
+    @StateObject private var groupPrefsStore = GroupPreferencesStore()
 
     var body: some Scene {
         WindowGroup {
@@ -34,6 +37,13 @@ struct MyApp: App {
             .environmentObject(predictions)
             .environmentObject(articleLibrary)
             .environmentObject(podcastStore)
+            .environmentObject(channelPrefsStore)
+            .environmentObject(customGroupStore)
+            .environmentObject(groupPrefsStore)
+            .environmentObject(ProgrammeReminderStore.shared)
+            .environmentObject(RecordingService.shared)
+            .environmentObject(ParentalControlStore.shared)
+            .task { channelPrefsStore.migrateLegacyFavorites(watchStore.favorites) }
             #if !os(tvOS)
             .dynamicTypeSize(Theme.isPad ? DynamicTypeSize.xLarge... : DynamicTypeSize.xSmall...)
             #endif

@@ -155,6 +155,25 @@ final class EPGRepository: ObservableObject {
             )
 
             var canonicals = buildResult.channels
+
+            // Enrich ChannelStream.archiveEnabled from the live-channel SQLite cache.
+            // Runs once per channel load; safe to skip silently if the store is unavailable.
+            let archiveIDs = Set((try? await LiveChannelStore.shared.archiveEnabledChannelIDs()) ?? [])
+            if !archiveIDs.isEmpty {
+                for i in canonicals.indices {
+                    if var ps = canonicals[i].primaryStream,
+                       archiveIDs.contains(ps.providerChannelId) {
+                        ps.archiveEnabled = true
+                        canonicals[i].primaryStream = ps
+                    }
+                    for j in canonicals[i].fallbackStreams.indices {
+                        if archiveIDs.contains(canonicals[i].fallbackStreams[j].providerChannelId) {
+                            canonicals[i].fallbackStreams[j].archiveEnabled = true
+                        }
+                    }
+                }
+            }
+
             if iptvIndexes.isLoaded, !canonicals.isEmpty {
                 let started = Date()
                 let resolver = ChannelLogoResolver(iptvOrg: iptvOrg)
@@ -181,7 +200,7 @@ final class EPGRepository: ObservableObject {
             if EPGPWSourcePolicy.epgShareFallbackEnabled {
                 self.refreshTask?.cancel()
                 self.refreshTask = Task(priority: .utility) { [weak self] in
-                    await self?.forceRefresh()
+                    await self?.refreshIfNeeded()
                 }
             }
         }
@@ -378,13 +397,13 @@ final class EPGRepository: ObservableObject {
     // MARK: - Refresh
 
     func refreshIfNeeded() async {
-        // programmeIndex is never persisted — always rebuild from disk cache after a cold start.
-        if programmeIndex.isEmpty {
-            await forceRefresh()
-            return
-        }
+        guard EPGPWSourcePolicy.epgShareFallbackEnabled else { return }
         let staleness: TimeInterval = 6 * 3600
-        if let last = lastUpdated, Date().timeIntervalSince(last) < staleness { return }
+        // Skip download if the cache is fresh AND the cache file exists on disk.
+        // lastUpdated is loaded synchronously from UserDefaults at init time so this
+        // check is valid even before the async disk-load of programmeIndex completes.
+        if let last = lastUpdated, Date().timeIntervalSince(last) < staleness,
+           FileManager.default.fileExists(atPath: programmeCacheURL.path) { return }
         await forceRefresh()
     }
 

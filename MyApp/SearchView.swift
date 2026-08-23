@@ -5,6 +5,7 @@ struct SearchView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var playlists: PlaylistStore
     @EnvironmentObject private var podcastStore: PodcastStore
+    @EnvironmentObject private var channelPrefs: ChannelPreferencesStore
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = SearchViewModel()
     @State private var query = ""
@@ -29,13 +30,25 @@ struct SearchView: View {
             || playerIntentWords.contains { normalized.contains($0) }
     }
 
+    /// All channels with hidden ones removed and custom names applied.
+    private var searchChannels: [Channel] {
+        playlists.allChannels
+            .filter { !channelPrefs.isHidden($0.id) }
+            .map { ch in
+                guard let custom = channelPrefs.customName(for: ch.id) else { return ch }
+                return Channel(id: ch.id, name: custom, streamURL: ch.streamURL,
+                               logoURL: ch.logoURL, group: ch.group,
+                               playlistID: ch.playlistID, playlistName: ch.playlistName)
+            }
+    }
+
     private var results: [UniversalSearchResult] {
         SearchIndex.results(
             for: trimmedQuery,
             leagues: League.all,
             teams: viewModel.teams,
             matches: viewModel.matches,
-            channels: playlists.allChannels,
+            channels: searchChannels,
             players: viewModel.players,
             articles: viewModel.articles,
             podcasts: podcastStore.catalog,

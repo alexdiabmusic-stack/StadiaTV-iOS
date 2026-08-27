@@ -57,8 +57,8 @@ struct ESPNService {
     }
 
     /// Fetches scoreboards for consecutive days and removes duplicate events.
-    /// ESPN caps the events returned per request, so long windows (e.g. a full
-    /// year of favorite-team games) are split into concurrent 30-day ranged requests.
+    /// Long windows (e.g. a full year) are split into 30-day chunks fetched
+    /// sequentially so ESPN's rate limiter is never triggered.
     func scoreboards(for league: League, starting startDate: Date, days: Int) async throws -> [Match] {
         let calendar = Calendar.current
         var windows: [(start: Date, end: Date)] = []
@@ -72,16 +72,14 @@ struct ESPNService {
             remaining -= length
         }
 
+        // Fetch windows sequentially with a small gap. Firing all windows for a
+        // 365-day range concurrently (~12 requests at once per league) was the
+        // primary trigger for ESPN's rate limiter.
         var matches: [Match] = []
-        try await withThrowingTaskGroup(of: [Match].self) { group in
-            for window in windows {
-                group.addTask {
-                    try await scoreboardRange(for: league, from: window.start, to: window.end)
-                }
-            }
-            for try await loaded in group {
-                matches.append(contentsOf: loaded)
-            }
+        for (i, window) in windows.enumerated() {
+            if i > 0 { try? await Task.sleep(nanoseconds: 250_000_000) } // 250 ms between windows
+            let loaded = try await scoreboardRange(for: league, from: window.start, to: window.end)
+            matches.append(contentsOf: loaded)
         }
 
         if Self.rangeIncludesToday(start: startDate, end: windows.last?.end ?? startDate),

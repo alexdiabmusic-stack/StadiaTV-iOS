@@ -11,6 +11,7 @@ struct TVGuideView: View {
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var guideStore: GuideChannelStore
     @EnvironmentObject private var fantasyStore: FantasyStore
+    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
     @StateObject private var vm = TVGuideViewModel()
 
     @Environment(\.dismiss) private var dismiss
@@ -133,7 +134,7 @@ struct TVGuideView: View {
                         playingChannel = channel
                     }
                 } onProgramTap: { programme, channel in
-                    let hasFantasyContext = fantasyStore.settings.showFantasyIndicatorsInGuide && fantasyStore.fantasyIndicatorCount(for: programme, channel: channel) > 0
+                    let hasFantasyContext = fantasyStore.settings.showFantasyIndicatorsInGuide && (fantasyStore.fantasyIndicatorCount(for: programme, channel: channel) + nativeFantasyStore.fantasyIndicatorCount(for: programme, channel: channel)) > 0
                     if programme.isOnNow(), !hasFantasyContext {
                         guard channel.playableChannel != nil else { return }
                         if let onChannelSelected {
@@ -438,6 +439,7 @@ private struct ProgrammeGridView: View {
     @ObservedObject var vm: TVGuideViewModel
     @EnvironmentObject var repository: EPGRepository
     @EnvironmentObject var fantasyStore: FantasyStore
+    @EnvironmentObject var nativeFantasyStore: StadiaFantasyStore
     let scrollState: EPGScrollState
     let scrollToNowTrigger: Int
     let now: Date
@@ -510,7 +512,7 @@ private struct ProgrammeGridView: View {
                     width: w,
                     now: now,
                     hasCatchup: channel.hasCatchup,
-                    fantasyIndicatorCount: fantasyStore.settings.showFantasyIndicatorsInGuide ? fantasyStore.fantasyIndicatorCount(for: prog, channel: channel) : 0
+                    fantasyIndicatorCount: fantasyStore.settings.showFantasyIndicatorsInGuide ? fantasyStore.fantasyIndicatorCount(for: prog, channel: channel) + nativeFantasyStore.fantasyIndicatorCount(for: prog, channel: channel) : 0
                 ) {
                     onProgramTap(prog, channel)
                 }
@@ -940,6 +942,7 @@ struct ProgrammeDetailSheet: View {
     @EnvironmentObject private var reminderStore: ProgrammeReminderStore
     @EnvironmentObject private var recordingService: RecordingService
     @EnvironmentObject private var fantasyStore: FantasyStore
+    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
 
     @State private var catchupState: CatchupState = .idle
     @State private var selectedLeadTime: Int = 5
@@ -1086,7 +1089,7 @@ struct ProgrammeDetailSheet: View {
 
     @ViewBuilder
     private var fantasyProgrammeContext: some View {
-        let games = fantasyStore.fantasyGames(for: programme, channel: channel)
+        let games = fantasyStore.fantasyGames(for: programme, channel: channel) + nativeFantasyStore.fantasyGames(for: programme, channel: channel)
         if fantasyStore.settings.showFantasyIndicatorsInGuide, !games.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 Label(games.count == 1 ? "1 Fantasy player" : "\(games.count) Fantasy players", systemImage: "star.fill")

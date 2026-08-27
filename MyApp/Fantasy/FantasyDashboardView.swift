@@ -4,8 +4,11 @@ struct FantasyDashboardView: View {
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var playlists: PlaylistStore
     @EnvironmentObject private var prefs: PreferencesStore
+    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
     @State private var showingConnect = false
     @State private var showingESPNConnect = false
+    @State private var showingCreateLeague = false
+    @State private var showingJoinLeague = false
     @State private var playingChannel: Channel?
 
     var body: some View {
@@ -23,10 +26,19 @@ struct FantasyDashboardView: View {
                 .environmentObject(prefs)
         }
         .sheet(isPresented: $showingESPNConnect) {
-            ESPNFantasyHockeyConnectSheet(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
+            ESPNFantasyConnectSheet(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
                 .environmentObject(fantasyStore)
         }
+        .sheet(isPresented: $showingCreateLeague) {
+            StadiaFantasyCreateLeagueFlow()
+                .environmentObject(nativeFantasyStore)
+        }
+        .sheet(isPresented: $showingJoinLeague) {
+            StadiaFantasyJoinLeagueSheet()
+                .environmentObject(nativeFantasyStore)
+        }
         .task {
+            await nativeFantasyStore.load()
             await fantasyStore.refresh(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
         }
         .refreshable {
@@ -36,15 +48,27 @@ struct FantasyDashboardView: View {
 
     @ViewBuilder
     private var content: some View {
-        switch fantasyStore.connectionState {
-        case .disconnected:
-            FantasyDisconnectedState(onConnectSleeper: { showingConnect = true }, onConnectESPN: { showingESPNConnect = true })
-        case .connecting:
-            FantasyLoadingState(title: "Connecting Fantasy", subtitle: "Resolving your account and leagues.")
-        case .providerUnavailable:
-            FantasyProviderErrorState(message: fantasyStore.lastError ?? "Fantasy could not load.", onConnectSleeper: { showingConnect = true }, onConnectESPN: { showingESPNConnect = true })
-        case .connected, .offlineWithCachedData:
-            connectedContent
+        if nativeFantasyStore.nativeLeagueCount > 0 {
+            StadiaFantasyNativeDashboardView()
+                .environmentObject(nativeFantasyStore)
+        } else if fantasyStore.currentConnection != nil {
+            StadiaFantasyHubView(
+                importedContent: AnyView(connectedContent),
+                onCreateLeague: { showingCreateLeague = true },
+                onJoinLeague: { showingJoinLeague = true },
+                onConnectESPN: { showingESPNConnect = true },
+                onConnectSleeper: { showingConnect = true }
+            )
+            .environmentObject(nativeFantasyStore)
+        } else {
+            StadiaFantasyHubView(
+                importedContent: nil,
+                onCreateLeague: { showingCreateLeague = true },
+                onJoinLeague: { showingJoinLeague = true },
+                onConnectESPN: { showingESPNConnect = true },
+                onConnectSleeper: { showingConnect = true }
+            )
+            .environmentObject(nativeFantasyStore)
         }
     }
 
@@ -362,13 +386,15 @@ private struct FantasyDisconnectedState: View {
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.accent)
                 }
-                Button(action: onConnectSleeper) {
-                    Label("Connect Sleeper", systemImage: "link")
-                        .font(.headline.weight(.bold))
-                        .frame(maxWidth: .infinity)
+                if AppConfiguration.isSleeperFantasyProviderEnabled {
+                    Button(action: onConnectSleeper) {
+                        Label("Connect Sleeper", systemImage: "link")
+                            .font(.headline.weight(.bold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Theme.accent)
                 }
-                .buttonStyle(.bordered)
-                .tint(Theme.accent)
             }
         }
         .padding(28)
@@ -419,9 +445,11 @@ private struct FantasyProviderErrorState: View {
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.accent)
             }
-            Button("Connect Sleeper", action: onConnectSleeper)
-                .buttonStyle(.bordered)
-                .tint(Theme.accent)
+            if AppConfiguration.isSleeperFantasyProviderEnabled {
+                Button("Connect Sleeper", action: onConnectSleeper)
+                    .buttonStyle(.bordered)
+                    .tint(Theme.accent)
+            }
         }
         .padding(28)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

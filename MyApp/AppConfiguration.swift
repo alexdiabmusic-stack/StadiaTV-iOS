@@ -6,6 +6,7 @@ enum AppConfiguration {
     private static let backendBaseURLName = "BackendBaseURL"
     private static let youtubeAPIKeyName = "YouTubeAPIKey"
     private nonisolated static let espnFantasyEnabledName = "ESPNFantasyProviderEnabled"
+    private nonisolated static let sleeperFantasyEnabledName = "SleeperFantasyProviderEnabled"
 
     static var oddsAPIKey: String? {
         sanitizedString(for: oddsAPIKeyName)
@@ -35,6 +36,11 @@ enum AppConfiguration {
 
     nonisolated static var isESPNFantasyProviderEnabled: Bool {
         guard let value = sanitizedString(for: espnFantasyEnabledName)?.lowercased() else { return true }
+        return ["1", "true", "yes", "enabled"].contains(value)
+    }
+
+    nonisolated static var isSleeperFantasyProviderEnabled: Bool {
+        guard let value = sanitizedString(for: sleeperFantasyEnabledName)?.lowercased() else { return false }
         return ["1", "true", "yes", "enabled"].contains(value)
     }
 

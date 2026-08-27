@@ -120,7 +120,8 @@ final class FantasyStore: ObservableObject {
         await connect(provider: .sleeper, usernameOrUserID: usernameOrUserID, channels: channels, preferredLanguages: preferredLanguages)
     }
 
-    func connectESPNHockey(
+    func connectESPNFantasy(
+        sport: FantasySport,
         leagueID: String,
         seasonID: Int,
         teamID: Int?,
@@ -140,16 +141,28 @@ final class FantasyStore: ObservableObject {
            !swid.isEmpty,
            let service = try? providerRegistry.service(for: .espn) as? any ESPNFantasyCredentialSaving {
             do {
-                try await service.saveESPNFantasyCredentials(espnS2: espnS2, swid: swid, leagueID: trimmedLeagueID, seasonID: seasonID)
+                try await service.saveESPNFantasyCredentials(espnS2: espnS2, swid: swid, sport: sport, leagueID: trimmedLeagueID, seasonID: seasonID)
             } catch {
                 lastError = error.localizedDescription
                 return
             }
         }
-        let identifier = [trimmedLeagueID, String(seasonID), teamID.map(String.init)]
+        let identifier = [sport.rawValue, trimmedLeagueID, String(seasonID), teamID.map(String.init)]
             .compactMap { $0 }
             .joined(separator: ":")
         await connect(provider: .espn, usernameOrUserID: identifier, channels: channels, preferredLanguages: preferredLanguages)
+    }
+
+    func connectESPNHockey(
+        leagueID: String,
+        seasonID: Int,
+        teamID: Int?,
+        espnS2: String? = nil,
+        swid: String? = nil,
+        channels: [Channel] = [],
+        preferredLanguages: Set<String> = []
+    ) async {
+        await connectESPNFantasy(sport: .nhl, leagueID: leagueID, seasonID: seasonID, teamID: teamID, espnS2: espnS2, swid: swid, channels: channels, preferredLanguages: preferredLanguages)
     }
 
     func reconnectFromStoredIdentity(channels: [Channel] = [], preferredLanguages: Set<String> = []) async {

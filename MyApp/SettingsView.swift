@@ -736,9 +736,11 @@ These preferences are stored locally on your device and are used to personalize 
 
 Fantasy sports
 
-If you connect Sleeper, StadiaTV resolves the Sleeper username or user ID directly with Sleeper and stores the stable Sleeper user ID locally on your device. Sleeper league, roster, matchup, player-directory cache, player mappings, and linked-game context are stored locally so Fantasy can load efficiently and degrade gracefully offline.
+If you connect ESPN Fantasy, StadiaTV reads league, roster, matchup, scoring, standing, and player metadata directly from ESPN Fantasy and stores lightweight cache data locally so Fantasy can load efficiently and degrade gracefully offline. Private ESPN Fantasy leagues may require ESPN session cookies; `espn_s2` and `SWID` are stored only in Keychain and are sent only as ESPN Cookie headers.
 
-StadiaTV does not require a Stadia account for Fantasy and does not send playlist credentials, stream URLs, IPTV provider details, or video traffic to StadiaTV-operated servers for Fantasy features.
+Sleeper import support is currently disabled in the active product, but previously stored Sleeper data is preserved locally for compatibility if that provider is re-enabled later.
+
+StadiaTV does not require a Stadia account for imported Fantasy connections and does not send playlist credentials, stream URLs, IPTV provider details, or video traffic to StadiaTV-operated servers for Fantasy features.
 
 Sports and news information
 
@@ -973,15 +975,61 @@ Feature ideas, sports coverage requests, bug reports, and design feedback are we
 
 struct FantasySettingsView: View {
     @EnvironmentObject private var fantasyStore: FantasyStore
+    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
     @EnvironmentObject private var playlists: PlaylistStore
     @EnvironmentObject private var prefs: PreferencesStore
     @State private var showingConnect = false
     @State private var showingESPNConnect = false
     @State private var showingDisconnectConfirmation = false
+    @State private var showingNativeResetConfirmation = false
+    @State private var nativeExportSummary: String?
 
     var body: some View {
         SettingsPage(title: "Fantasy") {
-            SettingsPanel(title: "CONNECTED ACCOUNTS") {
+            SettingsPanel(title: "STADIA FANTASY") {
+                if let bundle = nativeFantasyStore.selectedBundle {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "hockey.puck.fill")
+                                .foregroundStyle(Theme.accent)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(bundle.league.name)
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(Theme.textPrimary)
+                                Text("\(bundle.teams.count)/\(bundle.league.maxTeams) teams · Invite \(bundle.league.inviteCode)")
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                            Spacer()
+                        }
+                    }
+                    .padding(14)
+                } else {
+                    InfoTextRow("Create or join a native Stadia Fantasy league from Following → Fantasy.")
+                }
+            }
+
+            SettingsPanel(title: "LOCAL DATA") {
+                VStack(spacing: 0) {
+                    Button {
+                        Task {
+                            if let export = await nativeFantasyStore.exportData() {
+                                nativeExportSummary = "Export ready · v\(export.schemaVersion) · \(export.bundles.count) leagues"
+                            }
+                        }
+                    } label: {
+                        SettingsDisclosureRow(title: "Export Fantasy Data", value: nativeExportSummary ?? "Local backup")
+                    }
+                    .buttonStyle(.plain)
+                    Divider().overlay(Theme.hairline)
+                    Button(role: .destructive) { showingNativeResetConfirmation = true } label: {
+                        SettingsDisclosureRow(title: "Reset Local Fantasy Data", destructive: true)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            SettingsPanel(title: "IMPORT PROVIDERS") {
                 if let connection = fantasyStore.currentConnection {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 12) {
@@ -1007,23 +1055,25 @@ struct FantasySettingsView: View {
                     }
                     .padding(14)
                 } else {
-                    Button { showingConnect = true } label: {
-                        SettingsDisclosureRow(title: "Connect Sleeper", value: "NFL")
-                    }
-                    .buttonStyle(.plain)
                     if AppConfiguration.isESPNFantasyProviderEnabled {
-                        Divider().overlay(Theme.hairline)
                         Button { showingESPNConnect = true } label: {
-                            SettingsDisclosureRow(title: "Connect ESPN Fantasy Hockey", value: "NHL")
+                            SettingsDisclosureRow(title: "Connect ESPN Fantasy", value: "NFL · NHL · NBA · MLB")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    if AppConfiguration.isSleeperFantasyProviderEnabled {
+                        if AppConfiguration.isESPNFantasyProviderEnabled { Divider().overlay(Theme.hairline) }
+                        Button { showingConnect = true } label: {
+                            SettingsDisclosureRow(title: "Connect Sleeper", value: "NFL")
                         }
                         .buttonStyle(.plain)
                     }
                 }
             }
 
-            SettingsPanel(title: "DEFAULT LEAGUE") {
+            SettingsPanel(title: "DEFAULT IMPORTED LEAGUE") {
                 if fantasyStore.leagues.isEmpty {
-                    InfoTextRow(fantasyStore.currentConnection == nil ? "Connect a Fantasy provider to load your leagues." : "No Fantasy leagues are available for the current season.")
+                    InfoTextRow(fantasyStore.currentConnection == nil ? "Connect an import provider to load external leagues." : "No imported Fantasy leagues are available for the current season.")
                 } else {
                     Menu {
                         ForEach(fantasyStore.leagues) { league in
@@ -1087,7 +1137,7 @@ struct FantasySettingsView: View {
             SleeperConnectSheet(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
         }
         .sheet(isPresented: $showingESPNConnect) {
-            ESPNFantasyHockeyConnectSheet(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
+            ESPNFantasyConnectSheet(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
         }
         .confirmationDialog("Disconnect Fantasy?", isPresented: $showingDisconnectConfirmation, titleVisibility: .visible) {
             Button("Disconnect", role: .destructive) {
@@ -1097,7 +1147,19 @@ struct FantasySettingsView: View {
         } message: {
             Text("This removes the local Fantasy connection, provider credentials and Fantasy caches without changing playlists, favourites, recordings or other Stadia settings.")
         }
+        .confirmationDialog("Reset Local Fantasy Data?", isPresented: $showingNativeResetConfirmation, titleVisibility: .visible) {
+            Button("Reset Local Fantasy Data", role: .destructive) {
+                Task {
+                    await nativeFantasyStore.resetLocalData()
+                    nativeExportSummary = nil
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes Stadia Fantasy teams, local leagues, rosters, lineups and transactions. It does not change IPTV playlists, recordings, favourites or imported ESPN Fantasy credentials.")
+        }
         .task {
+            await nativeFantasyStore.load()
             await fantasyStore.refresh(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
         }
     }
@@ -1134,12 +1196,13 @@ struct FantasySettingsView: View {
     }
 }
 
-struct ESPNFantasyHockeyConnectSheet: View {
+struct ESPNFantasyConnectSheet: View {
     let channels: [Channel]
     let preferredLanguages: Set<String>
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var fantasyStore: FantasyStore
+    @State private var selectedSport: FantasySport = .nhl
     @State private var leagueID = ""
     @State private var seasonID = String(Calendar.current.component(.year, from: Date()))
     @State private var teamID = ""
@@ -1153,6 +1216,11 @@ struct ESPNFantasyHockeyConnectSheet: View {
                 Theme.background.ignoresSafeArea()
                 Form {
                     Section("League") {
+                        Picker("Sport", selection: $selectedSport) {
+                            ForEach(FantasySport.allCases) { sport in
+                                Label(sport.longDisplayName, systemImage: sport.symbolName).tag(sport)
+                            }
+                        }
                         TextField("League ID", text: $leagueID)
                             .keyboardType(.numberPad)
                         TextField("Season", text: $seasonID)
@@ -1188,7 +1256,7 @@ struct ESPNFantasyHockeyConnectSheet: View {
                 }
                 .scrollContentBackground(.hidden)
             }
-            .navigationTitle("ESPN Fantasy Hockey")
+            .navigationTitle("ESPN Fantasy")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -1196,7 +1264,8 @@ struct ESPNFantasyHockeyConnectSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Connect") {
                         Task {
-                            await fantasyStore.connectESPNHockey(
+                            await fantasyStore.connectESPNFantasy(
+                                sport: selectedSport,
                                 leagueID: leagueID,
                                 seasonID: Int(seasonID) ?? Calendar.current.component(.year, from: Date()),
                                 teamID: Int(teamID),

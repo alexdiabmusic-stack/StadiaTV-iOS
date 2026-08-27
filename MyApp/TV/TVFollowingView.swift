@@ -16,7 +16,7 @@ struct TVFollowingView: View {
                     TVEmptyState(
                         systemImage: "star.circle",
                         title: "Nothing followed yet",
-                        subtitle: "Go to Settings to follow teams and leagues or connect Sleeper."
+                        subtitle: "Go to Settings to follow teams and leagues or connect ESPN Fantasy."
                     )
                 } else if viewModel.isLoadingFollowing && viewModel.allFollowedMatches.isEmpty && selectedEntityID != "fantasy" {
                     ProgressView().tint(Theme.accent).scaleEffect(2)
@@ -479,12 +479,12 @@ private struct TVFantasyDashboardSection: View {
             if fantasyStore.currentConnection == nil {
                 TVEmptyState(
                     systemImage: "star.bubble.fill",
-                    title: "Connect Sleeper",
-                    subtitle: "Open Settings → Fantasy to connect your Sleeper account."
+                    title: "Connect ESPN Fantasy",
+                    subtitle: "Open Settings → Fantasy to connect an ESPN Fantasy league."
                 )
             } else {
                 HStack(spacing: 18) {
-                    summaryCard(title: "League", value: fantasyStore.selectedLeague?.name ?? "Sleeper", systemImage: "trophy.fill", tint: Theme.accent)
+                    summaryCard(title: "League", value: fantasyStore.selectedLeague?.name ?? fantasyStore.currentConnection?.provider.displayName ?? "Fantasy", systemImage: "trophy.fill", tint: Theme.accent)
                     summaryCard(title: "Roster", value: "\(fantasyStore.players.count) players", systemImage: "person.3.fill", tint: Theme.upcoming)
                     summaryCard(title: "Watchable", value: "\(fantasyStore.diagnostics.watchableGameCount) games", systemImage: "play.tv.fill", tint: Theme.live)
                 }

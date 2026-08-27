@@ -40,6 +40,7 @@ struct HomeView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var fantasyStore: FantasyStore
+    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
     @StateObject private var viewModel = HomeViewModel()
     @State private var playingChannel: Channel?
     @State private var selectedLiveSport: SportGroup?
@@ -292,7 +293,7 @@ struct HomeView: View {
     }
 
     private var homeFantasySummary: HomeFantasySummary? {
-        let liveContexts = fantasyStore.liveEventContexts
+        let liveContexts = fantasyStore.liveEventContexts + nativeFantasyStore.liveEventContexts
         if !liveContexts.isEmpty {
             let playerCount = liveContexts.reduce(0) { $0 + $1.playerGames.count }
             let total = fantasyStore.matchup?.userTeam.effectivePoints
@@ -304,7 +305,7 @@ struct HomeView: View {
                 watchChannel: liveContexts.first(where: { $0.watchAvailable })?.matchedChannel?.channel
             )
         }
-        let todayContexts = fantasyStore.todayEventContexts.filter { $0.isUpcoming }
+        let todayContexts = (fantasyStore.todayEventContexts + nativeFantasyStore.todayEventContexts).filter { $0.isUpcoming }
         if !todayContexts.isEmpty {
             let playerCount = todayContexts.reduce(0) { $0 + $1.playerGames.count }
             return HomeFantasySummary(

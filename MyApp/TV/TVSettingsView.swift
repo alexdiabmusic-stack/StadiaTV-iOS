@@ -35,11 +35,11 @@ struct TVSettingsView: View {
             TeamEditorView()
         }
         .sheet(isPresented: $showingFantasyConnect) {
-            SleeperConnectSheet(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
+            ESPNFantasyConnectSheet(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
         }
-        .confirmationDialog("Disconnect Sleeper?", isPresented: $showingFantasyDisconnect, titleVisibility: .visible) {
-            Button("Disconnect Sleeper", role: .destructive) {
-                Task { await fantasyStore.disconnectSleeper() }
+        .confirmationDialog("Disconnect Fantasy?", isPresented: $showingFantasyDisconnect, titleVisibility: .visible) {
+            Button("Disconnect", role: .destructive) {
+                Task { await fantasyStore.disconnect() }
             }
             Button("Cancel", role: .cancel) {}
         }
@@ -120,9 +120,9 @@ struct TVSettingsView: View {
         Section {
             if let connection = fantasyStore.currentConnection {
                 VStack(alignment: .leading, spacing: 4) {
-                    Label(connection.displayName ?? connection.username ?? "Sleeper", systemImage: "checkmark.circle.fill")
+                    Label(connection.displayName ?? connection.username ?? connection.provider.displayName, systemImage: "checkmark.circle.fill")
                         .foregroundStyle(Theme.textPrimary)
-                    Text("Sleeper connected")
+                    Text("\(connection.provider.displayName) connected")
                         .font(.caption)
                         .foregroundStyle(Theme.textSecondary)
                 }
@@ -141,12 +141,12 @@ struct TVSettingsView: View {
                 }
 
                 Button(role: .destructive) { showingFantasyDisconnect = true } label: {
-                    Label("Disconnect Sleeper", systemImage: "xmark.circle")
+                    Label("Disconnect Fantasy", systemImage: "xmark.circle")
                 }
                 .listRowBackground(Theme.surface)
-            } else {
+            } else if AppConfiguration.isESPNFantasyProviderEnabled {
                 Button { showingFantasyConnect = true } label: {
-                    Label("Connect Sleeper", systemImage: "star.circle")
+                    Label("Connect ESPN Fantasy", systemImage: "star.circle")
                         .foregroundStyle(Theme.accent)
                 }
                 .listRowBackground(Theme.surface)

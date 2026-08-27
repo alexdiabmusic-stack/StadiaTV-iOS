@@ -52,7 +52,10 @@ struct FantasyProviderRegistry: Sendable {
     }
 
     private nonisolated static func defaultServices() -> [any FantasyProviderService] {
-        var services: [any FantasyProviderService] = [SleeperFantasyService()]
+        var services: [any FantasyProviderService] = []
+        if AppConfiguration.isSleeperFantasyProviderEnabled {
+            services.append(SleeperFantasyService())
+        }
         if AppConfiguration.isESPNFantasyProviderEnabled {
             services.append(ESPNFantasyService())
         }
@@ -66,7 +69,7 @@ struct FantasyProviderRegistry: Sendable {
 }
 
 protocol ESPNFantasyCredentialSaving: Sendable {
-    func saveESPNFantasyCredentials(espnS2: String, swid: String, leagueID: String, seasonID: Int) async throws
+    func saveESPNFantasyCredentials(espnS2: String, swid: String, sport: FantasySport, leagueID: String, seasonID: Int) async throws
 }
 
 protocol FantasyEventLinking: Sendable {

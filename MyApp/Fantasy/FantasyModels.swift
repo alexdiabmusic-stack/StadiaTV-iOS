@@ -5,34 +5,66 @@ extension GameState: Codable, Sendable {}
 // MARK: - Provider-independent Fantasy domain
 
 enum FantasyProvider: String, Codable, CaseIterable, Identifiable, Sendable {
+    case stadia
     case sleeper
     case espn
 
     var id: String { rawValue }
 
-    var displayName: String {
+    nonisolated var displayName: String {
         switch self {
+        case .stadia: return "Stadia Fantasy"
         case .sleeper: return "Sleeper"
         case .espn: return "ESPN Fantasy"
         }
     }
 }
 
-enum FantasySport: String, Codable, Sendable {
+enum FantasySport: String, Codable, CaseIterable, Identifiable, Sendable {
     case nfl
     case nhl
+    case nba
+    case mlb
 
-    var stadiaLeague: League? {
+    nonisolated var id: String { rawValue }
+
+    nonisolated var stadiaLeague: League? {
+        League.all.first { $0.path == stadiaLeaguePath }
+    }
+
+    nonisolated var stadiaLeaguePath: String {
         switch self {
-        case .nfl: return League.all.first { $0.path == "football/nfl" }
-        case .nhl: return League.all.first { $0.path == "hockey/nhl" }
+        case .nfl: return "football/nfl"
+        case .nhl: return "hockey/nhl"
+        case .nba: return "basketball/nba"
+        case .mlb: return "baseball/mlb"
         }
     }
 
-    var displayName: String {
+    nonisolated var displayName: String {
         switch self {
         case .nfl: return "NFL"
         case .nhl: return "NHL"
+        case .nba: return "NBA"
+        case .mlb: return "MLB"
+        }
+    }
+
+    nonisolated var longDisplayName: String {
+        switch self {
+        case .nfl: return "Football"
+        case .nhl: return "Hockey"
+        case .nba: return "Basketball"
+        case .mlb: return "Baseball"
+        }
+    }
+
+    nonisolated var symbolName: String {
+        switch self {
+        case .nfl: return "football.fill"
+        case .nhl: return "hockey.puck.fill"
+        case .nba: return "basketball.fill"
+        case .mlb: return "baseball.fill"
         }
     }
 }
@@ -486,7 +518,7 @@ extension FantasyLeague {
     }
 
     var matchupPeriodLabel: String {
-        sport == .nhl ? "Matchup Period" : "Week"
+        sport == .nfl ? "Week" : "Matchup Period"
     }
 
     var currentScoringPeriodLabel: String? {

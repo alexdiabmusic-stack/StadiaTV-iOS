@@ -290,14 +290,14 @@ struct FantasyFoundationTests {
         let league = try ESPNFantasyMapper.league(from: response, descriptor: descriptor)
         #expect(league.provider == .espn)
         #expect(league.sport == .nhl)
-        #expect(league.scoringSettings.values["espn.hockey.stat.1"] == 3.0)
+        #expect(league.scoringSettings.values["espn.fhl.stat.1"] == 3.0)
 
         let teams = ESPNFantasyMapper.teams(from: response, descriptor: descriptor)
         let rosters = ESPNFantasyMapper.rosters(from: response, descriptor: descriptor, teams: teams)
         #expect(rosters.first?.slots.first?.kind == .starter)
         #expect(rosters.first?.slots.dropFirst().first?.kind == .bench)
-        ESPNHockeyTeamResolver.shared.updateMappings([22: "TOR"])
-        let players = ESPNFantasyMapper.players(from: response)
+        ESPNHockeyTeamResolver.shared.updateMappings([22: "TOR"], sport: .nhl)
+        let players = ESPNFantasyMapper.players(from: response, descriptor: descriptor)
         #expect(players["3114"]?.externalIDs.espnID == "3114")
         #expect(players["3114"]?.teamAbbreviation == "TOR")
 
@@ -308,6 +308,59 @@ struct FantasyFoundationTests {
         let standings = ESPNFantasyMapper.standings(from: response, descriptor: descriptor)
         #expect(standings.first?.rosterID == 1)
         #expect(ESPNFantasyMapper.ownerTeamID(from: response, swid: "owner") == 1)
+    }
+
+    @Test func espnFantasyRoutesAllSupportedSportsToGameCodes() throws {
+        let expected: [(FantasySport, ESPNFantasyGameCode, String)] = [
+            (.nfl, .football, "ffl"),
+            (.nhl, .hockey, "fhl"),
+            (.nba, .basketball, "fba"),
+            (.mlb, .baseball, "flb")
+        ]
+        for (sport, code, raw) in expected {
+            #expect(ESPNFantasyGameCode(sport: sport) == code)
+            #expect(ESPNFantasyGameCode(token: sport.rawValue) == code)
+            #expect(code.rawValue == raw)
+            let descriptor = ESPNFantasyConnectionInput(sport: sport, seasonID: 2026, leagueID: "123", teamID: 1, scoringPeriodID: nil, matchupPeriodID: nil)
+            #expect(descriptor.connectionKey == "espn:\(raw):2026:123")
+            #expect(descriptor.sport == sport)
+        }
+    }
+
+    @Test func espnFantasyRequestUsesRepeatedViewParametersForEverySport() throws {
+        let client = ESPNFantasyClient(baseURL: URL(string: "https://lm-api-reads.fantasy.espn.com")!)
+        for sport in FantasySport.allCases {
+            let code = try #require(ESPNFantasyGameCode(sport: sport))
+            let request = try client.request(gameCode: code, seasonID: 2026, leagueID: "999", views: [.settings, .team, .status], scoringPeriodID: nil, filter: nil, credentials: nil)
+            let url = try #require(request.url)
+            #expect(url.path == "/apis/v3/games/\(code.rawValue)/seasons/2026/segments/0/leagues/999")
+            let viewItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.filter { $0.name == "view" }.map(\.value) ?? []
+            #expect(viewItems == ["mSettings", "mTeam", "mStatus"])
+        }
+    }
+
+    @Test func nativeFantasySportConfigurationsCoverNFLNHLNBAMLB() {
+        for sport in FantasySport.allCases {
+            let configuration = FantasySportConfiguration.configuration(for: sport)
+            #expect(configuration.sport == sport)
+            #expect(!configuration.eligiblePositions.isEmpty)
+            #expect(!configuration.defaultRoster.slotCounts.isEmpty)
+            #expect(!configuration.availableScoringCategories.isEmpty)
+            #expect(!configuration.relevantLiveStatistics.isEmpty)
+        }
+        #expect(FantasySportConfiguration.configuration(for: .nfl).lineupFrequency == .weekly)
+        #expect(FantasySportConfiguration.configuration(for: .nhl).lineupFrequency == .daily)
+        #expect(FantasySportConfiguration.configuration(for: .nba).matchupStructure == .dailyScoringPeriods)
+        #expect(FantasySportConfiguration.configuration(for: .mlb).availableScoringCategories.contains(.earnedRunAverage))
+    }
+
+    @Test func previousESPNHockeyConnectionIdentifierMigratesToFHL() throws {
+        let legacy = try ESPNFantasyConnectionInput(rawValue: "12345:2026:4", now: Date(timeIntervalSince1970: 0))
+        #expect(legacy.sport == .nhl)
+        #expect(legacy.connectionKeyWithTeam(legacy.teamID) == "espn:fhl:2026:12345:4")
+        let modern = try ESPNFantasyConnectionInput(rawValue: "nba:98765:2026:2", now: Date(timeIntervalSince1970: 0))
+        #expect(modern.sport == .nba)
+        #expect(modern.connectionKeyWithTeam(modern.teamID) == "espn:fba:2026:98765:2")
     }
 
     private func fantasyLeague(id: String, name: String, status: FantasyLeagueStatus = .inSeason) -> FantasyLeague {
@@ -358,6 +411,100 @@ struct FantasyFoundationTests {
             injuryStatus: nil,
             jerseyNumber: nil,
             externalIDs: FantasyPlayerExternalIDs(espnID: espnID, sportradarID: nil, yahooID: nil, fantasyDataID: nil, statsID: nil, rotowireID: nil)
+        )
+    }
+    @Test func nativeScoringEngineUsesConfiguredPointRules() throws {
+        let rules = StadiaFantasyScoringRules.stadiaDefault(type: .headToHeadPoints)
+        let statLine = StadiaFantasyStatLine(values: [.goals: 2, .assists: 1, .shotsOnGoal: 5], appearances: 1)
+        let score = FantasyScoringEngine().score(statLine: statLine, rules: rules)
+        #expect(score.points == 10.0)
+        #expect(score.categoryValues.isEmpty)
+    }
+
+    @Test func nativeCategoryEnginePreservesCategoriesAndLowerIsBetter() throws {
+        let rules = StadiaFantasyScoringRules.stadiaDefault(type: .headToHeadCategories)
+        let statLine = StadiaFantasyStatLine(values: [.goals: 1, .goalsAgainstAverage: 2.1], appearances: 1)
+        let score = FantasyScoringEngine().score(statLine: statLine, rules: rules)
+        #expect(score.points == nil)
+        #expect(score.categoryValues[.goals] == 1)
+        #expect(FantasyScoringEngine().categoryWinner(home: 2.1, away: 3.4, stat: .goalsAgainstAverage) == 1)
+    }
+
+    @Test func nativeBackendCreatesPersonalAndSimulatedLeague() async throws {
+        let backend = LocalStadiaFantasyBackendService()
+        let commissionerID = UUID().uuidString
+        let personal = try await backend.createLeague(nativeCreateRequest(name: "My Local Team", teamName: "My Team", mode: .personalTeam), commissionerUserID: commissionerID)
+        #expect(personal.league.source == .native)
+        #expect(personal.league.effectiveMode == .personalTeam)
+        #expect(personal.teams.count == 1)
+        #expect(personal.standings.isEmpty)
+
+        let simulated = try await backend.createLeague(nativeCreateRequest(name: "Native Test League", teamName: "Commissioners", mode: .simulatedLeague), commissionerUserID: commissionerID)
+        #expect(simulated.league.effectiveMode == .simulatedLeague)
+        #expect(simulated.teams.count == 8)
+        #expect(simulated.rosters.count == 8)
+        #expect(simulated.standings.count == 8)
+        #expect(simulated.draft?.picks.isEmpty == false)
+    }
+
+    @Test func nativeBackendPreventsDuplicateDraftedPlayer() async throws {
+        let backend = LocalStadiaFantasyBackendService()
+        let userID = UUID().uuidString
+        let created = try await backend.createLeague(nativeCreateRequest(name: "Draft Test League", teamName: "Draft Team", mode: .personalTeam), commissionerUserID: userID)
+        let team = try #require(created.team(for: userID))
+        let player = StadiaFantasyAvailablePlayer(id: "p-native-test", fullName: "Native Player", teamAbbreviation: "TOR", position: "C", eligibleSlots: [.center], injuryStatus: nil)
+        _ = try await backend.draftPlayer(leagueID: created.league.id, teamID: team.id, player: player, availablePlayers: [player])
+        await #expect(throws: StadiaFantasyBackendError.playerAlreadyRostered) {
+            _ = try await backend.draftPlayer(leagueID: created.league.id, teamID: team.id, player: player, availablePlayers: [player])
+        }
+    }
+
+    @Test func nativeBackendAutoDraftsCPUSelectionsUntilNextUserPick() async throws {
+        let backend = LocalStadiaFantasyBackendService()
+        let userID = UUID().uuidString
+        let request = nativeCreateRequest(name: "CPU Draft League", teamName: "User Team", mode: .simulatedLeague)
+        let created = try await backend.createLeague(request, commissionerUserID: userID)
+        let team = try #require(created.team(for: userID))
+        let players = (0..<40).map { index in
+            StadiaFantasyAvailablePlayer(id: "cpu-player-\(index)", fullName: "CPU Player \(index)", teamAbbreviation: "TOR", position: "C", eligibleSlots: [.center, .forward, .utility], injuryStatus: nil)
+        }
+        let updated = try await backend.draftPlayer(leagueID: created.league.id, teamID: team.id, player: players[0], availablePlayers: players)
+        #expect((updated.rosters.first { $0.teamID == team.id }?.entries.count ?? 0) == 1)
+        #expect(updated.rosters.filter { $0.teamID != team.id }.flatMap(\.entries).isEmpty == false)
+        #expect((updated.draft?.currentPickOverall ?? 0) > 1)
+    }
+
+    @Test func nativeBackendAddDropAndExportEnvelope() async throws {
+        let backend = LocalStadiaFantasyBackendService()
+        let userID = UUID().uuidString
+        let created = try await backend.createLeague(nativeCreateRequest(name: "Transactions", teamName: "User Team", mode: .personalTeam), commissionerUserID: userID)
+        let team = try #require(created.team(for: userID))
+        let added = StadiaFantasyAvailablePlayer(id: "add-player", fullName: "Add Player", teamAbbreviation: "TOR", position: "C", eligibleSlots: [.center], injuryStatus: nil)
+        let dropped = StadiaFantasyAvailablePlayer(id: "drop-player", fullName: "Drop Player", teamAbbreviation: "EDM", position: "C", eligibleSlots: [.center], injuryStatus: nil)
+        let withDropped = try await backend.addFreeAgent(leagueID: created.league.id, teamID: team.id, player: dropped, dropPlayerEntryID: nil)
+        let dropEntry = try #require(withDropped.rosters.first?.entries.first)
+        let withAddDrop = try await backend.addFreeAgent(leagueID: created.league.id, teamID: team.id, player: added, dropPlayerEntryID: dropEntry.id)
+        #expect(withAddDrop.rosters.first?.entries.map(\.canonicalPlayerID) == ["add-player"])
+        let envelope = try await backend.exportData()
+        #expect(envelope.schemaVersion == StadiaFantasyPersistenceEnvelope.currentSchemaVersion)
+        #expect(envelope.bundles.contains { $0.league.id == created.league.id })
+    }
+
+    private func nativeCreateRequest(name: String, teamName: String, mode: StadiaFantasyMode = .simulatedLeague) -> StadiaFantasyCreateLeagueRequest {
+        StadiaFantasyCreateLeagueRequest(
+            sport: .nhl,
+            mode: mode,
+            leagueName: name,
+            teamName: teamName,
+            maxTeams: mode == .personalTeam ? 1 : 8,
+            visibility: .private,
+            scoringType: .headToHeadPoints,
+            rosterConfiguration: .standard,
+            scoringRules: .stadiaDefault(),
+            draftSettings: .standard,
+            waiverSettings: .standard,
+            tradeSettings: StadiaFantasyTradeSettings(deadline: nil, reviewType: .commissioner),
+            playoffSettings: StadiaFantasyPlayoffSettings(regularSeasonPeriods: 20, playoffTeams: 4, playoffRounds: 2, championshipPeriod: nil)
         )
     }
 }

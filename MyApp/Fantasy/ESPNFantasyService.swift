@@ -53,7 +53,7 @@ struct ESPNFantasyService: FantasyProviderService, ESPNFantasyCredentialSaving {
             provider: .espn,
             providerUserID: input.connectionKeyWithTeam(selectedTeamID),
             username: input.leagueID,
-            displayName: response.settings?.name ?? "ESPN Fantasy Hockey",
+            displayName: response.settings?.name ?? "ESPN Fantasy \(input.sport.displayName)",
             avatarID: nil,
             connectedAt: Date(),
             refreshedAt: Date()
@@ -130,7 +130,7 @@ struct ESPNFantasyService: FantasyProviderService, ESPNFantasyCredentialSaving {
         guard response.teams?.contains(where: { $0.roster?.entries?.isEmpty == false }) == true else {
             throw FantasyProviderError.suspiciousResponse
         }
-        await playerCache.store(ESPNFantasyMapper.players(from: response), leagueID: descriptor.connectionKeyWithTeam(descriptor.teamID))
+        await playerCache.store(ESPNFantasyMapper.players(from: response, descriptor: descriptor), leagueID: descriptor.connectionKeyWithTeam(descriptor.teamID))
         return ESPNFantasyMapper.rosters(from: response, descriptor: descriptor, teams: teams)
     }
 
@@ -170,10 +170,9 @@ struct ESPNFantasyService: FantasyProviderService, ESPNFantasyCredentialSaving {
     }
 
     func players(ids: Set<String>, sport: FantasySport) async throws -> [String: FantasyPlayer] {
-        guard sport == .nhl else { return [:] }
         let cached = await playerCache.players()
-        guard !ids.isEmpty else { return cached }
-        return cached.filter { ids.contains($0.key) }
+        guard !ids.isEmpty else { return cached.filter { $0.value.sport == sport } }
+        return cached.filter { ids.contains($0.key) && $0.value.sport == sport }
     }
 
     func disconnect(connection: FantasyConnection) async {
@@ -184,8 +183,8 @@ struct ESPNFantasyService: FantasyProviderService, ESPNFantasyCredentialSaving {
 
     func refreshCachedData() async {}
 
-    func saveESPNFantasyCredentials(espnS2: String, swid: String, leagueID: String, seasonID: Int) async throws {
-        let key = ESPNFantasyConnectionInput(gameCode: .hockey, seasonID: seasonID, leagueID: leagueID, teamID: nil, scoringPeriodID: nil, matchupPeriodID: nil).connectionKey
+    func saveESPNFantasyCredentials(espnS2: String, swid: String, sport: FantasySport, leagueID: String, seasonID: Int) async throws {
+        let key = ESPNFantasyConnectionInput(sport: sport, seasonID: seasonID, leagueID: leagueID, teamID: nil, scoringPeriodID: nil, matchupPeriodID: nil).connectionKey
         try await credentialStore.save(ESPNFantasyCredentials(espnS2: espnS2, swid: swid), for: key)
     }
 }
@@ -287,8 +286,40 @@ struct ESPNFantasyClient: Sendable {
     }
 }
 
-enum ESPNFantasyGameCode: String, Codable, Sendable {
+enum ESPNFantasyGameCode: String, Codable, CaseIterable, Sendable {
+    case football = "ffl"
     case hockey = "fhl"
+    case basketball = "fba"
+    case baseball = "flb"
+
+    nonisolated var sport: FantasySport {
+        switch self {
+        case .football: return .nfl
+        case .hockey: return .nhl
+        case .basketball: return .nba
+        case .baseball: return .mlb
+        }
+    }
+
+    init?(sport: FantasySport) {
+        switch sport {
+        case .nfl: self = .football
+        case .nhl: self = .hockey
+        case .nba: self = .basketball
+        case .mlb: self = .baseball
+        }
+    }
+
+    init?(token: String) {
+        let normalized = token.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch normalized {
+        case "ffl", "nfl", "football": self = .football
+        case "fhl", "nhl", "hockey": self = .hockey
+        case "fba", "nba", "basketball": self = .basketball
+        case "flb", "mlb", "baseball": self = .baseball
+        default: return nil
+        }
+    }
 }
 
 enum ESPNFantasyView: String, Sendable {
@@ -390,6 +421,7 @@ struct ESPNFantasyConnectionInput: Hashable, Sendable {
     let teamID: Int?
     let scoringPeriodID: Int?
     let matchupPeriodID: Int?
+    nonisolated var sport: FantasySport { gameCode.sport }
 
     init(gameCode: ESPNFantasyGameCode, seasonID: Int, leagueID: String, teamID: Int?, scoringPeriodID: Int?, matchupPeriodID: Int?) {
         self.gameCode = gameCode
@@ -400,13 +432,33 @@ struct ESPNFantasyConnectionInput: Hashable, Sendable {
         self.matchupPeriodID = matchupPeriodID
     }
 
+    init(sport: FantasySport, seasonID: Int, leagueID: String, teamID: Int?, scoringPeriodID: Int?, matchupPeriodID: Int?) {
+        self.init(gameCode: ESPNFantasyGameCode(sport: sport) ?? .hockey, seasonID: seasonID, leagueID: leagueID, teamID: teamID, scoringPeriodID: scoringPeriodID, matchupPeriodID: matchupPeriodID)
+    }
+
     init(rawValue: String, now: Date) throws {
         let parts = rawValue
             .split { [":", ",", "|"].contains($0) }
             .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        guard let leagueID = parts.first else { throw FantasyProviderError.invalidIdentifier }
+        guard !parts.isEmpty else { throw FantasyProviderError.invalidIdentifier }
         let defaultSeason = Calendar.current.component(.year, from: now)
+
+        if parts.first == "espn" {
+            try self.init(leagueIdentifier: parts.joined(separator: ":"))
+            return
+        }
+
+        if let gameCode = ESPNFantasyGameCode(token: parts[0]) {
+            guard parts.count >= 2 else { throw FantasyProviderError.invalidIdentifier }
+            let leagueID = parts[1]
+            let season = parts.dropFirst(2).first.flatMap(Int.init) ?? defaultSeason
+            let team = parts.dropFirst(3).first.flatMap(Int.init)
+            self.init(gameCode: gameCode, seasonID: season, leagueID: leagueID, teamID: team, scoringPeriodID: nil, matchupPeriodID: nil)
+            return
+        }
+
+        let leagueID = parts[0]
         let season = parts.dropFirst().first.flatMap(Int.init) ?? defaultSeason
         let team = parts.dropFirst(2).first.flatMap(Int.init)
         self.init(gameCode: .hockey, seasonID: season, leagueID: leagueID, teamID: team, scoringPeriodID: nil, matchupPeriodID: nil)
@@ -418,13 +470,21 @@ struct ESPNFantasyConnectionInput: Hashable, Sendable {
 
     init(leagueIdentifier: String) throws {
         let parts = leagueIdentifier.split(separator: ":").map(String.init)
-        guard parts.count >= 4, parts[0] == "espn", parts[1] == ESPNFantasyGameCode.hockey.rawValue, let season = Int(parts[2]) else {
-            throw FantasyProviderError.invalidIdentifier
+        if parts.count >= 4, parts[0] == "espn", let gameCode = ESPNFantasyGameCode(token: parts[1]), let season = Int(parts[2]) {
+            let team = parts.count > 4 ? Int(parts[4]) : nil
+            let scoring = parts.count > 5 ? Int(parts[5]) : nil
+            let matchup = parts.count > 6 ? Int(parts[6]) : nil
+            self.init(gameCode: gameCode, seasonID: season, leagueID: parts[3], teamID: team, scoringPeriodID: scoring, matchupPeriodID: matchup)
+            return
         }
-        let team = parts.count > 4 ? Int(parts[4]) : nil
-        let scoring = parts.count > 5 ? Int(parts[5]) : nil
-        let matchup = parts.count > 6 ? Int(parts[6]) : nil
-        self.init(gameCode: .hockey, seasonID: season, leagueID: parts[3], teamID: team, scoringPeriodID: scoring, matchupPeriodID: matchup)
+
+        if parts.count >= 2, let season = Int(parts[1]) {
+            let team = parts.count > 2 ? Int(parts[2]) : nil
+            self.init(gameCode: .hockey, seasonID: season, leagueID: parts[0], teamID: team, scoringPeriodID: nil, matchupPeriodID: nil)
+            return
+        }
+
+        throw FantasyProviderError.invalidIdentifier
     }
 
     nonisolated var connectionKey: String {
@@ -604,7 +664,7 @@ struct ESPNMatchupSideDTO: Decodable, Sendable {
 nonisolated enum ESPNFantasyMapper {
     static func seasonState(from response: ESPNLeagueResponseDTO, descriptor: ESPNFantasyConnectionInput) -> FantasySeasonState {
         FantasySeasonState(
-            sport: .nhl,
+            sport: descriptor.sport,
             season: String(response.seasonID ?? descriptor.seasonID),
             leagueSeason: String(response.seasonID ?? descriptor.seasonID),
             week: response.status?.currentMatchupPeriod,
@@ -619,7 +679,7 @@ nonisolated enum ESPNFantasyMapper {
         let status = leagueStatus(from: response.status)
         let scoringType = response.settings?.scoringSettings?.scoringType
         let scoringValues = Dictionary(uniqueKeysWithValues: (response.settings?.scoringSettings?.scoringItems ?? []).compactMap { item in
-            item.statID.map { ("espn.hockey.stat.\($0)", item.points ?? 0) }
+            item.statID.map { ("espn.\(descriptor.gameCode.rawValue).stat.\($0)", item.points ?? 0) }
         })
         var metadata: [String: String] = [
             "gameCode": descriptor.gameCode.rawValue,
@@ -633,13 +693,13 @@ nonisolated enum ESPNFantasyMapper {
         return FantasyLeague(
             id: descriptor.connectionKeyWithTeam(descriptor.teamID),
             provider: .espn,
-            sport: .nhl,
-            name: response.settings?.name ?? "ESPN Fantasy Hockey",
+            sport: descriptor.sport,
+            name: response.settings?.name ?? "ESPN Fantasy \(descriptor.sport.displayName)",
             season: String(response.seasonID ?? descriptor.seasonID),
             status: status,
             totalRosters: response.settings?.size ?? response.teams?.count,
             avatarID: nil,
-            rosterPositions: rosterPositions(from: response.settings?.rosterSettings),
+            rosterPositions: rosterPositions(from: response.settings?.rosterSettings, descriptor: descriptor),
             scoringSettings: FantasyScoringSettings(values: scoringValues),
             providerMetadata: metadata
         )
@@ -672,12 +732,12 @@ nonisolated enum ESPNFantasyMapper {
             guard let id = team.id else { return nil }
             let slots = (team.roster?.entries ?? []).compactMap { entry -> FantasyRosterSlot? in
                 guard let player = entry.playerPoolEntry?.player, let playerID = player.id else { return nil }
-                let slotID = entry.lineupSlotID ?? ESPNHockeyPositionMapper.benchSlotID
+                let slotID = entry.lineupSlotID ?? ESPNFantasyPositionMapper.benchSlotID(for: descriptor.sport)
                 return FantasyRosterSlot(
                     id: "\(descriptor.connectionKey)-\(id)-\(playerID)-\(slotID)",
                     playerID: String(playerID),
-                    kind: ESPNHockeyPositionMapper.slotKind(for: slotID),
-                    lineupPosition: ESPNHockeyPositionMapper.abbreviation(for: slotID),
+                    kind: ESPNFantasyPositionMapper.slotKind(for: slotID, sport: descriptor.sport),
+                    lineupPosition: ESPNFantasyPositionMapper.abbreviation(for: slotID, sport: descriptor.sport),
                     fantasyPoints: entry.playerPoolEntry?.appliedStatTotal ?? entry.playerPoolEntry?.totalPoints,
                     projectedPoints: nil
                 )
@@ -735,7 +795,7 @@ nonisolated enum ESPNFantasyMapper {
         return FantasyStanding(id: "\(roster.leagueID)-standing-\(roster.rosterID)", leagueID: roster.leagueID, rosterID: roster.rosterID, team: roster.team, record: record, rank: nil)
     }
 
-    static func players(from response: ESPNLeagueResponseDTO) -> [String: FantasyPlayer] {
+    static func players(from response: ESPNLeagueResponseDTO, descriptor: ESPNFantasyConnectionInput) -> [String: FantasyPlayer] {
         var output: [String: FantasyPlayer] = [:]
         for team in response.teams ?? [] {
             for entry in team.roster?.entries ?? [] {
@@ -743,13 +803,13 @@ nonisolated enum ESPNFantasyMapper {
                 output[String(id)] = FantasyPlayer(
                     id: String(id),
                     provider: .espn,
-                    sport: .nhl,
+                    sport: descriptor.sport,
                     firstName: player.firstName,
                     lastName: player.lastName,
                     fullName: player.fullName ?? [player.firstName, player.lastName].compactMap { $0 }.joined(separator: " "),
-                    teamAbbreviation: ESPNHockeyTeamResolver.shared.abbreviation(for: player.proTeamID),
-                    position: player.defaultPositionID.flatMap(ESPNHockeyPositionMapper.positionAbbreviation(for:)),
-                    fantasyPositions: (player.eligibleSlots ?? []).compactMap(ESPNHockeyPositionMapper.abbreviation(for:)),
+                    teamAbbreviation: ESPNFantasyTeamResolver.shared.abbreviation(for: player.proTeamID, sport: descriptor.sport),
+                    position: player.defaultPositionID.flatMap { ESPNFantasyPositionMapper.positionAbbreviation(for: $0, sport: descriptor.sport) },
+                    fantasyPositions: (player.eligibleSlots ?? []).compactMap { ESPNFantasyPositionMapper.abbreviation(for: $0, sport: descriptor.sport) },
                     status: player.active == false ? "Inactive" : "Active",
                     injuryStatus: player.injuryStatus,
                     jerseyNumber: nil,
@@ -776,9 +836,9 @@ nonisolated enum ESPNFantasyMapper {
         return .offSeason
     }
 
-    private static func rosterPositions(from settings: ESPNRosterSettingsDTO?) -> [String] {
+    private static func rosterPositions(from settings: ESPNRosterSettingsDTO?, descriptor: ESPNFantasyConnectionInput) -> [String] {
         (settings?.lineupSlotCounts ?? [:])
-            .compactMap { key, count -> String? in Int(key).flatMap { ESPNHockeyPositionMapper.abbreviation(for: $0) }.map { "\($0):\(count)" } }
+            .compactMap { key, count -> String? in Int(key).flatMap { ESPNFantasyPositionMapper.abbreviation(for: $0, sport: descriptor.sport) }.map { "\($0):\(count)" } }
             .sorted()
     }
 
@@ -807,56 +867,115 @@ nonisolated enum ESPNFantasyMapper {
     }
 }
 
-nonisolated enum ESPNHockeyPositionMapper {
-    static let benchSlotID = 7
+nonisolated enum ESPNFantasyPositionMapper {
+    static func benchSlotID(for sport: FantasySport) -> Int {
+        switch sport {
+        case .nfl: return 20
+        case .nhl: return 7
+        case .nba: return 12
+        case .mlb: return 13
+        }
+    }
 
-    static func slotKind(for id: Int) -> FantasyRosterSlotKind {
-        switch id {
-        case 7: return .bench
-        case 8: return .reserve
+    static func slotKind(for id: Int, sport: FantasySport) -> FantasyRosterSlotKind {
+        switch abbreviation(for: id, sport: sport) {
+        case "BN": return .bench
+        case "IR", "IL": return .reserve
         default: return .starter
         }
     }
 
-    static func abbreviation(for id: Int) -> String? {
-        switch id {
-        case 0: return "C"
-        case 1: return "LW"
-        case 2: return "RW"
-        case 3: return "F"
-        case 4: return "D"
-        case 5: return "G"
-        case 6: return "UTIL"
-        case 7: return "BN"
-        case 8: return "IR"
-        default: return "UNK\(id)"
+    static func abbreviation(for id: Int, sport: FantasySport) -> String? {
+        switch sport {
+        case .nfl:
+            switch id {
+            case 0: return "QB"
+            case 2: return "RB"
+            case 4: return "WR"
+            case 6: return "TE"
+            case 16: return "DST"
+            case 17: return "K"
+            case 20: return "BN"
+            case 21: return "IR"
+            case 23: return "FLEX"
+            default: return "UNK\(id)"
+            }
+        case .nhl:
+            switch id {
+            case 0: return "C"
+            case 1: return "LW"
+            case 2: return "RW"
+            case 3: return "F"
+            case 4: return "D"
+            case 5: return "G"
+            case 6: return "UTIL"
+            case 7: return "BN"
+            case 8: return "IR"
+            default: return "UNK\(id)"
+            }
+        case .nba:
+            switch id {
+            case 0: return "PG"
+            case 1: return "SG"
+            case 2: return "SF"
+            case 3: return "PF"
+            case 4: return "C"
+            case 5: return "G"
+            case 6: return "F"
+            case 11: return "UTIL"
+            case 12: return "BN"
+            case 13: return "IR"
+            default: return "UNK\(id)"
+            }
+        case .mlb:
+            switch id {
+            case 0: return "C"
+            case 1: return "1B"
+            case 2: return "2B"
+            case 3: return "3B"
+            case 4: return "SS"
+            case 5: return "OF"
+            case 10: return "UTIL"
+            case 11: return "P"
+            case 13: return "BN"
+            case 14: return "IL"
+            case 15: return "SP"
+            case 16: return "RP"
+            default: return "UNK\(id)"
+            }
         }
     }
 
-    static func positionAbbreviation(for id: Int) -> String? {
-        abbreviation(for: id)
+    static func positionAbbreviation(for id: Int, sport: FantasySport) -> String? {
+        abbreviation(for: id, sport: sport)
     }
 }
 
-nonisolated final class ESPNHockeyTeamResolver: @unchecked Sendable {
-    static let shared = ESPNHockeyTeamResolver()
+typealias ESPNHockeyPositionMapper = ESPNFantasyPositionMapper
+
+nonisolated final class ESPNFantasyTeamResolver: @unchecked Sendable {
+    static let shared = ESPNFantasyTeamResolver()
 
     private let lock = NSLock()
-    private var abbreviationsByProTeamID: [Int: String] = [:]
+    private var abbreviationsBySportAndProTeamID: [String: [Int: String]] = [:]
 
     nonisolated init() {}
 
-    func updateMappings(_ mappings: [Int: String]) {
+    func updateMappings(_ mappings: [Int: String], sport: FantasySport = .nhl) {
         lock.lock()
-        abbreviationsByProTeamID.merge(mappings) { _, new in new }
+        var existing = abbreviationsBySportAndProTeamID[sport.rawValue] ?? [:]
+        existing.merge(mappings) { _, new in new }
+        abbreviationsBySportAndProTeamID[sport.rawValue] = existing
         lock.unlock()
     }
 
-    func abbreviation(for proTeamID: Int?) -> String? {
+    func abbreviation(for proTeamID: Int?, sport: FantasySport) -> String? {
         guard let proTeamID else { return nil }
         lock.lock()
-        let value = abbreviationsByProTeamID[proTeamID]
+        let value = abbreviationsBySportAndProTeamID[sport.rawValue]?[proTeamID]
         lock.unlock()
         return value
     }
 }
+
+typealias ESPNHockeyTeamResolver = ESPNFantasyTeamResolver

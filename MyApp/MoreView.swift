@@ -114,7 +114,7 @@ struct MoreView: View {
 
     private var fantasySummary: String? {
         guard let connection = fantasyStore.currentConnection else { return "Not connected" }
-        return connection.displayName ?? connection.username ?? "Sleeper"
+        return connection.displayName ?? connection.username ?? connection.provider.displayName
     }
 
     private var defaultStreamLanguageName: String {

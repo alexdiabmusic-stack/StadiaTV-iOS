@@ -11,6 +11,7 @@ struct MatchDetailView: View {
     @EnvironmentObject private var entitlements: EntitlementStore
     @EnvironmentObject private var predictions: PredictionsStore
     @EnvironmentObject private var fantasyStore: FantasyStore
+    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
     @State private var showingAllChannels = false
     @State private var spoilerRevealed = false
     @State private var playingChannel: Channel?
@@ -254,7 +255,7 @@ struct MatchDetailView: View {
 
     @ViewBuilder
     private var fantasySection: some View {
-        if let context = fantasyStore.fantasyEventContext(for: match) {
+        if let context = combinedFantasyContext {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "star.fill")
@@ -310,6 +311,15 @@ struct MatchDetailView: View {
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
         }
+    }
+
+    private var combinedFantasyContext: FantasyEventContext? {
+        let imported = fantasyStore.fantasyEventContext(for: match)
+        let native = nativeFantasyStore.fantasyEventContext(for: match)
+        let games = (imported?.playerGames ?? []) + (native?.playerGames ?? [])
+        guard !games.isEmpty else { return nil }
+        let matched = (imported?.matchedChannel ?? native?.matchedChannel) ?? games.compactMap(\.matchedChannel).sorted { $0.score > $1.score }.first
+        return FantasyEventContext(event: match, playerGames: games, matchedChannel: matched)
     }
 
     private var statusLine: some View {

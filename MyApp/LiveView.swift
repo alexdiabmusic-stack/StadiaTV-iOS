@@ -7,6 +7,7 @@ struct LiveView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var viewModel: LiveViewModel
     @EnvironmentObject private var fantasyStore: FantasyStore
+    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
     @AppStorage("live.filter.v1") private var savedFilterRaw: String = LiveFilter.forYou.rawValue
     @State private var filter: LiveFilter = .forYou
     @State private var selectedSport: SportGroup?
@@ -327,7 +328,7 @@ struct LiveView: View {
 
     private func liveFantasyContext(for match: Match) -> [FantasyPlayerGame] {
         guard fantasyStore.settings.showFantasyIndicatorsInLive else { return [] }
-        return fantasyStore.fantasyEventContext(for: match)?.playerGames ?? []
+        return (fantasyStore.fantasyEventContext(for: match)?.playerGames ?? []) + (nativeFantasyStore.fantasyEventContext(for: match)?.playerGames ?? [])
     }
 
     private func mergedMatches(_ matches: [Match]) -> [Match] {

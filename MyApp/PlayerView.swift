@@ -102,6 +102,7 @@ struct PlayerView: View {
     @EnvironmentObject private var entitlements: EntitlementStore
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var fantasyStore: FantasyStore
+    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
 
     // Zap / channel navigation state
     @State private var currentZapChannel: Channel
@@ -196,7 +197,7 @@ struct PlayerView: View {
             ids.append(contentsOf: canonicalChannel.allStreams.map(\.providerChannelId))
         }
         var seen = Set<String>()
-        return ids.flatMap { fantasyStore.fantasyGames(for: $0) }
+        return ids.flatMap { fantasyStore.fantasyGames(for: $0) + nativeFantasyStore.fantasyGames(for: $0) }
             .filter { seen.insert($0.id).inserted }
             .sorted { lhs, rhs in
                 if lhs.isFantasyStarter != rhs.isFantasyStarter { return lhs.isFantasyStarter }

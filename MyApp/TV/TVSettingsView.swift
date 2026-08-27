@@ -4,8 +4,11 @@ import SwiftUI
 struct TVSettingsView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var playlists: PlaylistStore
+    @EnvironmentObject private var fantasyStore: FantasyStore
     @State private var showingAddPlaylist = false
     @State private var showingTeamEditor = false
+    @State private var showingFantasyConnect = false
+    @State private var showingFantasyDisconnect = false
 
     var body: some View {
         NavigationStack {
@@ -14,6 +17,7 @@ struct TVSettingsView: View {
                 List {
                     playlistsSection
                     teamsSection
+                    fantasySection
                     appearanceSection
                     streamingSection
                     setupSection
@@ -29,6 +33,15 @@ struct TVSettingsView: View {
         }
         .fullScreenCover(isPresented: $showingTeamEditor) {
             TeamEditorView()
+        }
+        .sheet(isPresented: $showingFantasyConnect) {
+            SleeperConnectSheet(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
+        }
+        .confirmationDialog("Disconnect Sleeper?", isPresented: $showingFantasyDisconnect, titleVisibility: .visible) {
+            Button("Disconnect Sleeper", role: .destructive) {
+                Task { await fantasyStore.disconnectSleeper() }
+            }
+            Button("Cancel", role: .cancel) {}
         }
     }
 
@@ -98,6 +111,78 @@ struct TVSettingsView: View {
             .listRowBackground(Theme.surface)
         } header: {
             Label("My Teams & Leagues", systemImage: "star.fill")
+        }
+    }
+
+    // MARK: - Fantasy
+
+    private var fantasySection: some View {
+        Section {
+            if let connection = fantasyStore.currentConnection {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(connection.displayName ?? connection.username ?? "Sleeper", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("Sleeper connected")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                .listRowBackground(Theme.surface)
+
+                if !fantasyStore.leagues.isEmpty {
+                    Picker("Default League", selection: Binding(
+                        get: { fantasyStore.selectedLeague?.id ?? fantasyStore.leagues.first?.id ?? "" },
+                        set: { leagueID in Task { await fantasyStore.selectLeague(id: leagueID, channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages) } }
+                    )) {
+                        ForEach(fantasyStore.leagues) { league in
+                            Text(league.name).tag(league.id)
+                        }
+                    }
+                    .listRowBackground(Theme.surface)
+                }
+
+                Button(role: .destructive) { showingFantasyDisconnect = true } label: {
+                    Label("Disconnect Sleeper", systemImage: "xmark.circle")
+                }
+                .listRowBackground(Theme.surface)
+            } else {
+                Button { showingFantasyConnect = true } label: {
+                    Label("Connect Sleeper", systemImage: "star.circle")
+                        .foregroundStyle(Theme.accent)
+                }
+                .listRowBackground(Theme.surface)
+            }
+
+            Toggle(isOn: Binding(
+                get: { fantasyStore.settings.showFantasyOnHome },
+                set: { value in Task { await fantasyStore.setShowFantasyOnHome(value) } }
+            )) {
+                Label("Show on Home", systemImage: "house.fill")
+                    .foregroundStyle(Theme.textPrimary)
+            }
+            .tint(Theme.accent)
+            .listRowBackground(Theme.surface)
+
+            Toggle(isOn: Binding(
+                get: { fantasyStore.settings.showFantasyIndicatorsInLive },
+                set: { value in Task { await fantasyStore.setShowFantasyIndicatorsInLive(value) } }
+            )) {
+                Label("Live Indicators", systemImage: "dot.radiowaves.left.and.right")
+                    .foregroundStyle(Theme.textPrimary)
+            }
+            .tint(Theme.accent)
+            .listRowBackground(Theme.surface)
+
+            Toggle(isOn: Binding(
+                get: { fantasyStore.settings.showFantasyIndicatorsInGuide },
+                set: { value in Task { await fantasyStore.setShowFantasyIndicatorsInGuide(value) } }
+            )) {
+                Label("Guide Indicators", systemImage: "rectangle.grid.2x2")
+                    .foregroundStyle(Theme.textPrimary)
+            }
+            .tint(Theme.accent)
+            .listRowBackground(Theme.surface)
+        } header: {
+            Label("Fantasy", systemImage: "star.circle.fill")
         }
     }
 

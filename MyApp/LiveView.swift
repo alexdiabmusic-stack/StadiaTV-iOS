@@ -6,6 +6,7 @@ import Combine
 struct LiveView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var viewModel: LiveViewModel
+    @EnvironmentObject private var fantasyStore: FantasyStore
     @AppStorage("live.filter.v1") private var savedFilterRaw: String = LiveFilter.forYou.rawValue
     @State private var filter: LiveFilter = .forYou
     @State private var selectedSport: SportGroup?
@@ -109,7 +110,8 @@ struct LiveView: View {
                                 onSetAlert: { Task { await setAlert(for: match) } },
                                 onAddToCalendar: { Task { await addToCalendar(match) } },
                                 onHide: { hide(match) },
-                                showScoreBar: prefs.showLiveScoreBar
+                                showScoreBar: prefs.showLiveScoreBar,
+                                fantasyContext: liveFantasyContext(for: match)
                             )
                         }
                             .buttonStyle(.plain)
@@ -209,8 +211,10 @@ struct LiveView: View {
         case .forYou:
             let favIDs = Set(prefs.favoriteTeams.map(\.id))
             let favNames = Set(prefs.favoriteTeams.map { $0.displayName.lowercased() })
-            let favMatches = viewModel.allLive.filter { involvesFavorite($0, favIDs: favIDs, favNames: favNames) }
-            base = favMatches.isEmpty ? viewModel.allLive : favMatches
+            let favoriteMatches = viewModel.allLive.filter { involvesFavorite($0, favIDs: favIDs, favNames: favNames) }
+            let fantasyMatches = viewModel.allLive.filter { !liveFantasyContext(for: $0).isEmpty }
+            let personalized = mergedMatches(favoriteMatches + fantasyMatches)
+            base = personalized.isEmpty ? viewModel.allLive : personalized.sorted { relevanceScore($0, favIDs: favIDs, favNames: favNames) > relevanceScore($1, favIDs: favIDs, favNames: favNames) }
         case .all:
             base = viewModel.allLive
         case .guide:
@@ -321,6 +325,31 @@ struct LiveView: View {
         return false
     }
 
+    private func liveFantasyContext(for match: Match) -> [FantasyPlayerGame] {
+        guard fantasyStore.settings.showFantasyIndicatorsInLive else { return [] }
+        return fantasyStore.fantasyEventContext(for: match)?.playerGames ?? []
+    }
+
+    private func mergedMatches(_ matches: [Match]) -> [Match] {
+        var seen: Set<String> = []
+        var merged: [Match] = []
+        for match in matches where seen.insert(match.id).inserted {
+            merged.append(match)
+        }
+        return merged
+    }
+
+    private func relevanceScore(_ match: Match, favIDs: Set<String>, favNames: Set<String>) -> Int {
+        var score = 0
+        if involvesFavorite(match, favIDs: favIDs, favNames: favNames) { score += 100 }
+        let fantasyContext = liveFantasyContext(for: match)
+        score += min(fantasyContext.filter(\.isFantasyStarter).count, 3) * 35
+        score += min(fantasyContext.filter(\.isFantasyBench).count, 3) * 15
+        score += min(fantasyContext.filter { !$0.isFantasyStarter && !$0.isFantasyBench }.count, 2) * 10
+        if isClose(match) { score += 10 }
+        return score
+    }
+
     private func isClose(_ match: Match) -> Bool {
         guard let h = match.home.score.flatMap(Int.init),
               let a = match.away.score.flatMap(Int.init) else { return false }
@@ -377,6 +406,15 @@ struct LiveMatchCard: View {
     let onAddToCalendar: () -> Void
     let onHide: () -> Void
     var showScoreBar: Bool = false
+    var fantasyContext: [FantasyPlayerGame] = []
+
+    private var fantasyLabel: String? {
+        guard !fantasyContext.isEmpty else { return nil }
+        if fantasyContext.count == 1, let player = fantasyContext.first {
+            return "★ \(player.fantasyPlayer.fullName)"
+        }
+        return "★ \(fantasyContext.count) Fantasy players"
+    }
 
     private var intelligenceLabel: String? {
         guard match.state == .live,
@@ -422,6 +460,15 @@ struct LiveMatchCard: View {
                     Text(label)
                         .font(.caption2.weight(.heavy))
                         .foregroundStyle(Theme.starting)
+                }
+                if let fantasyLabel {
+                    Text("·")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.textSecondary)
+                    Text(fantasyLabel)
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(Theme.accent)
+                        .lineLimit(1)
                 }
                 Spacer()
                 Text(match.statusDetail)

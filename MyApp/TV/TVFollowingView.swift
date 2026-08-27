@@ -3,6 +3,7 @@ import SwiftUI
 
 struct TVFollowingView: View {
     @EnvironmentObject private var prefs: PreferencesStore
+    @EnvironmentObject private var fantasyStore: FantasyStore
     @StateObject private var viewModel = MatchesViewModel()
 
     @State private var selectedEntityID: String = "all"
@@ -11,13 +12,13 @@ struct TVFollowingView: View {
         NavigationStack {
             ZStack {
                 Theme.background.ignoresSafeArea()
-                if prefs.favoriteTeams.isEmpty && prefs.explicitlyFollowedLeagues.isEmpty {
+                if !hasFollowingContent && fantasyStore.currentConnection == nil {
                     TVEmptyState(
                         systemImage: "star.circle",
                         title: "Nothing followed yet",
-                        subtitle: "Go to Settings → My Teams & Leagues to follow teams and leagues."
+                        subtitle: "Go to Settings to follow teams and leagues or connect Sleeper."
                     )
-                } else if viewModel.isLoadingFollowing && viewModel.allFollowedMatches.isEmpty {
+                } else if viewModel.isLoadingFollowing && viewModel.allFollowedMatches.isEmpty && selectedEntityID != "fantasy" {
                     ProgressView().tint(Theme.accent).scaleEffect(2)
                 } else {
                     mainContent
@@ -40,6 +41,10 @@ struct TVFollowingView: View {
         }
     }
 
+    private var hasFollowingContent: Bool {
+        !prefs.favoriteTeams.isEmpty || !prefs.explicitlyFollowedLeagues.isEmpty
+    }
+
     private var loadKey: String {
         [
             prefs.explicitlyFollowedLeagues.map(\.id).sorted().joined(separator: ","),
@@ -54,10 +59,14 @@ struct TVFollowingView: View {
             LazyVStack(alignment: .leading, spacing: 48) {
                 entitySelectorRow
 
-                sportsSummaryRow
-                    .padding(.horizontal, 48)
+                if selectedEntityID == "fantasy" {
+                    TVFantasyDashboardSection()
+                        .padding(.horizontal, 48)
+                } else {
+                    sportsSummaryRow
+                        .padding(.horizontal, 48)
 
-                if let live = liveMatches.first {
+                    if let live = liveMatches.first {
                     VStack(alignment: .leading, spacing: 20) {
                         Label("Live Now", systemImage: "dot.radiowaves.left.and.right")
                             .font(.title2.weight(.heavy))
@@ -93,12 +102,13 @@ struct TVFollowingView: View {
                     }
                 }
 
-                if selectedMatches.isEmpty && !viewModel.isLoadingFollowing {
-                    TVEmptyState(
-                        systemImage: "calendar.badge.exclamationmark",
-                        title: "No matches found",
-                        subtitle: "No upcoming or recent matches for this selection."
-                    )
+                    if selectedMatches.isEmpty && !viewModel.isLoadingFollowing {
+                        TVEmptyState(
+                            systemImage: "calendar.badge.exclamationmark",
+                            title: "No matches found",
+                            subtitle: "No upcoming or recent matches for this selection."
+                        )
+                    }
                 }
             }
             .padding(.vertical, 40)
@@ -111,6 +121,7 @@ struct TVFollowingView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 entityChip(title: "All", id: "all", logoURL: nil)
+                entityChip(title: "Fantasy", id: "fantasy", logoURL: nil)
                 ForEach(prefs.favoriteTeams) { team in
                     let abbr = team.abbreviation.isEmpty
                         ? String(team.displayName.prefix(3)).uppercased()
@@ -451,6 +462,112 @@ private struct TVFollowingLiveHero: View {
             }
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+private struct TVFantasyDashboardSection: View {
+    @EnvironmentObject private var fantasyStore: FantasyStore
+    @EnvironmentObject private var playlists: PlaylistStore
+    @EnvironmentObject private var prefs: PreferencesStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            Label("Fantasy", systemImage: "star.circle.fill")
+                .font(.title2.weight(.heavy))
+                .foregroundStyle(Theme.accent)
+
+            if fantasyStore.currentConnection == nil {
+                TVEmptyState(
+                    systemImage: "star.bubble.fill",
+                    title: "Connect Sleeper",
+                    subtitle: "Open Settings → Fantasy to connect your Sleeper account."
+                )
+            } else {
+                HStack(spacing: 18) {
+                    summaryCard(title: "League", value: fantasyStore.selectedLeague?.name ?? "Sleeper", systemImage: "trophy.fill", tint: Theme.accent)
+                    summaryCard(title: "Roster", value: "\(fantasyStore.players.count) players", systemImage: "person.3.fill", tint: Theme.upcoming)
+                    summaryCard(title: "Watchable", value: "\(fantasyStore.diagnostics.watchableGameCount) games", systemImage: "play.tv.fill", tint: Theme.live)
+                }
+
+                if !fantasyStore.livePlayerGames.isEmpty {
+                    TVShelfRow(title: "Players Live", systemImage: "dot.radiowaves.left.and.right", tint: Theme.live) {
+                        ForEach(fantasyStore.livePlayerGames.prefix(8)) { game in
+                            TVFantasyPlayerCard(game: game)
+                        }
+                    }
+                } else if !fantasyStore.todayPlayerGames.isEmpty {
+                    TVShelfRow(title: "Today", systemImage: "calendar", tint: Theme.upcoming) {
+                        ForEach(fantasyStore.todayPlayerGames.prefix(8)) { game in
+                            TVFantasyPlayerCard(game: game)
+                        }
+                    }
+                } else {
+                    TVEmptyState(
+                        systemImage: "calendar",
+                        title: "No Fantasy games today",
+                        subtitle: fantasyStore.isStale ? "Showing cached Fantasy information." : "Your linked roster has no games today."
+                    )
+                }
+            }
+        }
+        .task {
+            await fantasyStore.refresh(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
+        }
+    }
+
+    private func summaryCard(title: String, value: String, systemImage: String, tint: Color) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.title2.weight(.semibold))
+                .foregroundStyle(tint)
+            Text(value)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.75)
+            Text(title.uppercased())
+                .font(.caption.weight(.heavy))
+                .foregroundStyle(Theme.textSecondary)
+        }
+        .frame(width: 260, height: 140, alignment: .leading)
+        .padding(18)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
+    }
+}
+
+private struct TVFantasyPlayerCard: View {
+    let game: FantasyPlayerGame
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(game.fantasyPlayer.fullName)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+            Text(subtitle)
+                .font(.subheadline)
+                .foregroundStyle(Theme.textSecondary)
+                .lineLimit(1)
+            if let event = game.event {
+                Text(event.statusDetail)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(game.gameState == .live ? Theme.live : Theme.textTertiary)
+            }
+            Spacer()
+            Text(game.watchAvailable ? "Watch available" : "No channel")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(game.watchAvailable ? Theme.live : Theme.textSecondary)
+        }
+        .frame(width: 280, height: 150, alignment: .leading)
+        .padding(18)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(game.gameState == .live ? Theme.live.opacity(0.35) : Theme.hairline))
+    }
+
+    private var subtitle: String {
+        [game.fantasyPlayer.teamAbbreviation, game.fantasyPlayer.position].compactMap { $0 }.joined(separator: " · ")
     }
 }
 #endif

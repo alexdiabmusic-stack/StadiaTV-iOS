@@ -48,6 +48,42 @@ private struct LiveCommandKeyboardHandler: View {
     #endif
 }
 
+private struct PlayerFantasyOverlay: View {
+    let games: [FantasyPlayerGame]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Fantasy", systemImage: "star.fill")
+                .font(.caption.weight(.heavy))
+                .foregroundStyle(Theme.accent)
+            ForEach(games.prefix(4)) { game in
+                HStack(spacing: 10) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(game.fantasyPlayer.fullName)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                        Text([game.lineupPosition, game.isFantasyStarter ? "Starter" : game.isFantasyBench ? "Bench" : nil].compactMap { $0 }.joined(separator: " · "))
+                            .font(.caption2)
+                            .foregroundStyle(.white.opacity(0.68))
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 8)
+                    Text(game.fantasyPoints.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "--")
+                        .font(.caption.weight(.black).monospacedDigit())
+                        .foregroundStyle(.white)
+                }
+            }
+        }
+        .padding(12)
+        .frame(width: 240, alignment: .leading)
+        .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(.white.opacity(0.12)))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Fantasy overlay, \(games.count) players in this game")
+    }
+}
+
 // MARK: - Player
 
 /// Presents a channel's stream full screen.
@@ -65,6 +101,7 @@ struct PlayerView: View {
     @EnvironmentObject private var epgRepository: EPGRepository
     @EnvironmentObject private var entitlements: EntitlementStore
     @EnvironmentObject private var prefs: PreferencesStore
+    @EnvironmentObject private var fantasyStore: FantasyStore
 
     // Zap / channel navigation state
     @State private var currentZapChannel: Channel
@@ -150,6 +187,21 @@ struct PlayerView: View {
         playlistStore.channelsByPlaylist.values.contains { channels in
             channels.contains { $0.id != currentZapChannel.id }
         }
+    }
+
+    private var currentChannelFantasyGames: [FantasyPlayerGame] {
+        var ids = [currentZapChannel.id]
+        if let canonicalChannel {
+            ids.append(canonicalChannel.id)
+            ids.append(contentsOf: canonicalChannel.allStreams.map(\.providerChannelId))
+        }
+        var seen = Set<String>()
+        return ids.flatMap { fantasyStore.fantasyGames(for: $0) }
+            .filter { seen.insert($0.id).inserted }
+            .sorted { lhs, rhs in
+                if lhs.isFantasyStarter != rhs.isFantasyStarter { return lhs.isFantasyStarter }
+                return lhs.fantasyPlayer.fullName < rhs.fantasyPlayer.fullName
+            }
     }
 
     var body: some View {
@@ -295,6 +347,14 @@ struct PlayerView: View {
                 .padding(.leading, 16)
                 .padding(.bottom, 84)
                 .transition(.opacity)
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if isChromeVisible, fantasyStore.settings.showFantasyPlayerOverlay, !currentChannelFantasyGames.isEmpty {
+                PlayerFantasyOverlay(games: currentChannelFantasyGames)
+                    .padding(.trailing, 16)
+                    .padding(.bottom, 84)
+                    .transition(.opacity)
             }
         }
         .overlay(alignment: .bottom) {

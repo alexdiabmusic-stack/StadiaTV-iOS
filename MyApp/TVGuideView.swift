@@ -10,6 +10,7 @@ struct TVGuideView: View {
     @EnvironmentObject private var repository: EPGRepository
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var guideStore: GuideChannelStore
+    @EnvironmentObject private var fantasyStore: FantasyStore
     @StateObject private var vm = TVGuideViewModel()
 
     @Environment(\.dismiss) private var dismiss
@@ -132,7 +133,8 @@ struct TVGuideView: View {
                         playingChannel = channel
                     }
                 } onProgramTap: { programme, channel in
-                    if programme.isOnNow() {
+                    let hasFantasyContext = fantasyStore.settings.showFantasyIndicatorsInGuide && fantasyStore.fantasyIndicatorCount(for: programme, channel: channel) > 0
+                    if programme.isOnNow(), !hasFantasyContext {
                         guard channel.playableChannel != nil else { return }
                         if let onChannelSelected {
                             onChannelSelected(channel)
@@ -435,6 +437,7 @@ struct EPGGuideGrid: View {
 private struct ProgrammeGridView: View {
     @ObservedObject var vm: TVGuideViewModel
     @EnvironmentObject var repository: EPGRepository
+    @EnvironmentObject var fantasyStore: FantasyStore
     let scrollState: EPGScrollState
     let scrollToNowTrigger: Int
     let now: Date
@@ -506,7 +509,8 @@ private struct ProgrammeGridView: View {
                     programme: prog,
                     width: w,
                     now: now,
-                    hasCatchup: channel.hasCatchup
+                    hasCatchup: channel.hasCatchup,
+                    fantasyIndicatorCount: fantasyStore.settings.showFantasyIndicatorsInGuide ? fantasyStore.fantasyIndicatorCount(for: prog, channel: channel) : 0
                 ) {
                     onProgramTap(prog, channel)
                 }
@@ -772,11 +776,13 @@ struct ProgrammeCell: View {
     let width: CGFloat
     let now: Date
     var hasCatchup: Bool = false
+    var fantasyIndicatorCount: Int = 0
     let onTap: () -> Void
 
     private var isCurrent: Bool { programme.isOnNow(at: now) }
     private var isPast: Bool { programme.isPast(at: now) }
     private var showCatchupBadge: Bool { isPast && hasCatchup && width >= 80 }
+    private var showFantasyBadge: Bool { fantasyIndicatorCount > 0 && width >= 42 }
 
     // Static formatter to avoid re-creating DateFormatter on every cell render.
     nonisolated static let timeFmt: DateFormatter = {
@@ -810,13 +816,24 @@ struct ProgrammeCell: View {
                     cellContent
                 }
 
-                // Catch-up available badge
+                // Catch-up and Fantasy badges stay inside the existing cell height.
                 if showCatchupBadge {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(Theme.accent.opacity(0.8))
                         .padding(3)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                }
+
+                if showFantasyBadge {
+                    Text(fantasyIndicatorCount == 1 ? "★" : "★\(fantasyIndicatorCount)")
+                        .font(.system(size: 9, weight: .heavy))
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(.black.opacity(0.35), in: Capsule())
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: showCatchupBadge ? .bottomTrailing : .topTrailing)
+                        .padding(3)
                 }
             }
         }
@@ -855,11 +872,12 @@ struct ProgrammeCell: View {
     }
 
     private var accessibilityLabel: String {
+        let fantasySuffix = fantasyIndicatorCount > 0 ? " \(fantasyIndicatorCount) fantasy player\(fantasyIndicatorCount == 1 ? "" : "s") involved." : ""
         if isCurrent {
             let mins = programme.minutesRemaining(from: now)
-            return "\(programme.title), \(Self.timeFmt.string(from: programme.start)) to \(Self.timeFmt.string(from: programme.end)), now playing, \(mins) minutes remaining."
+            return "\(programme.title), \(Self.timeFmt.string(from: programme.start)) to \(Self.timeFmt.string(from: programme.end)), now playing, \(mins) minutes remaining.\(fantasySuffix)"
         }
-        return "\(programme.title), \(Self.timeFmt.string(from: programme.start)) to \(Self.timeFmt.string(from: programme.end))."
+        return "\(programme.title), \(Self.timeFmt.string(from: programme.start)) to \(Self.timeFmt.string(from: programme.end)).\(fantasySuffix)"
     }
 }
 
@@ -921,6 +939,7 @@ struct ProgrammeDetailSheet: View {
     @EnvironmentObject private var guideStore: GuideChannelStore
     @EnvironmentObject private var reminderStore: ProgrammeReminderStore
     @EnvironmentObject private var recordingService: RecordingService
+    @EnvironmentObject private var fantasyStore: FantasyStore
 
     @State private var catchupState: CatchupState = .idle
     @State private var selectedLeadTime: Int = 5
@@ -944,6 +963,7 @@ struct ProgrammeDetailSheet: View {
                         channelHeader
                         programmeImage
                         programmeMetadata
+                        fantasyProgrammeContext
                         programmeDescription
                         actionButtons
                         Spacer(minLength: 0)
@@ -1061,6 +1081,40 @@ struct ProgrammeDetailSheet: View {
                         .foregroundStyle(Theme.textTertiary)
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var fantasyProgrammeContext: some View {
+        let games = fantasyStore.fantasyGames(for: programme, channel: channel)
+        if fantasyStore.settings.showFantasyIndicatorsInGuide, !games.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Label(games.count == 1 ? "1 Fantasy player" : "\(games.count) Fantasy players", systemImage: "star.fill")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Theme.accent)
+                ForEach(games.prefix(4)) { game in
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(game.fantasyPlayer.fullName)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Theme.textPrimary)
+                                .lineLimit(1)
+                            Text([game.fantasyPlayer.teamAbbreviation, game.fantasyPlayer.position].compactMap { $0 }.joined(separator: " · "))
+                                .font(.caption)
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        Spacer()
+                        if let points = game.fantasyPoints {
+                            Text(points, format: .number.precision(.fractionLength(1)))
+                                .font(.subheadline.weight(.bold).monospacedDigit())
+                                .foregroundStyle(Theme.textPrimary)
+                        }
+                    }
+                }
+            }
+            .padding(14)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
         }
     }
 

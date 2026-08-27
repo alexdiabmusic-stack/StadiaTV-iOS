@@ -7,18 +7,35 @@ struct ESPNService {
 
     enum ServiceError: LocalizedError {
         case badResponse
-        var errorDescription: String? { "Couldn't load data from ESPN." }
+        case httpError(Int)
+        var errorDescription: String? {
+            switch self {
+            case .badResponse: return "Couldn't load data from ESPN."
+            case .httpError(let code): return "ESPN returned HTTP \(code). The service may be temporarily unavailable."
+            }
+        }
     }
+
 
     private let session: URLSession = {
         let config = URLSessionConfiguration.default
-        config.requestCachePolicy = .reloadRevalidatingCacheData
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
         // Keep the timeout tight: Home fans out across many leagues and a
         // single stalled request otherwise delays the slowest phase.
         config.timeoutIntervalForRequest = 10
         config.httpMaximumConnectionsPerHost = 8
+        config.httpAdditionalHeaders = Self.apiHeaders
         return URLSession(configuration: config)
     }()
+
+    // ESPN's CDN requires a browser-like User-Agent; requests with no UA are blocked.
+    static let apiHeaders: [AnyHashable: Any] = [
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://www.espn.com/",
+        "Origin": "https://www.espn.com",
+    ]
 
     /// Fetches the scoreboard for a league. `date` narrows to a single day (YYYYMMDD) when provided.
     func scoreboard(for league: League, on date: Date? = nil) async throws -> [Match] {
@@ -31,7 +48,8 @@ struct ESPNService {
 
         let (data, response) = try await session.data(from: components.url!)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw ServiceError.badResponse
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw ServiceError.httpError(status)
         }
         let decoded = try JSONDecoder().decode(ScoreboardResponse.self, from: data)
         return decoded.events?.compactMap { $0.toMatch(league: league) } ?? []
@@ -83,7 +101,8 @@ struct ESPNService {
 
         let (data, response) = try await session.data(from: components.url!)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw ServiceError.badResponse
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw ServiceError.httpError(status)
         }
         let decoded = try JSONDecoder().decode(ScoreboardResponse.self, from: data)
         return decoded.events?.compactMap { $0.toMatch(league: league) } ?? []
@@ -98,7 +117,8 @@ struct ESPNService {
 
         let (data, response) = try await session.data(from: components.url!)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw ServiceError.badResponse
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw ServiceError.httpError(status)
         }
         let decoded = try JSONDecoder().decode(NewsResponse.self, from: data)
         return decoded.articles?.compactMap { $0.toArticle(league: league) } ?? []
@@ -113,7 +133,8 @@ struct ESPNService {
 
         let (data, response) = try await session.data(from: components.url!)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw ServiceError.badResponse
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw ServiceError.httpError(status)
         }
         let decoded = try JSONDecoder().decode(TeamsResponse.self, from: data)
         let entries = decoded.sports?.first?.leagues?.first?.teams ?? []

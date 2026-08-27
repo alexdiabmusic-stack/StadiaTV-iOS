@@ -4,6 +4,7 @@ import SwiftUI
 struct TVRootView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var playlistStore: PlaylistStore
+    @EnvironmentObject private var fantasyStore: FantasyStore
     @StateObject private var liveViewModel = LiveViewModel()
     @StateObject private var epgRepository = EPGRepository()
 
@@ -48,6 +49,7 @@ struct TVRootView: View {
         .task { epgRepository.setupWithChannels(playlistStore.allChannels) }
         .onChange(of: playlistStore.channelsByPlaylist) {
             epgRepository.setupWithChannels(playlistStore.allChannels)
+            Task { await fantasyStore.refresh(channels: playlistStore.allChannels, preferredLanguages: prefs.preferredStreamLanguages, force: true) }
         }
     }
 }
@@ -59,6 +61,7 @@ struct TVRootView: View {
         .environmentObject(WatchStore())
         .environmentObject(EntitlementStore())
         .environmentObject(PredictionsStore())
+        .environmentObject(FantasyStore.shared)
         .preferredColorScheme(.dark)
 }
 #endif

@@ -13,19 +13,53 @@ struct StadiaFantasyAvailablePlayer: Identifiable, Codable, Hashable, Sendable {
     let position: String?
     let eligibleSlots: [StadiaFantasyRosterSlot]
     let injuryStatus: String?
+    var headshotURL: URL? = nil
+    var lastSeasonFantasyPoints: Double? = nil
+    var lastSeasonStatLine: StadiaFantasyStatLine? = nil
+    var keyInfo: [String] = []
+}
+
+actor ESPNSportsPlayerPoolCache {
+    static let shared = ESPNSportsPlayerPoolCache()
+    private var cached: [FantasySport: (date: Date, players: [StadiaFantasyAvailablePlayer])] = [:]
+    private var inFlight: [FantasySport: Task<[StadiaFantasyAvailablePlayer], Error>] = [:]
+    private let ttl: TimeInterval = 6 * 3600
+
+    func players(for sport: FantasySport, load: @escaping @Sendable () async throws -> [StadiaFantasyAvailablePlayer]) async throws -> [StadiaFantasyAvailablePlayer] {
+        if let value = cached[sport], Date().timeIntervalSince(value.date) < ttl { return value.players }
+        if let task = inFlight[sport] { return try await task.value }
+        let task = Task { try await load() }
+        inFlight[sport] = task
+        do {
+            let players = try await task.value
+            cached[sport] = (Date(), players)
+            inFlight[sport] = nil
+            return players
+        } catch {
+            inFlight[sport] = nil
+            throw error
+        }
+    }
 }
 
 struct ESPNSportsDataProvider: StadiaSportsDataProvider {
     private let service: ESPNService
+    private let cache: ESPNSportsPlayerPoolCache
+    private let session: URLSession
 
-    init(service: ESPNService = ESPNService()) {
+    init(service: ESPNService = ESPNService(), cache: ESPNSportsPlayerPoolCache = .shared) {
         self.service = service
+        self.cache = cache
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 12
+        config.httpAdditionalHeaders = ESPNService.apiHeaders
+        self.session = URLSession(configuration: config)
     }
 
     func currentPlayers(for sport: FantasySport) async throws -> [StadiaFantasyAvailablePlayer] {
-        // Stadia already resolves canonical players through ESPNService in player/detail flows.
-        // Full sport-specific player pool endpoints can be wired here without changing native Fantasy UI.
-        []
+        try await cache.players(for: sport) {
+            try await loadESPNPlayers(for: sport)
+        }
     }
 
     func currentSchedule(for sport: FantasySport, starting date: Date, days: Int) async throws -> [Match] {
@@ -34,11 +68,199 @@ struct ESPNSportsDataProvider: StadiaSportsDataProvider {
     }
 
     func statLines(for sport: FantasySport, playerIDs: Set<String>, from start: Date, to end: Date) async throws -> [String: StadiaFantasyStatLine] {
-        // Live scoring ingestion belongs here once the existing sport box-score/stat model exposes
-        // stable per-athlete game totals. The scoring engine is isolated from SwiftUI.
+        // Live box-score ingestion remains isolated here; draft/player-pool stats are loaded through
+        // the ESPN roster player model so SwiftUI never calculates fantasy scores directly.
         [:]
     }
+
+    private func loadESPNPlayers(for sport: FantasySport) async throws -> [StadiaFantasyAvailablePlayer] {
+        guard let league = sport.stadiaLeague else { return [] }
+        let teams = try await service.teams(for: league)
+        var players: [StadiaFantasyAvailablePlayer] = []
+        try await withThrowingTaskGroup(of: [StadiaFantasyAvailablePlayer].self) { group in
+            for team in teams {
+                group.addTask { [session] in
+                    try await Self.rosterPlayers(team: team, league: league, sport: sport, session: session)
+                }
+            }
+            for try await loaded in group {
+                players.append(contentsOf: loaded)
+            }
+        }
+        return Dictionary(grouping: players, by: \.id).compactMap { _, grouped in grouped.first }
+            .sorted { lhs, rhs in
+                (lhs.lastSeasonFantasyPoints ?? -1, lhs.fullName) > (rhs.lastSeasonFantasyPoints ?? -1, rhs.fullName)
+            }
+    }
+
+    private static func rosterPlayers(team: Team, league: League, sport: FantasySport, session: URLSession) async throws -> [StadiaFantasyAvailablePlayer] {
+        var components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/teams/\(team.id)/roster")!
+        components.queryItems = [URLQueryItem(name: "enable", value: "stats")]
+        let (data, response) = try await session.data(from: components.url!)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { return [] }
+        let decoded = try JSONDecoder().decode(ESPNSportsRosterResponse.self, from: data)
+        return decoded.athletesList.flatMap { group in
+            group.items.compactMap { $0.toFantasyPlayer(sport: sport, team: team) }
+        }
+    }
 }
+
+private struct ESPNSportsRosterResponse: Decodable {
+    let athletes: [ESPNSportsRosterGroup]?
+
+    var athletesList: [ESPNSportsRosterGroup] { athletes ?? [] }
+}
+
+private struct ESPNSportsRosterGroup: Decodable {
+    let items: [ESPNSportsAthleteDTO]
+}
+
+private struct ESPNSportsAthleteDTO: Decodable {
+    let id: String?
+    let displayName: String?
+    let fullName: String?
+    let firstName: String?
+    let lastName: String?
+    let headshot: ESPNSportsImageDTO?
+    let position: ESPNSportsPositionDTO?
+    let injuries: [ESPNSportsInjuryDTO]?
+    let statistics: [ESPNSportsStatisticGroupDTO]?
+
+    func toFantasyPlayer(sport: FantasySport, team: Team) -> StadiaFantasyAvailablePlayer? {
+        guard let id, let name = displayName ?? fullName else { return nil }
+        let positionAbbreviation = position?.abbreviation ?? position?.name
+        let statLine = fantasyStatLine(for: sport)
+        let scoringRules = StadiaFantasyScoringRules.stadiaDefault(sport: sport, type: .headToHeadPoints)
+        let points = statLine.map { FantasyScoringEngine().score(statLine: $0, rules: scoringRules, sport: sport).points }
+        let keyInfo = Self.keyInfo(from: statLine, sport: sport)
+        return StadiaFantasyAvailablePlayer(
+            id: "espn-\(sport.rawValue)-\(id)",
+            fullName: name,
+            teamAbbreviation: team.abbreviation,
+            position: positionAbbreviation,
+            eligibleSlots: Self.eligibleSlots(position: positionAbbreviation, sport: sport),
+            injuryStatus: injuries?.first?.status ?? injuries?.first?.type,
+            headshotURL: headshot?.href.flatMap(URL.init(string:)),
+            lastSeasonFantasyPoints: points ?? nil,
+            lastSeasonStatLine: statLine,
+            keyInfo: keyInfo
+        )
+    }
+
+    private func fantasyStatLine(for sport: FantasySport) -> StadiaFantasyStatLine? {
+        var values: [StadiaFantasyStat: Double] = [:]
+        for group in statistics ?? [] {
+            for stat in group.splits?.flatMap({ $0.stats ?? [] }) ?? [] {
+                guard let mapped = Self.mapStat(stat.name ?? stat.abbreviation, sport: sport), let value = stat.value ?? Double(stat.displayValue ?? "") else { continue }
+                values[mapped] = value
+            }
+        }
+        return values.isEmpty ? nil : StadiaFantasyStatLine(values: values, appearances: 1)
+    }
+
+    private static func mapStat(_ raw: String?, sport: FantasySport) -> StadiaFantasyStat? {
+        let key = (raw ?? "").lowercased().replacingOccurrences(of: "_", with: "")
+        switch sport {
+        case .nfl:
+            if key.contains("passingyards") || key == "pyds" { return .passingYards }
+            if key.contains("passingtouchdowns") || key == "ptd" { return .passingTouchdowns }
+            if key.contains("interceptions") || key == "int" { return .interceptions }
+            if key.contains("rushingyards") || key == "ryd" { return .rushingYards }
+            if key.contains("rushingtouchdowns") || key == "rtd" { return .rushingTouchdowns }
+            if key.contains("receptions") || key == "rec" { return .receptions }
+            if key.contains("receivingyards") || key == "reyd" { return .receivingYards }
+            if key.contains("receivingtouchdowns") || key == "retd" { return .receivingTouchdowns }
+        case .nhl:
+            if key == "goals" || key == "g" { return .goals }
+            if key == "assists" || key == "a" { return .assists }
+            if key.contains("shots") { return .shotsOnGoal }
+            if key == "hits" { return .hits }
+            if key.contains("blocked") { return .blockedShots }
+            if key.contains("saves") { return .saves }
+            if key.contains("wins") { return .goalieWins }
+        case .nba:
+            if key == "points" || key == "pts" { return .points }
+            if key == "rebounds" || key == "reb" { return .rebounds }
+            if key == "assists" || key == "ast" { return .assists }
+            if key == "steals" || key == "stl" { return .steals }
+            if key == "blocks" || key == "blk" { return .blockedShots }
+            if key.contains("three") { return .threePointersMade }
+            if key == "turnovers" || key == "to" { return .turnovers }
+        case .mlb:
+            if key == "runs" || key == "r" { return .runs }
+            if key == "homeruns" || key == "hr" { return .homeRuns }
+            if key == "rbi" || key.contains("runsbatted") { return .runsBattedIn }
+            if key == "stolenbases" || key == "sb" { return .stolenBases }
+            if key == "totalbases" || key == "tb" { return .totalBases }
+            if key == "strikeouts" || key == "so" || key == "k" { return .strikeouts }
+            if key == "wins" || key == "w" { return .pitcherWins }
+            if key == "saves" || key == "sv" { return .savesPitching }
+        }
+        return nil
+    }
+
+    private static func eligibleSlots(position: String?, sport: FantasySport) -> [StadiaFantasyRosterSlot] {
+        let raw = (position ?? "").uppercased()
+        switch sport {
+        case .nfl:
+            switch raw {
+            case "QB": return [.quarterback]
+            case "RB": return [.runningBack, .flex]
+            case "WR": return [.wideReceiver, .flex]
+            case "TE": return [.tightEnd, .flex]
+            case "K", "PK": return [.kicker]
+            case "DST", "D/ST": return [.defenseSpecialTeams]
+            default: return [.bench]
+            }
+        case .nhl:
+            switch raw {
+            case "C": return [.center, .forward, .utility]
+            case "LW": return [.leftWing, .forward, .utility]
+            case "RW": return [.rightWing, .forward, .utility]
+            case "D": return [.defense, .utility]
+            case "G": return [.goalie]
+            default: return [.bench]
+            }
+        case .nba:
+            switch raw {
+            case "PG": return [.pointGuard, .comboGuard, .utility]
+            case "SG": return [.shootingGuard, .comboGuard, .utility]
+            case "SF": return [.smallForward, .forward, .utility]
+            case "PF": return [.powerForward, .forward, .utility]
+            case "C": return [.center, .utility]
+            default: return [.bench]
+            }
+        case .mlb:
+            switch raw {
+            case "C": return [.center]
+            case "1B": return [.firstBase, .utility]
+            case "2B": return [.secondBase, .utility]
+            case "3B": return [.thirdBase, .utility]
+            case "SS": return [.shortstop, .utility]
+            case "OF", "LF", "CF", "RF": return [.outfield, .utility]
+            case "SP": return [.startingPitcher, .pitcher]
+            case "RP": return [.reliefPitcher, .pitcher]
+            case "P": return [.pitcher]
+            default: return [.bench]
+            }
+        }
+    }
+
+    private static func keyInfo(from statLine: StadiaFantasyStatLine?, sport: FantasySport) -> [String] {
+        guard let statLine else { return [] }
+        return FantasySportConfiguration.configuration(for: sport).relevantLiveStatistics.prefix(4).compactMap { stat in
+            let value = statLine[stat]
+            return value == 0 ? nil : "\(stat.abbreviation) \(value.formatted(.number.precision(.fractionLength(value.rounded() == value ? 0 : 1))))"
+        }
+    }
+}
+
+private struct ESPNSportsImageDTO: Decodable { let href: String? }
+private struct ESPNSportsPositionDTO: Decodable { let abbreviation: String?; let name: String? }
+private struct ESPNSportsInjuryDTO: Decodable { let status: String?; let type: String? }
+private struct ESPNSportsStatisticGroupDTO: Decodable { let splits: [ESPNSportsStatisticSplitDTO]? }
+private struct ESPNSportsStatisticSplitDTO: Decodable { let stats: [ESPNSportsStatisticDTO]? }
+private struct ESPNSportsStatisticDTO: Decodable { let name: String?; let abbreviation: String?; let value: Double?; let displayValue: String? }
 
 typealias ESPNHockeySportsDataProvider = ESPNSportsDataProvider
 

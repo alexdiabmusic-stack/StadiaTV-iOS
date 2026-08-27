@@ -444,95 +444,139 @@ struct StadiaFantasyCreateLeagueFlow: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("Fantasy Type") {
-                    Picker("Mode", selection: $selectedMode) {
-                        ForEach(StadiaFantasyMode.allCases) { mode in
-                            Text(mode.displayName).tag(mode)
+            ZStack {
+                Theme.background.ignoresSafeArea()
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("STADIA FANTASY", systemImage: selectedSport.symbolName)
+                                .font(.caption.weight(.heavy))
+                                .foregroundStyle(Theme.accent)
+                            Text(selectedMode == .personalTeam ? "Create your fantasy team" : "Create a simulated league")
+                                .font(.title2.weight(.black))
+                                .foregroundStyle(Theme.textPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text("Choose a sport, draft real ESPN-backed players, then track points and games inside Stadia.")
+                                .font(.subheadline)
+                                .foregroundStyle(Theme.textSecondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-                    }
-                    .pickerStyle(.segmented)
-                    Text(selectedMode == .personalTeam ? "Track one local fantasy roster against real games, live stats and Watch availability." : "Draft against locally generated CPU teams, play matchups and keep standings on this device.")
-                        .font(.footnote)
-                        .foregroundStyle(Theme.textSecondary)
-                }
-                Section("League Basics") {
-                    Picker("Sport", selection: $selectedSport) {
-                        ForEach(FantasySport.allCases) { sport in
-                            Label(sport.longDisplayName, systemImage: sport.symbolName).tag(sport)
-                        }
-                    }
-                    .onChange(of: selectedSport) { _, newSport in
-                        rosterConfiguration = .standard(for: newSport)
-                    }
-                    TextField(selectedMode == .personalTeam ? "Team name" : "League name", text: $leagueName)
-                    TextField("Your team name", text: $teamName)
-                    if selectedMode == .simulatedLeague {
-                        Stepper("\(maxTeams) teams", value: $maxTeams, in: 4...20, step: 2)
-                        Picker("Visibility", selection: $visibility) {
-                            ForEach(StadiaFantasyVisibility.allCases) { Text($0.displayName).tag($0) }
-                        }
-                    }
-                }
-                Section("Scoring Type") {
-                    Picker("Scoring", selection: $scoringType) {
-                        ForEach(StadiaFantasyScoringType.allCases) { Text($0.displayName).tag($0) }
-                    }
-                }
-                Section("Roster Configuration") {
-                    ForEach(FantasySportConfiguration.configuration(for: selectedSport).eligiblePositions) { slot in
-                        Stepper("\(slot.displayAbbreviation)  \(rosterConfiguration.slotCounts[slot] ?? 0)", value: Binding(
-                            get: { rosterConfiguration.slotCounts[slot] ?? 0 },
-                            set: { rosterConfiguration.slotCounts[slot] = $0 }
-                        ), in: 0...10)
-                    }
-                }
-                Section("Scoring Settings") {
-                    ForEach(StadiaFantasyScoringRules.stadiaDefault(sport: selectedSport, type: scoringType).rules) { rule in
-                        HStack {
-                            Text(rule.stat.abbreviation)
-                            Spacer()
-                            Text(rule.points.formatted(.number.precision(.fractionLength(1))))
+                        .padding(18)
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+
+                        setupCard(title: "Fantasy Type", systemImage: "switch.2") {
+                            Picker("Mode", selection: $selectedMode) {
+                                ForEach(StadiaFantasyMode.allCases) { mode in
+                                    Text(mode.displayName).tag(mode)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            Text(selectedMode == .personalTeam ? "One local roster for live scoring, season totals and Watch links." : "Local CPU opponents, generated schedules, standings and draft order.")
+                                .font(.footnote)
                                 .foregroundStyle(Theme.textSecondary)
                         }
-                    }
-                }
-                Section("Draft") {
-                    DatePicker("Draft time", selection: $draftDate)
-                    Stepper("\(pickTimer) second pick timer", value: $pickTimer, in: 30...300, step: 15)
-                }
-                if selectedMode == .simulatedLeague {
-                    Section("Waivers & Trades") {
-                        Picker("Waivers", selection: $waiverType) {
-                            ForEach(StadiaFantasyWaiverSettings.WaiverType.allCases) { Text($0.rawValue.capitalized).tag($0) }
+
+                        setupCard(title: "Sport & Identity", systemImage: selectedSport.symbolName) {
+                            Picker("Sport", selection: $selectedSport) {
+                                ForEach(FantasySport.allCases) { sport in
+                                    Label(sport.longDisplayName, systemImage: sport.symbolName).tag(sport)
+                                }
+                            }
+                            .onChange(of: selectedSport) { _, newSport in rosterConfiguration = .standard(for: newSport) }
+                            TextField(selectedMode == .personalTeam ? "Team name" : "League name", text: $leagueName)
+                                .textFieldStyle(.roundedBorder)
+                            TextField("Your team name", text: $teamName)
+                                .textFieldStyle(.roundedBorder)
+                            if selectedMode == .simulatedLeague {
+                                Stepper("\(maxTeams) teams", value: $maxTeams, in: 4...20, step: 2)
+                                Picker("Visibility", selection: $visibility) {
+                                    ForEach(StadiaFantasyVisibility.allCases) { Text($0.displayName).tag($0) }
+                                }
+                            }
                         }
-                        Text("Trades support propose, accept, reject and commissioner review in the service layer.")
-                            .font(.footnote)
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-                    Section("Schedule & Playoffs") {
-                        Stepper("\(playoffTeams) playoff teams", value: $playoffTeams, in: 2...12, step: 2)
-                    }
-                }
-                Section {
-                    Button {
-                        Task {
-                            await nativeStore.createLeague(createRequest)
-                            if nativeStore.lastError == nil { dismiss() }
+
+                        setupCard(title: "Scoring", systemImage: "chart.bar.fill") {
+                            Picker("Scoring", selection: $scoringType) {
+                                ForEach(StadiaFantasyScoringType.allCases) { Text($0.displayName).tag($0) }
+                            }
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 86), spacing: 8)], spacing: 8) {
+                                ForEach(StadiaFantasyScoringRules.stadiaDefault(sport: selectedSport, type: scoringType).rules.prefix(12)) { rule in
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(rule.stat.abbreviation)
+                                            .font(.caption2.weight(.heavy))
+                                            .foregroundStyle(Theme.textSecondary)
+                                        Text(rule.points.formatted(.number.precision(.fractionLength(1))))
+                                            .font(.headline.weight(.bold).monospacedDigit())
+                                            .foregroundStyle(Theme.textPrimary)
+                                    }
+                                    .padding(9)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                }
+                            }
                         }
-                    } label: {
-                        Label(selectedMode == .personalTeam ? "Create Fantasy Team" : "Create League", systemImage: "checkmark.circle.fill")
-                            .frame(maxWidth: .infinity)
+
+                        setupCard(title: "Roster", systemImage: "person.3.fill") {
+                            ForEach(FantasySportConfiguration.configuration(for: selectedSport).eligiblePositions) { slot in
+                                Stepper("\(slot.displayAbbreviation)  \(rosterConfiguration.slotCounts[slot] ?? 0)", value: Binding(
+                                    get: { rosterConfiguration.slotCounts[slot] ?? 0 },
+                                    set: { rosterConfiguration.slotCounts[slot] = $0 }
+                                ), in: 0...10)
+                            }
+                        }
+
+                        setupCard(title: "Draft", systemImage: "rectangle.grid.2x2") {
+                            DatePicker("Draft time", selection: $draftDate)
+                            Stepper("\(pickTimer) second pick timer", value: $pickTimer, in: 30...300, step: 15)
+                        }
+
+                        if selectedMode == .simulatedLeague {
+                            setupCard(title: "League Rules", systemImage: "slider.horizontal.3") {
+                                Picker("Waivers", selection: $waiverType) {
+                                    ForEach(StadiaFantasyWaiverSettings.WaiverType.allCases) { Text($0.rawValue.capitalized).tag($0) }
+                                }
+                                Stepper("\(playoffTeams) playoff teams", value: $playoffTeams, in: 2...12, step: 2)
+                            }
+                        }
+
+                        Button {
+                            Task {
+                                await nativeStore.createLeague(createRequest)
+                                if nativeStore.lastError == nil { dismiss() }
+                            }
+                        } label: {
+                            Label(selectedMode == .personalTeam ? "Create Fantasy Team" : "Create League", systemImage: "checkmark.circle.fill")
+                                .font(.headline.weight(.bold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(Theme.accent)
+                        .disabled(leagueName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || teamName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                        if let error = nativeStore.lastError {
+                            StadiaFantasyInfoCard(systemImage: "exclamationmark.triangle", title: "Could not create Fantasy", subtitle: error)
+                        }
                     }
-                    .disabled(leagueName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || teamName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-                if let error = nativeStore.lastError {
-                    Section { Text(error).foregroundStyle(Theme.starting) }
+                    .padding(20)
                 }
             }
-            .navigationTitle("Create League")
+            .navigationTitle("Create Fantasy")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
         }
+    }
+
+    private func setupCard<Content: View>(title: String, systemImage: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(title.uppercased(), systemImage: systemImage)
+                .font(.caption.weight(.heavy))
+                .foregroundStyle(Theme.textSecondary)
+            content()
+        }
+        .padding(16)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     private var createRequest: StadiaFantasyCreateLeagueRequest {
@@ -596,6 +640,8 @@ struct StadiaFantasyDraftRoomView: View {
     @State private var query = ""
     @State private var positionFilter: String = "All"
     @State private var teamFilter: String = "All"
+    @State private var minimumPoints = 0.0
+    @State private var selectedPlayer: StadiaFantasyAvailablePlayer?
 
     private var positions: [String] {
         ["All"] + Array(Set(nativeStore.availablePlayers.compactMap(\.position))).sorted()
@@ -610,7 +656,10 @@ struct StadiaFantasyDraftRoomView: View {
         let available = nativeStore.availablePlayers.filter { !rostered.contains($0.id) }
         let searched = query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? available : available.filter { $0.fullName.localizedCaseInsensitiveContains(query) || ($0.teamAbbreviation?.localizedCaseInsensitiveContains(query) == true) || ($0.position?.localizedCaseInsensitiveContains(query) == true) }
         return searched.filter { player in
-            (positionFilter == "All" || player.position == positionFilter) && (teamFilter == "All" || player.teamAbbreviation == teamFilter)
+            let matchesPosition = positionFilter == "All" || player.position == positionFilter
+            let matchesTeam = teamFilter == "All" || player.teamAbbreviation == teamFilter
+            let matchesPoints = minimumPoints == 0 || (player.lastSeasonFantasyPoints ?? -1) >= minimumPoints
+            return matchesPosition && matchesTeam && matchesPoints
         }
     }
 
@@ -625,38 +674,201 @@ struct StadiaFantasyDraftRoomView: View {
                         .padding(12)
                         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                         .padding(.horizontal, 16)
-                    HStack(spacing: 10) {
-                        Picker("Position", selection: $positionFilter) {
-                            ForEach(positions, id: \.self) { Text($0).tag($0) }
-                        }
-                        Picker("Team", selection: $teamFilter) {
-                            ForEach(teams, id: \.self) { Text($0).tag($0) }
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .padding(.horizontal, 16)
-                    List(filteredPlayers) { player in
+                    VStack(alignment: .leading, spacing: 10) {
                         HStack(spacing: 10) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(player.fullName)
-                                    .font(.headline)
-                                Text([player.teamAbbreviation, player.position, player.eligibleSlots.map(\.displayAbbreviation).joined(separator: "/")].compactMap { $0 }.joined(separator: " · "))
-                                    .font(.caption)
-                                    .foregroundStyle(Theme.textSecondary)
+                            Picker("Position", selection: $positionFilter) {
+                                ForEach(positions, id: \.self) { Text($0).tag($0) }
                             }
-                            Spacer()
-                            Button("Draft") { Task { await nativeStore.draft(player: player) } }
-                                .buttonStyle(.borderedProminent)
+                            Picker("Team", selection: $teamFilter) {
+                                ForEach(teams, id: \.self) { Text($0).tag($0) }
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("Last season points")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Theme.textSecondary)
+                                Spacer()
+                                Text(minimumPoints == 0 ? "Any" : minimumPoints.formatted(.number.precision(.fractionLength(0))))
+                                    .font(.caption.weight(.bold).monospacedDigit())
+                                    .foregroundStyle(Theme.accent)
+                            }
+                            Slider(value: $minimumPoints, in: 0...500, step: 10)
                                 .tint(Theme.accent)
                         }
                     }
+                    .padding(12)
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                    .padding(.horizontal, 16)
+                    List(filteredPlayers) { player in
+                        StadiaFantasyDraftPlayerRow(
+                            player: player,
+                            onOpen: { selectedPlayer = player },
+                            onDraft: { Task { await nativeStore.draft(player: player) } }
+                        )
+                        .listRowBackground(Color.clear)
+                    }
+                    .listStyle(.plain)
                     .scrollContentBackground(.hidden)
                 }
             }
             .navigationTitle("Draft Room")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
             .task { await nativeStore.loadAvailablePlayers() }
+            .sheet(item: $selectedPlayer) { player in
+                StadiaFantasyPlayerStatsSheet(player: player)
+            }
         }
+    }
+}
+
+private struct StadiaFantasyDraftPlayerRow: View {
+    let player: StadiaFantasyAvailablePlayer
+    let onOpen: () -> Void
+    let onDraft: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onOpen) {
+                HStack(spacing: 12) {
+                    StadiaFantasyPlayerHeadshot(url: player.headshotURL, name: player.fullName, size: 46)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(player.fullName)
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(Theme.textPrimary)
+                            .lineLimit(1)
+                        Text([player.teamAbbreviation, player.position, player.eligibleSlots.map(\.displayAbbreviation).joined(separator: "/")].compactMap { $0 }.joined(separator: " · "))
+                            .font(.caption)
+                            .foregroundStyle(Theme.textSecondary)
+                            .lineLimit(1)
+                        if !player.keyInfo.isEmpty {
+                            Text(player.keyInfo.prefix(4).joined(separator: " · "))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(Theme.textTertiary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            Spacer(minLength: 8)
+            VStack(alignment: .trailing, spacing: 6) {
+                Text(player.lastSeasonFantasyPoints.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "--")
+                    .font(.caption.weight(.heavy).monospacedDigit())
+                    .foregroundStyle(player.lastSeasonFantasyPoints == nil ? Theme.textTertiary : Theme.accent)
+                Button("Draft", action: onDraft)
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.accent)
+                    .controlSize(.small)
+            }
+        }
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(player.fullName), \(player.teamAbbreviation ?? "team unavailable"), \(player.position ?? "position unavailable"), last season fantasy points \(player.lastSeasonFantasyPoints.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "unavailable")")
+    }
+}
+
+private struct StadiaFantasyPlayerStatsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let player: StadiaFantasyAvailablePlayer
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Theme.background.ignoresSafeArea()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 18) {
+                        HStack(spacing: 14) {
+                            StadiaFantasyPlayerHeadshot(url: player.headshotURL, name: player.fullName, size: 72)
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(player.fullName)
+                                    .font(.title2.weight(.black))
+                                    .foregroundStyle(Theme.textPrimary)
+                                    .lineLimit(2)
+                                Text([player.teamAbbreviation, player.position].compactMap { $0 }.joined(separator: " · "))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                        }
+                        .padding(16)
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("LAST SEASON")
+                                .font(.caption.weight(.heavy))
+                                .foregroundStyle(Theme.textSecondary)
+                            HStack {
+                                Text("Fantasy points")
+                                    .foregroundStyle(Theme.textSecondary)
+                                Spacer()
+                                Text(player.lastSeasonFantasyPoints.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "Unavailable")
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(Theme.textPrimary)
+                            }
+                            if let statLine = player.lastSeasonStatLine {
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 86), spacing: 10)], spacing: 10) {
+                                    ForEach(statLine.values.sorted { $0.key.abbreviation < $1.key.abbreviation }, id: \.key) { stat, value in
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(stat.abbreviation)
+                                                .font(.caption2.weight(.heavy))
+                                                .foregroundStyle(Theme.textSecondary)
+                                            Text(value.formatted(.number.precision(.fractionLength(value.rounded() == value ? 0 : 2))))
+                                                .font(.headline.weight(.bold).monospacedDigit())
+                                                .foregroundStyle(Theme.textPrimary)
+                                        }
+                                        .padding(10)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                    }
+                                }
+                            } else {
+                                StadiaFantasyInfoCard(systemImage: "chart.bar.doc.horizontal", title: "Stats unavailable", subtitle: "ESPN did not return season statistics for this player in the roster feed.")
+                            }
+                        }
+                        .padding(16)
+                        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                    .padding(20)
+                }
+            }
+            .navigationTitle("Player Card")
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
+        }
+    }
+}
+
+private struct StadiaFantasyPlayerHeadshot: View {
+    let url: URL?
+    let name: String
+    let size: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle().fill(Theme.surfaceElevated)
+            if let url {
+                AsyncImage(url: url) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Image(systemName: "person.crop.circle.fill")
+                        .foregroundStyle(Theme.textTertiary)
+                }
+            } else {
+                Text(initials)
+                    .font(.caption.weight(.black))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .overlay(Circle().strokeBorder(Theme.hairline))
+        .accessibilityHidden(true)
+    }
+
+    private var initials: String {
+        String(name.split(separator: " ").compactMap(\.first).prefix(2)).uppercased()
     }
 }
 

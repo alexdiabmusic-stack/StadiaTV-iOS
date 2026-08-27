@@ -28,13 +28,14 @@ struct ESPNService {
         return URLSession(configuration: config)
     }()
 
-    // ESPN's CDN requires a browser-like User-Agent; requests with no UA are blocked.
+    // ESPN's WAF blocks requests with no User-Agent or with browser CORS headers
+    // (Origin/Referer) sent from a native app. Keep only the headers a native
+    // app legitimately sends so the WAF treats this as a first-party API call.
     static let apiHeaders: [AnyHashable: Any] = [
-        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
-        "Accept": "application/json, text/plain, */*",
+        "User-Agent": "ESPN/5.14 CFNetwork/1494.0.7 Darwin/23.4.0",
+        "Accept": "application/json",
         "Accept-Language": "en-US,en;q=0.9",
-        "Referer": "https://www.espn.com/",
-        "Origin": "https://www.espn.com",
+        "Accept-Encoding": "gzip, deflate, br",
     ]
 
     /// Fetches the scoreboard for a league. `date` narrows to a single day (YYYYMMDD) when provided.

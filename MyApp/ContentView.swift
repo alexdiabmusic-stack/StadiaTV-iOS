@@ -12,6 +12,7 @@ struct MyApp: App {
     @StateObject private var channelPrefsStore = ChannelPreferencesStore()
     @StateObject private var customGroupStore = CustomGroupStore()
     @StateObject private var groupPrefsStore = GroupPreferencesStore()
+    @StateObject private var fantasyStore = FantasyStore.shared
 
     var body: some Scene {
         WindowGroup {
@@ -40,6 +41,7 @@ struct MyApp: App {
             .environmentObject(channelPrefsStore)
             .environmentObject(customGroupStore)
             .environmentObject(groupPrefsStore)
+            .environmentObject(fantasyStore)
             .environmentObject(ProgrammeReminderStore.shared)
             .environmentObject(RecordingService.shared)
             .environmentObject(ParentalControlStore.shared)
@@ -49,6 +51,7 @@ struct MyApp: App {
             #endif
             .preferredColorScheme(preferences.appearance.colorScheme)
             .task { await playlistStore.refreshAll() }
+            .task { await fantasyStore.refresh(channels: playlistStore.allChannels, preferredLanguages: preferences.preferredStreamLanguages) }
         }
     }
 }
@@ -57,6 +60,7 @@ struct RootView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var podcastStore: PodcastStore
     @EnvironmentObject private var playlistStore: PlaylistStore
+    @EnvironmentObject private var fantasyStore: FantasyStore
     @StateObject private var liveViewModel = LiveViewModel()
     @StateObject private var epgRepository = EPGRepository()
     @StateObject private var guideStore = GuideChannelStore()
@@ -105,6 +109,7 @@ struct RootView: View {
         .task { epgRepository.setupWithChannels(playlistStore.allChannels) }
         .onChange(of: playlistStore.channelsByPlaylist) {
             epgRepository.setupWithChannels(playlistStore.allChannels)
+            Task { await fantasyStore.refresh(channels: playlistStore.allChannels, preferredLanguages: prefs.preferredStreamLanguages, force: true) }
         }
         .onChange(of: prefs.favoriteTeams) { updateFavoriteNotificationPrompt() }
         .onChange(of: prefs.matchNotificationsEnabled) { updateFavoriteNotificationPrompt() }
@@ -144,5 +149,6 @@ struct RootView: View {
         .environmentObject(PredictionsStore())
         .environmentObject(ArticleLibraryStore())
         .environmentObject(PodcastStore())
+        .environmentObject(FantasyStore.shared)
         .preferredColorScheme(.dark)
 }

@@ -151,6 +151,7 @@ struct NewsView: View {
     }
 
     private var emptyText: String {
+        if let err = viewModel.lastError { return err }
         if let league = selectedLeague {
             return "ESPN did not return news for \(league.name)."
         }
@@ -166,6 +167,7 @@ final class NewsViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var loadingLeagueIDs: Set<String> = []
     @Published private(set) var isLoadingMore = false
+    @Published private(set) var lastError: String?
 
     private let service = ESPNService()
     private var pagesByLeague: [String: Int] = [:]   // last page fetched per league (1-indexed)
@@ -266,7 +268,12 @@ final class NewsViewModel: ObservableObject {
         // Only the site feed is league-specific. ESPN's "Now" feed ignores its
         // league parameter and returns global headlines, which made every
         // filter show the same stories under a different tag.
-        (try? await service.news(for: league, limit: 50, page: page)) ?? []
+        do {
+            return try await service.news(for: league, limit: 50, page: page)
+        } catch {
+            lastError = error.localizedDescription
+            return []
+        }
     }
 }
 

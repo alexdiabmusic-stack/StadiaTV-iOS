@@ -2,6 +2,12 @@ import SwiftUI
 
 // MARK: - Entity filter
 
+private enum FollowingMode: String, CaseIterable, Identifiable {
+    case following = "Following"
+    case fantasy = "Fantasy"
+    var id: String { rawValue }
+}
+
 private enum FollowingSelection: Hashable {
     case all
     case team(FavoriteTeam)
@@ -22,7 +28,10 @@ struct MatchesView: View {
     @StateObject private var viewModel = MatchesViewModel()
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var predictions: PredictionsStore
+    @EnvironmentObject private var fantasyStore: FantasyStore
+    @EnvironmentObject private var playlists: PlaylistStore
 
+    @State private var mode: FollowingMode = .following
     @State private var selectedSelection: FollowingSelection = .all
     @State private var comingUpSportFilter: SportGroup? = nil
     @State private var showingTeamEditor = false
@@ -39,16 +48,18 @@ struct MatchesView: View {
                 Theme.background.ignoresSafeArea()
                 content
             }
-            .navigationTitle("Following")
+            .navigationTitle(mode.rawValue)
             .navigationBarTitleDisplayMode(.large)
             .toolbarBackground(Theme.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Edit") { showingTeamEditor = true }
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(Theme.accent)
+                    if mode == .following {
+                        Button("Edit") { showingTeamEditor = true }
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(Theme.accent)
+                    }
                 }
             }
             .sheet(isPresented: $showingTeamEditor) { TeamEditorView() }
@@ -110,12 +121,35 @@ struct MatchesView: View {
 
     @ViewBuilder
     private var content: some View {
-        if prefs.favoriteTeams.isEmpty && prefs.explicitlyFollowedLeagues.isEmpty {
-            FollowingEmptyStateView { showingTeamEditor = true }
-        } else if viewModel.isLoadingFollowing && viewModel.allFollowedMatches.isEmpty {
-            FollowingSkeletonView()
-        } else {
-            mainScroll
+        VStack(spacing: 0) {
+            modeSwitch
+            if mode == .fantasy {
+                FantasyDashboardView()
+            } else if prefs.favoriteTeams.isEmpty && prefs.explicitlyFollowedLeagues.isEmpty {
+                FollowingEmptyStateView { showingTeamEditor = true }
+            } else if viewModel.isLoadingFollowing && viewModel.allFollowedMatches.isEmpty {
+                FollowingSkeletonView()
+            } else {
+                mainScroll
+            }
+        }
+        .animation(.snappy, value: mode)
+    }
+
+    private var modeSwitch: some View {
+        Picker("Following mode", selection: $mode) {
+            ForEach(FollowingMode.allCases) { mode in
+                Text(mode.rawValue).tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+        .background(Theme.background)
+        .onChange(of: mode) { _, newMode in
+            guard newMode == .fantasy else { return }
+            Task { await fantasyStore.refresh(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages) }
         }
     }
 

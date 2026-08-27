@@ -5,6 +5,7 @@ enum AppConfiguration {
     private static let oddsAPIBaseURLName = "OddsAPIBaseURL"
     private static let backendBaseURLName = "BackendBaseURL"
     private static let youtubeAPIKeyName = "YouTubeAPIKey"
+    private nonisolated static let espnFantasyEnabledName = "ESPNFantasyProviderEnabled"
 
     static var oddsAPIKey: String? {
         sanitizedString(for: oddsAPIKeyName)
@@ -32,7 +33,12 @@ enum AppConfiguration {
         youtubeAPIKey != nil
     }
 
-    private static func sanitizedString(for key: String) -> String? {
+    nonisolated static var isESPNFantasyProviderEnabled: Bool {
+        guard let value = sanitizedString(for: espnFantasyEnabledName)?.lowercased() else { return true }
+        return ["1", "true", "yes", "enabled"].contains(value)
+    }
+
+    private nonisolated static func sanitizedString(for key: String) -> String? {
         guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !trimmed.hasPrefix("__") else { return nil }

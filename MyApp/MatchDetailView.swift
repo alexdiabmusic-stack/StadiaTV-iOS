@@ -10,6 +10,7 @@ struct MatchDetailView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var entitlements: EntitlementStore
     @EnvironmentObject private var predictions: PredictionsStore
+    @EnvironmentObject private var fantasyStore: FantasyStore
     @State private var showingAllChannels = false
     @State private var spoilerRevealed = false
     @State private var playingChannel: Channel?
@@ -87,6 +88,7 @@ struct MatchDetailView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     scoreboard
+                    fantasySection
                     picksSection
                     headToHeadSection
                     if match.state == .final {
@@ -248,6 +250,66 @@ struct MatchDetailView: View {
         .padding(16)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+    }
+
+    @ViewBuilder
+    private var fantasySection: some View {
+        if let context = fantasyStore.fantasyEventContext(for: match) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "star.fill")
+                        .foregroundStyle(Theme.accent)
+                    Text("YOUR FANTASY PLAYERS")
+                        .font(.caption.weight(.heavy))
+                        .foregroundStyle(Theme.accent)
+                    Spacer()
+                    Text("\(context.playerGames.count)")
+                        .font(.caption.weight(.bold).monospacedDigit())
+                        .foregroundStyle(Theme.textSecondary)
+                }
+
+                VStack(spacing: 0) {
+                    ForEach(context.playerGames) { game in
+                        HStack(spacing: 10) {
+                            Text(game.lineupPosition ?? game.fantasyPlayer.position ?? "--")
+                                .font(.caption2.weight(.heavy))
+                                .foregroundStyle(game.isFantasyStarter ? Theme.accent : Theme.textSecondary)
+                                .frame(width: 42, alignment: .leading)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(game.fantasyPlayer.fullName)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Theme.textPrimary)
+                                    .lineLimit(1)
+                                Text(game.isFantasyStarter ? "Starter" : game.isFantasyBench ? "Bench" : "Roster")
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                            Spacer(minLength: 8)
+                            if let points = game.fantasyPoints {
+                                Text(points.formatted(.number.precision(.fractionLength(1))))
+                                    .font(.subheadline.weight(.bold).monospacedDigit())
+                                    .foregroundStyle(Theme.textPrimary)
+                            }
+                        }
+                        .padding(.vertical, 8)
+                        if game.id != context.playerGames.last?.id { Divider().overlay(Theme.hairline) }
+                    }
+                }
+
+                if let channel = context.matchedChannel?.channel, match.state != .final {
+                    Button { playingChannel = channel } label: {
+                        Label(match.state == .live ? "Watch" : "Watch when live", systemImage: "play.fill")
+                            .font(.subheadline.weight(.bold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(match.state == .live ? Theme.live : Theme.accent)
+                }
+            }
+            .padding(14)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        }
     }
 
     private var statusLine: some View {

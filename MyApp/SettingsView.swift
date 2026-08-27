@@ -734,6 +734,12 @@ The App may store information such as:
 
 These preferences are stored locally on your device and are used to personalize your experience.
 
+Fantasy sports
+
+If you connect Sleeper, StadiaTV resolves the Sleeper username or user ID directly with Sleeper and stores the stable Sleeper user ID locally on your device. Sleeper league, roster, matchup, player-directory cache, player mappings, and linked-game context are stored locally so Fantasy can load efficiently and degrade gracefully offline.
+
+StadiaTV does not require a Stadia account for Fantasy and does not send playlist credentials, stream URLs, IPTV provider details, or video traffic to StadiaTV-operated servers for Fantasy features.
+
 Sports and news information
 
 The App obtains scores, schedules, standings, statistics, news, and related information from external data services.
@@ -962,6 +968,271 @@ Feature ideas, sports coverage requests, bug reports, and design feedback are we
 """)
             }
         }
+    }
+}
+
+struct FantasySettingsView: View {
+    @EnvironmentObject private var fantasyStore: FantasyStore
+    @EnvironmentObject private var playlists: PlaylistStore
+    @EnvironmentObject private var prefs: PreferencesStore
+    @State private var showingConnect = false
+    @State private var showingESPNConnect = false
+    @State private var showingDisconnectConfirmation = false
+
+    var body: some View {
+        SettingsPage(title: "Fantasy") {
+            SettingsPanel(title: "CONNECTED ACCOUNTS") {
+                if let connection = fantasyStore.currentConnection {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 12) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(Theme.upcoming)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(connection.displayName ?? connection.username ?? connection.provider.displayName)
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(Theme.textPrimary)
+                                Text("\(connection.provider.displayName) · ID \(connection.providerUserID)")
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.textSecondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                            Spacer()
+                        }
+                        if fantasyStore.isStale {
+                            Label("Using cached Fantasy data", systemImage: "wifi.slash")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Theme.starting)
+                        }
+                    }
+                    .padding(14)
+                } else {
+                    Button { showingConnect = true } label: {
+                        SettingsDisclosureRow(title: "Connect Sleeper", value: "NFL")
+                    }
+                    .buttonStyle(.plain)
+                    if AppConfiguration.isESPNFantasyProviderEnabled {
+                        Divider().overlay(Theme.hairline)
+                        Button { showingESPNConnect = true } label: {
+                            SettingsDisclosureRow(title: "Connect ESPN Fantasy Hockey", value: "NHL")
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            SettingsPanel(title: "DEFAULT LEAGUE") {
+                if fantasyStore.leagues.isEmpty {
+                    InfoTextRow(fantasyStore.currentConnection == nil ? "Connect a Fantasy provider to load your leagues." : "No Fantasy leagues are available for the current season.")
+                } else {
+                    Menu {
+                        ForEach(fantasyStore.leagues) { league in
+                            Button {
+                                Task { await fantasyStore.selectLeague(id: league.id, channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages) }
+                            } label: {
+                                if fantasyStore.selectedLeague?.id == league.id {
+                                    Label(league.name, systemImage: "checkmark")
+                                } else {
+                                    Text(league.name)
+                                }
+                            }
+                        }
+                    } label: {
+                        SettingsDisclosureRow(title: "Default League", value: fantasyStore.selectedLeague?.name ?? "Choose")
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            SettingsPanel(title: "DISPLAY") {
+                SettingsToggleRow(title: "Show Fantasy on Home", isOn: fantasyBinding(\.showFantasyOnHome) { await fantasyStore.setShowFantasyOnHome($0) })
+                Divider().overlay(Theme.hairline)
+                SettingsToggleRow(title: "Fantasy Indicators in Live", isOn: fantasyBinding(\.showFantasyIndicatorsInLive) { await fantasyStore.setShowFantasyIndicatorsInLive($0) })
+                Divider().overlay(Theme.hairline)
+                SettingsToggleRow(title: "Fantasy Indicators in Guide", isOn: fantasyBinding(\.showFantasyIndicatorsInGuide) { await fantasyStore.setShowFantasyIndicatorsInGuide($0) })
+                Divider().overlay(Theme.hairline)
+                SettingsToggleRow(title: "Fantasy Player Overlay", isOn: fantasyBinding(\.showFantasyPlayerOverlay) { await fantasyStore.setShowFantasyPlayerOverlay($0) })
+            }
+
+            SettingsPanel(title: "DIAGNOSTICS") {
+                VStack(spacing: 0) {
+                    DiagnosticValueRow(title: "Provider", value: fantasyStore.diagnostics.provider?.displayName ?? "None")
+                    Divider().overlay(Theme.hairline)
+                    DiagnosticValueRow(title: "State", value: contentStateText(fantasyStore.diagnostics.contentState))
+                    Divider().overlay(Theme.hairline)
+                    DiagnosticValueRow(title: "Leagues", value: "\(fantasyStore.diagnostics.leagueCount)")
+                    Divider().overlay(Theme.hairline)
+                    DiagnosticValueRow(title: "Roster Players", value: "\(fantasyStore.diagnostics.rosterPlayerCount)")
+                    Divider().overlay(Theme.hairline)
+                    DiagnosticValueRow(title: "Linked Games", value: "\(fantasyStore.diagnostics.linkedGameCount)")
+                    Divider().overlay(Theme.hairline)
+                    DiagnosticValueRow(title: "Watchable", value: "\(fantasyStore.diagnostics.watchableGameCount)")
+                    Divider().overlay(Theme.hairline)
+                    DiagnosticValueRow(title: "Unresolved", value: "\(fantasyStore.diagnostics.unresolvedPlayerCount)")
+                    Divider().overlay(Theme.hairline)
+                    DiagnosticValueRow(title: "Last Refresh", value: lastRefreshText)
+                }
+            }
+
+            if fantasyStore.currentConnection != nil {
+                SettingsPanel(title: "ACTIONS") {
+                    Button(role: .destructive) { showingDisconnectConfirmation = true } label: {
+                        SettingsDisclosureRow(title: "Disconnect \(fantasyStore.currentConnection?.provider.displayName ?? "Fantasy")", destructive: true)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .sheet(isPresented: $showingConnect) {
+            SleeperConnectSheet(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
+        }
+        .sheet(isPresented: $showingESPNConnect) {
+            ESPNFantasyHockeyConnectSheet(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
+        }
+        .confirmationDialog("Disconnect Fantasy?", isPresented: $showingDisconnectConfirmation, titleVisibility: .visible) {
+            Button("Disconnect", role: .destructive) {
+                Task { await fantasyStore.disconnect() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the local Fantasy connection, provider credentials and Fantasy caches without changing playlists, favourites, recordings or other Stadia settings.")
+        }
+        .task {
+            await fantasyStore.refresh(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
+        }
+    }
+
+    private var lastRefreshText: String {
+        guard let refreshedAt = fantasyStore.diagnostics.refreshedAt else { return "Never" }
+        return refreshedAt.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private func fantasyBinding(_ keyPath: KeyPath<FantasySettings, Bool>, setter: @escaping (Bool) async -> Void) -> Binding<Bool> {
+        Binding(
+            get: { fantasyStore.settings[keyPath: keyPath] },
+            set: { value in Task { await setter(value) } }
+        )
+    }
+
+    private func contentStateText(_ state: FantasyContentState) -> String {
+        switch state {
+        case .disconnected: return "Disconnected"
+        case .loading: return "Loading"
+        case .noLeagues: return "No leagues"
+        case .preDraft: return "Pre-draft"
+        case .inSeason: return "In season"
+        case .seasonComplete: return "Season complete"
+        case .offSeason: return "Off-season"
+        case .noCurrentMatchup: return "No matchup"
+        case .noFantasyPlayersToday: return "No games today"
+        case .playersScheduled: return "Players scheduled"
+        case .playersLive: return "Players live"
+        case .partialData: return "Partial data"
+        case .providerUnavailable: return "Provider unavailable"
+        case .offlineWithCachedData: return "Offline cached"
+        }
+    }
+}
+
+struct ESPNFantasyHockeyConnectSheet: View {
+    let channels: [Channel]
+    let preferredLanguages: Set<String>
+
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var fantasyStore: FantasyStore
+    @State private var leagueID = ""
+    @State private var seasonID = String(Calendar.current.component(.year, from: Date()))
+    @State private var teamID = ""
+    @State private var espnS2 = ""
+    @State private var swid = ""
+    @State private var includePrivateCredentials = false
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Theme.background.ignoresSafeArea()
+                Form {
+                    Section("League") {
+                        TextField("League ID", text: $leagueID)
+                            .keyboardType(.numberPad)
+                        TextField("Season", text: $seasonID)
+                            .keyboardType(.numberPad)
+                        TextField("Your team ID", text: $teamID)
+                            .keyboardType(.numberPad)
+                        Text("For public leagues, enter your ESPN Fantasy team ID so Stadia knows which roster is yours.")
+                            .font(.footnote)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+
+                    Section("Private League") {
+                        Toggle("Use ESPN session cookies", isOn: $includePrivateCredentials)
+                        if includePrivateCredentials {
+                            SecureField("espn_s2", text: $espnS2)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                            SecureField("SWID", text: $swid)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                            Text("These values are stored in Keychain and sent only as ESPN Cookie headers. Never enter your ESPN password.")
+                                .font(.footnote)
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                    }
+
+                    if let error = fantasyStore.lastError {
+                        Section {
+                            Text(error)
+                                .foregroundStyle(Theme.starting)
+                        }
+                    }
+                }
+                .scrollContentBackground(.hidden)
+            }
+            .navigationTitle("ESPN Fantasy Hockey")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Connect") {
+                        Task {
+                            await fantasyStore.connectESPNHockey(
+                                leagueID: leagueID,
+                                seasonID: Int(seasonID) ?? Calendar.current.component(.year, from: Date()),
+                                teamID: Int(teamID),
+                                espnS2: includePrivateCredentials ? espnS2 : nil,
+                                swid: includePrivateCredentials ? swid : nil,
+                                channels: channels,
+                                preferredLanguages: preferredLanguages
+                            )
+                            if fantasyStore.currentConnection?.provider == .espn { dismiss() }
+                        }
+                    }
+                    .disabled(leagueID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+}
+
+private struct DiagnosticValueRow: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.body)
+                .foregroundStyle(Theme.textPrimary)
+            Spacer()
+            Text(value)
+                .font(.subheadline)
+                .foregroundStyle(Theme.textSecondary)
+                .multilineTextAlignment(.trailing)
+                .lineLimit(2)
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 44)
     }
 }
 

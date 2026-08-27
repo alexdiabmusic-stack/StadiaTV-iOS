@@ -8,6 +8,7 @@
 
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* StadiaTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StadiaTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D2268B0E303FB4B90014AE4B /* FantasyFoundationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasyFoundationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -45,6 +46,7 @@
 			children = (
 				000000000000000000000010 /* MyApp */,
 				000000000000000000000020 /* Products */,
+				D2268B0D303FB4760014AE4B /* StadiaTVTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -54,6 +56,14 @@
 				000000000000000000000120 /* StadiaTV.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		D2268B0D303FB4760014AE4B /* StadiaTVTests */ = {
+			isa = PBXGroup;
+			children = (
+				D2268B0E303FB4B90014AE4B /* FantasyFoundationTests.swift */,
+			);
+			path = StadiaTVTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

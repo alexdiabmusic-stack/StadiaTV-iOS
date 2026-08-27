@@ -39,6 +39,7 @@ enum ScheduleDay: String, CaseIterable, Identifiable {
 struct HomeView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var watchStore: WatchStore
+    @EnvironmentObject private var fantasyStore: FantasyStore
     @StateObject private var viewModel = HomeViewModel()
     @State private var playingChannel: Channel?
     @State private var selectedLiveSport: SportGroup?
@@ -132,6 +133,8 @@ struct HomeView: View {
                 heroSection
 
                 sportsDaySummaryCard
+
+                fantasyContextCard
 
                 liveNowSection
 
@@ -245,6 +248,75 @@ struct HomeView: View {
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
     }
 
+    // MARK: - Fantasy Context
+
+    @ViewBuilder
+    private var fantasyContextCard: some View {
+        if fantasyStore.settings.showFantasyOnHome, let summary = homeFantasySummary {
+            HStack(spacing: 12) {
+                Image(systemName: summary.isLive ? "star.circle.fill" : "star.fill")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(summary.isLive ? Theme.live : Theme.accent)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(summary.title)
+                        .font(.caption.weight(.heavy))
+                        .foregroundStyle(summary.isLive ? Theme.live : Theme.accent)
+                    Text(summary.subtitle)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                if let channel = summary.watchChannel {
+                    Button { playingChannel = channel } label: {
+                        Label("Watch", systemImage: "play.fill")
+                            .font(.caption.weight(.bold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(summary.isLive ? Theme.live : Theme.accent)
+                } else {
+                    NavigationLink { FantasyDashboardView() } label: {
+                        HStack(spacing: 5) {
+                            Text("View")
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Theme.accent)
+                    }
+                }
+            }
+            .padding(14)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
+        }
+    }
+
+    private var homeFantasySummary: HomeFantasySummary? {
+        let liveContexts = fantasyStore.liveEventContexts
+        if !liveContexts.isEmpty {
+            let playerCount = liveContexts.reduce(0) { $0 + $1.playerGames.count }
+            let total = fantasyStore.matchup?.userTeam.effectivePoints
+            let points = total.map { " · \($0.formatted(.number.precision(.fractionLength(1)))) pts" } ?? ""
+            return HomeFantasySummary(
+                title: "FANTASY LIVE",
+                subtitle: "\(playerCount) player\(playerCount == 1 ? "" : "s") · \(liveContexts.count) NHL game\(liveContexts.count == 1 ? "" : "s")\(points)",
+                isLive: true,
+                watchChannel: liveContexts.first(where: { $0.watchAvailable })?.matchedChannel?.channel
+            )
+        }
+        let todayContexts = fantasyStore.todayEventContexts.filter { $0.isUpcoming }
+        if !todayContexts.isEmpty {
+            let playerCount = todayContexts.reduce(0) { $0 + $1.playerGames.count }
+            return HomeFantasySummary(
+                title: "FANTASY TONIGHT",
+                subtitle: "\(playerCount) player\(playerCount == 1 ? "" : "s") · \(todayContexts.count) NHL game\(todayContexts.count == 1 ? "" : "s")",
+                isLive: false,
+                watchChannel: nil
+            )
+        }
+        return nil
+    }
+
     // MARK: - Live Now
 
     private var liveNowSection: some View {
@@ -315,6 +387,13 @@ struct HomeView: View {
         }
         .padding(32)
     }
+}
+
+private struct HomeFantasySummary {
+    let title: String
+    let subtitle: String
+    let isLive: Bool
+    let watchChannel: Channel?
 }
 
 // MARK: - Home Filter Bar
@@ -1460,16 +1539,27 @@ final class HomeViewModel: ObservableObject {
         let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
         var matchesByLeague: [String: [Match]] = [:]
 
-        await withTaskGroup(of: (String, [Match]).self) { group in
+        var firstError: String?
+        await withTaskGroup(of: (String, Result<[Match], Error>).self) { group in
             for league in leagues {
                 group.addTask {
-                    (league.id, (try? await self.service.scoreboards(for: league, starting: Date(), days: 7)) ?? [])
+                    do {
+                        let m = try await self.service.scoreboards(for: league, starting: Date(), days: 7)
+                        return (league.id, .success(m))
+                    } catch {
+                        return (league.id, .failure(error))
+                    }
                 }
             }
-            for await (id, matches) in group {
-                guard !matches.isEmpty else { continue }
-                matchesByLeague[id] = matches
-                rebuildSections(matchesByLeague: matchesByLeague, followedIDs: leagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+            for await (id, result) in group {
+                switch result {
+                case .success(let matches):
+                    guard !matches.isEmpty else { continue }
+                    matchesByLeague[id] = matches
+                    rebuildSections(matchesByLeague: matchesByLeague, followedIDs: leagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+                case .failure(let error):
+                    if firstError == nil { firstError = error.localizedDescription }
+                }
             }
         }
 
@@ -1488,7 +1578,7 @@ final class HomeViewModel: ObservableObject {
 
         isLoading = false
         if matchesByLeague.isEmpty {
-            errorMessage = "ESPN did not return games for your followed leagues."
+            errorMessage = firstError ?? "ESPN did not return games for your followed leagues."
         }
 
         let favoriteLeagueIDs = Set(favorites.map(\.leaguePath))

@@ -6,6 +6,7 @@ struct MoreView: View {
     @EnvironmentObject private var playlists: PlaylistStore
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var articleLibrary: ArticleLibraryStore
+    @EnvironmentObject private var fantasyStore: FantasyStore
     @Environment(\.colorScheme) private var colorScheme
     @State private var showingTeamEditor = false
 
@@ -67,6 +68,9 @@ struct MoreView: View {
                 NavigationLink { NotificationsCalendarSettingsView() } label: {
                     MoreNavigationRow(title: "Notifications & Calendar", value: prefs.matchNotificationsEnabled ? "On" : "Off")
                 }
+                NavigationLink { FantasySettingsView() } label: {
+                    MoreNavigationRow(title: "Fantasy", value: fantasySummary)
+                }
             }
 
             MoreNavigationGroup(title: "DATA & PRIVACY") {
@@ -106,6 +110,11 @@ struct MoreView: View {
         let leagueText = "\(leagueCount) league\(leagueCount == 1 ? "" : "s")"
         let teamText = "\(teamCount) team\(teamCount == 1 ? "" : "s")"
         return "\(leagueText) · \(teamText)"
+    }
+
+    private var fantasySummary: String? {
+        guard let connection = fantasyStore.currentConnection else { return "Not connected" }
+        return connection.displayName ?? connection.username ?? "Sleeper"
     }
 
     private var defaultStreamLanguageName: String {

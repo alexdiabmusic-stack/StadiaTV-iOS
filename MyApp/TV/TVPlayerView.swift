@@ -221,7 +221,6 @@ struct TVPlayerView: View {
     }
 
     private func findAndPollLiveMatch() async {
-        let service = ESPNService()
         let channel = self.channel
         let leagues = ["football/nfl", "basketball/nba", "hockey/nhl", "baseball/mlb",
                        "soccer/eng.1", "soccer/esp.1", "soccer/ger.1", "soccer/ita.1",
@@ -231,7 +230,7 @@ struct TVPlayerView: View {
         var live: [Match] = []
         await withTaskGroup(of: [Match].self) { group in
             for league in leagues {
-                group.addTask { (try? await service.scoreboard(for: league)) ?? [] }
+                group.addTask { (try? await SportsRepository.shared.legacyScoreboard(for: league)) ?? [] }
             }
             for await matches in group { live.append(contentsOf: matches.filter { $0.state == .live }) }
         }
@@ -248,7 +247,7 @@ struct TVPlayerView: View {
         while !Task.isCancelled {
             try? await Task.sleep(nanoseconds: 30_000_000_000)
             guard !Task.isCancelled else { break }
-            if let updated = try? await service.scoreboard(for: match.league).first(where: { $0.id == match.id }) {
+            if let updated = try? await SportsRepository.shared.legacyScoreboard(for: match.league).first(where: { $0.id == match.id }) {
                 liveScoreMatch = updated
                 if updated.state == .final { break }
             }

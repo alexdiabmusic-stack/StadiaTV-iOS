@@ -80,11 +80,9 @@ struct PickMatchDetailSheet: View {
             return
         }
 
-        let service = ESPNService()
-
         // Fast path: fetch the specific date the match was scheduled
         let fetchDate = prediction.matchDate ?? prediction.placedAt
-        if let matches = try? await service.scoreboard(for: league, on: fetchDate),
+        if let matches = try? await SportsRepository.shared.legacyScoreboard(for: league, on: fetchDate),
            let found = matches.first(where: { $0.id == prediction.id }) {
             match = found
             isLoading = false
@@ -94,7 +92,7 @@ struct PickMatchDetailSheet: View {
         // Fallback: scan the last 30 days (catches timezone edge cases and old predictions
         // placed before matchDate was stored)
         let startDate = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
-        if let matches = try? await service.scoreboards(for: league, starting: startDate, days: 31),
+        if let matches = try? await SportsRepository.shared.legacyScoreboards(for: league, starting: startDate, days: 31),
            let found = matches.first(where: { $0.id == prediction.id }) {
             match = found
             isLoading = false

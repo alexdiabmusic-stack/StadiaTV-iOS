@@ -74,7 +74,7 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
         let settings = await center.notificationSettings()
         guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
 
-        let favoriteIDs = Set(favorites.map(\.id))
+        let favoriteIDs = Set(favorites.map(\.id) + favorites.map(\.canonicalTeamID))
         let favoriteMatches = matches.filter { match in
             isFavorite(match.away, in: favoriteIDs, league: match.league) || isFavorite(match.home, in: favoriteIDs, league: match.league)
         }
@@ -175,8 +175,13 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
     }
 
     private func isFavorite(_ side: TeamSide, in favoriteIDs: Set<String>, league: League) -> Bool {
-        guard let teamID = side.teamID else { return false }
-        return favoriteIDs.contains("\(league.path)-\(teamID)")
+        if let teamID = side.teamID, favoriteIDs.contains("\(league.path)-\(teamID)") {
+            return true
+        }
+        if let canonicalID = side.canonicalIDString, favoriteIDs.contains(canonicalID) {
+            return true
+        }
+        return false
     }
 
     private func isCloseGame(_ match: Match) -> Bool {

@@ -272,8 +272,6 @@ final class SearchViewModel: ObservableObject {
     @Published private(set) var teams: [SearchTeamResult] = []
     @Published private(set) var players: [SearchPlayerResult] = []
 
-    private let service = ESPNService()
-
     private var loadedFavoritePlayerTeamIDs: Set<String> = []
 
     func loadBase(leagues: [League], favoriteTeams: [FavoriteTeam]) async {
@@ -287,9 +285,9 @@ final class SearchViewModel: ObservableObject {
         await withTaskGroup(of: SearchLoadResult.self) { group in
             for league in leagues {
                 group.addTask {
-                    async let matches = self.service.scoreboards(for: league, starting: Date(), days: 14)
-                    async let articles = self.service.news(for: league, limit: 12)
-                    async let teams = self.service.teams(for: league)
+                    async let matches = SportsRepository.shared.legacyScoreboards(for: league, starting: Date(), days: 14)
+                    async let articles = SportsRepository.shared.legacyNews(for: league, limit: 12)
+                    async let teams = SportsRepository.shared.legacyTeams(for: league)
 
                     let loadedTeams = (try? await teams) ?? []
                     return SearchLoadResult(
@@ -328,7 +326,7 @@ final class SearchViewModel: ObservableObject {
             for favorite in teamsToLoad {
                 guard let league = League.all.first(where: { $0.path == favorite.leaguePath }) else { continue }
                 group.addTask {
-                    let rosterGroups = (try? await self.service.roster(for: league, teamID: favorite.teamID)) ?? []
+                    let rosterGroups = (try? await SportsRepository.shared.legacyRoster(for: league, teamID: favorite.teamID)) ?? []
                     return rosterGroups.flatMap(\.athletes).map { athlete in
                         SearchPlayerResult(league: league, teamID: favorite.teamID, teamName: favorite.displayName, athlete: athlete)
                     }

@@ -70,7 +70,6 @@ struct StandingsView: View {
     @State private var groups: [StandingsGroup] = []
     @State private var isLoading = true
     @State private var showDivisions = false
-    private let service = ESPNService()
 
     private var hasDivisionData: Bool {
         groups.contains { $0.name.localizedCaseInsensitiveContains("division") }
@@ -129,7 +128,7 @@ struct StandingsView: View {
 
     private func load() async {
         isLoading = true
-        groups = (try? await service.standings(for: league)) ?? []
+        groups = (try? await SportsRepository.shared.legacyStandings(for: league)) ?? []
         isLoading = false
     }
 }
@@ -337,7 +336,6 @@ struct LeadersView: View {
     let league: League
     @State private var boards: [LeaderBoard] = []
     @State private var isLoading = true
-    private let service = ESPNService()
 
     var body: some View {
         PremiumLoadState(isLoading: isLoading && boards.isEmpty,
@@ -376,7 +374,7 @@ struct LeadersView: View {
 
     private func load() async {
         isLoading = true
-        boards = (try? await service.leaders(for: league)) ?? []
+        boards = (try? await SportsRepository.shared.legacyLeaders(for: league)) ?? []
         isLoading = false
     }
 }
@@ -418,7 +416,6 @@ struct InjuriesView: View {
     let league: League
     @State private var injuries: [LeagueInjury] = []
     @State private var isLoading = true
-    private let service = ESPNService()
 
     var body: some View {
         PremiumLoadState(isLoading: isLoading && injuries.isEmpty,
@@ -443,7 +440,7 @@ struct InjuriesView: View {
 
     private func load() async {
         isLoading = true
-        injuries = (try? await service.injuries(for: league)) ?? []
+        injuries = (try? await SportsRepository.shared.legacyInjuries(for: league)) ?? []
         isLoading = false
     }
 }

@@ -210,7 +210,7 @@ struct LiveView: View {
         let base: [Match]
         switch filter {
         case .forYou:
-            let favIDs = Set(prefs.favoriteTeams.map(\.id))
+            let favIDs = Set(prefs.favoriteTeams.map(\.id) + prefs.favoriteTeams.map(\.canonicalTeamID))
             let favNames = Set(prefs.favoriteTeams.map { $0.displayName.lowercased() })
             let favoriteMatches = viewModel.allLive.filter { involvesFavorite($0, favIDs: favIDs, favNames: favNames) }
             let fantasyMatches = viewModel.allLive.filter { !liveFantasyContext(for: $0).isEmpty }
@@ -321,6 +321,7 @@ struct LiveView: View {
     private func involvesFavorite(_ match: Match, favIDs: Set<String>, favNames: Set<String>) -> Bool {
         for side in [match.home, match.away] {
             if let tid = side.teamID, favIDs.contains("\(match.league.path)-\(tid)") { return true }
+            if let canonicalID = side.canonicalIDString, favIDs.contains(canonicalID) { return true }
             if favNames.contains(side.displayName.lowercased()) { return true }
         }
         return false
@@ -614,7 +615,6 @@ final class LiveViewModel: ObservableObject {
     @Published private(set) var startingSoon: [Match] = []
     @Published private(set) var isLoading = false
 
-    private let service = ESPNService()
     private var refreshTask: Task<Void, Never>?
     private var lastLoaded: Date?
     private let cacheLifetime: TimeInterval = 60
@@ -629,7 +629,7 @@ final class LiveViewModel: ObservableObject {
         await withTaskGroup(of: [Match].self) { group in
             for league in League.all {
                 group.addTask {
-                    (try? await self.service.scoreboards(for: league, starting: Date(), days: 1)) ?? []
+                    (try? await SportsRepository.shared.legacyScoreboards(for: league, starting: Date(), days: 1)) ?? []
                 }
             }
             for await matches in group {
@@ -671,10 +671,12 @@ final class LiveViewModel: ObservableObject {
 
     private func score(_ match: Match, favTeams: [FavoriteTeam]) -> Int {
         let favIDs = Set(favTeams.map(\.id))
+        let canonicalFavIDs = Set(favTeams.map(\.canonicalTeamID))
         let favNames = Set(favTeams.map { $0.displayName.lowercased() })
         var s = 0
         for side in [match.home, match.away] {
             if let tid = side.teamID, favIDs.contains("\(match.league.path)-\(tid)") { s += 50 }
+            if let canonicalID = side.canonicalIDString, canonicalFavIDs.contains(canonicalID) { s += 50 }
             if favNames.contains(side.displayName.lowercased()) { s += 50 }
         }
         return s

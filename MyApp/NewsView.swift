@@ -169,7 +169,6 @@ final class NewsViewModel: ObservableObject {
     @Published private(set) var isLoadingMore = false
     @Published private(set) var lastError: String?
 
-    private let service = ESPNService()
     private var pagesByLeague: [String: Int] = [:]   // last page fetched per league (1-indexed)
     private var exhaustedLeagues: Set<String> = []   // leagues with no more pages
     private var followedLeagueIDs: [String] = []     // kept so loadMore("All") knows which leagues to page
@@ -269,7 +268,7 @@ final class NewsViewModel: ObservableObject {
         // league parameter and returns global headlines, which made every
         // filter show the same stories under a different tag.
         do {
-            return try await service.news(for: league, limit: 50, page: page)
+            return try await SportsRepository.shared.legacyNews(for: league, limit: 50)
         } catch {
             lastError = error.localizedDescription
             return []

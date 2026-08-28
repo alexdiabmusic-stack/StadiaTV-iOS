@@ -9,8 +9,6 @@ final class RecentSportsHighlightsViewModel: ObservableObject {
     @Published var clips: [MatchHighlight] = []
     @Published var isLoading = false
 
-    private let service = ESPNService()
-
     func load(leagues: [League]) async {
         let limitedLeagues = Array(leagues.prefix(8))
         guard !limitedLeagues.isEmpty else {
@@ -24,8 +22,8 @@ final class RecentSportsHighlightsViewModel: ObservableObject {
 
         await withTaskGroup(of: [Match].self) { group in
             for league in limitedLeagues {
-                group.addTask { [service] in
-                    let matches = (try? await service.scoreboards(for: league, starting: startDate, days: 8)) ?? []
+                group.addTask {
+                    let matches = (try? await SportsRepository.shared.legacyScoreboards(for: league, starting: startDate, days: 8)) ?? []
                     return matches.filter { $0.state == .final }
                 }
             }
@@ -42,8 +40,8 @@ final class RecentSportsHighlightsViewModel: ObservableObject {
         var loadedClips: [MatchHighlight] = []
         await withTaskGroup(of: [MatchHighlight].self) { group in
             for match in recentMatches {
-                group.addTask { [service] in
-                    (try? await service.gameSummary(for: match.league, eventID: match.id))?.highlights ?? []
+                group.addTask {
+                    (try? await SportsRepository.shared.legacyGameSummary(for: match))?.highlights ?? []
                 }
             }
 

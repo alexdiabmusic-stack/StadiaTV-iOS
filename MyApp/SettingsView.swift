@@ -374,12 +374,11 @@ struct NotificationsCalendarSettingsView: View {
     }
 
     private func loadFollowedMatches() async -> [Match] {
-        let service = ESPNService()
         var matches: [Match] = []
         await withTaskGroup(of: [Match].self) { group in
             for league in prefs.followedLeagues {
                 group.addTask {
-                    (try? await service.scoreboards(for: league, starting: Date(), days: 7)) ?? []
+                    (try? await SportsRepository.shared.legacyScoreboards(for: league, starting: Date(), days: 7)) ?? []
                 }
             }
             for await loaded in group { matches.append(contentsOf: loaded) }

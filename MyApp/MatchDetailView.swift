@@ -170,8 +170,7 @@ struct MatchDetailView: View {
 
     private func loadRosterPreviewForSelectedTeam() async {
         guard let teamID = selectedTeamID, rosterPreviewByTeamID[teamID] == nil else { return }
-        let service = ESPNService()
-        let groups = (try? await service.roster(for: match.league, teamID: teamID)) ?? []
+        let groups = (try? await SportsRepository.shared.legacyRoster(for: match.league, teamID: teamID)) ?? []
         rosterPreviewByTeamID[teamID] = groups.flatMap(\.athletes)
     }
 
@@ -189,10 +188,9 @@ struct MatchDetailView: View {
         didAttemptGameSummaryLoad = false
         guard match.state != .pre else { return }
 
-        let service = ESPNService()
         while !Task.isCancelled {
             isLoadingGameSummary = gameSummary == nil
-            let summary = try? await service.gameSummary(for: match.league, eventID: match.id)
+            let summary = try? await SportsRepository.shared.legacyGameSummary(for: match)
             didAttemptGameSummaryLoad = true
             isLoadingGameSummary = false
 
@@ -2102,7 +2100,6 @@ struct MatchDetailView: View {
         isLoadingLiveGames = true
         defer { isLoadingLiveGames = false }
 
-        let service = ESPNService()
         let leagues = multiscreenShowAllSports ? League.all : prefs.followedLeagues
         let allChannels = playlists.allChannels
         let preferredLanguages = prefs.preferredStreamLanguages
@@ -2113,7 +2110,7 @@ struct MatchDetailView: View {
         await withTaskGroup(of: [Match].self) { group in
             for league in leagues {
                 group.addTask {
-                    guard let matches = try? await service.scoreboard(for: league) else { return [] }
+                    guard let matches = try? await SportsRepository.shared.legacyScoreboard(for: league) else { return [] }
                     return Array(matches.filter { $0.state == .live && $0.id != currentMatchID }.prefix(2))
                 }
             }
@@ -2303,7 +2300,6 @@ private struct MatchStandingsPreview: View {
     let highlightedTeamIDs: Set<String>
     @State private var groups: [StandingsGroup] = []
     @State private var isLoading = true
-    private let service = ESPNService()
 
     private var previewRows: [StandingRow] {
         let allRows = uniqueRows(from: groups)
@@ -2396,7 +2392,7 @@ private struct MatchStandingsPreview: View {
 
     private func load() async {
         isLoading = true
-        groups = (try? await service.standings(for: league)) ?? []
+        groups = (try? await SportsRepository.shared.legacyStandings(for: league)) ?? []
         isLoading = false
     }
 }

@@ -1,11 +1,9 @@
 import Foundation
 
 struct FantasyEventLinker: FantasyEventLinking {
-    private let sportsService: ESPNService
     private let nowProvider: @Sendable () -> Date
 
-    init(sportsService: ESPNService = ESPNService(), nowProvider: @escaping @Sendable () -> Date = { Date() }) {
-        self.sportsService = sportsService
+    init(nowProvider: @escaping @Sendable () -> Date = { Date() }) {
         self.nowProvider = nowProvider
     }
 
@@ -23,7 +21,7 @@ struct FantasyEventLinker: FantasyEventLinking {
             matches = knownMatches
         } else if let fantasyLeague {
             let today = Calendar.current.startOfDay(for: nowProvider())
-            matches = (try? await sportsService.scoreboards(for: fantasyLeague, starting: today, days: 8)) ?? []
+            matches = (try? await SportsRepository.shared.legacyScoreboards(for: fantasyLeague, starting: today, days: 8)) ?? []
         } else {
             matches = []
         }

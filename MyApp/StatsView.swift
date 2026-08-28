@@ -12,7 +12,6 @@ struct StatsView: View {
     @State private var isLoadingTeams = false
     @State private var showPaywall = false
 
-    private let service = ESPNService()
 
     private var leagues: [League] {
         prefs.followedLeagues.isEmpty ? League.all : prefs.followedLeagues
@@ -204,7 +203,7 @@ struct StatsView: View {
             return
         }
         isLoadingTeams = true
-        teams = (try? await service.teams(for: selectedLeague)) ?? []
+        teams = (try? await SportsRepository.shared.legacyTeams(for: selectedLeague)) ?? []
         isLoadingTeams = false
     }
 }

@@ -1,6 +1,6 @@
 import Foundation
 
-struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, TeamProvider, GameDetailsProvider, BoxScoreProvider, TeamStatsProvider, PlayerStatsProvider, LeagueLeaderProvider {
+struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, TeamProvider, GameDetailsProvider, BoxScoreProvider, TeamStatsProvider, PlayerStatsProvider, LeagueLeaderProvider, GolfTournamentProvider {
     let metadata: SportsDataProviderMetadata
 
     private let manifestService: AppleSportsManifestService
@@ -21,7 +21,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
             supportLevel: .experimental,
             supportedSports: Set(SportGroup.allCases),
             supportedLeagues: Set(AppleSportsLeagueMapping.supportedLeaguePaths.flatMap { [$0, SportsProviderRouteConfiguration.leagueKey(forLegacyPath: $0)] }),
-            capabilities: [.liveScores, .schedule, .gameStatus, .gameDetails, .boxScore, .standings, .teams, .playerStats, .teamStats, .leagueLeaders],
+            capabilities: [.liveScores, .schedule, .gameStatus, .gameDetails, .boxScore, .standings, .teams, .playerStats, .teamStats, .leagueLeaders, .golfTournament],
             authenticationType: .none,
             isEnabled: AppConfiguration.isAppleSportsProviderEnabled,
             requestTimeout: 6
@@ -148,6 +148,18 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         }
         guard !leaders.isEmpty else { throw SportsDataError.unsupportedCapability(.leagueLeaders) }
         return leaders
+    }
+
+    func golfTournament(for league: League, gameID: StadiaEntityID) async throws -> StadiaGolfTournament {
+        try ensureEnabled()
+        guard league.group == .golf else { throw SportsDataError.unsupportedCapability(.golfTournament) }
+        let document = try await document(for: league)
+        let appleEventID = SportsIdentityResolver.providerID(from: gameID, provider: .appleSports) ?? gameID.rawValue
+        let event = document.content.events.first { $0.canonicalID == appleEventID }
+            ?? document.content.events.first { $0.progressStatus.map { StadiaGameStatus(appleProgressStatus: $0) } == .live && !$0.competitors.isEmpty }
+            ?? document.content.events.first { !$0.competitors.isEmpty }
+        guard let event else { throw SportsDataError.unsupportedCapability(.golfTournament) }
+        return try mapGolfTournament(event: event, league: league, manifest: document.manifest, requestedGameID: gameID)
     }
 
     private func ensureEnabled() throws {
@@ -318,6 +330,105 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
             )
         }
         return StadiaStandingGroup(id: StadiaEntityID(rawValue: "leaderboard:appleSports:\(league.stadiaKey)"), name: event.shortName ?? league.name, standings: standings)
+    }
+
+    private func mapGolfTournament(event: AppleSportsEventDTO, league: League, manifest: AppleSportsManifest, requestedGameID: StadiaEntityID) throws -> StadiaGolfTournament {
+        guard let eventID = event.canonicalID else { throw SportsDataError.invalidResponse }
+        let status = StadiaGameStatus(appleProgressStatus: event.progressStatus)
+        let provenance = DataProvenance(provider: .appleSports, fetchedAt: Date(), providerEntityID: eventID, confidence: 0.68)
+        let leaderboard = StadiaGolfLeaderboardNormalizer.normalized(
+            event.competitors.enumerated().compactMap { index, entry in
+                mapGolfLeaderboardEntry(entry: entry, index: index, eventID: eventID, league: league, manifest: manifest, provenance: provenance)
+            }
+        )
+        guard !leaderboard.isEmpty else { throw SportsDataError.unsupportedCapability(.golfTournament) }
+
+        let venue = event.venues.first
+        let course = venue.map { venue in
+            StadiaGolfCourse(
+                id: venue.canonicalID.map { StadiaEntityID(rawValue: "course:appleSports:\($0)") },
+                name: venue.name ?? venue.location?.name ?? "Course",
+                location: [venue.location?.city, venue.location?.state, venue.location?.country].compactMap { $0 }.joined(separator: ", ").nilIfEmpty(),
+                par: firstIntStat(named: ["Par", "CoursePar"], in: event.competitors.flatMap { $0.score?.scoreEntries ?? [] }),
+                yardage: firstIntStat(named: ["Yards", "Yardage"], in: event.competitors.flatMap { $0.score?.scoreEntries ?? [] }),
+                holes: []
+            )
+        }
+
+        return StadiaGolfTournament(
+            id: StadiaEntityID(rawValue: "golfTournament:appleSports:\(eventID)"),
+            leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
+            gameID: requestedGameID,
+            tournamentName: event.shortName ?? league.name,
+            tourName: league.name,
+            status: StadiaTournamentStatus(gameStatus: status),
+            statusDetail: AppleSportsStatusFormatter.detail(status: status, clock: event.clock.flatMap { clock in
+                StadiaGameClock(displayValue: clock.displayValue, remainingSeconds: nil, isRunning: status == .live)
+            }, period: event.clock?.current?.period.map { StadiaPeriod(number: $0.index, displayName: $0.displayName) }, start: AppleSportsDateParser.date(fromEpochSeconds: event.schedule?.duration?.start) ?? Date()),
+            currentRound: event.clock?.current?.period?.index,
+            totalRounds: event.clock?.total?.period?.index,
+            course: course,
+            cutLine: firstDisplayStat(named: ["Cut", "CutLine", "ProjectedCut"], in: event.competitors.flatMap { $0.score?.scoreEntries ?? [] }).flatMap(StadiaGolfScoreFormatter.format(raw:)),
+            leaderboard: leaderboard,
+            broadcasts: [],
+            stats: [],
+            provenance: provenance
+        )
+    }
+
+    private func mapGolfLeaderboardEntry(entry: AppleSportsCompetitorEntryDTO, index: Int, eventID: String, league: League, manifest: AppleSportsManifest, provenance: DataProvenance) -> StadiaGolfLeaderboardEntry? {
+        guard let providerID = entry.competitor?.canonicalID else { return nil }
+        let manifestTeam = manifest.teams[providerID]
+        let displayName = manifestTeam?.fullName ?? manifestTeam?.name ?? entry.competitor?.displayName ?? providerID
+        let stats = entry.score?.scoreEntries ?? []
+        let lineScore = entry.score?.lineScore ?? []
+        let position = firstDisplayStat(named: ["Position", "Rank", "Place"], in: stats)
+        let total = firstDisplayStat(named: ["Total", "Score", "ToPar"], in: stats) ?? entry.score?.displayScore
+        let today = firstDisplayStat(named: ["Today", "Round", "CurrentRound", "RoundScore"], in: stats)
+        let thru = firstDisplayStat(named: ["Thru", "Through", "Holes", "HolesPlayed"], in: stats)
+        let status = entry.competitor?.status ?? firstDisplayStat(named: ["Status"], in: stats)
+        let playerID = identityResolver.canonicalPlayerID(league: league, provider: .appleSports, providerPlayerID: providerID, fullName: displayName)
+
+        let rounds = lineScore.enumerated().map { offset, line in
+            let roundScore = firstDisplayStat(named: ["Score", "Total", "ToPar"], in: line.score) ?? line.score.first?.displayValue
+            return StadiaGolfRound(
+                number: line.period?.index ?? offset + 1,
+                displayName: line.period?.displayName,
+                score: StadiaGolfScoreFormatter.format(raw: roundScore) ?? roundScore,
+                strokes: firstIntStat(named: ["Strokes"], in: line.score),
+                scoreToPar: StadiaGolfScoreFormatter.format(raw: roundScore),
+                holes: []
+            )
+        }
+        let normalizedStats = stats.compactMap { $0.statValue(prefix: "golf") }.uniquedByKey()
+
+        return StadiaGolfLeaderboardEntry(
+            id: StadiaEntityID(rawValue: "golfEntry:appleSports:\(eventID):\(providerID)"),
+            playerID: playerID,
+            playerName: displayName,
+            position: position,
+            isTied: position?.uppercased().hasPrefix("T") == true,
+            totalScore: StadiaGolfScoreFormatter.format(raw: total),
+            todayScore: StadiaGolfScoreFormatter.format(raw: today),
+            thru: thru,
+            status: status,
+            rounds: rounds,
+            stats: normalizedStats,
+            aliases: [ProviderEntityAlias(provider: .appleSports, id: providerID)],
+            provenance: provenance
+        )
+    }
+
+    private func firstDisplayStat(named names: [String], in stats: [AppleSportsStatisticDTO]) -> String? {
+        let normalized = Set(names.map { SportsIdentityResolver.slug($0) })
+        return stats.first { stat in
+            guard let name = stat.statisticType?.name else { return false }
+            return normalized.contains(SportsIdentityResolver.slug(name))
+        }?.displayValue
+    }
+
+    private func firstIntStat(named names: [String], in stats: [AppleSportsStatisticDTO]) -> Int? {
+        firstDisplayStat(named: names, in: stats).flatMap { Int($0.replacingOccurrences(of: ",", with: "")) }
     }
 }
 
@@ -918,6 +1029,12 @@ extension KeyedDecodingContainer {
     func decodeIfPresent(_ type: URL.Type, forKey key: Key) throws -> URL? {
         guard let value = try decodeIfPresent(String.self, forKey: key) else { return nil }
         return URL(string: value)
+    }
+}
+
+private extension String {
+    func nilIfEmpty() -> String? {
+        isEmpty ? nil : self
     }
 }
 

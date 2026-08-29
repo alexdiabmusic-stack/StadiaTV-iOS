@@ -25,6 +25,9 @@ struct MatchDetailView: View {
     @State private var gameSummary: GameSummary?
     @State private var isLoadingGameSummary = false
     @State private var didAttemptGameSummaryLoad = false
+    @State private var golfTournament: StadiaGolfTournament?
+    @State private var isLoadingGolfTournament = false
+    @State private var didAttemptGolfTournamentLoad = false
     @State private var showPaywall = false
     @State private var browsingWatchLink: WatchLink?
     // Ranking a big playlist is expensive, so it runs once off the main thread
@@ -47,6 +50,8 @@ struct MatchDetailView: View {
         case standings = "Standings"
         var id: String { rawValue }
     }
+
+    private var gameCentreArchetype: GameCentreArchetype { GameCentreArchetype(match: match) }
 
     private var filteredMatchedSources: [RankedSource] {
         guard showingAllChannels else { return Array(rankedSources.prefix(3)) }
@@ -88,10 +93,12 @@ struct MatchDetailView: View {
             Theme.background.ignoresSafeArea()
             ScrollView {
                 VStack(spacing: 16) {
-                    scoreboard
-                    fantasySection
-                    picksSection
-                    headToHeadSection
+                    eventHeader
+                    if gameCentreArchetype.usesHeadToHeadParticipantUI {
+                        fantasySection
+                        picksSection
+                        headToHeadSection
+                    }
                     if match.state == .final {
                         highlightsSection
                         scoringSummarySection
@@ -99,11 +106,18 @@ struct MatchDetailView: View {
                     if match.state != .final && (!playlists.allChannels.isEmpty || !watchLinks.isEmpty) {
                         sourcesSection
                     }
-                    if match.league.group == .racing {
-                        RacersSection(league: match.league)
-                    } else {
-                        gameCenterSection
-                    }
+                    GameCentreContainerView(
+                        match: match,
+                        gameSummary: gameSummary,
+                        golfTournament: golfTournament,
+                        isLoadingGolfTournament: isLoadingGolfTournament,
+                        didAttemptGolfTournamentLoad: didAttemptGolfTournamentLoad,
+                        isLoadingGameSummary: isLoadingGameSummary,
+                        didAttemptGameSummaryLoad: didAttemptGameSummaryLoad,
+                        isPremium: entitlements.isPremium,
+                        showPaywall: $showPaywall,
+                        reloadGameSummary: { Task { await loadGameSummary() } }
+                    )
                     playByPlaySection
                     if match.state != .final {
                         highlightsSection
@@ -138,15 +152,13 @@ struct MatchDetailView: View {
             await loadGameSummary()
         }
         .task(id: match.id) {
+            await loadGolfTournament()
+        }
+        .task(id: match.id) {
             await loadOdds()
         }
         .task(id: "\(playlists.allChannels.count)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))") {
             await rankSources()
-        }
-        .task(id: selectedTeamID) {
-            selectedRosterPosition = nil
-            isShowingFullRosterPreview = false
-            await loadRosterPreviewForSelectedTeam()
         }
     }
 
@@ -204,7 +216,47 @@ struct MatchDetailView: View {
         }
     }
 
+    private func loadGolfTournament() async {
+        golfTournament = nil
+        didAttemptGolfTournamentLoad = false
+        guard gameCentreArchetype == .golf else { return }
+
+        while !Task.isCancelled {
+            isLoadingGolfTournament = golfTournament == nil
+            let tournament = try? await SportsRepository.shared.golfTournament(
+                for: match.league,
+                gameID: StadiaEntityID(rawValue: match.id)
+            )
+            didAttemptGolfTournamentLoad = true
+            isLoadingGolfTournament = false
+
+            if let tournament {
+                golfTournament = tournament
+            }
+
+            guard match.state == .live else { break }
+            try? await Task.sleep(nanoseconds: 30_000_000_000)
+            if Task.isCancelled { break }
+        }
+    }
+
     // MARK: Scoreboard header
+
+    @ViewBuilder private var eventHeader: some View {
+        switch gameCentreArchetype {
+        case .teamSport, .tennis:
+            scoreboard
+        case .golf, .motorsport, .combatSport:
+            GameCentreEventHeader(
+                match: match,
+                gameSummary: gameSummary,
+                golfTournament: golfTournament,
+                spoilerFreeMode: prefs.spoilerFreeMode,
+                spoilerRevealed: spoilerRevealed,
+                revealScore: { withAnimation(.snappy) { spoilerRevealed = true } }
+            )
+        }
+    }
 
     private var scoreboard: some View {
         VStack(spacing: 16) {
@@ -2295,7 +2347,7 @@ private enum GameCenterTeam: String, Hashable {
     case home
 }
 
-private struct MatchStandingsPreview: View {
+struct MatchStandingsPreview: View {
     let league: League
     let highlightedTeamIDs: Set<String>
     @State private var groups: [StandingsGroup] = []

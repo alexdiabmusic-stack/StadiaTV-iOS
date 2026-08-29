@@ -117,6 +117,58 @@ struct SportsDataFoundationTests {
         #expect(routed.provenance.provider == .appleSports)
     }
 
+    @Test func repositoryRoutesGolfTournamentCapabilityWithNormalizedLeaderboard() async throws {
+        let league = try #require(League.all.first { $0.path == "golf/pga" })
+        let gameID = StadiaEntityID(rawValue: "umc.cse.golf")
+        let playerID = StadiaEntityID(rawValue: "player:league-golf-pga:appleSports:golfer-1")
+        let tournament = StadiaGolfTournament(
+            id: StadiaEntityID(rawValue: "golfTournament:appleSports:umc.cse.golf"),
+            leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
+            gameID: gameID,
+            tournamentName: "PGA Tour Champions",
+            tourName: league.name,
+            status: .live,
+            statusDetail: "Round 2",
+            currentRound: 2,
+            totalRounds: 4,
+            course: StadiaGolfCourse(id: nil, name: "Example Course", location: nil, par: 72, yardage: nil, holes: []),
+            cutLine: "-2",
+            leaderboard: StadiaGolfLeaderboardNormalizer.normalized([
+                StadiaGolfLeaderboardEntry(
+                    id: StadiaEntityID(rawValue: "golfEntry:appleSports:umc.cse.golf:golfer-1"),
+                    playerID: playerID,
+                    playerName: "V. Taylor",
+                    position: nil,
+                    isTied: false,
+                    totalScore: StadiaGolfScoreFormatter.format(raw: "-12"),
+                    todayScore: StadiaGolfScoreFormatter.format(raw: "-4"),
+                    thru: "15",
+                    status: nil,
+                    rounds: [],
+                    stats: [],
+                    aliases: [ProviderEntityAlias(provider: .appleSports, id: "golfer-1")],
+                    provenance: DataProvenance(provider: .appleSports, fetchedAt: Date(), providerEntityID: "golfer-1", confidence: 1)
+                )
+            ]),
+            broadcasts: [StadiaBroadcast(network: "Golf Channel", type: nil, countryCode: nil)],
+            stats: [],
+            provenance: DataProvenance(provider: .appleSports, fetchedAt: Date(), providerEntityID: "umc.cse.golf", confidence: 1)
+        )
+        let router = SportsProviderRouter(
+            registry: SportsProviderRegistry(providers: [MockGolfTournamentProvider(result: .success(tournament))]),
+            routeConfiguration: SportsProviderRouteConfiguration(routes: [
+                ProviderRoute(leagueID: league.path, capability: .golfTournament, providers: [.appleSports])
+            ]),
+            healthMonitor: ProviderHealthMonitor()
+        )
+        let repository = SportsRepository(router: router, cache: SportsDataCache())
+        let routed = try await repository.golfTournament(for: league, gameID: gameID)
+        #expect(routed.leaderboard.first?.position == "1")
+        #expect(routed.leaderboard.first?.totalScore == "-12")
+        #expect(routed.cutLine == "-2")
+        #expect(routed.provenance.provider == .appleSports)
+    }
+
     @Test func nhlLocalizedStringsDecodeKnownAPIShapes() throws {
         let objectData = #"{"name":{"default":"Toronto Maple Leafs"}}"#.data(using: .utf8)!
         let stringData = #"{"name":"Toronto"}"#.data(using: .utf8)!
@@ -318,6 +370,39 @@ struct SportsDataFoundationTests {
         #expect(await counter.value == 1)
     }
 
+    @Test func gameCentreArchetypeUsesSportGroupRouting() throws {
+        let golf = try #require(League.all.first { $0.path == "golf/champions-tour" })
+        let indyCar = try #require(League.all.first { $0.path == "racing/irl" })
+        let tennis = try #require(League.all.first { $0.path == "tennis/atp" })
+        let nhl = try #require(League.all.first { $0.path == "hockey/nhl" })
+
+        #expect(GameCentreArchetype(match: Self.legacyMatch(league: golf)) == .golf)
+        #expect(GameCentreArchetype(match: Self.legacyMatch(league: indyCar)) == .motorsport)
+        #expect(GameCentreArchetype(match: Self.legacyMatch(league: tennis)) == .tennis)
+        #expect(GameCentreArchetype(match: Self.legacyMatch(league: nhl)) == .teamSport)
+    }
+
+    @Test func gameCentreArchetypeDetectsCombatEventsFromMetadata() {
+        let league = League(name: "UFC", shortName: "UFC", path: "combat/ufc", group: .wrestling, keywords: ["ufc", "mma"])
+        #expect(GameCentreArchetype(match: Self.legacyMatch(league: league, name: "UFC Fight Night")) == .combatSport)
+    }
+
+    private static func legacyMatch(league: League, name: String = "Example Event") -> Match {
+        Match(
+            id: "event-\(league.path)",
+            league: league,
+            date: Date(),
+            name: name,
+            shortName: league.shortName,
+            state: .live,
+            statusDetail: "In Progress",
+            home: TeamSide(displayName: "Home", shortName: "Home", abbreviation: "HME", logoURL: nil, score: "1", record: nil, isWinner: false, teamID: "1"),
+            away: TeamSide(displayName: "Away", shortName: "Away", abbreviation: "AWY", logoURL: nil, score: "0", record: nil, isWinner: false, teamID: "2"),
+            broadcasts: [],
+            venue: nil
+        )
+    }
+
     private static func game(league: League, providerID: SportsDataProviderID, providerGameID: String) -> StadiaGame {
         let resolver = SportsIdentityResolver()
         let provenance = DataProvenance(provider: providerID, fetchedAt: Date(), providerEntityID: providerGameID, confidence: 1)
@@ -406,6 +491,25 @@ private struct MockPlayByPlayProvider: PlayByPlayProvider {
             plays: try result.get(),
             provenance: DataProvenance(provider: .nhl, fetchedAt: Date(), providerEntityID: gameID.rawValue, confidence: 1)
         )
+    }
+}
+
+private struct MockGolfTournamentProvider: GolfTournamentProvider {
+    let metadata = SportsDataProviderMetadata(
+        id: .appleSports,
+        name: "Apple golf mock",
+        supportLevel: .experimental,
+        supportedSports: [.golf],
+        supportedLeagues: ["*"],
+        capabilities: [.golfTournament],
+        authenticationType: .none,
+        isEnabled: true,
+        requestTimeout: 1
+    )
+    let result: Result<StadiaGolfTournament, Error>
+
+    func golfTournament(for league: League, gameID: StadiaEntityID) async throws -> StadiaGolfTournament {
+        try result.get()
     }
 }
 

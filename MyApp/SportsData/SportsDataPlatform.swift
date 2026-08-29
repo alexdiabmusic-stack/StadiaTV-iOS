@@ -48,6 +48,7 @@ enum SportsDataCapability: String, Codable, CaseIterable, Hashable, Sendable {
     case teamStats
     case injuries
     case leagueLeaders
+    case golfTournament
     case newsMetadata
     case odds
     case fantasyRelevantData
@@ -226,6 +227,154 @@ struct StadiaGame: Identifiable, Codable, Hashable, Sendable {
     let broadcasts: [StadiaBroadcast]
     let aliases: [ProviderEntityAlias]
     let provenance: DataProvenance
+}
+
+enum StadiaTournamentStatus: String, Codable, Hashable, Sendable {
+    case upcoming
+    case live
+    case suspended
+    case complete
+    case unknown
+
+    init(gameStatus: StadiaGameStatus) {
+        switch gameStatus {
+        case .scheduled, .pregame:
+            self = .upcoming
+        case .live, .delayed:
+            self = .live
+        case .suspended, .postponed:
+            self = .suspended
+        case .final:
+            self = .complete
+        case .cancelled, .unknown:
+            self = .unknown
+        }
+    }
+}
+
+struct StadiaGolfCourse: Identifiable, Codable, Hashable, Sendable {
+    let id: StadiaEntityID?
+    let name: String
+    let location: String?
+    let par: Int?
+    let yardage: Int?
+    let holes: [StadiaGolfCourseHole]
+}
+
+struct StadiaGolfCourseHole: Identifiable, Codable, Hashable, Sendable {
+    let number: Int
+    let par: Int?
+    let yardage: Int?
+    let handicap: Int?
+
+    var id: Int { number }
+}
+
+struct StadiaGolfHoleScore: Identifiable, Codable, Hashable, Sendable {
+    let hole: Int
+    let par: Int?
+    let strokes: Int?
+    let scoreToPar: String?
+
+    var id: Int { hole }
+}
+
+struct StadiaGolfRound: Identifiable, Codable, Hashable, Sendable {
+    let number: Int
+    let displayName: String?
+    let score: String?
+    let strokes: Int?
+    let scoreToPar: String?
+    let holes: [StadiaGolfHoleScore]
+
+    var id: Int { number }
+}
+
+struct StadiaGolfLeaderboardEntry: Identifiable, Codable, Hashable, Sendable {
+    let id: StadiaEntityID
+    let playerID: StadiaEntityID?
+    let playerName: String
+    let position: String?
+    let isTied: Bool
+    let totalScore: String?
+    let todayScore: String?
+    let thru: String?
+    let status: String?
+    let rounds: [StadiaGolfRound]
+    let stats: [StadiaStatValue]
+    let aliases: [ProviderEntityAlias]
+    let provenance: DataProvenance?
+}
+
+struct StadiaGolfTournament: Identifiable, Codable, Hashable, Sendable {
+    let id: StadiaEntityID
+    let leagueID: StadiaEntityID
+    let gameID: StadiaEntityID?
+    let tournamentName: String
+    let tourName: String?
+    let status: StadiaTournamentStatus
+    let statusDetail: String?
+    let currentRound: Int?
+    let totalRounds: Int?
+    let course: StadiaGolfCourse?
+    let cutLine: String?
+    let leaderboard: [StadiaGolfLeaderboardEntry]
+    let broadcasts: [StadiaBroadcast]
+    let stats: [StadiaStatValue]
+    let provenance: DataProvenance
+}
+
+enum StadiaGolfScoreFormatter {
+    nonisolated static func format(raw: String?) -> String? {
+        guard let raw else { return nil }
+        let cleaned = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty, cleaned != "-" else { return nil }
+        let upper = cleaned.uppercased()
+        if ["E", "WD", "CUT", "DQ", "DNS", "F"].contains(upper) { return upper }
+        if cleaned == "0" { return "E" }
+        if let value = Int(cleaned.replacingOccurrences(of: "+", with: "")) {
+            if value == 0 { return "E" }
+            return value > 0 ? "+\(value)" : "\(value)"
+        }
+        return cleaned
+    }
+
+    nonisolated static func sortValue(_ value: String?) -> Int {
+        guard let value else { return Int.max - 1 }
+        let cleaned = value.uppercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleaned == "E" { return 0 }
+        if cleaned == "WD" || cleaned == "CUT" || cleaned == "DQ" || cleaned == "DNS" { return Int.max }
+        return Int(cleaned.replacingOccurrences(of: "+", with: "")) ?? Int.max - 1
+    }
+}
+
+enum StadiaGolfLeaderboardNormalizer {
+    nonisolated static func normalized(_ entries: [StadiaGolfLeaderboardEntry]) -> [StadiaGolfLeaderboardEntry] {
+        let sorted = entries.sorted {
+            StadiaGolfScoreFormatter.sortValue($0.totalScore) < StadiaGolfScoreFormatter.sortValue($1.totalScore)
+        }
+        let grouped = Dictionary(grouping: sorted) { $0.totalScore ?? "" }
+        return sorted.enumerated().map { index, entry in
+            guard entry.position == nil || entry.position?.isEmpty == true else { return entry }
+            let scoreKey = entry.totalScore ?? ""
+            let tied = (grouped[scoreKey]?.count ?? 1) > 1 && !scoreKey.isEmpty
+            return StadiaGolfLeaderboardEntry(
+                id: entry.id,
+                playerID: entry.playerID,
+                playerName: entry.playerName,
+                position: tied ? "T\(index + 1)" : "\(index + 1)",
+                isTied: tied,
+                totalScore: entry.totalScore,
+                todayScore: entry.todayScore,
+                thru: entry.thru,
+                status: entry.status,
+                rounds: entry.rounds,
+                stats: entry.stats,
+                aliases: entry.aliases,
+                provenance: entry.provenance
+            )
+        }
+    }
 }
 
 struct StadiaStanding: Identifiable, Codable, Hashable, Sendable {
@@ -551,6 +700,10 @@ protocol LeagueLeaderProvider: SportsProvider {
     func leaders(for league: League) async throws -> [StadiaLeader]
 }
 
+protocol GolfTournamentProvider: SportsProvider {
+    func golfTournament(for league: League, gameID: StadiaEntityID) async throws -> StadiaGolfTournament
+}
+
 protocol SportsNewsProvider: SportsProvider {
     func newsMetadata(for league: League, limit: Int) async throws -> [StadiaNewsArticle]
 }
@@ -759,6 +912,8 @@ actor SportsDataCache {
             return 7 * 24 * 60 * 60
         case .playerStats, .teamStats, .leagueLeaders:
             return 60 * 60
+        case .golfTournament:
+            return containsLiveGames ? 30 : 10 * 60
         case .injuries:
             return 15 * 60
         case .newsMetadata:
@@ -841,7 +996,7 @@ struct SportsProviderRouteConfiguration: Sendable {
             "racing/nascar-premier"
         ].map(leagueKey(forLegacyPath:))
         let defaultCapabilities: [SportsDataCapability] = [.liveScores, .schedule, .gameStatus, .gameDetails, .playByPlay, .boxScore, .standings, .teams, .players, .rosters, .playerStats, .teamStats, .injuries, .leagueLeaders, .fantasyRelevantData]
-        let appleBaselineCapabilities: [SportsDataCapability] = [.liveScores, .schedule, .gameStatus, .gameDetails, .boxScore, .standings, .teams, .playerStats, .teamStats, .leagueLeaders]
+        let appleBaselineCapabilities: [SportsDataCapability] = [.liveScores, .schedule, .gameStatus, .gameDetails, .boxScore, .standings, .teams, .playerStats, .teamStats, .leagueLeaders, .golfTournament]
         var routes = firstPartyCore.flatMap { leagueID, providers in
             defaultCapabilities.map { ProviderRoute(leagueID: leagueID, capability: $0, providers: providers) }
         }
@@ -850,6 +1005,7 @@ struct SportsProviderRouteConfiguration: Sendable {
         }
         routes.append(ProviderRoute(leagueID: "*", capability: .liveScores, providers: [.appleSports, .cbsSports, .yahooSports, .foxSports, .espn]))
         routes.append(ProviderRoute(leagueID: "*", capability: .schedule, providers: [.appleSports, .cbsSports, .yahooSports, .foxSports, .espn]))
+        routes.append(ProviderRoute(leagueID: "*", capability: .golfTournament, providers: [.appleSports, .espn]))
         routes.append(ProviderRoute(leagueID: "*", capability: .newsMetadata, providers: [.espn]))
         routes.append(ProviderRoute(leagueID: "*", capability: .odds, providers: [.espn]))
         return routes
@@ -1042,6 +1198,7 @@ struct SportsRepository: Sendable {
     private let gameDetailsDeduplicator = SportsRequestDeduplicator<String, StadiaGame>()
     private let boxScoreDeduplicator = SportsRequestDeduplicator<String, StadiaBoxScore>()
     private let playByPlayDeduplicator = SportsRequestDeduplicator<String, StadiaPlayByPlay>()
+    private let golfTournamentDeduplicator = SportsRequestDeduplicator<String, StadiaGolfTournament>()
 
     init(router: SportsProviderRouter = SportsProviderRouter(), cache: SportsDataCache = SportsDataCache()) {
         self.router = router
@@ -1128,6 +1285,17 @@ struct SportsRepository: Sendable {
         }
         return try await playByPlayDeduplicator.value(for: key.rawValue) {
             try await requestPlayByPlay(for: league, gameID: gameID, key: key)
+        }
+    }
+
+    func golfTournament(for league: League, gameID: StadiaEntityID) async throws -> StadiaGolfTournament {
+        let key = cacheKey(league: league, capability: .golfTournament, scope: gameID.rawValue)
+        if let cached: StadiaGolfTournament = await cache.value(for: key) {
+            await recordDiagnostics(league: league, capability: .golfTournament, currentProvider: cached.provenance.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
+            return cached
+        }
+        return try await golfTournamentDeduplicator.value(for: key.rawValue) {
+            try await requestGolfTournament(for: league, gameID: gameID, key: key)
         }
     }
 
@@ -1471,6 +1639,30 @@ struct SportsRepository: Sendable {
         throw SportsDataError.unavailable
     }
 
+    private func requestGolfTournament(for league: League, gameID: StadiaEntityID, key: SportsCacheKey) async throws -> StadiaGolfTournament {
+        guard league.group == .golf else { throw SportsDataError.unsupportedCapability(.golfTournament) }
+        let providers = await router.providers(for: league, capability: .golfTournament, as: (any GolfTournamentProvider).self)
+        guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.golfTournament, league.path) }
+        var failures: [String] = []
+        var fallbacks: [SportsDataProviderID] = []
+        for provider in providers {
+            let start = Date()
+            do {
+                let tournament = try await provider.golfTournament(for: league, gameID: gameID)
+                let latency = Date().timeIntervalSince(start)
+                await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
+                await cache.store(tournament, for: key, ttl: SportsDataCache.defaultTTL(for: .golfTournament, containsLiveGames: tournament.status == .live))
+                await recordDiagnostics(league: league, capability: .golfTournament, currentProvider: provider.metadata.id, latency: latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
+                return tournament
+            } catch {
+                failures.append("\(provider.metadata.name): \(error.localizedDescription)")
+                await router.healthMonitor.recordFailure(providerID: provider.metadata.id, error: error)
+                fallbacks.append(provider.metadata.id)
+            }
+        }
+        throw SportsDataError.unavailable
+    }
+
     private func normalizedGameSummary(for match: Match) async throws -> GameSummary {
         let gameID = StadiaEntityID(rawValue: match.id)
         async let boxScoreResult = optionalBoxScore(for: match.league, gameID: gameID)
@@ -1559,7 +1751,7 @@ struct SportsRepository: Sendable {
 
 // MARK: - ESPN adapter
 
-struct ESPNProvider: ScoreProvider, ScheduleProvider, TeamProvider, StandingsProvider, RosterProvider, InjuryProvider, LeagueLeaderProvider, SportsNewsProvider {
+struct ESPNProvider: ScoreProvider, ScheduleProvider, TeamProvider, StandingsProvider, RosterProvider, InjuryProvider, LeagueLeaderProvider, GolfTournamentProvider, SportsNewsProvider {
     let metadata: SportsDataProviderMetadata
     private let service: ESPNService
     private let identityResolver: SportsIdentityResolver
@@ -1573,7 +1765,7 @@ struct ESPNProvider: ScoreProvider, ScheduleProvider, TeamProvider, StandingsPro
             supportLevel: .legacy,
             supportedSports: Set(SportGroup.allCases.filter { $0.hasEspnLeagues }),
             supportedLeagues: Set(League.all.flatMap { [$0.path, $0.stadiaKey] }),
-            capabilities: [.liveScores, .schedule, .gameStatus, .teams, .standings, .rosters, .injuries, .leagueLeaders, .newsMetadata],
+            capabilities: [.liveScores, .schedule, .gameStatus, .teams, .standings, .rosters, .injuries, .leagueLeaders, .golfTournament, .newsMetadata],
             authenticationType: .publicWebHeaders,
             isEnabled: true,
             requestTimeout: 10
@@ -1755,6 +1947,16 @@ struct ESPNProvider: ScoreProvider, ScheduleProvider, TeamProvider, StandingsPro
                     provenance: DataProvenance(provider: .espn, fetchedAt: Date(), providerEntityID: article.id, confidence: 0.75)
                 )
             }
+        } catch {
+            throw SportsDataError.network(error.localizedDescription)
+        }
+    }
+
+    func golfTournament(for league: League, gameID: StadiaEntityID) async throws -> StadiaGolfTournament {
+        guard league.group == .golf else { throw SportsDataError.unsupportedCapability(.golfTournament) }
+        let providerEventID = SportsIdentityResolver.providerID(from: gameID, provider: .espn) ?? gameID.rawValue
+        do {
+            return try await service.golfTournament(for: league, eventID: providerEventID, gameID: gameID)
         } catch {
             throw SportsDataError.network(error.localizedDescription)
         }

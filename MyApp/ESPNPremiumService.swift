@@ -130,11 +130,21 @@ extension ESPNService {
         let response = try await fetch(GameSummaryResponse.self, from: request)
         return response.toSummary()
     }
+
+    func golfTournament(for league: League, eventID: String, gameID: StadiaEntityID) async throws -> StadiaGolfTournament {
+        var components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/summary")!
+        components.queryItems = [URLQueryItem(name: "event", value: eventID)]
+        var request = URLRequest(url: components.url!)
+        request.timeoutInterval = 8
+        let response = try await fetch(GameSummaryResponse.self, from: request)
+        return try response.toGolfTournament(league: league, eventID: eventID, gameID: gameID)
+    }
 }
 
 // MARK: - Game summary DTOs
 
 private struct GameSummaryResponse: Decodable {
+    let header: SummaryHeaderDTO?
     let boxscore: BoxscoreDTO?
     let leaders: [SummaryLeaderNodeDTO]?
     let plays: [PlayDTO]?
@@ -217,6 +227,246 @@ private struct GameSummaryResponse: Decodable {
             headToHead: h2h,
             highlights: Array(highlights)
         )
+    }
+
+    func toGolfTournament(league: League, eventID: String, gameID: StadiaEntityID) throws -> StadiaGolfTournament {
+        let competition = header?.competitions?.first
+        let status = StadiaTournamentStatus(gameStatus: StadiaGameStatus(espnState: competition?.status?.type?.state))
+        let provider = SportsDataProviderID.espn
+        let provenance = DataProvenance(provider: provider, fetchedAt: Date(), providerEntityID: eventID, confidence: 0.72)
+        let mappedEntries = (competition?.competitors ?? []).enumerated().compactMap { index, competitor in
+            competitor.toGolfLeaderboardEntry(index: index, league: league, eventID: eventID, provenance: provenance)
+        }
+        let leaderEntries = mappedEntries.isEmpty ? golfLeaderEntriesFromLeaders(league: league, eventID: eventID, provenance: provenance) : []
+        let leaderboard = StadiaGolfLeaderboardNormalizer.normalized(mappedEntries.isEmpty ? leaderEntries : mappedEntries)
+        guard !leaderboard.isEmpty || competition != nil else { throw SportsDataError.unsupportedCapability(.golfTournament) }
+
+        let course = competition?.venue.map { venue in
+            StadiaGolfCourse(
+                id: venue.id.map { StadiaEntityID(rawValue: "course:espn:\($0)") },
+                name: venue.fullName ?? venue.displayName ?? venue.name ?? "Course",
+                location: [venue.address?.city, venue.address?.state, venue.address?.country].compactMap { $0 }.joined(separator: ", ").nilIfEmpty(),
+                par: nil,
+                yardage: nil,
+                holes: []
+            )
+        }
+
+        return StadiaGolfTournament(
+            id: StadiaEntityID(rawValue: "golfTournament:espn:\(eventID)"),
+            leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
+            gameID: gameID,
+            tournamentName: header?.name ?? header?.shortName ?? competition?.notes?.first?.headline ?? league.name,
+            tourName: league.name,
+            status: status,
+            statusDetail: competition?.status?.type?.detail ?? competition?.status?.type?.shortDetail,
+            currentRound: SummaryGolfValueParser.roundNumber(from: competition?.status?.type?.detail ?? competition?.status?.type?.shortDetail),
+            totalRounds: nil,
+            course: course,
+            cutLine: SummaryGolfValueParser.stat(named: ["cut", "cutline", "cutLine"], in: competition?.competitors?.flatMap { $0.statistics ?? [] } ?? []),
+            leaderboard: leaderboard,
+            broadcasts: (competition?.broadcasts ?? []).compactMap { broadcast in
+                guard let name = broadcast.names?.first ?? broadcast.market else { return nil }
+                return StadiaBroadcast(network: name, type: broadcast.type, countryCode: nil)
+            },
+            stats: [],
+            provenance: provenance
+        )
+    }
+
+    private func golfLeaderEntriesFromLeaders(league: League, eventID: String, provenance: DataProvenance) -> [StadiaGolfLeaderboardEntry] {
+        var output: [StadiaGolfLeaderboardEntry] = []
+        func walk(_ nodes: [SummaryLeaderNodeDTO], category: String?) {
+            for node in nodes {
+                if let athlete = node.athlete, let name = athlete.displayName, let value = node.displayValue {
+                    let playerID = SportsIdentityResolver().canonicalPlayerID(league: league, provider: .espn, providerPlayerID: athlete.id, fullName: name)
+                    output.append(StadiaGolfLeaderboardEntry(
+                        id: StadiaEntityID(rawValue: "golfEntry:espn:\(eventID):\(athlete.id ?? SportsIdentityResolver.slug(name))"),
+                        playerID: playerID,
+                        playerName: name,
+                        position: nil,
+                        isTied: false,
+                        totalScore: SummaryGolfValueParser.score(value),
+                        todayScore: nil,
+                        thru: nil,
+                        status: category,
+                        rounds: [],
+                        stats: [],
+                        aliases: athlete.id.map { [ProviderEntityAlias(provider: .espn, id: $0)] } ?? [],
+                        provenance: provenance
+                    ))
+                }
+                if let children = node.leaders, !children.isEmpty {
+                    walk(children, category: node.displayName ?? node.name ?? category)
+                }
+            }
+        }
+        walk(leaders ?? [], category: nil)
+        return output
+    }
+}
+
+private struct SummaryHeaderDTO: Decodable {
+    let id: String?
+    let name: String?
+    let shortName: String?
+    let competitions: [SummaryCompetitionDTO]?
+}
+
+private struct SummaryCompetitionDTO: Decodable {
+    let id: String?
+    let competitors: [SummaryCompetitionCompetitorDTO]?
+    let status: SummaryStatusDTO?
+    let venue: SummaryVenueDTO?
+    let broadcasts: [SummaryBroadcastDTO]?
+    let notes: [SummaryNoteDTO]?
+}
+
+private struct SummaryCompetitionCompetitorDTO: Decodable {
+    let id: String?
+    let order: Int?
+    let score: String?
+    let curatedRank: SummaryRankDTO?
+    let athlete: SummaryAthleteDTO?
+    let team: SummaryTeamInfoDTO?
+    let linescores: [SummaryLineScoreDTO]?
+    let statistics: [BoxscoreLeafStatDTO]?
+
+    func toGolfLeaderboardEntry(index: Int, league: League, eventID: String, provenance: DataProvenance) -> StadiaGolfLeaderboardEntry? {
+        let providerID = id ?? athlete?.id ?? team?.id
+        let name = athlete?.displayName ?? team?.displayName ?? providerID
+        guard let name, !name.isEmpty else { return nil }
+        let canonicalPlayerID = SportsIdentityResolver().canonicalPlayerID(league: league, provider: .espn, providerPlayerID: providerID, fullName: name)
+        let stats = (statistics ?? []).compactMap { stat -> StadiaStatValue? in
+            guard let label = stat.displayLabel, let value = stat.displayValue else { return nil }
+            return StadiaStatValue(key: "espn_\(SportsIdentityResolver.slug(label))", displayName: label, value: value)
+        }
+        let rawPosition = SummaryGolfValueParser.stat(named: ["rank", "position", "pos"], in: statistics ?? []) ?? curatedRank?.current.map(String.init)
+        let position = rawPosition.map { SummaryGolfValueParser.position($0) }
+        let total = SummaryGolfValueParser.score(score ?? SummaryGolfValueParser.stat(named: ["total", "score", "toPar"], in: statistics ?? []))
+        let today = SummaryGolfValueParser.score(SummaryGolfValueParser.stat(named: ["today", "currentRound", "round"], in: statistics ?? []))
+        let thru = SummaryGolfValueParser.stat(named: ["thru", "through", "holes"], in: statistics ?? [])
+        let rounds = (linescores ?? []).enumerated().map { offset, line in
+            StadiaGolfRound(
+                number: line.period ?? offset + 1,
+                displayName: line.period.map { "R\($0)" },
+                score: line.displayValue ?? line.value.map { SummaryGolfValueParser.score(String($0)) ?? String($0) },
+                strokes: line.value,
+                scoreToPar: nil,
+                holes: []
+            )
+        }
+
+        return StadiaGolfLeaderboardEntry(
+            id: StadiaEntityID(rawValue: "golfEntry:espn:\(eventID):\(providerID ?? "\(index)")"),
+            playerID: providerID == nil ? nil : canonicalPlayerID,
+            playerName: name,
+            position: position,
+            isTied: position?.hasPrefix("T") == true,
+            totalScore: total,
+            todayScore: today,
+            thru: thru,
+            status: SummaryGolfValueParser.stat(named: ["status"], in: statistics ?? []),
+            rounds: rounds,
+            stats: stats,
+            aliases: providerID.map { [ProviderEntityAlias(provider: .espn, id: $0)] } ?? [],
+            provenance: provenance
+        )
+    }
+}
+
+private struct SummaryLineScoreDTO: Decodable {
+    let period: Int?
+    let value: Int?
+    let displayValue: String?
+}
+
+private struct SummaryRankDTO: Decodable {
+    let current: Int?
+}
+
+private struct SummaryStatusDTO: Decodable {
+    let type: SummaryStatusTypeDTO?
+}
+
+private struct SummaryStatusTypeDTO: Decodable {
+    let state: String?
+    let detail: String?
+    let shortDetail: String?
+}
+
+private struct SummaryVenueDTO: Decodable {
+    let id: String?
+    let name: String?
+    let displayName: String?
+    let fullName: String?
+    let address: SummaryAddressDTO?
+}
+
+private struct SummaryAddressDTO: Decodable {
+    let city: String?
+    let state: String?
+    let country: String?
+}
+
+private struct SummaryBroadcastDTO: Decodable {
+    let market: String?
+    let names: [String]?
+    let type: String?
+}
+
+private struct SummaryNoteDTO: Decodable {
+    let headline: String?
+}
+
+private enum SummaryGolfValueParser {
+    static func stat(named names: [String], in stats: [BoxscoreLeafStatDTO]) -> String? {
+        let normalizedNames = Set(names.map { SportsIdentityResolver.slug($0) })
+        return stats.first { stat in
+            [stat.name, stat.displayName, stat.shortDisplayName, stat.abbreviation]
+                .compactMap { $0 }
+                .contains { normalizedNames.contains(SportsIdentityResolver.slug($0)) }
+        }?.displayValue
+    }
+
+    static func score(_ value: String?) -> String? {
+        StadiaGolfScoreFormatter.format(raw: value)
+    }
+
+    static func position(_ value: String) -> String {
+        let cleaned = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return cleaned }
+        if cleaned.uppercased().hasPrefix("T") { return cleaned.uppercased() }
+        return cleaned
+    }
+
+    static func roundNumber(from value: String?) -> Int? {
+        guard let value else { return nil }
+        let lower = value.lowercased()
+        guard let range = lower.range(of: #"round\s+(\d+)"#, options: .regularExpression) else { return nil }
+        let match = String(lower[range])
+        return Int(match.components(separatedBy: CharacterSet.decimalDigits.inverted).joined())
+    }
+}
+
+private extension StadiaGameStatus {
+    init(espnState: String?) {
+        switch espnState?.lowercased() {
+        case "pre", "pregame":
+            self = .scheduled
+        case "in", "live", "inprogress", "in_progress":
+            self = .live
+        case "post", "final", "complete", "completed":
+            self = .final
+        default:
+            self = .unknown
+        }
+    }
+}
+
+private extension String {
+    func nilIfEmpty() -> String? {
+        isEmpty ? nil : self
     }
 }
 

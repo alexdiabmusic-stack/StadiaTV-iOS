@@ -1303,7 +1303,14 @@ struct SportsRepository: Sendable {
         if let summary = try? await normalizedGameSummary(for: match), !summary.isEmpty {
             return summary
         }
-        return try await ESPNService().gameSummary(for: match.league, eventID: match.id)
+        let espn = ESPNService()
+        if let summary = try? await espn.gameSummary(for: match.league, eventID: match.id) {
+            return summary
+        }
+        if let espnEventID = try? await resolveESPNSummaryEventID(for: match, service: espn), espnEventID != match.id {
+            return try await espn.gameSummary(for: match.league, eventID: espnEventID)
+        }
+        return try await espn.gameSummary(for: match.league, eventID: match.id)
     }
 
     func teams(for league: League) async throws -> [StadiaTeam] {
@@ -1692,6 +1699,32 @@ struct SportsRepository: Sendable {
 
     private func optionalPlayByPlay(for league: League, gameID: StadiaEntityID) async -> StadiaPlayByPlay? {
         try? await playByPlay(for: league, gameID: gameID)
+    }
+
+    private func resolveESPNSummaryEventID(for match: Match, service: ESPNService) async throws -> String? {
+        let sameDayMatches = try await service.scoreboard(for: match.league, on: match.date)
+        let calendar = Calendar.current
+        let awayTokens = legacyMatchTokens(match.away)
+        let homeTokens = legacyMatchTokens(match.home)
+        return sameDayMatches.first { candidate in
+            guard calendar.isDate(candidate.date, inSameDayAs: match.date) else { return false }
+            let candidateAway = legacyMatchTokens(candidate.away)
+            let candidateHome = legacyMatchTokens(candidate.home)
+            let direct = !awayTokens.isDisjoint(with: candidateAway) && !homeTokens.isDisjoint(with: candidateHome)
+            let reversed = !awayTokens.isDisjoint(with: candidateHome) && !homeTokens.isDisjoint(with: candidateAway)
+            return direct || reversed || candidate.name.localizedCaseInsensitiveContains(match.name) || match.name.localizedCaseInsensitiveContains(candidate.name)
+        }?.id
+    }
+
+    private func legacyMatchTokens(_ side: TeamSide) -> Set<String> {
+        [side.teamID, side.abbreviation, side.shortName, side.displayName]
+            .compactMap { $0 }
+            .map { SportsIdentityResolver.slug($0) }
+            .filter { !$0.isEmpty && $0 != "tbd" && $0 != "field" }
+            .reduce(into: Set<String>()) { tokens, token in
+                tokens.insert(token)
+                token.split(separator: "-").filter { $0.count > 2 }.forEach { tokens.insert(String($0)) }
+            }
     }
 
     private func teamBox(stat: StadiaTeamStat, match: Match) -> GameSummary.TeamBox {

@@ -78,8 +78,19 @@ struct RacersSection: View {
 
     private func load() async {
         isLoading = true
-        racers = (try? await SportsRepository.shared.legacyRacers(for: league)) ?? []
+        let loaded = (try? await SportsRepository.shared.legacyRacers(for: league)) ?? []
+        racers = loaded.uniquedForDisplay()
         isLoading = false
+    }
+}
+
+private extension Array where Element == Racer {
+    func uniquedForDisplay() -> [Racer] {
+        var seen: Set<String> = []
+        return filter { racer in
+            let key = racer.id.isEmpty ? racer.name.lowercased() : racer.id
+            return seen.insert(key).inserted
+        }
     }
 }
 

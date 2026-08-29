@@ -448,6 +448,10 @@ struct LiveMatchCard: View {
         return nil
     }
 
+    private var archetype: GameCentreArchetype {
+        GameCentreArchetype(match: match)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -479,33 +483,7 @@ struct LiveMatchCard: View {
                     .lineLimit(1)
             }
 
-            HStack(spacing: 0) {
-                HStack(spacing: 8) {
-                    TeamLogo(url: match.away.logoURL, size: 36)
-                    Text(match.away.shortName)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                HStack(spacing: 6) {
-                    Text(match.away.score ?? "-")
-                    Text("–").foregroundStyle(Theme.textSecondary)
-                    Text(match.home.score ?? "-")
-                }
-                .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
-                .foregroundStyle(Theme.textPrimary)
-
-                HStack(spacing: 8) {
-                    Text(match.home.shortName)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(1)
-                    TeamLogo(url: match.home.logoURL, size: 36)
-                }
-                .frame(maxWidth: .infinity, alignment: .trailing)
-            }
+            eventSummaryRow
 
             if !match.broadcasts.isEmpty {
                 HStack(spacing: 4) {
@@ -533,6 +511,87 @@ struct LiveMatchCard: View {
             Button("Add to Calendar", systemImage: "calendar.badge.plus") { onAddToCalendar() }
             Divider()
             Button("Hide", systemImage: "eye.slash", role: .destructive) { onHide() }
+        }
+    }
+
+    @ViewBuilder
+    private var eventSummaryRow: some View {
+        switch archetype {
+        case .golf:
+            VStack(alignment: .leading, spacing: 6) {
+                Text(match.name.isEmpty ? match.league.name : match.name)
+                    .font(.system(size: 18, weight: .heavy))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(2)
+                golfLeaderLine
+            }
+        case .motorsport:
+            VStack(alignment: .leading, spacing: 6) {
+                Text(match.name.isEmpty ? match.league.name : match.name)
+                    .font(.system(size: 18, weight: .heavy))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(2)
+                if !match.away.displayName.isEmpty, match.away.displayName != "TBD" {
+                    Label("Leader: \(match.away.shortName)", systemImage: "flag.checkered")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+        case .combatSport:
+            Text(match.name.isEmpty ? match.league.name : match.name)
+                .font(.system(size: 18, weight: .heavy))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(2)
+        case .teamSport, .tennis:
+            headToHeadScoreRow
+        }
+    }
+
+    @ViewBuilder
+    private var golfLeaderLine: some View {
+        let leaders = [match.away, match.home]
+            .filter { !$0.displayName.isEmpty && $0.displayName != "Field" && $0.displayName != "TBD" }
+        if !leaders.isEmpty {
+            HStack(spacing: 8) {
+                Image(systemName: "flag.fill")
+                    .font(.caption2)
+                Text(leaders.prefix(2).map { side in
+                    [side.shortName, side.score].compactMap { $0 }.joined(separator: " ")
+                }.joined(separator: " · "))
+                .lineLimit(1)
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(Theme.textSecondary)
+        }
+    }
+
+    private var headToHeadScoreRow: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 8) {
+                TeamLogo(url: match.away.logoURL, size: 36)
+                Text(match.away.shortName)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 6) {
+                Text(match.away.score ?? "-")
+                Text("–").foregroundStyle(Theme.textSecondary)
+                Text(match.home.score ?? "-")
+            }
+            .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
+            .foregroundStyle(Theme.textPrimary)
+
+            HStack(spacing: 8) {
+                Text(match.home.shortName)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
+                TeamLogo(url: match.home.logoURL, size: 36)
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
 }

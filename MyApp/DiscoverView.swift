@@ -40,8 +40,8 @@ struct DiscoverView: View {
     }
 
     private var selectedFavoriteTeams: [FavoriteTeam] {
-        let targetLeagueIDs = Set(targetLeagues.map(\.id))
-        return prefs.favoriteTeams.filter { targetLeagueIDs.contains($0.leaguePath) }
+        let targetLeagueIDs = Set(targetLeagues.flatMap { [$0.id, $0.stadiaKey] })
+        return prefs.favoriteTeams.filter { targetLeagueIDs.contains($0.leaguePath) || targetLeagueIDs.contains($0.leagueStadiaKey) }
     }
 
     private var teamArticles: [ESPNArticle] {
@@ -569,7 +569,7 @@ private extension ESPNArticle {
     }
 
     func matchesFavoriteTeam(_ team: FavoriteTeam) -> Bool {
-        guard league.path == team.leaguePath else { return false }
+        guard league.path == team.leaguePath || league.stadiaKey == team.leagueStadiaKey else { return false }
 
         let taggedText = categories.joined(separator: " ").normalizedForTeamMatching
         let articleText = "\(headline) \(description)".normalizedForTeamMatching

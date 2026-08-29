@@ -1,6 +1,6 @@
 import Foundation
 
-struct NHLProvider: ScoreProvider, ScheduleProvider, StandingsProvider, TeamProvider, RosterProvider, GameDetailsProvider, PlayByPlayProvider {
+struct NHLProvider: ScoreProvider, ScheduleProvider, StandingsProvider, TeamProvider, RosterProvider, GameDetailsProvider, BoxScoreProvider, PlayByPlayProvider, TeamStatsProvider {
     let metadata: SportsDataProviderMetadata
 
     private let client: NHLClient
@@ -14,8 +14,8 @@ struct NHLProvider: ScoreProvider, ScheduleProvider, StandingsProvider, TeamProv
             name: "NHL Web API",
             supportLevel: .firstPartyWeb,
             supportedSports: [.hockey],
-            supportedLeagues: ["hockey/nhl"],
-            capabilities: [.liveScores, .schedule, .gameStatus, .gameDetails, .playByPlay, .standings, .teams, .rosters],
+            supportedLeagues: [SportsProviderRouteConfiguration.leagueKey(forLegacyPath: "hockey/nhl"), "hockey/nhl"],
+            capabilities: [.liveScores, .schedule, .gameStatus, .gameDetails, .playByPlay, .boxScore, .standings, .teams, .rosters, .teamStats],
             authenticationType: .none,
             isEnabled: AppConfiguration.isNHLProviderEnabled,
             requestTimeout: 8
@@ -47,7 +47,7 @@ struct NHLProvider: ScoreProvider, ScheduleProvider, StandingsProvider, TeamProv
 
         let games = gamesByID.values.sorted { $0.scheduledStart < $1.scheduledStart }
         return StadiaSchedule(
-            id: StadiaEntityID(rawValue: "schedule:nhl:\(league.path):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
+            id: StadiaEntityID(rawValue: "schedule:nhl:\(league.stadiaKey):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             range: range,
             games: games,
@@ -100,7 +100,7 @@ struct NHLProvider: ScoreProvider, ScheduleProvider, StandingsProvider, TeamProv
                 displayName: nhlID,
                 shortName: nhlID,
                 abbreviation: nhlID,
-                logoURL: nil,
+                logoURL: teamLogoURL(rawLogo: nil, abbreviation: nhlID),
                 aliases: [ProviderEntityAlias(provider: .nhl, id: nhlID)],
                 provenance: standing.provenance
             )
@@ -138,6 +138,27 @@ struct NHLProvider: ScoreProvider, ScheduleProvider, StandingsProvider, TeamProv
         return game
     }
 
+    func boxScore(for league: League, gameID: StadiaEntityID) async throws -> StadiaBoxScore {
+        try ensureNHL(league)
+        let nhlGameID = try resolvedNHLGameID(from: gameID)
+        let response = try await client.boxscore(gameID: nhlGameID)
+        let teamStats = [
+            mapBoxScoreTeam(response.awayTeam, side: .away, league: league, gameID: gameID),
+            mapBoxScoreTeam(response.homeTeam, side: .home, league: league, gameID: gameID)
+        ].compactMap { $0 }
+        let playerStats = [
+            mapBoxScorePlayers(response.playerByGameStats?.awayTeam, side: response.awayTeam, league: league, gameID: gameID),
+            mapBoxScorePlayers(response.playerByGameStats?.homeTeam, side: response.homeTeam, league: league, gameID: gameID)
+        ].flatMap { $0 }
+        return StadiaBoxScore(
+            id: StadiaEntityID(rawValue: "boxScore:nhl:\(nhlGameID)"),
+            gameID: gameID,
+            teamStats: teamStats,
+            playerStats: playerStats,
+            provenance: DataProvenance(provider: .nhl, fetchedAt: Date(), providerEntityID: nhlGameID, confidence: 0.88)
+        )
+    }
+
     func playByPlay(for league: League, gameID: StadiaEntityID) async throws -> StadiaPlayByPlay {
         try ensureNHL(league)
         let nhlGameID = try resolvedNHLGameID(from: gameID)
@@ -149,6 +170,29 @@ struct NHLProvider: ScoreProvider, ScheduleProvider, StandingsProvider, TeamProv
             plays: plays,
             provenance: DataProvenance(provider: .nhl, fetchedAt: Date(), providerEntityID: nhlGameID, confidence: 0.86)
         )
+    }
+
+    func teamStats(for league: League, teamIDs: Set<StadiaEntityID>, range: SportsDateRange?) async throws -> [StadiaTeamStat] {
+        try ensureNHL(league)
+        let standings = try await standings(for: league).flatMap(\.standings)
+        return standings.compactMap { standing in
+            guard teamIDs.isEmpty || teamIDs.contains(standing.teamID) else { return nil }
+            let stats = [
+                stat("games_played", "GP", standing.gamesPlayed),
+                stat("wins", "W", standing.wins),
+                stat("losses", "L", standing.losses),
+                stat("overtime_losses", "OTL", standing.ties),
+                stat("points", "PTS", standing.points),
+                stat("record", "Record", standing.displayRecord)
+            ].compactMap { $0 }
+            return StadiaTeamStat(
+                id: StadiaEntityID(rawValue: "teamStat:nhl:\(standing.teamID.rawValue):standings"),
+                teamID: standing.teamID,
+                seasonID: nil,
+                stats: stats,
+                provenance: DataProvenance(provider: .nhl, fetchedAt: Date(), providerEntityID: SportsIdentityResolver.providerID(from: standing.teamID, provider: .nhl), confidence: 0.86)
+            )
+        }
     }
 
     private func ensureNHL(_ league: League) throws {
@@ -209,11 +253,30 @@ struct NHLProvider: ScoreProvider, ScheduleProvider, StandingsProvider, TeamProv
             displayName: displayName.isEmpty ? abbreviation : displayName,
             shortName: shortName,
             abbreviation: abbreviation,
-            logoURL: dto.logo.flatMap(URL.init(string:)),
+            logoURL: teamLogoURL(rawLogo: dto.logo, abbreviation: abbreviation),
             aliases: [ProviderEntityAlias(provider: .nhl, id: providerTeamID)],
             provenance: DataProvenance(provider: .nhl, fetchedAt: Date(), providerEntityID: dto.id.map(String.init), confidence: 0.9)
         )
     }
+
+    private func teamLogoURL(rawLogo: String?, abbreviation: String) -> URL? {
+        if let rawLogo, let url = URL(string: rawLogo), url.pathExtension.lowercased() != "svg" {
+            return url
+        }
+        let assetName = Self.logoAssetNames[abbreviation.uppercased()]
+        return assetName.flatMap { URL.stadiaImageAsset(named: $0) }
+    }
+
+    private static let logoAssetNames: [String: String] = [
+        "ANA": "NHLLogo_ANA", "BOS": "NHLLogo_BOS", "BUF": "NHLLogo_BUF", "CAR": "NHLLogo_CAR",
+        "CBJ": "NHLLogo_CBJ", "CGY": "NHLLogo_CGY", "CHI": "NHLLogo_CHI", "COL": "NHLLogo_COL",
+        "DAL": "NHLLogo_DAL", "DET": "NHLLogo_DET", "EDM": "NHLLogo_EDM", "FLA": "NHLLogo_FLA",
+        "LAK": "NHLLogo_LAK", "MIN": "NHLLogo_MIN", "MTL": "NHLLogo_MTL", "NJD": "NHLLogo_NJD",
+        "NSH": "NHLLogo_NSH", "NYI": "NHLLogo_NYI", "NYR": "NHLLogo_NYR", "OTT": "NHLLogo_OTT",
+        "PHI": "NHLLogo_PHI", "PIT": "NHLLogo_PIT", "SEA": "NHLLogo_SEA", "SJS": "NHLLogo_SJS",
+        "STL": "NHLLogo_STL", "TBL": "NHLLogo_TBL", "TOR": "NHLLogo_TOR", "UTA": "NHLLogo_UTA",
+        "VAN": "NHLLogo_VAN", "VGK": "NHLLogo_VGK", "WPG": "NHLLogo_WPG", "WSH": "NHLLogo_WSH"
+    ]
 
     private func mapStandingTeam(_ row: NHLStandingDTO, league: League) -> StadiaTeam? {
         guard let abbreviation = row.teamAbbrev?.value else { return nil }
@@ -224,7 +287,7 @@ struct NHLProvider: ScoreProvider, ScheduleProvider, StandingsProvider, TeamProv
             displayName: displayName,
             shortName: displayName,
             abbreviation: abbreviation,
-            logoURL: row.teamLogo.flatMap(URL.init(string:)),
+            logoURL: teamLogoURL(rawLogo: row.teamLogo, abbreviation: abbreviation),
             aliases: [ProviderEntityAlias(provider: .nhl, id: abbreviation)],
             provenance: DataProvenance(provider: .nhl, fetchedAt: Date(), providerEntityID: abbreviation, confidence: 0.9)
         )
@@ -253,6 +316,94 @@ struct NHLProvider: ScoreProvider, ScheduleProvider, StandingsProvider, TeamProv
     private func mapVenue(_ venue: NHLLocalizedString?) -> StadiaVenue? {
         guard let value = venue?.value, !value.isEmpty else { return nil }
         return StadiaVenue(id: StadiaEntityID(rawValue: "venue:nhl:\(SportsIdentityResolver.slug(value))"), name: value, city: nil, state: nil, country: nil, aliases: [])
+    }
+
+    private func mapBoxScoreTeam(_ dto: NHLBoxScoreTeamDTO?, side: NHLGameSide, league: League, gameID: StadiaEntityID) -> StadiaTeamStat? {
+        guard let dto else { return nil }
+        let abbreviation = dto.abbrev ?? dto.id.map(String.init) ?? side.rawValue.uppercased()
+        let displayName = dto.name?.value ?? abbreviation
+        let teamID = identityResolver.canonicalTeamID(league: league, provider: .nhl, providerTeamID: abbreviation, abbreviation: abbreviation, displayName: displayName)
+        let stats = [
+            stat("score", "Score", dto.score.map(String.init)),
+            stat("shots_on_goal", "SOG", dto.sog.map(String.init))
+        ].compactMap { $0 }
+        return StadiaTeamStat(
+            id: StadiaEntityID(rawValue: "teamStat:nhl:\(gameID.rawValue):\(side.rawValue)"),
+            teamID: teamID,
+            seasonID: nil,
+            stats: stats,
+            provenance: DataProvenance(provider: .nhl, fetchedAt: Date(), providerEntityID: abbreviation, confidence: 0.86)
+        )
+    }
+
+    private func mapBoxScorePlayers(_ dto: NHLBoxScorePlayerGroupDTO?, side: NHLBoxScoreTeamDTO?, league: League, gameID: StadiaEntityID) -> [StadiaPlayerStat] {
+        guard let dto else { return [] }
+        let teamAbbreviation = side?.abbrev
+        let teamID = teamAbbreviation.map {
+            identityResolver.canonicalTeamID(league: league, provider: .nhl, providerTeamID: $0, abbreviation: $0, displayName: side?.name?.value ?? $0)
+        }
+        return (dto.forwards ?? []).map { mapSkaterStat($0, league: league, gameID: gameID, teamID: teamID, teamAbbreviation: teamAbbreviation) }
+            + (dto.defense ?? []).map { mapSkaterStat($0, league: league, gameID: gameID, teamID: teamID, teamAbbreviation: teamAbbreviation) }
+            + (dto.goalies ?? []).map { mapGoalieStat($0, league: league, gameID: gameID, teamID: teamID, teamAbbreviation: teamAbbreviation) }
+    }
+
+    private func mapSkaterStat(_ dto: NHLBoxScoreSkaterDTO, league: League, gameID: StadiaEntityID, teamID: StadiaEntityID?, teamAbbreviation: String?) -> StadiaPlayerStat {
+        let playerID = dto.playerID.map(String.init) ?? dto.name?.value ?? UUID().uuidString
+        let displayName = dto.name?.value ?? playerID
+        return StadiaPlayerStat(
+            id: StadiaEntityID(rawValue: "playerStat:nhl:\(gameID.rawValue):\(playerID)"),
+            playerID: identityResolver.canonicalPlayerID(league: league, provider: .nhl, providerPlayerID: playerID, fullName: displayName, teamAbbreviation: teamAbbreviation),
+            playerDisplayName: displayName,
+            teamAbbreviation: teamAbbreviation,
+            headshotURL: nil,
+            teamID: teamID,
+            seasonID: nil,
+            stats: [
+                stat("position", "POS", dto.position),
+                stat("jersey", "#", dto.sweaterNumber.map(String.init)),
+                stat("goals", "G", dto.goals.map(String.init)),
+                stat("assists", "A", dto.assists.map(String.init)),
+                stat("points", "PTS", dto.points.map(String.init)),
+                stat("plus_minus", "+/-", dto.plusMinus.map(String.init)),
+                stat("penalty_minutes", "PIM", dto.pim.map(String.init)),
+                stat("shots_on_goal", "SOG", dto.sog.map(String.init)),
+                stat("hits", "HIT", dto.hits.map(String.init)),
+                stat("blocked_shots", "BLK", dto.blockedShots.map(String.init)),
+                stat("power_play_goals", "PPG", dto.powerPlayGoals.map(String.init)),
+                stat("faceoff_win_pct", "FO%", dto.faceoffWinningPctg.map { String(format: "%.1f", $0 * 100) }),
+                stat("time_on_ice", "TOI", dto.toi)
+            ].compactMap { $0 },
+            provenance: DataProvenance(provider: .nhl, fetchedAt: Date(), providerEntityID: playerID, confidence: 0.86)
+        )
+    }
+
+    private func mapGoalieStat(_ dto: NHLBoxScoreGoalieDTO, league: League, gameID: StadiaEntityID, teamID: StadiaEntityID?, teamAbbreviation: String?) -> StadiaPlayerStat {
+        let playerID = dto.playerID.map(String.init) ?? dto.name?.value ?? UUID().uuidString
+        let displayName = dto.name?.value ?? playerID
+        return StadiaPlayerStat(
+            id: StadiaEntityID(rawValue: "playerStat:nhl:\(gameID.rawValue):\(playerID)"),
+            playerID: identityResolver.canonicalPlayerID(league: league, provider: .nhl, providerPlayerID: playerID, fullName: displayName, teamAbbreviation: teamAbbreviation),
+            playerDisplayName: displayName,
+            teamAbbreviation: teamAbbreviation,
+            headshotURL: nil,
+            teamID: teamID,
+            seasonID: nil,
+            stats: [
+                stat("position", "POS", "G"),
+                stat("jersey", "#", dto.sweaterNumber.map(String.init)),
+                stat("goals_against", "GA", dto.goalsAgainst.map(String.init)),
+                stat("shots_against", "SA", dto.shotsAgainst.map(String.init)),
+                stat("saves", "SV", dto.saves.map(String.init)),
+                stat("save_pct", "SV%", dto.savePctg.map { String(format: "%.3f", $0) }),
+                stat("time_on_ice", "TOI", dto.toi)
+            ].compactMap { $0 },
+            provenance: DataProvenance(provider: .nhl, fetchedAt: Date(), providerEntityID: playerID, confidence: 0.86)
+        )
+    }
+
+    private func stat(_ key: String, _ displayName: String, _ value: String?) -> StadiaStatValue? {
+        guard let value, !value.isEmpty else { return nil }
+        return StadiaStatValue(key: key, displayName: displayName, value: value)
     }
 
     private func mapPlay(_ dto: NHLPlayDTO, league: League, gameID: StadiaEntityID) -> StadiaPlay? {
@@ -301,6 +452,10 @@ struct NHLClient: Sendable {
 
     func landing(gameID: String) async throws -> NHLGameDTO {
         try await get("gamecenter/\(gameID)/landing")
+    }
+
+    func boxscore(gameID: String) async throws -> NHLBoxScoreResponseDTO {
+        try await get("gamecenter/\(gameID)/boxscore")
     }
 
     func playByPlay(gameID: String) async throws -> NHLPlayByPlayResponseDTO {
@@ -362,8 +517,96 @@ struct NHLRosterResponseDTO: Decodable, Sendable {
     let goalies: [NHLRosterPlayerDTO]?
 }
 
+struct NHLBoxScoreResponseDTO: Decodable, Sendable {
+    let awayTeam: NHLBoxScoreTeamDTO?
+    let homeTeam: NHLBoxScoreTeamDTO?
+    let playerByGameStats: NHLPlayerByGameStatsDTO?
+}
+
+struct NHLBoxScoreTeamDTO: Decodable, Sendable {
+    let id: Int?
+    let abbrev: String?
+    let score: Int?
+    let sog: Int?
+    let name: NHLLocalizedString?
+}
+
+struct NHLPlayerByGameStatsDTO: Decodable, Sendable {
+    let awayTeam: NHLBoxScorePlayerGroupDTO?
+    let homeTeam: NHLBoxScorePlayerGroupDTO?
+}
+
+struct NHLBoxScorePlayerGroupDTO: Decodable, Sendable {
+    let forwards: [NHLBoxScoreSkaterDTO]?
+    let defense: [NHLBoxScoreSkaterDTO]?
+    let goalies: [NHLBoxScoreGoalieDTO]?
+}
+
+struct NHLBoxScoreSkaterDTO: Decodable, Sendable {
+    let playerID: Int?
+    let name: NHLLocalizedString?
+    let sweaterNumber: Int?
+    let position: String?
+    let goals: Int?
+    let assists: Int?
+    let points: Int?
+    let plusMinus: Int?
+    let pim: Int?
+    let hits: Int?
+    let blockedShots: Int?
+    let powerPlayGoals: Int?
+    let sog: Int?
+    let faceoffWinningPctg: Double?
+    let toi: String?
+
+    enum CodingKeys: String, CodingKey {
+        case playerID = "playerId"
+        case name
+        case sweaterNumber
+        case position
+        case goals
+        case assists
+        case points
+        case plusMinus
+        case pim
+        case hits
+        case blockedShots
+        case powerPlayGoals
+        case sog
+        case faceoffWinningPctg
+        case toi
+    }
+}
+
+struct NHLBoxScoreGoalieDTO: Decodable, Sendable {
+    let playerID: Int?
+    let name: NHLLocalizedString?
+    let sweaterNumber: Int?
+    let goalsAgainst: Int?
+    let shotsAgainst: Int?
+    let saves: Int?
+    let savePctg: Double?
+    let toi: String?
+
+    enum CodingKeys: String, CodingKey {
+        case playerID = "playerId"
+        case name
+        case sweaterNumber
+        case goalsAgainst
+        case shotsAgainst
+        case saves
+        case savePctg
+        case toi
+    }
+}
+
 struct NHLPlayByPlayResponseDTO: Decodable, Sendable {
     let plays: [NHLPlayDTO]?
+}
+
+private enum NHLGameSide: String, Sendable {
+    case away
+    case home
 }
 
 struct NHLGameDTO: Decodable, Sendable {

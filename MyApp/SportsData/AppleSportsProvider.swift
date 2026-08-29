@@ -20,7 +20,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
             name: "Apple Sports",
             supportLevel: .experimental,
             supportedSports: Set(SportGroup.allCases),
-            supportedLeagues: Set(AppleSportsLeagueMapping.supportedLeaguePaths),
+            supportedLeagues: Set(AppleSportsLeagueMapping.supportedLeaguePaths.flatMap { [$0, SportsProviderRouteConfiguration.leagueKey(forLegacyPath: $0)] }),
             capabilities: [.liveScores, .schedule, .gameStatus, .gameDetails, .boxScore, .standings, .teams, .playerStats, .teamStats, .leagueLeaders],
             authenticationType: .none,
             isEnabled: AppConfiguration.isAppleSportsProviderEnabled,
@@ -46,7 +46,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
             .filter { $0.scheduledStart >= range.start && $0.scheduledStart <= range.end }
             .sorted { $0.scheduledStart < $1.scheduledStart }
         return StadiaSchedule(
-            id: StadiaEntityID(rawValue: "schedule:appleSports:\(league.path):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
+            id: StadiaEntityID(rawValue: "schedule:appleSports:\(league.stadiaKey):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             range: range,
             games: games,
@@ -139,7 +139,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
             let players = leaderStats.filter { playerStat in playerStat.stats.contains { $0.key == key } }
             guard !players.isEmpty else { return nil }
             return StadiaLeader(
-                id: StadiaEntityID(rawValue: "leader:appleSports:\(league.path):\(key)"),
+                id: StadiaEntityID(rawValue: "leader:appleSports:\(league.stadiaKey):\(key)"),
                 statKey: key,
                 displayName: first.displayName,
                 players: players,
@@ -238,7 +238,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         let stats = entry.allStats(prefix: "event")
         guard !stats.isEmpty else { return nil }
         return StadiaTeamStat(
-            id: StadiaEntityID(rawValue: "teamStat:appleSports:\(event.canonicalID ?? league.path):\(team.id.rawValue)"),
+            id: StadiaEntityID(rawValue: "teamStat:appleSports:\(event.canonicalID ?? league.stadiaKey):\(team.id.rawValue)"),
             teamID: team.id,
             seasonID: nil,
             stats: stats,
@@ -253,7 +253,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         let displayName = entry.competitor?.displayName ?? playerID
         let canonicalPlayerID = identityResolver.canonicalPlayerID(league: league, provider: .appleSports, providerPlayerID: playerID, fullName: displayName)
         return StadiaPlayerStat(
-            id: StadiaEntityID(rawValue: "playerStat:appleSports:\(event.canonicalID ?? league.path):\(canonicalPlayerID.rawValue)"),
+            id: StadiaEntityID(rawValue: "playerStat:appleSports:\(event.canonicalID ?? league.stadiaKey):\(canonicalPlayerID.rawValue)"),
             playerID: canonicalPlayerID,
             playerDisplayName: displayName,
             teamAbbreviation: nil,
@@ -292,7 +292,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
                 provenance: DataProvenance(provider: .appleSports, fetchedAt: Date(), providerEntityID: member.canonicalID, confidence: 0.65)
             )
         }
-        return StadiaStandingGroup(id: StadiaEntityID(rawValue: "standings:appleSports:\(league.path)"), name: league.name, standings: standings)
+        return StadiaStandingGroup(id: StadiaEntityID(rawValue: "standings:appleSports:\(league.stadiaKey)"), name: league.name, standings: standings)
     }
 
     private func mapEventLeaderboard(document: AppleSportsLeagueDocumentContext, league: League) -> StadiaStandingGroup? {
@@ -301,7 +301,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
             let team = mapCompetitor(entry, fallbackName: "Competitor \(index + 1)", league: league, manifest: document.manifest)
             let score = entry.score?.displayScore
             return StadiaStanding(
-                id: StadiaEntityID(rawValue: "standing:appleSports:\(event.canonicalID ?? league.path):\(index)"),
+                id: StadiaEntityID(rawValue: "standing:appleSports:\(event.canonicalID ?? league.stadiaKey):\(index)"),
                 teamID: team.id,
                 teamDisplayName: team.displayName,
                 teamAbbreviation: team.abbreviation,
@@ -317,7 +317,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
                 provenance: DataProvenance(provider: .appleSports, fetchedAt: Date(), providerEntityID: event.canonicalID, confidence: 0.58)
             )
         }
-        return StadiaStandingGroup(id: StadiaEntityID(rawValue: "leaderboard:appleSports:\(league.path)"), name: event.shortName ?? league.name, standings: standings)
+        return StadiaStandingGroup(id: StadiaEntityID(rawValue: "leaderboard:appleSports:\(league.stadiaKey)"), name: event.shortName ?? league.name, standings: standings)
     }
 }
 

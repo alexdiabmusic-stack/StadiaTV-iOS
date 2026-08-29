@@ -167,12 +167,8 @@ struct PodcastBrowserView: View {
             withAnimation(.snappy) { selectedFilter = .team(team) }
         } label: {
             HStack(spacing: 12) {
-                AsyncImage(url: team.logoURL) { phase in
-                    if case .success(let img) = phase { img.resizable().scaledToFit() }
-                    else { Theme.surface.overlay(Image(systemName: "person.3").foregroundStyle(Theme.textSecondary)) }
-                }
-                .frame(width: 36, height: 36)
-                .clipShape(Circle())
+                TeamLogo(url: team.logoURL, size: 36)
+                    .clipShape(Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text(team.displayName)
                         .font(.subheadline.weight(.semibold))

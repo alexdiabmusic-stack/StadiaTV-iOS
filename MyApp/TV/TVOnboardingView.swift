@@ -201,15 +201,7 @@ struct TVOnboardingView: View {
                                                 prefs.toggleFavorite(team, in: league)
                                             } label: {
                                                 HStack(spacing: 14) {
-                                                    AsyncImage(url: team.logoURL) { phase in
-                                                        if case .success(let img) = phase {
-                                                            img.resizable().scaledToFit()
-                                                        } else {
-                                                            Image(systemName: "shield.fill")
-                                                                .foregroundStyle(Theme.textSecondary.opacity(0.5))
-                                                        }
-                                                    }
-                                                    .frame(width: 40, height: 40)
+                                                    TVTeamLogo(url: team.logoURL, size: 40)
                                                     Text(team.displayName)
                                                         .font(.headline.weight(.medium))
                                                         .foregroundStyle(Theme.textPrimary)

@@ -342,9 +342,9 @@ struct TVFollowingView: View {
     }
 
     private var leagueChips: [League] {
-        let favLeagueIDs = Set(prefs.favoriteTeams.map(\.leaguePath))
+        let favLeagueIDs = Set(prefs.favoriteTeams.flatMap { [$0.leaguePath, $0.leagueStadiaKey] })
         return League.all.filter {
-            prefs.isLeagueSelected($0) && !favLeagueIDs.contains($0.id)
+            prefs.isLeagueSelected($0) && !favLeagueIDs.contains($0.id) && !favLeagueIDs.contains($0.stadiaKey)
         }.prefix(6).map { $0 }
     }
 

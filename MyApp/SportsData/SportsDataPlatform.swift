@@ -560,32 +560,32 @@ protocol SportsNewsProvider: SportsProvider {
 struct SportsIdentityResolver: Sendable {
     func canonicalTeamID(league: League, provider: SportsDataProviderID, providerTeamID: String?, abbreviation: String, displayName: String) -> StadiaEntityID {
         if provider == .espn, let providerTeamID, !providerTeamID.isEmpty {
-            return StadiaEntityID(rawValue: "team:\(league.path):espn:\(providerTeamID)")
+            return StadiaEntityID(rawValue: "team:\(league.stadiaKey):espn:\(providerTeamID)")
         }
-        let slug = Self.slug([league.path, abbreviation, displayName].joined(separator: ":"))
+        let slug = Self.slug([league.stadiaKey, abbreviation, displayName].joined(separator: ":"))
         return StadiaEntityID(rawValue: "team:\(slug)")
     }
 
     func canonicalPlayerID(league: League, provider: SportsDataProviderID, providerPlayerID: String?, fullName: String, birthDate: Date? = nil, teamAbbreviation: String? = nil) -> StadiaEntityID {
         if provider == .espn, let providerPlayerID, !providerPlayerID.isEmpty {
-            return StadiaEntityID(rawValue: "player:\(league.path):espn:\(providerPlayerID)")
+            return StadiaEntityID(rawValue: "player:\(league.stadiaKey):espn:\(providerPlayerID)")
         }
         let birth = birthDate.map { String(Int($0.timeIntervalSince1970)) } ?? "unknown"
-        let slug = Self.slug([league.path, fullName, teamAbbreviation ?? "", birth].joined(separator: ":"))
+        let slug = Self.slug([league.stadiaKey, fullName, teamAbbreviation ?? "", birth].joined(separator: ":"))
         return StadiaEntityID(rawValue: "player:\(slug)")
     }
 
     func canonicalGameID(league: League, provider: SportsDataProviderID, providerGameID: String?, home: StadiaTeam, away: StadiaTeam, scheduledStart: Date) -> StadiaEntityID {
         if provider == .espn, let providerGameID, !providerGameID.isEmpty {
-            return StadiaEntityID(rawValue: "game:\(league.path):espn:\(providerGameID)")
+            return StadiaEntityID(rawValue: "game:\(league.stadiaKey):espn:\(providerGameID)")
         }
         let minute = Int(scheduledStart.timeIntervalSince1970 / 60)
-        let slug = Self.slug([league.path, home.id.rawValue, away.id.rawValue, String(minute)].joined(separator: ":"))
+        let slug = Self.slug([league.stadiaKey, home.id.rawValue, away.id.rawValue, String(minute)].joined(separator: ":"))
         return StadiaEntityID(rawValue: "game:\(slug)")
     }
 
     static func canonicalLeagueID(for league: League) -> StadiaEntityID {
-        StadiaEntityID(rawValue: "league:\(league.path)")
+        StadiaEntityID(rawValue: "league:\(league.stadiaKey)")
     }
 
     static func providerID(from canonicalID: StadiaEntityID, provider: SportsDataProviderID) -> String? {
@@ -730,6 +730,11 @@ actor SportsDataCache {
         return entry.value as? T
     }
 
+    func age(for key: SportsCacheKey, now: Date = Date()) -> TimeInterval? {
+        guard let entry = entries[key.rawValue], now.timeIntervalSince(entry.fetchedAt) < entry.ttl else { return nil }
+        return now.timeIntervalSince(entry.fetchedAt)
+    }
+
     func store<T: Sendable>(_ value: T, for key: SportsCacheKey, ttl: TimeInterval, now: Date = Date()) {
         entries[key.rawValue] = Entry(value: value, fetchedAt: now, ttl: ttl)
     }
@@ -792,7 +797,8 @@ struct SportsProviderRouteConfiguration: Sendable {
     var routes: [ProviderRoute]
 
     func providers(for league: League, capability: SportsDataCapability) -> [SportsDataProviderID] {
-        routes.first { $0.leagueID == league.path && $0.capability == capability }?.providers
+        routes.first { $0.leagueID == league.stadiaKey && $0.capability == capability }?.providers
+            ?? routes.first { $0.leagueID == league.path && $0.capability == capability }?.providers
             ?? routes.first { $0.leagueID == "*" && $0.capability == capability }?.providers
             ?? [.espn]
     }
@@ -801,10 +807,10 @@ struct SportsProviderRouteConfiguration: Sendable {
 
     private static func defaultRoutes() -> [ProviderRoute] {
         let firstPartyCore: [(String, [SportsDataProviderID])] = [
-            ("hockey/nhl", [.nhl, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
-            ("baseball/mlb", [.mlb, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
-            ("basketball/nba", [.nba, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
-            ("football/nfl", [.nfl, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn])
+            (leagueKey(forLegacyPath: "hockey/nhl"), [.nhl, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
+            (leagueKey(forLegacyPath: "baseball/mlb"), [.mlb, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
+            (leagueKey(forLegacyPath: "basketball/nba"), [.nba, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
+            (leagueKey(forLegacyPath: "football/nfl"), [.nfl, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn])
         ]
         let applePrimaryLeagues: [String] = [
             "football/college-football",
@@ -833,7 +839,7 @@ struct SportsProviderRouteConfiguration: Sendable {
             "golf/lpga",
             "racing/f1",
             "racing/nascar-premier"
-        ]
+        ].map(leagueKey(forLegacyPath:))
         let defaultCapabilities: [SportsDataCapability] = [.liveScores, .schedule, .gameStatus, .gameDetails, .playByPlay, .boxScore, .standings, .teams, .players, .rosters, .playerStats, .teamStats, .injuries, .leagueLeaders, .fantasyRelevantData]
         let appleBaselineCapabilities: [SportsDataCapability] = [.liveScores, .schedule, .gameStatus, .gameDetails, .boxScore, .standings, .teams, .playerStats, .teamStats, .leagueLeaders]
         var routes = firstPartyCore.flatMap { leagueID, providers in
@@ -847,6 +853,83 @@ struct SportsProviderRouteConfiguration: Sendable {
         routes.append(ProviderRoute(leagueID: "*", capability: .newsMetadata, providers: [.espn]))
         routes.append(ProviderRoute(leagueID: "*", capability: .odds, providers: [.espn]))
         return routes
+    }
+
+    nonisolated static func leagueKey(forLegacyPath path: String) -> String {
+        let slug = path
+            .folding(options: .diacriticInsensitive, locale: Locale(identifier: "en_US_POSIX"))
+            .lowercased()
+            .map { $0.isLetter || $0.isNumber ? $0 : "-" }
+            .reduce(into: "") { result, character in
+                if character == "-", result.last == "-" { return }
+                result.append(character)
+            }
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        return "league.\(slug)"
+    }
+}
+
+struct SportsProviderRouteOverride: Identifiable, Codable, Hashable, Sendable {
+    nonisolated var id: String { "\(leagueID)|\(capability.rawValue)|\(providerID.rawValue)" }
+    let leagueID: String
+    let capability: SportsDataCapability
+    let providerID: SportsDataProviderID
+    var isEnabled: Bool
+}
+
+actor SportsProviderRouteOverrideStore {
+    static let shared = SportsProviderRouteOverrideStore()
+
+    private let storageKey: String
+    private var overrides: [String: SportsProviderRouteOverride]
+
+    init(storageKey: String = "sportsData.routeOverrides.v1") {
+        self.storageKey = storageKey
+        if let data = UserDefaults.standard.data(forKey: storageKey),
+           let decoded = try? JSONDecoder().decode([SportsProviderRouteOverride].self, from: data) {
+            overrides = Dictionary(uniqueKeysWithValues: decoded.map { ($0.id, $0) })
+        } else {
+            overrides = [:]
+        }
+    }
+
+    func isProviderEnabled(_ providerID: SportsDataProviderID, leagueID: String, capability: SportsDataCapability) -> Bool {
+        let exact = key(leagueID: leagueID, capability: capability, providerID: providerID)
+        let global = key(leagueID: "*", capability: capability, providerID: providerID)
+        return overrides[exact]?.isEnabled ?? overrides[global]?.isEnabled ?? true
+    }
+
+    func setProvider(_ providerID: SportsDataProviderID, enabled: Bool, leagueID: String, capability: SportsDataCapability) {
+        let override = SportsProviderRouteOverride(leagueID: leagueID, capability: capability, providerID: providerID, isEnabled: enabled)
+        overrides[override.id] = override
+        persist()
+    }
+
+    func removeOverride(providerID: SportsDataProviderID, leagueID: String, capability: SportsDataCapability) {
+        overrides[key(leagueID: leagueID, capability: capability, providerID: providerID)] = nil
+        persist()
+    }
+
+    func all() -> [SportsProviderRouteOverride] {
+        overrides.values.sorted { lhs, rhs in
+            [lhs.leagueID, lhs.capability.rawValue, lhs.providerID.rawValue].joined(separator: "|") < [rhs.leagueID, rhs.capability.rawValue, rhs.providerID.rawValue].joined(separator: "|")
+        }
+    }
+
+    func removeAll() {
+        overrides.removeAll()
+        persist()
+    }
+
+    private func key(leagueID: String, capability: SportsDataCapability, providerID: SportsDataProviderID) -> String {
+        "\(leagueID)|\(capability.rawValue)|\(providerID.rawValue)"
+    }
+
+    private func persist() {
+        let values = Array(overrides.values)
+        if let data = try? JSONEncoder().encode(values) {
+            UserDefaults.standard.set(data, forKey: storageKey)
+        }
     }
 }
 
@@ -881,15 +964,18 @@ struct SportsProviderRouter: Sendable {
     let registry: SportsProviderRegistry
     let routeConfiguration: SportsProviderRouteConfiguration
     let healthMonitor: ProviderHealthMonitor
+    let routeOverrides: SportsProviderRouteOverrideStore
 
     init(
         registry: SportsProviderRegistry = .production(),
         routeConfiguration: SportsProviderRouteConfiguration = .firstPass,
-        healthMonitor: ProviderHealthMonitor = ProviderHealthMonitor()
+        healthMonitor: ProviderHealthMonitor = ProviderHealthMonitor(),
+        routeOverrides: SportsProviderRouteOverrideStore = .shared
     ) {
         self.registry = registry
         self.routeConfiguration = routeConfiguration
         self.healthMonitor = healthMonitor
+        self.routeOverrides = routeOverrides
     }
 
     func providers<T>(for league: League, capability: SportsDataCapability, as type: T.Type) async -> [T] {
@@ -898,7 +984,8 @@ struct SportsProviderRouter: Sendable {
             guard let provider = registry.provider(id: providerID),
                   provider.metadata.isEnabled,
                   provider.metadata.capabilities.contains(capability),
-                  provider.metadata.supportedLeagues.contains(league.path) || provider.metadata.supportedLeagues.contains("*"),
+                  provider.metadata.supportedLeagues.contains(league.stadiaKey) || provider.metadata.supportedLeagues.contains(league.path) || provider.metadata.supportedLeagues.contains("*"),
+                  await routeOverrides.isProviderEnabled(providerID, leagueID: league.stadiaKey, capability: capability),
                   await healthMonitor.isAvailable(provider.metadata),
                   let typed = provider as? T else {
                 continue
@@ -906,6 +993,14 @@ struct SportsProviderRouter: Sendable {
             output.append(typed)
         }
         return output
+    }
+
+    func providerMetadata() -> [SportsDataProviderMetadata] {
+        registry.metadata()
+    }
+
+    func routeProviderIDs(for league: League, capability: SportsDataCapability) -> [SportsDataProviderID] {
+        routeConfiguration.providers(for: league, capability: capability)
     }
 }
 
@@ -927,7 +1022,7 @@ actor SportsDiagnosticsStore {
     private var entries: [String: SportsProviderDiagnostics] = [:]
 
     func record(_ diagnostics: SportsProviderDiagnostics) {
-        entries["\(diagnostics.league.path)-\(diagnostics.capability.rawValue)"] = diagnostics
+        entries["\(diagnostics.league.stadiaKey)-\(diagnostics.capability.rawValue)"] = diagnostics
     }
 
     func all() -> [SportsProviderDiagnostics] {
@@ -953,10 +1048,38 @@ struct SportsRepository: Sendable {
         self.cache = cache
     }
 
+    func providerMetadata() -> [SportsDataProviderMetadata] {
+        router.providerMetadata()
+    }
+
+    func routeProviderIDs(for league: League, capability: SportsDataCapability) -> [SportsDataProviderID] {
+        router.routeProviderIDs(for: league, capability: capability)
+    }
+
+    func providerHealthSnapshot(for providerID: SportsDataProviderID) async -> SportsProviderHealthSnapshot {
+        await router.healthMonitor.snapshot(for: providerID)
+    }
+
+    func routeOverrides() async -> [SportsProviderRouteOverride] {
+        await router.routeOverrides.all()
+    }
+
+    func setProvider(_ providerID: SportsDataProviderID, enabled: Bool, league: League, capability: SportsDataCapability) async {
+        await router.routeOverrides.setProvider(providerID, enabled: enabled, leagueID: league.stadiaKey, capability: capability)
+    }
+
+    func clearRouteOverrides() async {
+        await router.routeOverrides.removeAll()
+    }
+
+    func clearCache() async {
+        await cache.removeAll()
+    }
+
     func liveScores(for league: League) async throws -> [StadiaGame] {
         let key = cacheKey(league: league, capability: .liveScores, scope: "today")
         if let cached: [StadiaGame] = await cache.value(for: key) {
-            await recordDiagnostics(league: league, capability: .liveScores, currentProvider: cached.first?.provenance.provider, latency: nil, cacheHit: true, fallbacks: [], failures: [])
+            await recordDiagnostics(league: league, capability: .liveScores, currentProvider: cached.first?.provenance.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
             return cached
         }
         return try await scoreDeduplicator.value(for: key.rawValue) {
@@ -967,7 +1090,7 @@ struct SportsRepository: Sendable {
     func schedule(for league: League, range: SportsDateRange) async throws -> StadiaSchedule {
         let key = cacheKey(league: league, capability: .schedule, scope: "\(Int(range.start.timeIntervalSince1970))-\(Int(range.end.timeIntervalSince1970))")
         if let cached: StadiaSchedule = await cache.value(for: key) {
-            await recordDiagnostics(league: league, capability: .schedule, currentProvider: cached.provenance.provider, latency: nil, cacheHit: true, fallbacks: [], failures: [])
+            await recordDiagnostics(league: league, capability: .schedule, currentProvider: cached.provenance.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
             return cached
         }
         return try await scheduleDeduplicator.value(for: key.rawValue) {
@@ -978,7 +1101,7 @@ struct SportsRepository: Sendable {
     func gameDetails(for league: League, gameID: StadiaEntityID) async throws -> StadiaGame {
         let key = cacheKey(league: league, capability: .gameDetails, scope: gameID.rawValue)
         if let cached: StadiaGame = await cache.value(for: key) {
-            await recordDiagnostics(league: league, capability: .gameDetails, currentProvider: cached.provenance.provider, latency: nil, cacheHit: true, fallbacks: [], failures: [])
+            await recordDiagnostics(league: league, capability: .gameDetails, currentProvider: cached.provenance.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
             return cached
         }
         return try await gameDetailsDeduplicator.value(for: key.rawValue) {
@@ -989,7 +1112,7 @@ struct SportsRepository: Sendable {
     func boxScore(for league: League, gameID: StadiaEntityID) async throws -> StadiaBoxScore {
         let key = cacheKey(league: league, capability: .boxScore, scope: gameID.rawValue)
         if let cached: StadiaBoxScore = await cache.value(for: key) {
-            await recordDiagnostics(league: league, capability: .boxScore, currentProvider: cached.provenance.provider, latency: nil, cacheHit: true, fallbacks: [], failures: [])
+            await recordDiagnostics(league: league, capability: .boxScore, currentProvider: cached.provenance.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
             return cached
         }
         return try await boxScoreDeduplicator.value(for: key.rawValue) {
@@ -1000,7 +1123,7 @@ struct SportsRepository: Sendable {
     func playByPlay(for league: League, gameID: StadiaEntityID) async throws -> StadiaPlayByPlay {
         let key = cacheKey(league: league, capability: .playByPlay, scope: gameID.rawValue)
         if let cached: StadiaPlayByPlay = await cache.value(for: key) {
-            await recordDiagnostics(league: league, capability: .playByPlay, currentProvider: cached.provenance.provider, latency: nil, cacheHit: true, fallbacks: [], failures: [])
+            await recordDiagnostics(league: league, capability: .playByPlay, currentProvider: cached.provenance.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
             return cached
         }
         return try await playByPlayDeduplicator.value(for: key.rawValue) {
@@ -1016,6 +1139,11 @@ struct SportsRepository: Sendable {
     }
 
     func teams(for league: League) async throws -> [StadiaTeam] {
+        let key = cacheKey(league: league, capability: .teams, scope: "all")
+        if let cached: [StadiaTeam] = await cache.value(for: key) {
+            await recordDiagnostics(league: league, capability: .teams, currentProvider: cached.first?.provenance?.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
+            return cached
+        }
         let providers = await router.providers(for: league, capability: .teams, as: (any TeamProvider).self)
         guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.teams, league.path) }
         var fallbacks: [SportsDataProviderID] = []
@@ -1026,6 +1154,7 @@ struct SportsRepository: Sendable {
                 let teams = try await provider.teams(for: league)
                 let latency = Date().timeIntervalSince(start)
                 await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
+                await cache.store(teams, for: key, ttl: SportsDataCache.defaultTTL(for: .teams))
                 await recordDiagnostics(league: league, capability: .teams, currentProvider: provider.metadata.id, latency: latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
                 return teams
             } catch {
@@ -1038,6 +1167,11 @@ struct SportsRepository: Sendable {
     }
 
     func newsMetadata(for league: League, limit: Int = 10) async throws -> [StadiaNewsArticle] {
+        let key = cacheKey(league: league, capability: .newsMetadata, scope: "limit-\(limit)")
+        if let cached: [StadiaNewsArticle] = await cache.value(for: key) {
+            await recordDiagnostics(league: league, capability: .newsMetadata, currentProvider: cached.first?.provenance?.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
+            return cached
+        }
         let providers = await router.providers(for: league, capability: .newsMetadata, as: (any SportsNewsProvider).self)
         guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.newsMetadata, league.path) }
         var fallbacks: [SportsDataProviderID] = []
@@ -1048,6 +1182,7 @@ struct SportsRepository: Sendable {
                 let articles = try await provider.newsMetadata(for: league, limit: limit)
                 let latency = Date().timeIntervalSince(start)
                 await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
+                await cache.store(articles, for: key, ttl: SportsDataCache.defaultTTL(for: .newsMetadata))
                 await recordDiagnostics(league: league, capability: .newsMetadata, currentProvider: provider.metadata.id, latency: latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
                 return articles
             } catch {
@@ -1060,6 +1195,11 @@ struct SportsRepository: Sendable {
     }
 
     func roster(for league: League, teamID: StadiaEntityID) async throws -> StadiaRoster {
+        let key = cacheKey(league: league, capability: .rosters, scope: teamID.rawValue)
+        if let cached: StadiaRoster = await cache.value(for: key) {
+            await recordDiagnostics(league: league, capability: .rosters, currentProvider: cached.provenance.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
+            return cached
+        }
         let providers = await router.providers(for: league, capability: .rosters, as: (any RosterProvider).self)
         guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.rosters, league.path) }
         var fallbacks: [SportsDataProviderID] = []
@@ -1070,6 +1210,7 @@ struct SportsRepository: Sendable {
                 let roster = try await provider.roster(for: league, teamID: teamID)
                 let latency = Date().timeIntervalSince(start)
                 await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
+                await cache.store(roster, for: key, ttl: SportsDataCache.defaultTTL(for: .rosters))
                 await recordDiagnostics(league: league, capability: .rosters, currentProvider: provider.metadata.id, latency: latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
                 return roster
             } catch {
@@ -1082,6 +1223,12 @@ struct SportsRepository: Sendable {
     }
 
     func standings(for league: League) async throws -> [StadiaStandingGroup] {
+        let key = cacheKey(league: league, capability: .standings, scope: "current")
+        if let cached: [StadiaStandingGroup] = await cache.value(for: key) {
+            let provider = cached.first?.standings.first?.provenance?.provider
+            await recordDiagnostics(league: league, capability: .standings, currentProvider: provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
+            return cached
+        }
         let providers = await router.providers(for: league, capability: .standings, as: (any StandingsProvider).self)
         guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.standings, league.path) }
         var fallbacks: [SportsDataProviderID] = []
@@ -1092,6 +1239,7 @@ struct SportsRepository: Sendable {
                 let groups = try await provider.standings(for: league)
                 let latency = Date().timeIntervalSince(start)
                 await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
+                await cache.store(groups, for: key, ttl: SportsDataCache.defaultTTL(for: .standings))
                 await recordDiagnostics(league: league, capability: .standings, currentProvider: provider.metadata.id, latency: latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
                 return groups
             } catch {
@@ -1104,6 +1252,11 @@ struct SportsRepository: Sendable {
     }
 
     func injuries(for league: League) async throws -> [StadiaInjury] {
+        let key = cacheKey(league: league, capability: .injuries, scope: "current")
+        if let cached: [StadiaInjury] = await cache.value(for: key) {
+            await recordDiagnostics(league: league, capability: .injuries, currentProvider: cached.first?.provenance?.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
+            return cached
+        }
         let providers = await router.providers(for: league, capability: .injuries, as: (any InjuryProvider).self)
         guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.injuries, league.path) }
         var fallbacks: [SportsDataProviderID] = []
@@ -1114,6 +1267,7 @@ struct SportsRepository: Sendable {
                 let injuries = try await provider.injuries(for: league)
                 let latency = Date().timeIntervalSince(start)
                 await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
+                await cache.store(injuries, for: key, ttl: SportsDataCache.defaultTTL(for: .injuries))
                 await recordDiagnostics(league: league, capability: .injuries, currentProvider: provider.metadata.id, latency: latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
                 return injuries
             } catch {
@@ -1126,6 +1280,11 @@ struct SportsRepository: Sendable {
     }
 
     func leaders(for league: League) async throws -> [StadiaLeader] {
+        let key = cacheKey(league: league, capability: .leagueLeaders, scope: "current")
+        if let cached: [StadiaLeader] = await cache.value(for: key) {
+            await recordDiagnostics(league: league, capability: .leagueLeaders, currentProvider: cached.first?.provenance?.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
+            return cached
+        }
         let providers = await router.providers(for: league, capability: .leagueLeaders, as: (any LeagueLeaderProvider).self)
         guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.leagueLeaders, league.path) }
         var fallbacks: [SportsDataProviderID] = []
@@ -1136,6 +1295,7 @@ struct SportsRepository: Sendable {
                 let boards = try await provider.leaders(for: league)
                 let latency = Date().timeIntervalSince(start)
                 await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
+                await cache.store(boards, for: key, ttl: SportsDataCache.defaultTTL(for: .leagueLeaders))
                 await recordDiagnostics(league: league, capability: .leagueLeaders, currentProvider: provider.metadata.id, latency: latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
                 return boards
             } catch {
@@ -1207,16 +1367,16 @@ struct SportsRepository: Sendable {
     private func legacyCanonicalTeamID(league: League, teamID: String) -> StadiaEntityID {
         if teamID.hasPrefix("team:") { return StadiaEntityID(rawValue: teamID) }
         if teamID.hasPrefix("umc.") {
-            return StadiaEntityID(rawValue: "team:\(league.path):appleSports:\(teamID)")
+            return StadiaEntityID(rawValue: "team:\(league.stadiaKey):appleSports:\(teamID)")
         }
         if league.path == "hockey/nhl", teamID.rangeOfCharacter(from: .decimalDigits) == nil {
-            return StadiaEntityID(rawValue: "team:\(league.path):nhl:\(teamID)")
+            return StadiaEntityID(rawValue: "team:\(league.stadiaKey):nhl:\(teamID)")
         }
-        return StadiaEntityID(rawValue: "team:\(league.path):espn:\(teamID)")
+        return StadiaEntityID(rawValue: "team:\(league.stadiaKey):espn:\(teamID)")
     }
 
     private func cacheKey(league: League, capability: SportsDataCapability, scope: String) -> SportsCacheKey {
-        SportsCacheKey(providerID: router.routeConfiguration.providers(for: league, capability: capability).first ?? .espn, leagueID: league.path, capability: capability, scope: scope)
+        SportsCacheKey(providerID: router.routeConfiguration.providers(for: league, capability: capability).first ?? .espn, leagueID: league.stadiaKey, capability: capability, scope: scope)
     }
 
     private func requestScores(for league: League, key: SportsCacheKey) async throws -> [StadiaGame] {
@@ -1379,7 +1539,7 @@ struct SportsRepository: Sendable {
         throw SportsDataError.unavailable
     }
 
-    private func recordDiagnostics(league: League, capability: SportsDataCapability, currentProvider: SportsDataProviderID?, latency: TimeInterval?, cacheHit: Bool, fallbacks: [SportsDataProviderID], failures: [String]) async {
+    private func recordDiagnostics(league: League, capability: SportsDataCapability, currentProvider: SportsDataProviderID?, latency: TimeInterval?, cacheHit: Bool, cacheAge: TimeInterval? = nil, fallbacks: [SportsDataProviderID], failures: [String]) async {
         let primary = router.routeConfiguration.providers(for: league, capability: capability).first
         let health = currentProvider == nil ? nil : await router.healthMonitor.snapshot(for: currentProvider!)
         await SportsDiagnosticsStore.shared.record(SportsProviderDiagnostics(
@@ -1389,7 +1549,7 @@ struct SportsRepository: Sendable {
             currentProvider: currentProvider,
             latency: latency,
             cacheHit: cacheHit,
-            cacheAge: nil,
+            cacheAge: cacheAge,
             fallbacksAttempted: fallbacks,
             providerHealth: health,
             failureDescriptions: failures
@@ -1412,7 +1572,7 @@ struct ESPNProvider: ScoreProvider, ScheduleProvider, TeamProvider, StandingsPro
             name: "ESPN",
             supportLevel: .legacy,
             supportedSports: Set(SportGroup.allCases.filter { $0.hasEspnLeagues }),
-            supportedLeagues: Set(League.all.map(\.path)),
+            supportedLeagues: Set(League.all.flatMap { [$0.path, $0.stadiaKey] }),
             capabilities: [.liveScores, .schedule, .gameStatus, .teams, .standings, .rosters, .injuries, .leagueLeaders, .newsMetadata],
             authenticationType: .publicWebHeaders,
             isEnabled: true,
@@ -1433,7 +1593,7 @@ struct ESPNProvider: ScoreProvider, ScheduleProvider, TeamProvider, StandingsPro
             let matches = try await service.scoreboards(for: league, starting: range.start, days: range.dayCount)
             let games = matches.map { map(match: $0) }
             return StadiaSchedule(
-                id: StadiaEntityID(rawValue: "schedule:\(league.path):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
+                id: StadiaEntityID(rawValue: "schedule:\(league.stadiaKey):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
                 leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
                 range: range,
                 games: games,
@@ -1468,7 +1628,7 @@ struct ESPNProvider: ScoreProvider, ScheduleProvider, TeamProvider, StandingsPro
             let groups = try await service.standings(for: league)
             return groups.map { group in
                 StadiaStandingGroup(
-                    id: StadiaEntityID(rawValue: "standings:\(league.path):\(SportsIdentityResolver.slug(group.id))"),
+                    id: StadiaEntityID(rawValue: "standings:\(league.stadiaKey):\(SportsIdentityResolver.slug(group.id))"),
                     name: group.name,
                     standings: group.rows.enumerated().map { index, row in
                         let teamID = identityResolver.canonicalTeamID(league: league, provider: .espn, providerTeamID: row.teamID, abbreviation: row.abbreviation, displayName: row.displayName)
@@ -1535,7 +1695,7 @@ struct ESPNProvider: ScoreProvider, ScheduleProvider, TeamProvider, StandingsPro
         do {
             return try await service.injuries(for: league).map { injury in
                 StadiaInjury(
-                    id: StadiaEntityID(rawValue: "injury:\(league.path):\(SportsIdentityResolver.slug(injury.id))"),
+                    id: StadiaEntityID(rawValue: "injury:\(league.stadiaKey):\(SportsIdentityResolver.slug(injury.id))"),
                     playerID: nil,
                     playerName: injury.athleteName,
                     teamID: nil,
@@ -1553,7 +1713,7 @@ struct ESPNProvider: ScoreProvider, ScheduleProvider, TeamProvider, StandingsPro
         do {
             return try await service.leaders(for: league).map { board in
                 StadiaLeader(
-                    id: StadiaEntityID(rawValue: "leader:\(league.path):\(SportsIdentityResolver.slug(board.id))"),
+                    id: StadiaEntityID(rawValue: "leader:\(league.stadiaKey):\(SportsIdentityResolver.slug(board.id))"),
                     statKey: board.statName,
                     displayName: board.displayName,
                     players: board.rows.map { row in

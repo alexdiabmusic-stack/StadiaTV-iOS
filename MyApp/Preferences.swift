@@ -25,23 +25,96 @@ struct Team: Identifiable, Hashable {
 /// A favorited team, stored with enough context to rebuild it without a network call.
 struct FavoriteTeam: Codable, Hashable, Identifiable {
     var leaguePath: String
+    var leagueStadiaKey: String
     var teamID: String
     var displayName: String
     var abbreviation: String
     var logoURLString: String?
     var canonicalTeamIDString: String?
+    var providerAliases: [ProviderEntityAlias]
 
-    var id: String { "\(leaguePath)-\(teamID)" }
+    var id: String { "\(leagueStadiaKey)-\(canonicalTeamID)" }
     var logoURL: URL? { logoURLString.flatMap(URL.init(string:)) }
-    var canonicalTeamID: String { canonicalTeamIDString ?? "team:\(leaguePath):legacy:\(teamID)" }
+    var canonicalTeamID: String { canonicalTeamIDString ?? Self.canonicalTeamID(legacyTeamID: teamID, abbreviation: abbreviation, displayName: displayName, leaguePath: leaguePath) }
 
     init(team: Team, league: League) {
         self.leaguePath = league.path
+        self.leagueStadiaKey = league.stadiaKey
         self.teamID = team.id
         self.displayName = team.displayName
         self.abbreviation = team.abbreviation
         self.logoURLString = team.logoURL?.absoluteString
-        self.canonicalTeamIDString = team.canonicalIDString
+        self.canonicalTeamIDString = team.canonicalIDString ?? Self.canonicalTeamID(team: team, league: league)
+        self.providerAliases = [Self.providerAlias(teamID: team.id, league: league)]
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        leaguePath = try container.decode(String.self, forKey: .leaguePath)
+        leagueStadiaKey = try container.decodeIfPresent(String.self, forKey: .leagueStadiaKey)
+            ?? SportsProviderRouteConfiguration.leagueKey(forLegacyPath: leaguePath)
+        teamID = try container.decode(String.self, forKey: .teamID)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        abbreviation = try container.decode(String.self, forKey: .abbreviation)
+        logoURLString = try container.decodeIfPresent(String.self, forKey: .logoURLString)
+        canonicalTeamIDString = try container.decodeIfPresent(String.self, forKey: .canonicalTeamIDString)
+            ?? Self.canonicalTeamID(legacyTeamID: teamID, abbreviation: abbreviation, displayName: displayName, leaguePath: leaguePath)
+        providerAliases = try container.decodeIfPresent([ProviderEntityAlias].self, forKey: .providerAliases)
+            ?? [Self.providerAlias(teamID: teamID, leaguePath: leaguePath)]
+    }
+
+    func matches(_ team: Team, in league: League) -> Bool {
+        guard leaguePath == league.path || leagueStadiaKey == league.stadiaKey else { return false }
+        let teamCanonicalID = team.canonicalIDString ?? Self.canonicalTeamID(team: team, league: league)
+        return canonicalTeamID == teamCanonicalID
+            || teamID == team.id
+            || providerAliases.contains { $0.id == team.id }
+    }
+
+    func migrated() -> FavoriteTeam {
+        var copy = self
+        copy.leagueStadiaKey = SportsProviderRouteConfiguration.leagueKey(forLegacyPath: leaguePath)
+        if copy.canonicalTeamIDString == nil {
+            copy.canonicalTeamIDString = Self.canonicalTeamID(legacyTeamID: teamID, abbreviation: abbreviation, displayName: displayName, leaguePath: leaguePath)
+        }
+        if copy.providerAliases.isEmpty {
+            copy.providerAliases = [Self.providerAlias(teamID: teamID, leaguePath: leaguePath)]
+        }
+        return copy
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case leaguePath, leagueStadiaKey, teamID, displayName, abbreviation, logoURLString, canonicalTeamIDString, providerAliases
+    }
+
+    private static func canonicalTeamID(team: Team, league: League) -> String {
+        if let canonicalID = team.canonicalIDString, !canonicalID.isEmpty { return canonicalID }
+        if team.id.hasPrefix("team:") { return team.id }
+        if team.id.hasPrefix("umc.") {
+            return "team:\(league.stadiaKey):appleSports:\(team.id)"
+        }
+        if league.path == "hockey/nhl", team.id.rangeOfCharacter(from: .decimalDigits) == nil {
+            return "team:\(league.stadiaKey):nhl:\(team.id)"
+        }
+        return "team:\(league.stadiaKey):espn:\(team.id)"
+    }
+
+    private static func canonicalTeamID(legacyTeamID: String, abbreviation: String, displayName: String, leaguePath: String) -> String {
+        let leagueKey = SportsProviderRouteConfiguration.leagueKey(forLegacyPath: leaguePath)
+        if legacyTeamID.hasPrefix("team:") { return legacyTeamID }
+        if legacyTeamID.hasPrefix("umc.") { return "team:\(leagueKey):appleSports:\(legacyTeamID)" }
+        if leaguePath == "hockey/nhl", legacyTeamID.rangeOfCharacter(from: .decimalDigits) == nil { return "team:\(leagueKey):nhl:\(legacyTeamID)" }
+        return "team:\(leagueKey):espn:\(legacyTeamID)"
+    }
+
+    private static func providerAlias(teamID: String, league: League) -> ProviderEntityAlias {
+        providerAlias(teamID: teamID, leaguePath: league.path)
+    }
+
+    private static func providerAlias(teamID: String, leaguePath: String) -> ProviderEntityAlias {
+        if teamID.hasPrefix("umc.") { return ProviderEntityAlias(provider: .appleSports, id: teamID) }
+        if leaguePath == "hockey/nhl", teamID.rangeOfCharacter(from: .decimalDigits) == nil { return ProviderEntityAlias(provider: .nhl, id: teamID) }
+        return ProviderEntityAlias(provider: .espn, id: teamID)
     }
 }
 
@@ -167,8 +240,17 @@ final class PreferencesStore: ObservableObject {
         } else {
             prefs = UserPreferences()
         }
+        var shouldPersistMigration = false
         if prefs.preferredStreamLanguages.isEmpty {
             prefs.preferredStreamLanguages = ["en"]
+            shouldPersistMigration = true
+        }
+        let migratedFavorites = prefs.favoriteTeams.map { $0.migrated() }
+        if migratedFavorites != prefs.favoriteTeams {
+            prefs.favoriteTeams = migratedFavorites
+            shouldPersistMigration = true
+        }
+        if shouldPersistMigration {
             persist()
         }
         CloudSyncService.shared.setEnabled(prefs.cloudSyncEnabled)
@@ -368,11 +450,11 @@ final class PreferencesStore: ObservableObject {
     // MARK: Favorite teams
 
     func isFavorite(_ team: Team, in league: League) -> Bool {
-        prefs.favoriteTeams.contains { $0.leaguePath == league.path && $0.teamID == team.id }
+        prefs.favoriteTeams.contains { $0.matches(team, in: league) }
     }
 
     func toggleFavorite(_ team: Team, in league: League) {
-        if let index = prefs.favoriteTeams.firstIndex(where: { $0.leaguePath == league.path && $0.teamID == team.id }) {
+        if let index = prefs.favoriteTeams.firstIndex(where: { $0.matches(team, in: league) }) {
             prefs.favoriteTeams.remove(at: index)
         } else {
             prefs.favoriteTeams.append(FavoriteTeam(team: team, league: league))
@@ -388,9 +470,15 @@ final class PreferencesStore: ObservableObject {
 
     /// True when a match involves one of the user's favorite teams.
     func isFavoriteMatch(_ match: Match) -> Bool {
-        let names = favoriteTeamNames
-        guard !names.isEmpty else { return false }
-        return names.contains(match.home.displayName.lowercased())
-            || names.contains(match.away.displayName.lowercased())
+        let leagueFavorites = prefs.favoriteTeams.filter { $0.leaguePath == match.league.path || $0.leagueStadiaKey == match.league.stadiaKey }
+        guard !leagueFavorites.isEmpty else { return false }
+        let matchIDs = Set([match.home.canonicalIDString, match.away.canonicalIDString, match.home.teamID, match.away.teamID].compactMap { $0 })
+        let matchNames = Set([match.home.displayName.lowercased(), match.away.displayName.lowercased()])
+        return leagueFavorites.contains { favorite in
+            matchIDs.contains(favorite.canonicalTeamID)
+                || matchIDs.contains(favorite.teamID)
+                || favorite.providerAliases.contains { matchIDs.contains($0.id) }
+                || matchNames.contains(favorite.displayName.lowercased())
+        }
     }
 }

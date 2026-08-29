@@ -15,8 +15,10 @@ struct SportsDataFoundationTests {
 
     @Test func routeConfigurationIsCapabilitySpecific() throws {
         let league = try #require(League.all.first { $0.path == "hockey/nhl" })
-        var config = SportsProviderRouteConfiguration.firstPass
-        config.routes.append(ProviderRoute(leagueID: league.path, capability: .injuries, providers: [.cbsSports, .espn]))
+        let config = SportsProviderRouteConfiguration(routes: [
+            ProviderRoute(leagueID: league.stadiaKey, capability: .liveScores, providers: [.nhl, .espn]),
+            ProviderRoute(leagueID: league.stadiaKey, capability: .injuries, providers: [.cbsSports, .espn])
+        ])
         #expect(config.providers(for: league, capability: .liveScores).first == .nhl)
         #expect(config.providers(for: league, capability: .injuries).first == .cbsSports)
     }
@@ -130,6 +132,29 @@ struct SportsDataFoundationTests {
         #expect(legacy.home.teamID == "1")
     }
 
+    @Test func nhlBoxScoreFixtureDecodesPlayerStats() throws {
+        let data = #"""
+        {
+          "awayTeam":{"id":10,"abbrev":"TOR","score":4,"sog":31,"name":{"default":"Toronto Maple Leafs"}},
+          "homeTeam":{"id":8,"abbrev":"MTL","score":2,"sog":26,"name":{"default":"Montreal Canadiens"}},
+          "playerByGameStats":{
+            "awayTeam":{
+              "forwards":[{"playerId":8478402,"name":{"default":"Auston Matthews"},"sweaterNumber":34,"position":"C","goals":2,"assists":1,"points":3,"plusMinus":2,"pim":0,"hits":1,"blockedShots":0,"powerPlayGoals":1,"sog":6,"faceoffWinningPctg":0.56,"toi":"21:14"}],
+              "defense":[],
+              "goalies":[{"playerId":8475883,"name":{"default":"Example Goalie"},"sweaterNumber":31,"goalsAgainst":2,"shotsAgainst":26,"saves":24,"savePctg":0.923,"toi":"60:00"}]
+            },
+            "homeTeam":{"forwards":[],"defense":[],"goalies":[]}
+          }
+        }
+        """#.data(using: .utf8)!
+        let boxScore = try NHLJSONDecoder.decoder.decode(NHLBoxScoreResponseDTO.self, from: data)
+        #expect(boxScore.awayTeam?.abbrev == "TOR")
+        #expect(boxScore.awayTeam?.sog == 31)
+        #expect(boxScore.playerByGameStats?.awayTeam?.forwards?.first?.playerID == 8478402)
+        #expect(boxScore.playerByGameStats?.awayTeam?.forwards?.first?.points == 3)
+        #expect(boxScore.playerByGameStats?.awayTeam?.goalies?.first?.savePctg == 0.923)
+    }
+
     @Test func routerSkipsUnhealthyPrimaryAndUsesFallbackProvider() async throws {
         let league = try #require(League.all.first { $0.path == "football/nfl" })
         let failing = MockScoreProvider(id: .nfl, result: .failure(SportsDataError.unavailable))
@@ -226,6 +251,71 @@ struct SportsDataFoundationTests {
         #expect(await monitor.snapshot(for: .appleSports).state == .unavailable)
         await monitor.recordSuccess(providerID: .appleSports, latency: 0.2)
         #expect(await monitor.snapshot(for: .appleSports).state == .healthy)
+    }
+
+    @Test func legacyESPNFavoriteDecodesWithCanonicalTeamIDAndAlias() throws {
+        let data = #"""
+        {
+          "leaguePath":"hockey/nhl",
+          "teamID":"10",
+          "displayName":"Toronto Maple Leafs",
+          "abbreviation":"TOR",
+          "logoURLString":null
+        }
+        """#.data(using: .utf8)!
+        let favorite = try JSONDecoder().decode(FavoriteTeam.self, from: data)
+        #expect(favorite.leagueStadiaKey == "league.hockey-nhl")
+        #expect(favorite.canonicalTeamID == "team:league.hockey-nhl:espn:10")
+        #expect(favorite.providerAliases == [ProviderEntityAlias(provider: .espn, id: "10")])
+    }
+
+    @Test func routeOverrideDisablesProviderForSelectedCapability() async throws {
+        let league = try #require(League.all.first { $0.path == "hockey/nhl" })
+        let overrides = SportsProviderRouteOverrideStore(storageKey: "sportsData.tests.routeOverrides")
+        await overrides.removeAll()
+        await overrides.setProvider(.nhl, enabled: false, leagueID: league.stadiaKey, capability: .liveScores)
+        let router = SportsProviderRouter(
+            registry: SportsProviderRegistry(providers: [
+                MockScoreProvider(id: .nhl, result: .success([])),
+                MockScoreProvider(id: .espn, result: .success([]))
+            ]),
+            routeConfiguration: SportsProviderRouteConfiguration(routes: [
+                ProviderRoute(leagueID: league.stadiaKey, capability: .liveScores, providers: [.nhl, .espn])
+            ]),
+            healthMonitor: ProviderHealthMonitor(),
+            routeOverrides: overrides
+        )
+        let providers = await router.providers(for: league, capability: .liveScores, as: (any ScoreProvider).self)
+        #expect(providers.map { $0.metadata.id } == [.espn])
+        await overrides.removeAll()
+    }
+
+    @Test func repositoryCachesTeamsCapability() async throws {
+        let league = try #require(League.all.first { $0.path == "hockey/nhl" })
+        let counter = SportsCounter()
+        let team = StadiaTeam(
+            id: StadiaEntityID(rawValue: "team:\(league.stadiaKey):nhl:TOR"),
+            leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
+            displayName: "Toronto Maple Leafs",
+            shortName: "Maple Leafs",
+            abbreviation: "TOR",
+            logoURL: nil,
+            aliases: [ProviderEntityAlias(provider: .nhl, id: "TOR")],
+            provenance: DataProvenance(provider: .nhl, fetchedAt: Date(), providerEntityID: "TOR", confidence: 1)
+        )
+        let router = SportsProviderRouter(
+            registry: SportsProviderRegistry(providers: [MockTeamProvider(counter: counter, teams: [team])]),
+            routeConfiguration: SportsProviderRouteConfiguration(routes: [
+                ProviderRoute(leagueID: league.stadiaKey, capability: .teams, providers: [.nhl])
+            ]),
+            healthMonitor: ProviderHealthMonitor(),
+            routeOverrides: SportsProviderRouteOverrideStore(storageKey: "sportsData.tests.teamCache")
+        )
+        let repository = SportsRepository(router: router, cache: SportsDataCache())
+        let first = try await repository.teams(for: league)
+        let second = try await repository.teams(for: league)
+        #expect(first == second)
+        #expect(await counter.value == 1)
     }
 
     private static func game(league: League, providerID: SportsDataProviderID, providerGameID: String) -> StadiaGame {
@@ -340,6 +430,27 @@ private struct MockScoreProvider: ScoreProvider {
 
     func liveScores(for league: League) async throws -> [StadiaGame] {
         try result.get()
+    }
+}
+
+private struct MockTeamProvider: TeamProvider {
+    let metadata = SportsDataProviderMetadata(
+        id: .nhl,
+        name: "NHL teams mock",
+        supportLevel: .firstPartyWeb,
+        supportedSports: [.hockey],
+        supportedLeagues: ["*"],
+        capabilities: [.teams],
+        authenticationType: .none,
+        isEnabled: true,
+        requestTimeout: 1
+    )
+    let counter: SportsCounter
+    let teams: [StadiaTeam]
+
+    func teams(for league: League) async throws -> [StadiaTeam] {
+        await counter.increment()
+        return teams
     }
 }
 

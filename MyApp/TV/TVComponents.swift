@@ -250,17 +250,28 @@ struct TVTeamLogo: View {
     let size: CGFloat
 
     var body: some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
-                image.resizable().scaledToFit()
-            default:
-                Image(systemName: "shield.fill")
-                    .font(.system(size: size * 0.48))
-                    .foregroundStyle(Theme.textSecondary)
+        logo
+            .frame(width: size, height: size)
+    }
+
+    @ViewBuilder
+    private var logo: some View {
+        if let assetName = url?.stadiaImageAssetName {
+            Image(assetName)
+                .resizable()
+                .scaledToFit()
+        } else {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().scaledToFit()
+                default:
+                    Image(systemName: "shield.fill")
+                        .font(.system(size: size * 0.48))
+                        .foregroundStyle(Theme.textSecondary)
+                }
             }
         }
-        .frame(width: size, height: size)
     }
 }
 

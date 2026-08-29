@@ -503,14 +503,7 @@ private struct TeamPickRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                AsyncImage(url: team.logoURL) { phase in
-                    if case .success(let image) = phase {
-                        image.resizable().scaledToFit()
-                    } else {
-                        Image(systemName: "shield.fill").foregroundStyle(Theme.textSecondary.opacity(0.5))
-                    }
-                }
-                .frame(width: 34, height: 34)
+                TeamLogo(url: team.logoURL, size: 34)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(team.displayName)
                         .font(.subheadline.weight(.medium))

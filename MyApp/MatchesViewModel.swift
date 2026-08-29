@@ -13,7 +13,7 @@ final class MatchesViewModel: ObservableObject {
     @Published private(set) var allFollowedMatches: [Match] = []
     @Published private(set) var isLoadingFollowing = false
 
-    private let service = ESPNService()
+    private let sportsRepository = SportsRepository.shared
     private var refreshTask: Task<Void, Never>?
     private var lastFollowingArgs: (leagues: [League], favorites: [FavoriteTeam])?
 
@@ -33,7 +33,7 @@ final class MatchesViewModel: ObservableObject {
         isLoading = matches.isEmpty
         errorMessage = nil
         do {
-            let result = try await service.scoreboard(for: selectedLeague)
+            let result = try await sportsRepository.legacyScoreboard(for: selectedLeague)
             matches = result
         } catch {
             errorMessage = error.localizedDescription
@@ -58,8 +58,8 @@ final class MatchesViewModel: ObservableObject {
         await withTaskGroup(of: [Match].self) { group in
             for league in sourceLeagues {
                 let days = favoriteLeagueIDs.contains(league.id) ? 365 : 30
-                group.addTask { [service] in
-                    (try? await service.scoreboards(for: league, starting: Date(), days: days)) ?? []
+                group.addTask { [sportsRepository] in
+                    (try? await sportsRepository.legacyScoreboards(for: league, starting: Date(), days: days)) ?? []
                 }
             }
             for await matches in group {
@@ -95,8 +95,8 @@ final class MatchesViewModel: ObservableObject {
         var loaded: [Match] = []
         await withTaskGroup(of: [Match].self) { group in
             for league in leagues {
-                group.addTask { [service] in
-                    (try? await service.scoreboards(for: league, starting: Date(), days: 365)) ?? []
+                group.addTask { [sportsRepository] in
+                    (try? await sportsRepository.legacyScoreboards(for: league, starting: Date(), days: 365)) ?? []
                 }
             }
             for await matches in group {
@@ -140,10 +140,14 @@ final class MatchesViewModel: ObservableObject {
     private func filterForFavorites(_ matches: [Match], favorites: [FavoriteTeam]) -> [Match] {
         guard !favorites.isEmpty else { return [] }
         let favoriteIDs = Set(favorites.map(\.id))
+        let canonicalFavoriteIDs = Set(favorites.map(\.canonicalTeamID))
         let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
         return matches.filter { match in
             [match.home, match.away].contains { side in
                 if let teamID = side.teamID, favoriteIDs.contains("\(match.league.path)-\(teamID)") {
+                    return true
+                }
+                if let canonicalID = side.canonicalIDString, canonicalFavoriteIDs.contains(canonicalID) {
                     return true
                 }
                 return favoriteNames.contains(side.displayName.lowercased())

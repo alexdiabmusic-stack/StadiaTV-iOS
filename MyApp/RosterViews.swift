@@ -9,7 +9,6 @@ struct TeamRosterView: View {
 
     @State private var groups: [RosterGroup] = []
     @State private var isLoading = true
-    private let service = ESPNService()
 
     var body: some View {
         ZStack {
@@ -67,7 +66,7 @@ struct TeamRosterView: View {
 
     private func load() async {
         isLoading = true
-        groups = (try? await service.roster(for: league, teamID: teamID)) ?? []
+        groups = (try? await SportsRepository.shared.legacyRoster(for: league, teamID: teamID)) ?? []
         isLoading = false
     }
 }
@@ -122,7 +121,6 @@ struct PlayerDetailView: View {
     @State private var overview: AthleteOverview?
     @State private var isLoading = true
     @Environment(\.openURL) private var openURL
-    private let service = ESPNService()
 
     var body: some View {
         ZStack {
@@ -304,7 +302,7 @@ struct PlayerDetailView: View {
 
     private func load() async {
         isLoading = true
-        overview = try? await service.athleteOverview(for: league, athleteID: athlete.id)
+        overview = try? await SportsRepository.shared.legacyAthleteOverview(for: league, athleteID: athlete.id)
         isLoading = false
     }
 }

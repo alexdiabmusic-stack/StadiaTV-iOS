@@ -184,7 +184,7 @@ struct LeagueTeamPickerView: View {
         .navigationTitle(league.name)
         .inlineNavigationTitle()
         .task {
-            teams = (try? await ESPNService().teams(for: league)) ?? []
+            teams = (try? await SportsRepository.shared.legacyTeams(for: league)) ?? []
             isLoading = false
         }
     }

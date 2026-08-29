@@ -666,7 +666,6 @@ struct PlayerView: View {
     // MARK: Live score tracking
 
     private func findAndPollLiveMatch(for targetChannel: Channel) async {
-        let service = ESPNService()
         let channel = targetChannel
         let leaguePaths = [
             "football/nfl", "basketball/nba", "hockey/nhl", "baseball/mlb",
@@ -679,7 +678,7 @@ struct PlayerView: View {
         await withTaskGroup(of: [Match].self) { group in
             for league in leagues {
                 group.addTask {
-                    (try? await service.scoreboard(for: league)) ?? []
+                    (try? await SportsRepository.shared.legacyScoreboard(for: league)) ?? []
                 }
             }
             for await matches in group {
@@ -703,7 +702,7 @@ struct PlayerView: View {
         while !Task.isCancelled {
             try? await Task.sleep(nanoseconds: 30_000_000_000)
             guard !Task.isCancelled else { break }
-            if let updated = try? await service.scoreboard(for: match.league).first(where: { $0.id == match.id }) {
+            if let updated = try? await SportsRepository.shared.legacyScoreboard(for: match.league).first(where: { $0.id == match.id }) {
                 liveScoreMatch = updated
                 if updated.state == .final { break }
             }
@@ -1621,7 +1620,7 @@ private struct PlayerMultiscreenPicker: View {
         await withTaskGroup(of: [LiveMatchEntry].self) { group in
             for league in leagues {
                 group.addTask {
-                    let matches = (try? await ESPNService().scoreboard(for: league)) ?? []
+                    let matches = (try? await SportsRepository.shared.legacyScoreboard(for: league)) ?? []
                     return matches.compactMap { match in
                         guard match.state == .live else { return nil }
                         let sources = Array(SourceMatcher.rank(match: match, channels: channels).prefix(4))

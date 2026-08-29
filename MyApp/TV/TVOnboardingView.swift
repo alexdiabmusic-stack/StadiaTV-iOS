@@ -342,7 +342,6 @@ struct TVOnboardingView: View {
 private final class TVOnboardingTeamsLoader: ObservableObject {
     @Published private(set) var teamsByLeague: [League: [Team]] = [:]
     @Published private(set) var isLoading = false
-    private let service = ESPNService()
     private var loadedKey: String?
 
     func load(leagues: [League]) async {
@@ -354,7 +353,7 @@ private final class TVOnboardingTeamsLoader: ObservableObject {
         await withTaskGroup(of: (League, [Team]).self) { group in
             for league in leagues {
                 group.addTask {
-                    let teams = (try? await self.service.teams(for: league)) ?? []
+                    let teams = (try? await SportsRepository.shared.legacyTeams(for: league)) ?? []
                     return (league, teams)
                 }
             }

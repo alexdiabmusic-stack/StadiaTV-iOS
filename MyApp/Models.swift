@@ -188,8 +188,31 @@ struct TeamSide: Hashable {
     let score: String?
     let record: String?
     let isWinner: Bool
-    /// ESPN team id, used to load rosters and team detail. May be nil for some sports.
+    /// Legacy/provider team id, used by older UI until all surfaces consume canonical team IDs directly.
     var teamID: String? = nil
+    var canonicalIDString: String? = nil
+
+    init(
+        displayName: String,
+        shortName: String,
+        abbreviation: String,
+        logoURL: URL?,
+        score: String?,
+        record: String?,
+        isWinner: Bool,
+        teamID: String? = nil,
+        canonicalIDString: String? = nil
+    ) {
+        self.displayName = displayName
+        self.shortName = shortName
+        self.abbreviation = abbreviation
+        self.logoURL = logoURL
+        self.score = score
+        self.record = record
+        self.isWinner = isWinner
+        self.teamID = teamID
+        self.canonicalIDString = canonicalIDString
+    }
 }
 
 struct Match: Identifiable, Hashable {

@@ -78,7 +78,7 @@ struct RacersSection: View {
 
     private func load() async {
         isLoading = true
-        racers = (try? await ESPNService().racers(for: league)) ?? []
+        racers = (try? await SportsRepository.shared.legacyRacers(for: league)) ?? []
         isLoading = false
     }
 }

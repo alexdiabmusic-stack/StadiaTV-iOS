@@ -9,6 +9,7 @@
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* StadiaTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StadiaTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2268B0E303FB4B90014AE4B /* FantasyFoundationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasyFoundationTests.swift; sourceTree = "<group>"; };
+		D28647D33041356500260FB3 /* SportsDataFoundationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SportsDataFoundationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -62,6 +63,7 @@
 			isa = PBXGroup;
 			children = (
 				D2268B0E303FB4B90014AE4B /* FantasyFoundationTests.swift */,
+				D28647D33041356500260FB3 /* SportsDataFoundationTests.swift */,
 			);
 			path = StadiaTVTests;
 			sourceTree = "<group>";

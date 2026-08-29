@@ -69,8 +69,6 @@ struct ArticleReaderView: View {
     @State private var showingReaderSettings = false
     @State private var scrollProgress: CGFloat = 0
 
-    private let service = ESPNService()
-
     // MARK: Computed appearance
 
     private var readerBackground: Color {
@@ -437,7 +435,7 @@ struct ArticleReaderView: View {
         }
         guard let articleURL = article.url else { return }
         isLoading = true
-        let fetched = (try? await service.articleBodyFromURL(articleURL)) ?? []
+        let fetched = (try? await SportsRepository.shared.legacyArticleBody(from: articleURL)) ?? []
         isLoading = false
         bodyParagraphs = fetched
         fullyLoaded = true

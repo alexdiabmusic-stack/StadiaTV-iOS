@@ -252,7 +252,6 @@ private struct TVTeamsSection: View {
     let league: League
     @State private var teams: [Team] = []
     @State private var isLoading = true
-    private let service = ESPNService()
 
     var body: some View {
         Group {
@@ -300,7 +299,7 @@ private struct TVTeamsSection: View {
     private func loadTeams() async {
         guard league.group != .golf && league.group != .racing else { isLoading = false; return }
         isLoading = true
-        teams = (try? await service.teams(for: league)) ?? []
+        teams = (try? await SportsRepository.shared.legacyTeams(for: league)) ?? []
         isLoading = false
     }
 }

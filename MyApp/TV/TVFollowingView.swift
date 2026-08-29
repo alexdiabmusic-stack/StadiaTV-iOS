@@ -357,8 +357,11 @@ struct TVFollowingView: View {
     private func matchIncludes(_ match: Match, team: FavoriteTeam) -> Bool {
         guard match.league.path == team.leaguePath else { return false }
         return [match.home, match.away].contains { side in
-            if let tid = side.teamID, !tid.isEmpty, !team.teamID.isEmpty {
-                return tid == team.teamID
+            if let tid = side.teamID, !tid.isEmpty, !team.teamID.isEmpty, tid == team.teamID {
+                return true
+            }
+            if let canonicalID = side.canonicalIDString, canonicalID == team.canonicalTeamID {
+                return true
             }
             let sideNames = [side.displayName, side.shortName, side.abbreviation]
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }

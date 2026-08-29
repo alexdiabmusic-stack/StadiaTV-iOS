@@ -101,11 +101,10 @@ struct MatchesView: View {
 
     private func loadNews() async {
         newsLoading = true
-        let service = ESPNService()
         var articles: [ESPNArticle] = []
         await withTaskGroup(of: [ESPNArticle].self) { group in
             for league in newsLeagues.prefix(5) {
-                group.addTask { (try? await service.news(for: league, limit: 5)) ?? [] }
+                group.addTask { (try? await SportsRepository.shared.legacyNews(for: league, limit: 5)) ?? [] }
             }
             for await batch in group { articles.append(contentsOf: batch) }
         }
@@ -352,8 +351,11 @@ struct MatchesView: View {
     private func matchIncludes(_ match: Match, team: FavoriteTeam) -> Bool {
         guard match.league.path == team.leaguePath else { return false }
         return [match.home, match.away].contains { side in
-            if let tid = side.teamID, !tid.isEmpty, !team.teamID.isEmpty {
-                return tid == team.teamID
+            if let tid = side.teamID, !tid.isEmpty, !team.teamID.isEmpty, tid == team.teamID {
+                return true
+            }
+            if let canonicalID = side.canonicalIDString, canonicalID == team.canonicalTeamID {
+                return true
             }
             let sideNames = [side.displayName, side.shortName, side.abbreviation]
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
@@ -1236,7 +1238,6 @@ private struct FollowingStandingsPanelView: View {
 
     @State private var groups: [StandingsGroup] = []
     @State private var isLoading = true
-    private let service = ESPNService()
 
     var body: some View {
         Group {
@@ -1254,7 +1255,7 @@ private struct FollowingStandingsPanelView: View {
         }
         .task(id: league.id) {
             isLoading = true
-            groups = (try? await service.standings(for: league)) ?? []
+            groups = (try? await SportsRepository.shared.legacyStandings(for: league)) ?? []
             isLoading = false
         }
     }

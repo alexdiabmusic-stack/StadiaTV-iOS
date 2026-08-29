@@ -10,6 +10,16 @@ struct Team: Identifiable, Hashable {
     let shortDisplayName: String
     let abbreviation: String
     let logoURL: URL?
+    let canonicalIDString: String?
+
+    init(id: String, displayName: String, shortDisplayName: String, abbreviation: String, logoURL: URL?, canonicalIDString: String? = nil) {
+        self.id = id
+        self.displayName = displayName
+        self.shortDisplayName = shortDisplayName
+        self.abbreviation = abbreviation
+        self.logoURL = logoURL
+        self.canonicalIDString = canonicalIDString
+    }
 }
 
 /// A favorited team, stored with enough context to rebuild it without a network call.
@@ -19,9 +29,11 @@ struct FavoriteTeam: Codable, Hashable, Identifiable {
     var displayName: String
     var abbreviation: String
     var logoURLString: String?
+    var canonicalTeamIDString: String?
 
     var id: String { "\(leaguePath)-\(teamID)" }
     var logoURL: URL? { logoURLString.flatMap(URL.init(string:)) }
+    var canonicalTeamID: String { canonicalTeamIDString ?? "team:\(leaguePath):legacy:\(teamID)" }
 
     init(team: Team, league: League) {
         self.leaguePath = league.path
@@ -29,6 +41,7 @@ struct FavoriteTeam: Codable, Hashable, Identifiable {
         self.displayName = team.displayName
         self.abbreviation = team.abbreviation
         self.logoURLString = team.logoURL?.absoluteString
+        self.canonicalTeamIDString = team.canonicalIDString
     }
 }
 

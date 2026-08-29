@@ -163,14 +163,13 @@ final class PredictionsStore: ObservableObject {
         let leagues = League.all.filter { leagueNames.contains($0.name) }
         guard !leagues.isEmpty else { return }
 
-        let service = ESPNService()
         let startDate = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
 
         var allMatches: [Match] = []
         await withTaskGroup(of: [Match].self) { group in
             for league in leagues {
-                group.addTask { [service] in
-                    (try? await service.scoreboards(for: league, starting: startDate, days: 31)) ?? []
+                group.addTask {
+                    (try? await SportsRepository.shared.legacyScoreboards(for: league, starting: startDate, days: 31)) ?? []
                 }
             }
             for await matches in group {

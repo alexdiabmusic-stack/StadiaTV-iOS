@@ -64,7 +64,7 @@ struct ESPNSportsDataProvider: StadiaSportsDataProvider {
 
     func currentSchedule(for sport: FantasySport, starting date: Date, days: Int) async throws -> [Match] {
         guard let league = sport.stadiaLeague else { return [] }
-        return try await service.scoreboards(for: league, starting: date, days: days)
+        return try await SportsRepository.shared.legacyScoreboards(for: league, starting: date, days: days)
     }
 
     func statLines(for sport: FantasySport, playerIDs: Set<String>, from start: Date, to end: Date) async throws -> [String: StadiaFantasyStatLine] {
@@ -75,7 +75,7 @@ struct ESPNSportsDataProvider: StadiaSportsDataProvider {
 
     private func loadESPNPlayers(for sport: FantasySport) async throws -> [StadiaFantasyAvailablePlayer] {
         guard let league = sport.stadiaLeague else { return [] }
-        let teams = try await service.teams(for: league)
+        let teams = try await SportsRepository.shared.legacyTeams(for: league)
         var players: [StadiaFantasyAvailablePlayer] = []
         try await withThrowingTaskGroup(of: [StadiaFantasyAvailablePlayer].self) { group in
             for team in teams {

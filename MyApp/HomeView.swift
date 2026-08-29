@@ -1494,7 +1494,6 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
 
-    private let service = ESPNService()
     private let featuredCalendar = FeaturedEventCalendar.shared
 
     private var lastLoadedLeagueIDs: Set<String> = []
@@ -1536,16 +1535,19 @@ final class HomeViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         demandScoreCache.removeAll(keepingCapacity: true)
-        let favoriteIDs = Set(favorites.map(\.id))
+        let favoriteIDs = Set(favorites.map(\.id) + favorites.map(\.canonicalTeamID))
         let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
         var matchesByLeague: [String: [Match]] = [:]
 
+        // Phase 1 — today's scoreboard for followed leagues only.
+        // One request per league, all concurrent (small count). This populates
+        // Live Now and Today's schedule immediately without hammering ESPN.
         var firstError: String?
         await withTaskGroup(of: (String, Result<[Match], Error>).self) { group in
             for league in leagues {
                 group.addTask {
                     do {
-                        let m = try await self.service.scoreboards(for: league, starting: Date(), days: 7)
+                        let m = try await SportsRepository.shared.legacyScoreboard(for: league)
                         return (league.id, .success(m))
                     } catch {
                         return (league.id, .failure(error))
@@ -1564,37 +1566,32 @@ final class HomeViewModel: ObservableObject {
             }
         }
 
-        await withTaskGroup(of: (String, [Match]).self) { group in
-            for league in League.all where !leagueIDs.contains(league.id) {
-                group.addTask {
-                    (league.id, (try? await self.service.scoreboards(for: league, starting: Date(), days: 3)) ?? [])
-                }
-            }
-            for await (id, matches) in group {
-                guard !matches.isEmpty else { continue }
-                matchesByLeague[id] = matches
-                rebuildSections(matchesByLeague: matchesByLeague, followedIDs: leagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
-            }
-        }
-
         isLoading = false
         if matchesByLeague.isEmpty {
             errorMessage = firstError ?? "ESPN did not return games for your followed leagues."
         }
 
+        // Phase 2 — 7-day range for followed leagues (fills the schedule section).
+        // Staggered so ESPN never sees more than one in-flight request per 300 ms.
+        for (i, league) in leagues.enumerated() {
+            guard !Task.isCancelled else { break }
+            if i > 0 { try? await Task.sleep(nanoseconds: 300_000_000) }
+            let extended = (try? await SportsRepository.shared.legacyScoreboards(for: league, starting: Date(), days: 7)) ?? []
+            guard !extended.isEmpty else { continue }
+            matchesByLeague[league.id] = mergeMatches((matchesByLeague[league.id] ?? []) + extended)
+            rebuildSections(matchesByLeague: matchesByLeague, followedIDs: leagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+        }
+
+        // Phase 3 — 365-day data for favorite-team leagues (powers the favorite
+        // team schedule card). Staggered at 500 ms to stay well within rate limits.
         let favoriteLeagueIDs = Set(favorites.map(\.leaguePath))
-        await withTaskGroup(of: (String, [Match]).self) { group in
-            for league in League.all where favoriteLeagueIDs.contains(league.id) {
-                group.addTask {
-                    (league.id, (try? await self.service.scoreboards(for: league, starting: Date(), days: 365)) ?? [])
-                }
-            }
-            for await (id, matches) in group {
-                guard !matches.isEmpty else { continue }
-                let existing = matchesByLeague[id] ?? []
-                matchesByLeague[id] = mergeMatches(existing + matches)
-                rebuildSections(matchesByLeague: matchesByLeague, followedIDs: leagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
-            }
+        for (i, league) in League.all.filter({ favoriteLeagueIDs.contains($0.id) }).enumerated() {
+            guard !Task.isCancelled else { break }
+            if i > 0 { try? await Task.sleep(nanoseconds: 500_000_000) }
+            let yearData = (try? await SportsRepository.shared.legacyScoreboards(for: league, starting: Date(), days: 365)) ?? []
+            guard !yearData.isEmpty else { continue }
+            matchesByLeague[league.id] = mergeMatches((matchesByLeague[league.id] ?? []) + yearData)
+            rebuildSections(matchesByLeague: matchesByLeague, followedIDs: leagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
         }
 
         if notificationsEnabled {
@@ -1620,8 +1617,8 @@ final class HomeViewModel: ObservableObject {
             var clips: [MatchHighlight] = []
             await withTaskGroup(of: [MatchHighlight].self) { group in
                 for match in recentlyFinished {
-                    group.addTask { [service] in
-                        (try? await service.gameSummary(for: match.league, eventID: match.id))?.highlights ?? []
+                    group.addTask {
+                        (try? await SportsRepository.shared.legacyGameSummary(for: match))?.highlights ?? []
                     }
                 }
                 for await matchClips in group {
@@ -1745,6 +1742,9 @@ final class HomeViewModel: ObservableObject {
         let sides = [match.home, match.away]
         return sides.contains { side in
             if let teamID = side.teamID, favoriteIDs.contains("\(match.league.path)-\(teamID)") {
+                return true
+            }
+            if let canonicalID = side.canonicalIDString, favoriteIDs.contains(canonicalID) {
                 return true
             }
             return favoriteNames.contains(side.displayName.lowercased())

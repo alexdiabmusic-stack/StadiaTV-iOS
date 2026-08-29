@@ -56,14 +56,7 @@ struct PreferencesView: View {
             Section("Favorite Teams") {
                 ForEach(prefs.favoriteTeams) { fav in
                     HStack(spacing: 12) {
-                        AsyncImage(url: fav.logoURL) { phase in
-                            if case .success(let image) = phase {
-                                image.resizable().scaledToFit()
-                            } else {
-                                Image(systemName: "shield.fill").foregroundStyle(Theme.textSecondary.opacity(0.5))
-                            }
-                        }
-                        .frame(width: 28, height: 28)
+                        TeamLogo(url: fav.logoURL, size: 28)
                         Text(fav.displayName).foregroundStyle(Theme.textPrimary)
                         Spacer()
                         Button {

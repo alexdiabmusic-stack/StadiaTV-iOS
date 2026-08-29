@@ -389,7 +389,7 @@ struct TeamHighlightsSection: View {
     }
 
     private var teamCacheKey: String {
-        supportedTeams.map { "\($0.leaguePath)-\($0.abbreviation)" }.sorted().joined(separator: ",")
+        supportedTeams.map { "\($0.leagueStadiaKey)-\($0.canonicalTeamID)-\($0.abbreviation)" }.sorted().joined(separator: ",")
     }
 }
 

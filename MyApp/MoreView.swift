@@ -86,6 +86,11 @@ struct MoreView: View {
                 NavigationLink { WatchHistorySettingsView() } label: {
                     MoreNavigationRow(title: "Watch History", value: watchStore.history.isEmpty ? nil : "\(watchStore.history.count) items")
                 }
+                #if DEBUG
+                NavigationLink { SportsProviderDiagnosticsView() } label: {
+                    MoreNavigationRow(title: "Sports Providers", value: "Debug")
+                }
+                #endif
             }
 
             MoreNavigationGroup(title: "SUPPORT") {

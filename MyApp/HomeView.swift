@@ -1041,11 +1041,12 @@ private struct LiveNowCommandCenter: View {
     @ViewBuilder
     private var noLiveContent: some View {
         if !startingSoon.isEmpty || !nextMatches.isEmpty {
+            let soonMatches = startingSoon.isEmpty ? Array(nextMatches.prefix(3)) : startingSoon
+            let headline = startingSoon.isEmpty ? "Nothing live right now — next up" : "Nothing live right now — starting soon"
             VStack(alignment: .leading, spacing: 10) {
-                let soonMatches = startingSoon.isEmpty ? Array(nextMatches.prefix(3)) : startingSoon
                 HStack(spacing: 6) {
                     Image(systemName: "clock.badge.fill")
-                    Text("Nothing live right now — starting soon")
+                    Text(headline)
                         .font(.caption.weight(.semibold))
                 }
                 .foregroundStyle(Theme.starting)
@@ -1523,10 +1524,13 @@ final class HomeViewModel: ObservableObject {
 
     func load(leagues: [League], favorites: [FavoriteTeam], notificationsEnabled: Bool = false, notificationLeadTime: MatchReminderLeadTime = .thirty, morningDigestEnabled: Bool = false, force: Bool = false) async {
         lastLoadArgs = (leagues, favorites, notificationsEnabled, notificationLeadTime, morningDigestEnabled)
-        let leagueIDs = Set(leagues.map(\.id))
+        let followedLeagueIDs = Set(leagues.map(\.id))
+        var seenDiscoveryLeagueIDs: Set<String> = []
+        let discoveryLeagues = (leagues + League.all).filter { seenDiscoveryLeagueIDs.insert($0.id).inserted }
+        let discoveryLeagueIDs = Set(discoveryLeagues.map(\.id))
         featuredPicks = featuredCalendar.picks()
         let hasData = !(liveNow.isEmpty && upcoming.isEmpty && favoriteTeamUpcoming.isEmpty)
-        if !force, hasData, leagueIDs == lastLoadedLeagueIDs,
+        if !force, hasData, discoveryLeagueIDs == lastLoadedLeagueIDs,
            let lastLoadedAt, Date().timeIntervalSince(lastLoadedAt) < cacheLifetime {
             return
         }
@@ -1535,16 +1539,18 @@ final class HomeViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         demandScoreCache.removeAll(keepingCapacity: true)
-        let favoriteIDs = Set(favorites.map(\.id) + favorites.map(\.canonicalTeamID))
+        let favoriteIDs = Set(favorites.flatMap { favorite in
+            [favorite.id, favorite.canonicalTeamID, favorite.teamID, "\(favorite.leaguePath)-\(favorite.teamID)"] + favorite.providerAliases.map(\.id)
+        })
         let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
         var matchesByLeague: [String: [Match]] = [:]
 
-        // Phase 1 — today's scoreboard for followed leagues only.
-        // One request per league, all concurrent (small count). This populates
-        // Live Now and Today's schedule immediately without hammering ESPN.
+        // Phase 1: today's scoreboard across the supported catalog. Home should
+        // agree with Live about what is currently live, while longer schedule
+        // fetches below stay scoped to followed/favorite leagues.
         var firstError: String?
         await withTaskGroup(of: (String, Result<[Match], Error>).self) { group in
-            for league in leagues {
+            for league in discoveryLeagues {
                 group.addTask {
                     do {
                         let m = try await SportsRepository.shared.legacyScoreboard(for: league)
@@ -1559,7 +1565,7 @@ final class HomeViewModel: ObservableObject {
                 case .success(let matches):
                     guard !matches.isEmpty else { continue }
                     matchesByLeague[id] = matches
-                    rebuildSections(matchesByLeague: matchesByLeague, followedIDs: leagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+                    rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
                 case .failure(let error):
                     if firstError == nil { firstError = error.localizedDescription }
                 }
@@ -1568,7 +1574,7 @@ final class HomeViewModel: ObservableObject {
 
         isLoading = false
         if matchesByLeague.isEmpty {
-            errorMessage = firstError ?? "ESPN did not return games for your followed leagues."
+            errorMessage = firstError ?? "No live or upcoming games were returned for today."
         }
 
         // Phase 2 — 7-day range for followed leagues (fills the schedule section).
@@ -1579,19 +1585,19 @@ final class HomeViewModel: ObservableObject {
             let extended = (try? await SportsRepository.shared.legacyScoreboards(for: league, starting: Date(), days: 7)) ?? []
             guard !extended.isEmpty else { continue }
             matchesByLeague[league.id] = mergeMatches((matchesByLeague[league.id] ?? []) + extended)
-            rebuildSections(matchesByLeague: matchesByLeague, followedIDs: leagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+            rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
         }
 
         // Phase 3 — 365-day data for favorite-team leagues (powers the favorite
         // team schedule card). Staggered at 500 ms to stay well within rate limits.
-        let favoriteLeagueIDs = Set(favorites.map(\.leaguePath))
-        for (i, league) in League.all.filter({ favoriteLeagueIDs.contains($0.id) }).enumerated() {
+        let favoriteLeagueIDs = Set(favorites.flatMap { [$0.leaguePath, $0.leagueStadiaKey] })
+        for (i, league) in League.all.filter({ favoriteLeagueIDs.contains($0.id) || favoriteLeagueIDs.contains($0.stadiaKey) }).enumerated() {
             guard !Task.isCancelled else { break }
             if i > 0 { try? await Task.sleep(nanoseconds: 500_000_000) }
             let yearData = (try? await SportsRepository.shared.legacyScoreboards(for: league, starting: Date(), days: 365)) ?? []
             guard !yearData.isEmpty else { continue }
             matchesByLeague[league.id] = mergeMatches((matchesByLeague[league.id] ?? []) + yearData)
-            rebuildSections(matchesByLeague: matchesByLeague, followedIDs: leagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+            rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
         }
 
         if notificationsEnabled {
@@ -1607,7 +1613,7 @@ final class HomeViewModel: ObservableObject {
         }
 
         let recentlyFinished = matchesByLeague
-            .filter { leagueIDs.contains($0.key) }
+            .filter { followedLeagueIDs.contains($0.key) }
             .values.flatMap { $0 }
             .filter { $0.state == .final }
             .sorted { $0.date > $1.date }
@@ -1630,7 +1636,7 @@ final class HomeViewModel: ObservableObject {
 
         if !Task.isCancelled, !matchesByLeague.isEmpty {
             errorMessage = nil
-            lastLoadedLeagueIDs = leagueIDs
+            lastLoadedLeagueIDs = discoveryLeagueIDs
             lastLoadedAt = Date()
         }
     }
@@ -1675,7 +1681,6 @@ final class HomeViewModel: ObservableObject {
         }
         featuredMatchesByPickID = syncedFeaturedMatches
         let featuredIDs = Set(syncedFeaturedMatches.values.map { $0.id })
-        liveNow = liveNow.filter { !featuredIDs.contains($0.id) }
         let soonWindow = now.addingTimeInterval(6 * 60 * 60)
         startingSoon = allMatches
             .filter { $0.state == .pre && $0.date > now && $0.date <= soonWindow && !featuredIDs.contains($0.id) }
@@ -1741,7 +1746,10 @@ final class HomeViewModel: ObservableObject {
         guard !favoriteIDs.isEmpty || !favoriteNames.isEmpty else { return false }
         let sides = [match.home, match.away]
         return sides.contains { side in
-            if let teamID = side.teamID, favoriteIDs.contains("\(match.league.path)-\(teamID)") {
+            if let teamID = side.teamID,
+               favoriteIDs.contains(teamID) ||
+               favoriteIDs.contains("\(match.league.path)-\(teamID)") ||
+               favoriteIDs.contains("\(match.league.stadiaKey)-\(teamID)") {
                 return true
             }
             if let canonicalID = side.canonicalIDString, favoriteIDs.contains(canonicalID) {

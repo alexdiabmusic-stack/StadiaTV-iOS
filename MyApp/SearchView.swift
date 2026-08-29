@@ -278,8 +278,11 @@ final class SearchViewModel: ObservableObject {
         var loadedMatches: [Match] = []
         var loadedArticles: [ESPNArticle] = []
         var loadedTeams: [SearchTeamResult] = []
-        let favoriteIDs = Set(favoriteTeams.map(\.id))
-        players.removeAll { !favoriteIDs.contains("\($0.league.path)-\($0.teamID)") }
+        let favoriteIDs = Set(favoriteTeams.flatMap { [$0.id, $0.canonicalTeamID, "\($0.leaguePath)-\($0.teamID)"] + $0.providerAliases.map(\.id) })
+        players.removeAll { player in
+            let legacyKey = "\(player.league.path)-\(player.teamID)"
+            return !favoriteIDs.contains(legacyKey) && !favoriteIDs.contains(player.teamID)
+        }
         loadedFavoritePlayerTeamIDs.formIntersection(favoriteIDs)
 
         await withTaskGroup(of: SearchLoadResult.self) { group in

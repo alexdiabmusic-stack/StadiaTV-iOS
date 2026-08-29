@@ -240,9 +240,9 @@ struct MatchesView: View {
     }
 
     private var leagueChips: [League] {
-        let favLeagueIDs = Set(prefs.favoriteTeams.map(\.leaguePath))
+        let favLeagueIDs = Set(prefs.favoriteTeams.flatMap { [$0.leaguePath, $0.leagueStadiaKey] })
         return League.all.filter {
-            prefs.isLeagueSelected($0) && !favLeagueIDs.contains($0.id)
+            prefs.isLeagueSelected($0) && !favLeagueIDs.contains($0.id) && !favLeagueIDs.contains($0.stadiaKey)
         }.prefix(6).map { $0 }
     }
 
@@ -337,9 +337,9 @@ struct MatchesView: View {
     }
 
     private var newsLeagues: [League] {
-        let favPaths = Set(prefs.favoriteTeams.map(\.leaguePath))
-        let explicitIDs = Set(prefs.explicitlyFollowedLeagues.map(\.id))
-        return League.all.filter { favPaths.contains($0.id) || explicitIDs.contains($0.id) }
+        let favLeagueIDs = Set(prefs.favoriteTeams.flatMap { [$0.leaguePath, $0.leagueStadiaKey] })
+        let explicitIDs = Set(prefs.explicitlyFollowedLeagues.flatMap { [$0.id, $0.stadiaKey] })
+        return League.all.filter { favLeagueIDs.contains($0.id) || favLeagueIDs.contains($0.stadiaKey) || explicitIDs.contains($0.id) || explicitIDs.contains($0.stadiaKey) }
     }
 
     private func isTBDMatch(_ match: Match) -> Bool {
@@ -1566,17 +1566,28 @@ struct TeamLogo: View {
     var size: CGFloat = 34
 
     var body: some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
-                image.resizable().scaledToFit()
-            default:
-                Image(systemName: "shield.fill")
-                    .resizable().scaledToFit()
-                    .foregroundStyle(Theme.textSecondary.opacity(0.4))
-                    .padding(4)
+        logo
+            .frame(width: size, height: size)
+    }
+
+    @ViewBuilder
+    private var logo: some View {
+        if let assetName = url?.stadiaImageAssetName {
+            Image(assetName)
+                .resizable()
+                .scaledToFit()
+        } else {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().scaledToFit()
+                default:
+                    Image(systemName: "shield.fill")
+                        .resizable().scaledToFit()
+                        .foregroundStyle(Theme.textSecondary.opacity(0.4))
+                        .padding(4)
+                }
             }
         }
-        .frame(width: size, height: size)
     }
 }

@@ -268,13 +268,7 @@ private struct TVTeamsSection: View {
                                 TeamRosterView(league: league, teamID: team.id, teamName: team.displayName)
                             } label: {
                                 VStack(spacing: 10) {
-                                    AsyncImage(url: team.logoURL) { phase in
-                                        switch phase {
-                                        case .success(let img): img.resizable().scaledToFit()
-                                        default: Image(systemName: "shield.fill").font(.title).foregroundStyle(Theme.textSecondary)
-                                        }
-                                    }
-                                    .frame(width: 64, height: 64)
+                                    TVTeamLogo(url: team.logoURL, size: 64)
                                     Text(team.displayName)
                                         .font(.subheadline.weight(.semibold))
                                         .foregroundStyle(Theme.textPrimary)

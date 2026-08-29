@@ -97,7 +97,7 @@ nonisolated enum SourceMatcher {
                 }
             }
 
-            if score > 0 {
+            if score >= minimumScore(for: match) {
                 ranked.append(RankedSource(channel: channel, score: score))
             }
         }
@@ -149,6 +149,15 @@ nonisolated enum SourceMatcher {
             count + (haystackTokens.contains(token) ? 1 : 0)
         }
         return eventTokens.count == 1 ? matchedTokenCount == 1 : matchedTokenCount >= 2
+    }
+
+    private static func minimumScore(for match: Match) -> Int {
+        switch match.league.group {
+        case .soccer, .racing, .golf, .tennis:
+            return 20
+        default:
+            return 12
+        }
     }
 
     private static func eventBroadcasterMatches(_ aliases: [String], in haystack: String, tokens haystackTokens: Set<String>) -> Bool {
@@ -258,7 +267,10 @@ nonisolated enum SourceMatcher {
         case "soccer/fra.1":
             return ["canal plus", "dazn", "bein sport", "amazon prime", "prime video"]
         case "soccer/ned.1":
-            return ["viaplay", "ziggo sport", "espn", "dazn"]
+            return [
+                "viaplay", "ziggo sport", "espn", "espn nl", "espn netherlands",
+                "espn eredivisie", "dazn"
+            ]
         case "soccer/por.1":
             return ["sport tv", "benfica tv", "eleven sports", "dazn"]
         case "soccer/fifa.world", "soccer/fifa.wwc":
@@ -304,7 +316,10 @@ nonisolated enum SourceMatcher {
                 "peacock", "fs1", "fs2"
             ]
         case "racing/irl":
-            return ["peacock", "nbc", "nbc sports", "fox", "fs1", "sky sports f1", "dazn"]
+            return [
+                "fox", "fox sports", "fs1", "fs2", "indycar", "indy car", "ntt indycar",
+                "peacock", "nbc", "nbc sports", "sky sports f1", "dazn"
+            ]
 
         // ── Golf ─────────────────────────────────────────────────────────────
         case "golf/pga", "golf/lpga", "golf/champions-tour":

@@ -18,7 +18,7 @@ struct StatsView: View {
     }
 
     private var favoriteTeams: [FavoriteTeam] {
-        prefs.favoriteTeams.filter { $0.leaguePath == selectedLeague.path }
+        prefs.favoriteTeams.filter { $0.leaguePath == selectedLeague.path || $0.leagueStadiaKey == selectedLeague.stadiaKey }
     }
 
     private var availableSections: [StatsSection] {
@@ -184,8 +184,12 @@ struct StatsView: View {
     }
 
     private var teamsMatchingFavorites: [Team] {
-        let ids = Set(favoriteTeams.map(\.teamID))
-        return teams.filter { ids.contains($0.id) }
+        let favoriteIDs = Set(favoriteTeams.flatMap { favorite in
+            [favorite.teamID, favorite.canonicalTeamID] + favorite.providerAliases.map(\.id)
+        })
+        return teams.filter { team in
+            favoriteIDs.contains(team.id) || team.canonicalIDString.map { favoriteIDs.contains($0) } == true
+        }
     }
 
     private func syncLeagueSelection() {

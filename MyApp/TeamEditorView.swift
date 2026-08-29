@@ -108,7 +108,7 @@ struct TeamEditorView: View {
     }
 
     private func favoriteCount(in league: League) -> Int {
-        prefs.favoriteTeams.filter { $0.leaguePath == league.path }.count
+        prefs.favoriteTeams.filter { $0.leaguePath == league.path || $0.leagueStadiaKey == league.stadiaKey }.count
     }
 
     private func remove(_ favorite: FavoriteTeam) {
@@ -118,7 +118,8 @@ struct TeamEditorView: View {
             displayName: favorite.displayName,
             shortDisplayName: favorite.displayName,
             abbreviation: favorite.abbreviation,
-            logoURL: favorite.logoURL
+            logoURL: favorite.logoURL,
+            canonicalIDString: favorite.canonicalTeamID
         )
         prefs.toggleFavorite(team, in: league)
     }

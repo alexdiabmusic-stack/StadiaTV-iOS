@@ -1545,31 +1545,23 @@ final class HomeViewModel: ObservableObject {
         let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
         var matchesByLeague: [String: [Match]] = [:]
 
-        // Phase 1: today's scoreboard across the supported catalog. Home should
-        // agree with Live about what is currently live, while longer schedule
-        // fetches below stay scoped to followed/favorite leagues.
-        var firstError: String?
-        await withTaskGroup(of: (String, Result<[Match], Error>).self) { group in
-            for league in discoveryLeagues {
-                group.addTask {
-                    do {
-                        let m = try await SportsRepository.shared.legacyScoreboard(for: league)
-                        return (league.id, .success(m))
-                    } catch {
-                        return (league.id, .failure(error))
-                    }
-                }
+        // Phase 1: live-first aggregation across the supported catalog. This
+        // goes through the provider router's liveScores capability and only asks
+        // schedule providers for the near-future cards.
+        let liveSnapshot = await SportsRepository.shared.liveMatchSnapshot(
+            leagues: discoveryLeagues,
+            startingSoonWindow: 6 * 3600,
+            nextLimit: 8
+        )
+        let firstError = liveSnapshot.failures.first
+        for match in liveSnapshot.live + liveSnapshot.startingSoon + liveSnapshot.next {
+            matchesByLeague[match.league.id, default: []].append(match)
+        }
+        if !matchesByLeague.isEmpty {
+            for key in matchesByLeague.keys {
+                matchesByLeague[key] = mergeMatches(matchesByLeague[key] ?? [])
             }
-            for await (id, result) in group {
-                switch result {
-                case .success(let matches):
-                    guard !matches.isEmpty else { continue }
-                    matchesByLeague[id] = matches
-                    rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
-                case .failure(let error):
-                    if firstError == nil { firstError = error.localizedDescription }
-                }
-            }
+            rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
         }
 
         isLoading = false

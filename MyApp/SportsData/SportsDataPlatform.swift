@@ -1109,6 +1109,9 @@ struct SportsProviderRegistry: Sendable {
         if AppConfiguration.isAppleSportsProviderEnabled {
             providers.insert(AppleSportsProvider(), at: 0)
         }
+        if AppConfiguration.isMLBProviderEnabled {
+            providers.insert(MLBProvider(), at: 0)
+        }
         if AppConfiguration.isNHLProviderEnabled {
             providers.insert(NHLProvider(), at: 0)
         }
@@ -1187,6 +1190,20 @@ actor SportsDiagnosticsStore {
 }
 
 // MARK: - Repository facade
+
+struct SportsLiveMatchSnapshot {
+    let live: [Match]
+    let startingSoon: [Match]
+    let next: [Match]
+    let failures: [String]
+}
+
+private struct SportsLiveLeagueLoadResult {
+    let leagueID: String
+    let live: [Match]
+    let scheduled: [Match]
+    let failures: [String]
+}
 
 struct SportsRepository: Sendable {
     static let shared = SportsRepository()
@@ -1297,6 +1314,78 @@ struct SportsRepository: Sendable {
         return try await golfTournamentDeduplicator.value(for: key.rawValue) {
             try await requestGolfTournament(for: league, gameID: gameID, key: key)
         }
+    }
+
+    func liveMatchSnapshot(leagues: [League], startingSoonWindow: TimeInterval = 4 * 3600, nextLimit: Int = 12) async -> SportsLiveMatchSnapshot {
+        var seenLeagueIDs: Set<String> = []
+        let uniqueLeagues = leagues.filter { seenLeagueIDs.insert($0.stadiaKey).inserted }
+        let now = Date()
+        let soonEnd = now.addingTimeInterval(max(60, startingSoonWindow))
+        let scheduleRange = SportsDateRange.dateRange(start: now, end: soonEnd)
+        var live: [Match] = []
+        var scheduled: [Match] = []
+        var failures: [String] = []
+
+        await withTaskGroup(of: SportsLiveLeagueLoadResult.self) { group in
+            for league in uniqueLeagues {
+                group.addTask {
+                    var leagueLive: [Match] = []
+                    var leagueScheduled: [Match] = []
+                    var leagueFailures: [String] = []
+
+                    do {
+                        let games = try await liveScores(for: league)
+                        leagueLive = await MainActor.run {
+                            games.map { $0.toLegacyMatch(league: league) }
+                        }
+                    } catch {
+                        leagueFailures.append("\(league.shortName) live: \(error.localizedDescription)")
+                    }
+
+                    do {
+                        let games = try await schedule(for: league, range: scheduleRange).games
+                        leagueScheduled = await MainActor.run {
+                            games.map { $0.toLegacyMatch(league: league) }
+                        }
+                    } catch {
+                        leagueFailures.append("\(league.shortName) schedule: \(error.localizedDescription)")
+                    }
+
+                    return SportsLiveLeagueLoadResult(
+                        leagueID: league.stadiaKey,
+                        live: leagueLive,
+                        scheduled: leagueScheduled,
+                        failures: leagueFailures
+                    )
+                }
+            }
+
+            for await result in group {
+                live.append(contentsOf: result.live)
+                scheduled.append(contentsOf: result.scheduled)
+                failures.append(contentsOf: result.failures)
+            }
+        }
+
+        let merged = mergeLiveAggregationMatches(live + scheduled)
+        let liveMatches = merged
+            .filter { $0.state == .live }
+            .sorted { liveAggregationSortKey($0, now: now) > liveAggregationSortKey($1, now: now) }
+        let startingSoon = merged
+            .filter { $0.state == .pre && $0.date > now && $0.date <= soonEnd }
+            .sorted { $0.date < $1.date }
+        let next = merged
+            .filter { $0.state == .pre && $0.date > now }
+            .sorted { $0.date < $1.date }
+            .prefix(nextLimit)
+            .map { $0 }
+
+        return SportsLiveMatchSnapshot(
+            live: liveMatches,
+            startingSoon: startingSoon,
+            next: next,
+            failures: failures
+        )
     }
 
     func legacyGameSummary(for match: Match) async throws -> GameSummary {
@@ -1529,7 +1618,9 @@ struct SportsRepository: Sendable {
 
     func legacyScoreboard(for league: League, on date: Date? = nil) async throws -> [Match] {
         if let date {
-            let range = SportsDateRange.dateRange(start: Calendar.current.startOfDay(for: date), end: date)
+            let start = Calendar.current.startOfDay(for: date)
+            let end = Calendar.current.date(byAdding: .day, value: 1, to: start)?.addingTimeInterval(-1) ?? date
+            let range = SportsDateRange.dateRange(start: start, end: end)
             return try await schedule(for: league, range: range).games.map { $0.toLegacyMatch(league: league) }
         }
         return try await liveScores(for: league).map { $0.toLegacyMatch(league: league) }
@@ -1548,6 +1639,57 @@ struct SportsRepository: Sendable {
             return StadiaEntityID(rawValue: "team:\(league.stadiaKey):nhl:\(teamID)")
         }
         return StadiaEntityID(rawValue: "team:\(league.stadiaKey):espn:\(teamID)")
+    }
+
+    private func mergeLiveAggregationMatches(_ matches: [Match]) -> [Match] {
+        var byKey: [String: Match] = [:]
+        for match in matches {
+            let key = liveAggregationKey(for: match)
+            if let existing = byKey[key] {
+                if liveAggregationSortKey(match, now: Date()) > liveAggregationSortKey(existing, now: Date()) {
+                    byKey[key] = match
+                }
+            } else {
+                byKey[key] = match
+            }
+        }
+        return Array(byKey.values)
+    }
+
+    private func liveAggregationKey(for match: Match) -> String {
+        let calendar = Calendar.current
+        let day = Int(calendar.startOfDay(for: match.date).timeIntervalSince1970)
+        switch match.league.group {
+        case .golf, .racing:
+            let eventName = SportsIdentityResolver.slug(match.name.isEmpty ? match.league.name : match.name)
+            return "\(match.league.stadiaKey):\(day):\(eventName)"
+        default:
+            let participants = [match.away, match.home]
+                .map { side in
+                    if let canonicalID = side.canonicalIDString { return canonicalID }
+                    if let teamID = side.teamID { return teamID }
+                    if !side.abbreviation.isEmpty { return side.abbreviation }
+                    return side.shortName
+                }
+                .map { SportsIdentityResolver.slug($0) }
+                .filter { !$0.isEmpty && $0 != "tbd" && $0 != "field" }
+                .sorted()
+                .joined(separator: ":")
+            if !participants.isEmpty {
+                let halfHourBucket = Int(match.date.timeIntervalSince1970 / 1800)
+                return "\(match.league.stadiaKey):\(halfHourBucket):\(participants)"
+            }
+            return "\(match.league.stadiaKey):\(day):\(SportsIdentityResolver.slug(match.name)):\(match.id)"
+        }
+    }
+
+    private func liveAggregationSortKey(_ match: Match, now: Date) -> Int {
+        var score = 0
+        if match.state == .live { score += 10_000 }
+        if !match.broadcasts.isEmpty { score += 500 }
+        if match.away.displayName != "TBD" && match.home.displayName != "TBD" { score += 100 }
+        score -= max(0, Int(abs(match.date.timeIntervalSince(now)) / 60))
+        return score
     }
 
     private func cacheKey(league: League, capability: SportsDataCapability, scope: String) -> SportsCacheKey {
@@ -2065,6 +2207,7 @@ extension StadiaStanding {
             teamID: SportsIdentityResolver.providerID(from: teamID, provider: .espn)
                 ?? SportsIdentityResolver.providerID(from: teamID, provider: .appleSports)
                 ?? SportsIdentityResolver.providerID(from: teamID, provider: .nhl)
+                ?? SportsIdentityResolver.providerID(from: teamID, provider: .mlb)
                 ?? teamID.rawValue,
             displayName: teamDisplayName ?? teamID.rawValue,
             abbreviation: teamAbbreviation ?? "",
@@ -2097,6 +2240,7 @@ extension StadiaLeader {
                     rank: index + 1,
                     athleteID: SportsIdentityResolver.providerID(from: row.playerID, provider: .espn)
                         ?? SportsIdentityResolver.providerID(from: row.playerID, provider: .appleSports)
+                        ?? SportsIdentityResolver.providerID(from: row.playerID, provider: .mlb)
                         ?? row.playerID.rawValue,
                     displayName: row.playerDisplayName ?? row.playerID.rawValue,
                     teamAbbreviation: row.teamAbbreviation,

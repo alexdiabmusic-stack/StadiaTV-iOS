@@ -26,6 +26,7 @@ struct SportsDataFoundationTests {
     @Test func productionRegistryContainsEnabledFoundationAdapters() {
         let providerIDs = Set(SportsProviderRegistry.production().metadata().map(\.id))
         #expect(providerIDs.contains(.nhl))
+        #expect(providerIDs.contains(.mlb))
         #expect(providerIDs.contains(.appleSports))
         #expect(providerIDs.contains(.espn))
     }
@@ -42,6 +43,49 @@ struct SportsDataFoundationTests {
         #expect(config.providers(for: wnba, capability: .playerStats).first == .appleSports)
         #expect(config.providers(for: nhl, capability: .liveScores).prefix(2) == [.nhl, .appleSports])
         #expect(config.providers(for: mlb, capability: .schedule).prefix(2) == [.mlb, .appleSports])
+        #expect(config.providers(for: mlb, capability: .boxScore).prefix(2) == [.mlb, .appleSports])
+        #expect(config.providers(for: mlb, capability: .playByPlay).prefix(2) == [.mlb, .appleSports])
+    }
+
+    @Test func mlbScheduleFixtureDecodesLiveGameShape() throws {
+        let data = #"""
+        {
+          "dates":[{
+            "date":"2026-08-29",
+            "games":[{
+              "gamePk":822770,
+              "gameDate":"2026-08-29T19:07:00Z",
+              "status":{"abstractGameState":"Live","detailedState":"In Progress","statusCode":"I"},
+              "teams":{
+                "away":{"team":{"id":136,"name":"Seattle Mariners","teamName":"Mariners","abbreviation":"SEA","fileCode":"sea"},"score":4},
+                "home":{"team":{"id":141,"name":"Toronto Blue Jays","teamName":"Blue Jays","abbreviation":"TOR","fileCode":"tor"},"score":3}
+              },
+              "venue":{"id":14,"name":"Rogers Centre","location":{"city":"Toronto","state":"Ontario","country":"Canada"}},
+              "broadcasts":[{"id":1,"name":"Sportsnet","type":"TV"}],
+              "linescore":{"currentInning":7,"inningHalf":"Top","balls":1,"strikes":2,"outs":1}
+            }]
+          }]
+        }
+        """#.data(using: .utf8)!
+        let response = try MLBJSONDecoder.decoder.decode(MLBScheduleResponseDTO.self, from: data)
+        let game = try #require(response.dates?.first?.games?.first)
+        #expect(game.gamePk == 822770)
+        #expect(game.teams?.away?.team?.abbreviation == "SEA")
+        #expect(game.venue?.location?.city == "Toronto")
+        #expect(game.broadcasts?.first?.name == "Sportsnet")
+        #expect(StadiaGameStatus(mlbAbstractState: game.status?.abstractGameState, detailedState: game.status?.detailedState, statusCode: game.status?.statusCode) == .live)
+        #expect(MLBStatusFormatter.detail(status: .live, detailedState: game.status?.detailedState, linescore: game.linescore, start: Date()) == "Top 7th · 1 out")
+    }
+
+    @Test func mlbBoxScoreStatsFlattenBaseballFields() throws {
+        let data = #"""
+        {"batting":{"runs":5,"hits":9,"homeRuns":2,"rbi":5,"baseOnBalls":3,"strikeOuts":7,"avg":".264"},"pitching":{"inningsPitched":"8.0","earnedRuns":2,"pitchesStrikes":"101-65","era":"3.41"},"fielding":{"errors":1}}
+        """#.data(using: .utf8)!
+        let stats = try MLBJSONDecoder.decoder.decode(MLBPlayerBoxStatsDTO.self, from: data).flattenedStats()
+        #expect(stats.contains { $0.key == "runs" && $0.value == "5" })
+        #expect(stats.contains { $0.key == "home_runs" && $0.value == "2" })
+        #expect(stats.contains { $0.key == "pitch_strikes" && $0.value == "101-65" })
+        #expect(stats.contains { $0.key == "errors" && $0.value == "1" })
     }
 
     @Test func appleSportsManifestDecodesDiscoveredGroupAndTeamIDs() throws {

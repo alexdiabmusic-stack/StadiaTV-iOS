@@ -534,15 +534,21 @@ private struct EventDTO: Decodable {
     func toRacers() -> [Racer] {
         let entrants = (raceCompetition?.competitors ?? [])
             .sorted { ($0.order ?? Int.max) < ($1.order ?? Int.max) }
+        let orderCounts = Dictionary(grouping: entrants.compactMap(\.order), by: { $0 }).mapValues(\.count)
+        var seenIDs: Set<String> = []
         return entrants.enumerated().compactMap { index, dto in
             guard let athlete = dto.athlete,
                   let name = athlete.displayName ?? athlete.fullName else { return nil }
+            let racerID = dto.id ?? SportsIdentityResolver.slug(name)
+            guard seenIDs.insert(racerID).inserted else { return nil }
+            let providerPlace = dto.order
+            let displayPlace = providerPlace.flatMap { orderCounts[$0] == 1 ? $0 : nil } ?? index + 1
             return Racer(
-                id: dto.id ?? "\(id)-\(index)",
+                id: racerID,
                 name: name,
                 shortName: athlete.shortName ?? name,
                 teamName: dto.vehicle?.manufacturer ?? "Independent",
-                place: dto.order,
+                place: displayPlace,
                 flagURL: athlete.flag?.href.flatMap(URL.init(string:)),
                 isWinner: dto.winner ?? false
             )

@@ -8,6 +8,7 @@ enum AppConfiguration {
     private nonisolated static let espnFantasyEnabledName = "ESPNFantasyProviderEnabled"
     private nonisolated static let sleeperFantasyEnabledName = "SleeperFantasyProviderEnabled"
     private nonisolated static let nhlProviderEnabledName = "NHLProviderEnabled"
+    private nonisolated static let mlbProviderEnabledName = "MLBProviderEnabled"
     private nonisolated static let appleSportsEnabledName = "AppleSportsProviderEnabled"
 
     static var oddsAPIKey: String? {
@@ -48,6 +49,11 @@ enum AppConfiguration {
 
     nonisolated static var isNHLProviderEnabled: Bool {
         guard let value = sanitizedString(for: nhlProviderEnabledName)?.lowercased() else { return true }
+        return ["1", "true", "yes", "enabled"].contains(value)
+    }
+
+    nonisolated static var isMLBProviderEnabled: Bool {
+        guard let value = sanitizedString(for: mlbProviderEnabledName)?.lowercased() else { return true }
         return ["1", "true", "yes", "enabled"].contains(value)
     }
 

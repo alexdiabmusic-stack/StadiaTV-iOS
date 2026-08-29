@@ -684,25 +684,15 @@ final class LiveViewModel: ObservableObject {
         guard !isLoading else { return }
         isLoading = true
 
-        var allMatches: [Match] = []
-        await withTaskGroup(of: [Match].self) { group in
-            for league in League.all {
-                group.addTask {
-                    (try? await SportsRepository.shared.legacyScoreboards(for: league, starting: Date(), days: 1)) ?? []
-                }
-            }
-            for await matches in group {
-                allMatches.append(contentsOf: matches)
-            }
-        }
+        let snapshot = await SportsRepository.shared.liveMatchSnapshot(
+            leagues: League.all,
+            startingSoonWindow: 4 * 3600,
+            nextLimit: 0
+        )
 
-        let now = Date()
-        let soonWindow = now.addingTimeInterval(4 * 3600)
-        allLive = Array(Set(allMatches.filter { $0.state == .live }))
+        allLive = snapshot.live
             .sorted { score($0, favTeams: favoriteTeams) > score($1, favTeams: favoriteTeams) }
-        startingSoon = allMatches
-            .filter { $0.state == .pre && $0.date > now && $0.date <= soonWindow }
-            .sorted { $0.date < $1.date }
+        startingSoon = snapshot.startingSoon
 
         isLoading = false
         lastLoaded = Date()

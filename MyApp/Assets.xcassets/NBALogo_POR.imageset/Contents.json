@@ -1,0 +1,15 @@
+{
+  "images" : [
+    {
+      "filename" : "POR_portland-trail-blazers.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  },
+  "properties" : {
+    "preserves-vector-representation" : true
+  }
+}

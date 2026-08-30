@@ -27,6 +27,8 @@ struct SportsDataFoundationTests {
         let providerIDs = Set(SportsProviderRegistry.production().metadata().map(\.id))
         #expect(providerIDs.contains(.nhl))
         #expect(providerIDs.contains(.mlb))
+        #expect(providerIDs.contains(.nba))
+        #expect(providerIDs.contains(.nfl))
         #expect(providerIDs.contains(.appleSports))
         #expect(providerIDs.contains(.espn))
     }
@@ -36,6 +38,8 @@ struct SportsDataFoundationTests {
         let premierLeague = try #require(League.all.first { $0.path == "soccer/eng.1" })
         let nhl = try #require(League.all.first { $0.path == "hockey/nhl" })
         let mlb = try #require(League.all.first { $0.path == "baseball/mlb" })
+        let nba = try #require(League.all.first { $0.path == "basketball/nba" })
+        let nfl = try #require(League.all.first { $0.path == "football/nfl" })
         let wnba = try #require(League.all.first { $0.path == "basketball/wnba" })
         #expect(config.providers(for: premierLeague, capability: .liveScores).prefix(2) == [.appleSports, .cbsSports])
         #expect(config.providers(for: premierLeague, capability: .boxScore).first == .appleSports)
@@ -45,6 +49,141 @@ struct SportsDataFoundationTests {
         #expect(config.providers(for: mlb, capability: .schedule).prefix(2) == [.mlb, .appleSports])
         #expect(config.providers(for: mlb, capability: .boxScore).prefix(2) == [.mlb, .appleSports])
         #expect(config.providers(for: mlb, capability: .playByPlay).prefix(2) == [.mlb, .appleSports])
+        #expect(config.providers(for: nba, capability: .liveScores).prefix(2) == [.nba, .appleSports])
+        #expect(config.providers(for: nba, capability: .schedule).prefix(2) == [.nba, .appleSports])
+        #expect(config.providers(for: nba, capability: .boxScore).prefix(2) == [.nba, .appleSports])
+        #expect(config.providers(for: nba, capability: .playByPlay).prefix(2) == [.nba, .appleSports])
+        #expect(config.providers(for: nfl, capability: .liveScores).prefix(2) == [.nfl, .appleSports])
+        #expect(config.providers(for: nfl, capability: .schedule).prefix(2) == [.nfl, .appleSports])
+        #expect(config.providers(for: nfl, capability: .playByPlay).prefix(2) == [.nfl, .appleSports])
+    }
+
+    @Test func nflScheduleFixtureDecodesAndNormalizesGameShape() throws {
+        let data = #"""
+        {
+          "games":[{
+            "id":"7d3e8f84-1312-11ef-afd1-646009f18b2e",
+            "date":"2026-09-13T20:25:00Z",
+            "status":{"phase":"SCHEDULED","shortDescription":"4:25 PM ET"},
+            "awayTeam":{"id":"away-team","fullName":"Green Bay Packers","nickName":"Packers","abbreviation":"GB"},
+            "homeTeam":{"id":"home-team","fullName":"Minnesota Vikings","nickName":"Vikings","abbreviation":"MIN"},
+            "venue":{"id":"venue-1","name":"U.S. Bank Stadium","city":"Minneapolis","state":"MN"},
+            "broadcasts":[{"name":"FOX","type":"TV"}]
+          }]
+        }
+        """#.data(using: .utf8)!
+        let response = try NFLJSONDecoder.decoder.decode(NFLGameScheduleResponseDTO.self, from: data)
+        let game = try #require(response.games?.first)
+        #expect(game.providerID == "7d3e8f84-1312-11ef-afd1-646009f18b2e")
+        #expect(game.awayTeam?.abbreviation == "GB")
+        #expect(game.homeTeam?.fullName == "Minnesota Vikings")
+        #expect(StadiaGameStatus(nflStatus: game.status, start: NFLDateFormatter.date(from: game.date) ?? Date()) == .scheduled)
+    }
+
+    @Test func nflGameDetailEnvelopeUnwrapsPlayByPlayPayload() throws {
+        let data = #"""
+        {
+          "data":{"viewer":{"gameDetail":{
+            "id":"game-1",
+            "homeTeam":{"id":"home-team","fullName":"Buffalo Bills","nickName":"Bills","abbreviation":"BUF","score":14,"totalYards":180},
+            "visitorTeam":{"id":"away-team","fullName":"Miami Dolphins","nickName":"Dolphins","abbreviation":"MIA","score":7,"totalYards":121},
+            "status":{"phase":"LIVE","quarter":2,"clock":"08:11","displayStatus":"2nd · 08:11"},
+            "plays":[{"playID":"42","quarter":2,"clock":"08:11","playDescription":"Josh Allen pass complete for 12 yards","homeScore":14,"visitorScore":7}]
+          }}}
+        }
+        """#.data(using: .utf8)!
+        let envelope = try NFLJSONDecoder.decoder.decode(NFLGameDetailEnvelopeDTO.self, from: data)
+        let detail = try #require(envelope.data?.viewer?.gameDetail)
+        #expect(detail.id == "game-1")
+        #expect(detail.homeTeam?.totalYards == 180)
+        #expect(detail.visitorTeam?.score == 7)
+        #expect(detail.plays?.first?.playDescription == "Josh Allen pass complete for 12 yards")
+        #expect(StadiaGameStatus(nflStatus: detail.status, start: Date()) == .live)
+    }
+
+    @Test func bundledTeamLogoResolverReturnsAssetURLsForPrimaryLeagues() {
+        #expect(TeamLogoAssetResolver.nbaAssetURL(abbreviation: "TOR")?.stadiaImageAssetName == "NBALogo_TOR")
+        #expect(TeamLogoAssetResolver.nflAssetURL(abbreviation: "JAC")?.stadiaImageAssetName == "NFLLogo_JAX")
+        #expect(TeamLogoAssetResolver.mlbAssetURL(abbreviation: "TOR", displayName: "Toronto Blue Jays", providerTeamID: "141")?.stadiaImageAssetName == "MLBLogo_Toronto_Blue_Jays")
+        #expect(TeamLogoAssetResolver.assetURL(leaguePath: "soccer/fra.1", abbreviation: nil, displayName: "Paris Saint Germain")?.stadiaImageAssetName == "MSILogo_ligue_1_paris_saint_germain")
+    }
+
+    @Test func nbaScoreboardFixtureDecodesLiveGameShape() throws {
+        let data = #"""
+        {
+          "scoreboard":{
+            "games":[{
+              "gameId":"0022500001",
+              "gameCode":"20251021/LALGSW",
+              "gameStatus":2,
+              "gameStatusText":"Q2 05:31",
+              "gameTimeUTC":"2025-10-22T02:00:00Z",
+              "period":2,
+              "homeTeam":{"teamId":1610612744,"teamCity":"Golden State","teamName":"Warriors","teamTricode":"GSW","score":54},
+              "awayTeam":{"teamId":1610612747,"teamCity":"Los Angeles","teamName":"Lakers","teamTricode":"LAL","score":51},
+              "broadcasters":{"nationalTvBroadcasters":[{"broadcasterDisplay":"TNT"}]}
+            }]
+          }
+        }
+        """#.data(using: .utf8)!
+        let response = try NBAJSONDecoder.decoder.decode(NBAScoreboardResponseDTO.self, from: data)
+        let game = try #require(response.scoreboard?.games?.first)
+        #expect(game.gameIDValue == "0022500001")
+        #expect(game.homeTeam?.teamTricode == "GSW")
+        #expect(game.awayTeam?.score == 51)
+        #expect(game.stadiaBroadcasts.first?.network == "TNT")
+        #expect(StadiaGameStatus(nbaStatusCode: game.gameStatus, text: game.gameStatusText, start: NBADateFormatter.date(from: game.gameTimeUTC) ?? Date()) == .live)
+    }
+
+    @Test func nbaBoxScoreFixtureDecodesTeamAndPlayerStats() throws {
+        let data = #"""
+        {
+          "game":{
+            "gameId":"0022500001",
+            "gameStatus":3,
+            "gameStatusText":"Final",
+            "gameTimeUTC":"2025-10-22T02:00:00Z",
+            "homeTeam":{
+              "teamId":1610612744,
+              "teamCity":"Golden State",
+              "teamName":"Warriors",
+              "teamTricode":"GSW",
+              "score":112,
+              "statistics":{"points":112,"assists":28,"reboundsTotal":44,"fieldGoalsPercentage":"47.8"},
+              "players":[{"personId":201939,"name":"Stephen Curry","statistics":{"minutes":"32:18","points":31,"assists":7,"reboundsTotal":5,"plusMinusPoints":12}}]
+            },
+            "awayTeam":{"teamId":1610612747,"teamCity":"Los Angeles","teamName":"Lakers","teamTricode":"LAL","score":106,"statistics":{"points":106,"assists":22,"reboundsTotal":41}}
+          }
+        }
+        """#.data(using: .utf8)!
+        let response = try NBAJSONDecoder.decoder.decode(NBABoxScoreResponseDTO.self, from: data)
+        let game = try #require(response.game)
+        #expect(game.homeTeam?.statistics?.assists == 28)
+        #expect(game.homeTeam?.players?.first?.personID == 201939)
+        #expect(game.homeTeam?.players?.first?.statistics?.points == 31)
+    }
+
+    @Test func nbaStatsResultSetFixtureMapsRowsByHeader() throws {
+        let data = #"""
+        {"resultSets":[{"name":"Standings","headers":["TeamID","Conference","WINS","Losses","ConferenceRank"],"rowSet":[["1610612761","East",50,32,3]]}]}
+        """#.data(using: .utf8)!
+        let response = try NBAJSONDecoder.decoder.decode(NBAStatsResponseDTO.self, from: data)
+        let row = try #require(response.firstResultSet(named: "Standings")?.rowsByHeader.first)
+        #expect(row["TeamID"]?.stringValue == "1610612761")
+        #expect(row["Conference"]?.stringValue == "East")
+        #expect(row["WINS"]?.intValue == 50)
+        #expect(row["ConferenceRank"]?.intValue == 3)
+    }
+
+    @Test func nbaPlayByPlayFixtureDecodesActionShape() throws {
+        let data = #"""
+        {"game":{"actions":[{"actionNumber":7,"period":1,"clock":"PT08M42.00S","teamId":1610612744,"description":"Stephen Curry makes 3PT jump shot","scoreHome":"12","scoreAway":"9","shotResult":"Made"}]}}
+        """#.data(using: .utf8)!
+        let response = try NBAJSONDecoder.decoder.decode(NBAPlayByPlayResponseDTO.self, from: data)
+        let action = try #require(response.game?.actions?.first)
+        #expect(action.actionNumber == 7)
+        #expect(action.teamIDValue == "1610612744")
+        #expect(action.isScoringPlay)
     }
 
     @Test func mlbScheduleFixtureDecodesLiveGameShape() throws {

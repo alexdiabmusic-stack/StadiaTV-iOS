@@ -1023,7 +1023,7 @@ private struct LiveNowCommandCenter: View {
                     .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.hairline))
             } else {
-                ForEach(displayed.prefix(4)) { match in
+                ForEach(displayed) { match in
                     NavigationLink(value: match) {
                         LiveMatchCard(
                             match: match,
@@ -1698,6 +1698,7 @@ final class HomeViewModel: ObservableObject {
     private func primeScore(_ match: Match, favoriteIDs: Set<String> = [], favoriteNames: Set<String> = []) -> Int {
         var score = cachedDemandScore(match)
         if match.state == .live { score += 100 }
+        if match.hasDisplayScore { score += 25 }
         if involvesFavorite(match, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames) { score += 50 }
         if !match.broadcasts.isEmpty { score += 20 }
         score -= max(0, Int(match.date.timeIntervalSinceNow / 3600))

@@ -26,7 +26,9 @@ struct MLBProvider: ScoreProvider, ScheduleProvider, StandingsProvider, TeamProv
         try ensureMLB(league)
         let today = MLBDateFormatter.dayString(from: Date())
         let response = try await client.schedule(startDate: today, endDate: today)
-        return response.dates?.flatMap { $0.games ?? [] }.compactMap { mapGame($0, league: league) } ?? []
+        return (response.dates?.flatMap { $0.games ?? [] }.compactMap { mapGame($0, league: league) } ?? [])
+            .filter { $0.status == .live || Calendar.current.isDate($0.scheduledStart, inSameDayAs: Date()) }
+            .sorted { $0.scheduledStart < $1.scheduledStart }
     }
 
     func schedule(for league: League, range: SportsDateRange) async throws -> StadiaSchedule {
@@ -929,9 +931,9 @@ extension StadiaGameStatus {
             self = .delayed
         } else if detailed.contains("suspended") {
             self = .suspended
-        } else if abstract == "live" || ["I", "M", "N"].contains(statusCode) {
+        } else if abstract == "live" || ["I", "M", "N"].contains(statusCode) || detailed.contains("in progress") || detailed.contains("middle") || detailed.contains("top") || detailed.contains("bottom") {
             self = .live
-        } else if abstract == "final" || detailed.contains("final") || detailed.contains("completed") {
+        } else if abstract == "final" || detailed.contains("final") || detailed.contains("completed") || detailed.contains("game over") {
             self = .final
         } else if abstract == "preview" || abstract == "pre-game" || ["P", "S"].contains(statusCode) {
             self = .scheduled

@@ -244,6 +244,14 @@ struct Match: Identifiable, Hashable {
 
     static func == (lhs: Match, rhs: Match) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+
+    var hasDisplayScore: Bool {
+        func isUsefulScore(_ value: String?) -> Bool {
+            guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return false }
+            return value != "-" && value != "--" && value != "—"
+        }
+        return isUsefulScore(home.score) || isUsefulScore(away.score)
+    }
 }
 
 // MARK: - Racing

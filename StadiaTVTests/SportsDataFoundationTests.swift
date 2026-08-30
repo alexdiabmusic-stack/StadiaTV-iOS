@@ -41,9 +41,9 @@ struct SportsDataFoundationTests {
         let nba = try #require(League.all.first { $0.path == "basketball/nba" })
         let nfl = try #require(League.all.first { $0.path == "football/nfl" })
         let wnba = try #require(League.all.first { $0.path == "basketball/wnba" })
-        #expect(config.providers(for: premierLeague, capability: .liveScores).prefix(2) == [.appleSports, .cbsSports])
+        #expect(config.providers(for: premierLeague, capability: .liveScores).prefix(2) == [.appleSports, .espn])
         #expect(config.providers(for: premierLeague, capability: .boxScore).first == .appleSports)
-        #expect(config.providers(for: wnba, capability: .schedule).first == .appleSports)
+        #expect(config.providers(for: wnba, capability: .schedule).prefix(2) == [.appleSports, .foxSports])
         #expect(config.providers(for: wnba, capability: .playerStats).first == .appleSports)
         #expect(config.providers(for: nhl, capability: .liveScores).prefix(2) == [.nhl, .appleSports])
         #expect(config.providers(for: mlb, capability: .schedule).prefix(2) == [.mlb, .appleSports])
@@ -56,6 +56,20 @@ struct SportsDataFoundationTests {
         #expect(config.providers(for: nfl, capability: .liveScores).prefix(2) == [.nfl, .appleSports])
         #expect(config.providers(for: nfl, capability: .schedule).prefix(2) == [.nfl, .appleSports])
         #expect(config.providers(for: nfl, capability: .playByPlay).prefix(2) == [.nfl, .appleSports])
+    }
+
+    @Test func webFallbackProviderMetadataMatchesImplementedReferenceCoverage() throws {
+        let yahoo = YahooSportsProvider()
+        let fox = FoxSportsProvider()
+        let cbs = CBSSportsProvider()
+
+        #expect(yahoo.metadata.supportedLeagues == Set(["football/college-football", "league.football-college-football"]))
+        #expect(yahoo.metadata.supportedSports == [.football])
+        #expect(fox.metadata.supportedLeagues.contains("baseball/mlb"))
+        #expect(fox.metadata.supportedLeagues.contains("basketball/wnba"))
+        #expect(!fox.metadata.capabilities.contains(.leagueLeaders))
+        #expect(cbs.metadata.supportedLeagues.contains("football/nfl"))
+        #expect(!cbs.metadata.supportedLeagues.contains("*"))
     }
 
     @Test func nflScheduleFixtureDecodesAndNormalizesGameShape() throws {
@@ -214,6 +228,12 @@ struct SportsDataFoundationTests {
         #expect(game.broadcasts?.first?.name == "Sportsnet")
         #expect(StadiaGameStatus(mlbAbstractState: game.status?.abstractGameState, detailedState: game.status?.detailedState, statusCode: game.status?.statusCode) == .live)
         #expect(MLBStatusFormatter.detail(status: .live, detailedState: game.status?.detailedState, linescore: game.linescore, start: Date()) == "Top 7th · 1 out")
+    }
+
+    @Test func mlbStatusMapperTreatsDetailedInningStatesAsLive() {
+        #expect(StadiaGameStatus(mlbAbstractState: nil, detailedState: "Top 4th", statusCode: nil) == .live)
+        #expect(StadiaGameStatus(mlbAbstractState: nil, detailedState: "In Progress", statusCode: nil) == .live)
+        #expect(StadiaGameStatus(mlbAbstractState: nil, detailedState: "Game Over", statusCode: nil) == .final)
     }
 
     @Test func mlbBoxScoreStatsFlattenBaseballFields() throws {
@@ -553,6 +573,55 @@ struct SportsDataFoundationTests {
         #expect(await counter.value == 1)
     }
 
+    @Test func liveSnapshotRequestsSameDayScheduleWindowForAggregation() async throws {
+        let league = try #require(League.all.first { $0.path == "baseball/mlb" })
+        let capture = SportsScheduleRangeCapture()
+        let router = SportsProviderRouter(
+            registry: SportsProviderRegistry(providers: [MockScheduleSnapshotProvider(capture: capture)]),
+            routeConfiguration: SportsProviderRouteConfiguration(routes: [
+                ProviderRoute(leagueID: league.stadiaKey, capability: .liveScores, providers: [.mlb]),
+                ProviderRoute(leagueID: league.stadiaKey, capability: .schedule, providers: [.mlb])
+            ]),
+            healthMonitor: ProviderHealthMonitor(),
+            routeOverrides: SportsProviderRouteOverrideStore(storageKey: "sportsData.tests.liveSnapshotRange")
+        )
+        let repository = SportsRepository(router: router, cache: SportsDataCache())
+        _ = await repository.liveMatchSnapshot(leagues: [league], startingSoonWindow: 4 * 3600, nextLimit: 0)
+        let range = try #require(await capture.range)
+        #expect(Calendar.current.isDate(range.start, inSameDayAs: Date()))
+        #expect(range.start == Calendar.current.startOfDay(for: Date()))
+        #expect(range.end > Date())
+        await router.routeOverrides.removeAll()
+    }
+
+    @Test func liveSnapshotPromotesSameDayScoredLiveDetailFromSchedule() async throws {
+        let league = try #require(League.all.first { $0.path == "soccer/eng.1" })
+        let scheduledButLive = Self.game(
+            league: league,
+            providerID: .appleSports,
+            providerGameID: "soccer-live-detail",
+            scheduledStart: Date().addingTimeInterval(-1_800),
+            status: .scheduled,
+            statusDetail: "HT",
+            homeScore: "2",
+            awayScore: "1"
+        )
+        let router = SportsProviderRouter(
+            registry: SportsProviderRegistry(providers: [MockScoreScheduleProvider(scoreResult: .success([]), scheduleGames: [scheduledButLive])]),
+            routeConfiguration: SportsProviderRouteConfiguration(routes: [
+                ProviderRoute(leagueID: league.stadiaKey, capability: .liveScores, providers: [.appleSports]),
+                ProviderRoute(leagueID: league.stadiaKey, capability: .schedule, providers: [.appleSports])
+            ]),
+            healthMonitor: ProviderHealthMonitor(),
+            routeOverrides: SportsProviderRouteOverrideStore(storageKey: "sportsData.tests.liveSnapshotScored")
+        )
+        let repository = SportsRepository(router: router, cache: SportsDataCache())
+        let snapshot = await repository.liveMatchSnapshot(leagues: [league], startingSoonWindow: 4 * 3600, nextLimit: 0)
+        #expect(snapshot.live.map(\.id) == ["soccer-live-detail"])
+        #expect(snapshot.live.first?.hasDisplayScore == true)
+        await router.routeOverrides.removeAll()
+    }
+
     @Test func gameCentreArchetypeUsesSportGroupRouting() throws {
         let golf = try #require(League.all.first { $0.path == "golf/champions-tour" })
         let indyCar = try #require(League.all.first { $0.path == "racing/irl" })
@@ -586,7 +655,16 @@ struct SportsDataFoundationTests {
         )
     }
 
-    private static func game(league: League, providerID: SportsDataProviderID, providerGameID: String) -> StadiaGame {
+    private static func game(
+        league: League,
+        providerID: SportsDataProviderID,
+        providerGameID: String,
+        scheduledStart: Date = Date(timeIntervalSince1970: 1_800_000_000),
+        status: StadiaGameStatus = .scheduled,
+        statusDetail: String = "Tonight",
+        homeScore: String? = nil,
+        awayScore: String? = nil
+    ) -> StadiaGame {
         let resolver = SportsIdentityResolver()
         let provenance = DataProvenance(provider: providerID, fetchedAt: Date(), providerEntityID: providerGameID, confidence: 1)
         let home = StadiaTeam(
@@ -610,16 +688,16 @@ struct SportsDataFoundationTests {
             provenance: provenance
         )
         return StadiaGame(
-            id: resolver.canonicalGameID(league: league, provider: providerID, providerGameID: providerGameID, home: home, away: away, scheduledStart: Date(timeIntervalSince1970: 1_800_000_000)),
+            id: resolver.canonicalGameID(league: league, provider: providerID, providerGameID: providerGameID, home: home, away: away, scheduledStart: scheduledStart),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
-            scheduledStart: Date(timeIntervalSince1970: 1_800_000_000),
+            scheduledStart: scheduledStart,
             name: "Away at Home",
             shortName: "AWY @ HME",
-            status: .scheduled,
-            statusDetail: "Tonight",
+            status: status,
+            statusDetail: statusDetail,
             homeTeam: home,
             awayTeam: away,
-            score: StadiaScore(home: nil, away: nil),
+            score: StadiaScore(home: homeScore, away: awayScore),
             clock: nil,
             period: nil,
             venue: nil,
@@ -720,6 +798,36 @@ private struct MockScoreProvider: ScoreProvider {
     }
 }
 
+private struct MockScoreScheduleProvider: ScoreProvider, ScheduleProvider {
+    let metadata = SportsDataProviderMetadata(
+        id: .appleSports,
+        name: "Apple schedule mock",
+        supportLevel: .experimental,
+        supportedSports: Set(SportGroup.allCases),
+        supportedLeagues: ["*"],
+        capabilities: [.liveScores, .schedule],
+        authenticationType: .none,
+        isEnabled: true,
+        requestTimeout: 1
+    )
+    let scoreResult: Result<[StadiaGame], Error>
+    let scheduleGames: [StadiaGame]
+
+    func liveScores(for league: League) async throws -> [StadiaGame] {
+        try scoreResult.get()
+    }
+
+    func schedule(for league: League, range: SportsDateRange) async throws -> StadiaSchedule {
+        StadiaSchedule(
+            id: StadiaEntityID(rawValue: "schedule:scoreScheduleMock:\(league.stadiaKey)"),
+            leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
+            range: range,
+            games: scheduleGames,
+            provenance: DataProvenance(provider: .appleSports, fetchedAt: Date(), providerEntityID: nil, confidence: 1)
+        )
+    }
+}
+
 private struct MockTeamProvider: TeamProvider {
     let metadata = SportsDataProviderMetadata(
         id: .nhl,
@@ -738,6 +846,44 @@ private struct MockTeamProvider: TeamProvider {
     func teams(for league: League) async throws -> [StadiaTeam] {
         await counter.increment()
         return teams
+    }
+}
+
+private struct MockScheduleSnapshotProvider: ScoreProvider, ScheduleProvider {
+    let metadata = SportsDataProviderMetadata(
+        id: .mlb,
+        name: "MLB schedule mock",
+        supportLevel: .official,
+        supportedSports: [.baseball],
+        supportedLeagues: ["*"],
+        capabilities: [.liveScores, .schedule],
+        authenticationType: .none,
+        isEnabled: true,
+        requestTimeout: 1
+    )
+    let capture: SportsScheduleRangeCapture
+
+    func liveScores(for league: League) async throws -> [StadiaGame] {
+        []
+    }
+
+    func schedule(for league: League, range: SportsDateRange) async throws -> StadiaSchedule {
+        await capture.set(range)
+        return StadiaSchedule(
+            id: StadiaEntityID(rawValue: "schedule:mock:\(league.stadiaKey)"),
+            leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
+            range: range,
+            games: [],
+            provenance: DataProvenance(provider: .mlb, fetchedAt: Date(), providerEntityID: nil, confidence: 1)
+        )
+    }
+}
+
+private actor SportsScheduleRangeCapture {
+    private(set) var range: SportsDateRange?
+
+    func set(_ range: SportsDateRange) {
+        self.range = range
     }
 }
 

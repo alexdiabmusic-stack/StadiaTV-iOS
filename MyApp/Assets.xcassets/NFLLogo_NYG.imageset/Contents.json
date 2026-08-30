@@ -1,0 +1,15 @@
+{
+  "images" : [
+    {
+      "filename" : "NYG_new-york-giants.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  },
+  "properties" : {
+    "preserves-vector-representation" : true
+  }
+}

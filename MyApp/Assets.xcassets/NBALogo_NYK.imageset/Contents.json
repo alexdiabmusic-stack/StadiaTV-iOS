@@ -1,0 +1,15 @@
+{
+  "images" : [
+    {
+      "filename" : "NYK_new-york-knicks.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  },
+  "properties" : {
+    "preserves-vector-representation" : true
+  }
+}

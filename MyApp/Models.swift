@@ -1,11 +1,11 @@
 import Foundation
 
 extension URL {
-    static func stadiaImageAsset(named assetName: String) -> URL? {
+    nonisolated static func stadiaImageAsset(named assetName: String) -> URL? {
         URL(string: "stadia-asset:/\(assetName)")
     }
 
-    var stadiaImageAssetName: String? {
+    nonisolated var stadiaImageAssetName: String? {
         guard scheme == "stadia-asset" else { return nil }
         let trimmedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         return trimmedPath.isEmpty ? host : trimmedPath
@@ -244,6 +244,14 @@ struct Match: Identifiable, Hashable {
 
     static func == (lhs: Match, rhs: Match) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+
+    var hasDisplayScore: Bool {
+        func isUsefulScore(_ value: String?) -> Bool {
+            guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return false }
+            return value != "-" && value != "--" && value != "—"
+        }
+        return isUsefulScore(home.score) || isUsefulScore(away.score)
+    }
 }
 
 // MARK: - Racing

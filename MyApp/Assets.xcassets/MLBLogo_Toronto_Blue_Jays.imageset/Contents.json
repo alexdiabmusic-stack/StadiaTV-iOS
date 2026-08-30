@@ -1,0 +1,15 @@
+{
+  "images" : [
+    {
+      "filename" : "Toronto_Blue_Jays.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  },
+  "properties" : {
+    "preserves-vector-representation" : true
+  }
+}

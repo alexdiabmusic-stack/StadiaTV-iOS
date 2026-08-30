@@ -99,20 +99,20 @@ struct FeaturedEventPick: Identifiable, Hashable {
         for separator in separators {
             let pieces = normalizedTitle.components(separatedBy: separator)
             guard pieces.count == 2 else { continue }
-            let awayName = pieces[0].trimmingCharacters(in: .whitespacesAndNewlines)
-            let homeName = pieces[1].trimmingCharacters(in: .whitespacesAndNewlines)
+            let awayName = cleanParticipantName(pieces[0])
+            let homeName = cleanParticipantName(pieces[1])
             if !awayName.isEmpty && !homeName.isEmpty {
-                return (side(named: homeName), side(named: awayName))
+                return (side(named: homeName, league: matchedLeague ?? fallbackLeague), side(named: awayName, league: matchedLeague ?? fallbackLeague))
             }
         }
-        return (side(named: "TBD"), side(named: "TBD"))
+        return (side(named: "TBD", league: matchedLeague ?? fallbackLeague), side(named: "TBD", league: matchedLeague ?? fallbackLeague))
     }
 
     private var currentState: GameState {
-        guard let startDate else { return .pre }
+        guard startDate != nil else { return .pre }
         let now = Date()
         if let endDate, now >= endDate { return .final }
-        return now >= startDate ? .live : .pre
+        return .pre
     }
 
     private var statusDetail: String {
@@ -123,9 +123,65 @@ struct FeaturedEventPick: Identifiable, Hashable {
         }
     }
 
-    private func side(named name: String) -> TeamSide {
+    private func side(named name: String, league: League) -> TeamSide {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        return TeamSide(displayName: trimmed, shortName: trimmed, abbreviation: "", logoURL: nil, score: nil, record: nil, isWinner: false)
+        let abbreviation = inferredAbbreviation(for: trimmed, league: league)
+        let logoURL = TeamLogoAssetResolver.assetURL(
+            leaguePath: league.path,
+            abbreviation: abbreviation,
+            displayName: trimmed,
+            providerTeamID: nil
+        )
+        return TeamSide(
+            displayName: trimmed,
+            shortName: shortName(for: trimmed, abbreviation: abbreviation),
+            abbreviation: abbreviation ?? "",
+            logoURL: logoURL,
+            score: nil,
+            record: nil,
+            isWinner: false,
+            teamID: nil,
+            canonicalIDString: canonicalTeamID(for: trimmed, league: league)
+        )
+    }
+
+    private func cleanParticipantName(_ value: String) -> String {
+        let dashSeparated = value
+            .components(separatedBy: " — ")
+            .first?
+            .components(separatedBy: " – ")
+            .first?
+            .components(separatedBy: " - ")
+            .first ?? value
+        return dashSeparated
+            .replacingOccurrences(of: #"(?i)\s+game\s+\d+$"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func inferredAbbreviation(for displayName: String, league: League) -> String? {
+        let key = normalized(displayName)
+        switch league.path {
+        case "baseball/mlb":
+            return Self.mlbTeamAbbreviations[key]
+        case "basketball/nba":
+            return Self.nbaTeamAbbreviations[key]
+        case "football/nfl":
+            return Self.nflTeamAbbreviations[key]
+        case "hockey/nhl":
+            return Self.nhlTeamAbbreviations[key]
+        default:
+            return nil
+        }
+    }
+
+    private func shortName(for displayName: String, abbreviation: String?) -> String {
+        if let abbreviation, !abbreviation.isEmpty { return abbreviation }
+        return displayName
+    }
+
+    private func canonicalTeamID(for displayName: String, league: League) -> String {
+        let slug = normalized(displayName).replacingOccurrences(of: " ", with: "-")
+        return "stadia:\(league.stadiaKey):team:\(slug)"
     }
 
     private func normalized(_ value: String) -> String {
@@ -136,6 +192,63 @@ struct FeaturedEventPick: Identifiable, Hashable {
             .split(separator: " ")
             .joined(separator: " ")
     }
+
+    private static let mlbTeamAbbreviations: [String: String] = [
+        "arizona diamondbacks": "ARI", "athletics": "ATH", "oakland athletics": "OAK",
+        "atlanta braves": "ATL", "baltimore orioles": "BAL", "boston red sox": "BOS",
+        "chicago cubs": "CHC", "chicago white sox": "CWS", "cincinnati reds": "CIN",
+        "cleveland guardians": "CLE", "colorado rockies": "COL", "detroit tigers": "DET",
+        "houston astros": "HOU", "kansas city royals": "KC", "los angeles angels": "LAA",
+        "los angeles dodgers": "LAD", "miami marlins": "MIA", "milwaukee brewers": "MIL",
+        "minnesota twins": "MIN", "new york mets": "NYM", "new york yankees": "NYY",
+        "philadelphia phillies": "PHI", "pittsburgh pirates": "PIT", "san diego padres": "SD",
+        "san francisco giants": "SF", "seattle mariners": "SEA", "st louis cardinals": "STL",
+        "st. louis cardinals": "STL", "tampa bay rays": "TB", "texas rangers": "TEX",
+        "toronto blue jays": "TOR", "washington nationals": "WSH"
+    ]
+
+    private static let nbaTeamAbbreviations: [String: String] = [
+        "atlanta hawks": "ATL", "boston celtics": "BOS", "brooklyn nets": "BKN",
+        "charlotte hornets": "CHA", "chicago bulls": "CHI", "cleveland cavaliers": "CLE",
+        "dallas mavericks": "DAL", "denver nuggets": "DEN", "detroit pistons": "DET",
+        "golden state warriors": "GSW", "houston rockets": "HOU", "indiana pacers": "IND",
+        "la clippers": "LAC", "los angeles clippers": "LAC", "los angeles lakers": "LAL",
+        "memphis grizzlies": "MEM", "miami heat": "MIA", "milwaukee bucks": "MIL",
+        "minnesota timberwolves": "MIN", "new orleans pelicans": "NOP", "new york knicks": "NYK",
+        "oklahoma city thunder": "OKC", "orlando magic": "ORL", "philadelphia 76ers": "PHI",
+        "phoenix suns": "PHX", "portland trail blazers": "POR", "sacramento kings": "SAC",
+        "san antonio spurs": "SAS", "toronto raptors": "TOR", "utah jazz": "UTA",
+        "washington wizards": "WAS"
+    ]
+
+    private static let nflTeamAbbreviations: [String: String] = [
+        "arizona cardinals": "ARI", "atlanta falcons": "ATL", "baltimore ravens": "BAL",
+        "buffalo bills": "BUF", "carolina panthers": "CAR", "chicago bears": "CHI",
+        "cincinnati bengals": "CIN", "cleveland browns": "CLE", "dallas cowboys": "DAL",
+        "denver broncos": "DEN", "detroit lions": "DET", "green bay packers": "GB",
+        "houston texans": "HOU", "indianapolis colts": "IND", "jacksonville jaguars": "JAX",
+        "kansas city chiefs": "KC", "las vegas raiders": "LV", "los angeles chargers": "LAC",
+        "los angeles rams": "LAR", "miami dolphins": "MIA", "minnesota vikings": "MIN",
+        "new england patriots": "NE", "new orleans saints": "NO", "new york giants": "NYG",
+        "new york jets": "NYJ", "philadelphia eagles": "PHI", "pittsburgh steelers": "PIT",
+        "san francisco 49ers": "SF", "seattle seahawks": "SEA", "tampa bay buccaneers": "TB",
+        "tennessee titans": "TEN", "washington commanders": "WAS"
+    ]
+
+    private static let nhlTeamAbbreviations: [String: String] = [
+        "anaheim ducks": "ANA", "boston bruins": "BOS", "buffalo sabres": "BUF",
+        "calgary flames": "CGY", "carolina hurricanes": "CAR", "chicago blackhawks": "CHI",
+        "colorado avalanche": "COL", "columbus blue jackets": "CBJ", "dallas stars": "DAL",
+        "detroit red wings": "DET", "edmonton oilers": "EDM", "florida panthers": "FLA",
+        "los angeles kings": "LAK", "minnesota wild": "MIN", "montreal canadiens": "MTL",
+        "nashville predators": "NSH", "new jersey devils": "NJD", "new york islanders": "NYI",
+        "new york rangers": "NYR", "ottawa senators": "OTT", "philadelphia flyers": "PHI",
+        "pittsburgh penguins": "PIT", "san jose sharks": "SJS", "seattle kraken": "SEA",
+        "st louis blues": "STL", "st. louis blues": "STL", "tampa bay lightning": "TBL",
+        "toronto maple leafs": "TOR", "utah mammoth": "UTA", "utah hockey club": "UTA",
+        "vancouver canucks": "VAN", "vegas golden knights": "VGK", "washington capitals": "WSH",
+        "winnipeg jets": "WPG"
+    ]
 }
 
 /// In-app projection of the Daily Picks sheet from the sports demand workbook.

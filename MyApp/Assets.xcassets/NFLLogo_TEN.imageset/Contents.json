@@ -1,0 +1,15 @@
+{
+  "images" : [
+    {
+      "filename" : "TEN_tennessee-titans.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  },
+  "properties" : {
+    "preserves-vector-representation" : true
+  }
+}

@@ -227,7 +227,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
             displayName: displayName,
             shortName: shortName,
             abbreviation: abbreviation,
-            logoURL: AppleSportsImageResolver.logoURL(token: manifestTeam?.logoToken),
+            logoURL: AppleSportsImageResolver.logoURL(token: manifestTeam?.logoToken) ?? TeamLogoAssetResolver.assetURL(leaguePath: league.path, abbreviation: abbreviation, displayName: displayName, providerTeamID: canonicalID),
             aliases: [ProviderEntityAlias(provider: .appleSports, id: canonicalID)],
             provenance: DataProvenance(provider: .appleSports, fetchedAt: Date(), providerEntityID: canonicalID, confidence: manifestTeam == nil ? 0.5 : 0.78)
         )
@@ -938,8 +938,12 @@ enum AppleSportsLeagueMapping {
         "tennis/wta": AppleSportsLeagueIdentifiers(names: ["WTA", "Women’s Tennis", "Women's Tennis"], abbreviations: ["WTA", "WOMEN_TENNIS"]),
         "golf/pga": AppleSportsLeagueIdentifiers(names: ["PGA Tour"], abbreviations: ["PGA"]),
         "golf/lpga": AppleSportsLeagueIdentifiers(names: ["LPGA Tour"], abbreviations: ["LPGA"]),
+        "golf/champions-tour": AppleSportsLeagueIdentifiers(names: ["PGA Tour Champions", "Champions Tour"], abbreviations: ["CHMP", "PGATC"]),
+        "golf/eur": AppleSportsLeagueIdentifiers(names: ["DP World Tour", "European Tour"], abbreviations: ["EUR", "DPWT"]),
         "racing/f1": AppleSportsLeagueIdentifiers(names: ["Formula 1"], abbreviations: ["FORMULA1"]),
-        "racing/nascar-premier": AppleSportsLeagueIdentifiers(names: ["NASCAR"], abbreviations: ["NASCAR"])
+        "racing/nascar-premier": AppleSportsLeagueIdentifiers(names: ["NASCAR"], abbreviations: ["NASCAR"]),
+        "racing/nascar-truck": AppleSportsLeagueIdentifiers(names: ["NASCAR Truck Series", "Craftsman Truck Series"], abbreviations: ["NASCAR_TRUCK", "TRUCK"]),
+        "racing/irl": AppleSportsLeagueIdentifiers(names: ["IndyCar", "IndyCar Series"], abbreviations: ["INDYCAR", "IRL"])
     ]
 
     nonisolated static var supportedLeaguePaths: [String] {

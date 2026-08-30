@@ -227,7 +227,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
             displayName: displayName,
             shortName: shortName,
             abbreviation: abbreviation,
-            logoURL: AppleSportsImageResolver.logoURL(token: manifestTeam?.logoToken),
+            logoURL: AppleSportsImageResolver.logoURL(token: manifestTeam?.logoToken) ?? TeamLogoAssetResolver.assetURL(leaguePath: league.path, abbreviation: abbreviation, displayName: displayName, providerTeamID: canonicalID),
             aliases: [ProviderEntityAlias(provider: .appleSports, id: canonicalID)],
             provenance: DataProvenance(provider: .appleSports, fetchedAt: Date(), providerEntityID: canonicalID, confidence: manifestTeam == nil ? 0.5 : 0.78)
         )

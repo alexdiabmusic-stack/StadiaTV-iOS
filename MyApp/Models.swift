@@ -1,11 +1,11 @@
 import Foundation
 
 extension URL {
-    static func stadiaImageAsset(named assetName: String) -> URL? {
+    nonisolated static func stadiaImageAsset(named assetName: String) -> URL? {
         URL(string: "stadia-asset:/\(assetName)")
     }
 
-    var stadiaImageAssetName: String? {
+    nonisolated var stadiaImageAssetName: String? {
         guard scheme == "stadia-asset" else { return nil }
         let trimmedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         return trimmedPath.isEmpty ? host : trimmedPath

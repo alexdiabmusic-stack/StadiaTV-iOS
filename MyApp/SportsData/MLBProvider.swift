@@ -269,7 +269,7 @@ struct MLBProvider: ScoreProvider, ScheduleProvider, StandingsProvider, TeamProv
             displayName: displayName.isEmpty ? abbreviation : displayName,
             shortName: shortName,
             abbreviation: abbreviation,
-            logoURL: MLBAssetURL.teamLogo(teamID: id),
+            logoURL: TeamLogoAssetResolver.mlbAssetURL(abbreviation: abbreviation, displayName: displayName.isEmpty ? abbreviation : displayName, providerTeamID: id) ?? MLBAssetURL.teamLogo(teamID: id),
             aliases: [ProviderEntityAlias(provider: .mlb, id: id)],
             provenance: DataProvenance(provider: .mlb, fetchedAt: Date(), providerEntityID: id, confidence: 0.93)
         )

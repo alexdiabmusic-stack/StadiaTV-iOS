@@ -1,0 +1,15 @@
+{
+  "images" : [
+    {
+      "filename" : "SF_san-francisco-49ers.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  },
+  "properties" : {
+    "preserves-vector-representation" : true
+  }
+}

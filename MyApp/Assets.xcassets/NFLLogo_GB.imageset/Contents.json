@@ -1,0 +1,15 @@
+{
+  "images" : [
+    {
+      "filename" : "GB_green-bay-packers.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  },
+  "properties" : {
+    "preserves-vector-representation" : true
+  }
+}

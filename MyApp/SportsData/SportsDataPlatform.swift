@@ -1706,6 +1706,9 @@ struct SportsRepository: Sendable {
             || detail.contains("bot ")
             || detail.contains("bottom")
             || detail.contains("round")
+            || detail.contains("set")
+            || detail.contains("deuce")
+            || detail.contains("game")
     }
 
     private func liveAggregationKey(for match: Match) -> String {

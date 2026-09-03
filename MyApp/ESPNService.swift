@@ -440,6 +440,7 @@ private struct EventDTO: Decodable {
     func toMatch(league: League) -> Match? {
         if league.group == .racing { return toRaceMatch(league: league) }
         if league.group == .golf { return toGolfMatch(league: league) }
+        if league.group == .tennis { return toTennisMatch(league: league) }
         guard let competition = competitions?.first,
               let competitors = competition.competitors, competitors.count >= 2 else { return nil }
 
@@ -462,6 +463,34 @@ private struct EventDTO: Decodable {
             away: awayDTO.toTeamSide(),
             broadcasts: competition.broadcastNames,
             venue: competition.venue?.fullName
+        )
+    }
+
+    /// Tennis events carry athletes as competitors rather than teams; parse names
+    /// from the athlete field so we don't end up with "TBD vs TBD".
+    private func toTennisMatch(league: League) -> Match? {
+        let competition = competitions?.first
+        let players = (competition?.competitors ?? [])
+            .sorted { ($0.order ?? Int.max) < ($1.order ?? Int.max) }
+        guard players.count >= 2 else { return nil }
+
+        let status = competition?.status ?? status
+        let state = Self.gameState(from: status?.type?.state)
+        let date = Self.parseDate(date)
+        let placeholder = TeamSide(displayName: "TBD", shortName: "TBD", abbreviation: "",
+                                   logoURL: nil, score: nil, record: nil, isWinner: false)
+        return Match(
+            id: id,
+            league: league,
+            date: date,
+            name: name ?? "Tennis Match",
+            shortName: shortName ?? "",
+            state: state,
+            statusDetail: Self.statusDetail(status: status, state: state, date: date),
+            home: players.dropFirst().first?.toTennisSide() ?? placeholder,
+            away: players.first?.toTennisSide() ?? placeholder,
+            broadcasts: competition?.broadcastNames ?? [],
+            venue: competition?.venue?.fullName
         )
     }
 
@@ -661,6 +690,21 @@ private struct CompetitorDTO: Decodable {
             logoURL: athlete?.flag?.href.flatMap(URL.init(string:)),
             score: score,
             record: order.map { "#\($0)" },
+            isWinner: winner ?? false,
+            teamID: nil
+        )
+    }
+
+    /// Tennis competitors are athletes; score carries the current set/game tally.
+    func toTennisSide() -> TeamSide {
+        let name = athlete?.displayName ?? athlete?.fullName ?? team?.displayName ?? "TBD"
+        return TeamSide(
+            displayName: name,
+            shortName: athlete?.shortName ?? name,
+            abbreviation: "",
+            logoURL: nil,
+            score: score,
+            record: nil,
             isWinner: winner ?? false,
             teamID: nil
         )

@@ -782,6 +782,7 @@ private struct GameCentreTeamRosterPreview: View {
                             PlayerDetailView(league: league, athlete: athlete)
                         } label: {
                             RosterPreviewRow(athlete: athlete)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         if index < displayedAthletes.count - 1 { Divider().overlay(Theme.hairline) }

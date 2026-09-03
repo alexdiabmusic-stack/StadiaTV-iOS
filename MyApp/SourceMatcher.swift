@@ -237,42 +237,152 @@ nonisolated enum SourceMatcher {
             // "fox"/"fs1"/"fs2" are covered by the broadcasts[] array from ESPN data.
             return [
                 "mls season pass", "season pass", "mls 360", "mls wrap up",
-                "tudn", "univision", "tsn", "rds", "one soccer"
+                "tudn", "univision", "tsn", "rds", "one soccer", "onesoccer"
             ]
         case "soccer/eng.1":
+            // UK: Sky Sports, TNT Sports. Canada: Fubo. USA: NBC Sports/Peacock.
             return [
                 "sky sports", "sky sports premier league", "tnt sports", "tntsports",
                 "bt sport", "peacock", "nbc sports", "nbcsn", "optus sport",
-                "hub premier", "premier sports"
+                "hub premier", "premier sports", "fubo"
             ]
+        case "soccer/eng.2", "soccer/eng.3", "soccer/eng.4":
+            // EFL Championship / League One / Two: Sky Sports, TNT Sports in UK; beIN internationally
+            return [
+                "sky sports", "tnt sports", "tntsports", "bein sport", "espn"
+            ]
+        case "soccer/eng.fa_cup":
+            return ["bbc", "itv", "tnt sports", "tntsports", "bt sport", "espn"]
         case "soccer/uefa.champions", "soccer/uefa.europa":
             return [
                 "cbs sports", "cbs", "paramount", "tnt sports", "tntsports",
                 "dazn", "canal plus", "sky sport", "bein sport"
             ]
         case "soccer/esp.1":
+            // Spain: DAZN. USA: ESPN. Canada: TSN/RDS. International: beIN Sports.
             return [
                 "dazn", "espn", "abc", "sky sports", "bein sport",
-                "movistar", "m sport", "laliga tv", "la liga tv"
+                "movistar", "m sport", "laliga tv", "la liga tv",
+                "tsn", "rds"
             ]
         case "soccer/ita.1":
+            // Italy: DAZN, Sky. USA: CBS/Paramount+. Canada: Fubo.
             return [
                 "dazn", "sky sport serie a", "sky sport", "espn",
-                "peacock", "bein sport", "paramount"
+                "peacock", "bein sport", "paramount", "cbs sports", "fubo"
             ]
         case "soccer/ger.1":
+            // Germany: Sky, DAZN, RTL. Canada: OneSoccer/DAZN. USA: USA Sports/Telemundo.
             return [
-                "sky sport bundesliga", "sky sport", "dazn", "espn", "bein sport", "sport1"
+                "sky sport bundesliga", "sky sport", "dazn", "espn", "bein sport", "sport1",
+                "rtl", "onesoccer", "one soccer", "telemundo"
             ]
         case "soccer/fra.1":
-            return ["canal plus", "dazn", "bein sport", "amazon prime", "prime video"]
+            // France: Ligue 1+, Canal+, DAZN, beIN Sports.
+            return [
+                "canal plus", "dazn", "bein sport", "amazon prime", "prime video",
+                "ligue 1", "ligue1"
+            ]
         case "soccer/ned.1":
+            // Netherlands: ESPN. International: Viaplay, beIN Sports.
             return [
                 "viaplay", "ziggo sport", "espn", "espn nl", "espn netherlands",
-                "espn eredivisie", "dazn"
+                "espn eredivisie", "dazn", "bein sport"
             ]
         case "soccer/por.1":
-            return ["sport tv", "benfica tv", "eleven sports", "dazn"]
+            // Portugal: SPORT TV, BTV (Benfica home), Eleven Sports.
+            return ["sport tv", "benfica tv", "eleven sports", "dazn", "btv"]
+        case "soccer/sco.1":
+            // Scottish Premiership: Sky Sports UK, Premier Sports.
+            return ["sky sports", "premier sports", "bein sport", "espn"]
+        case "soccer/bel.1":
+            // Belgian Pro League: DAZN (domestic), beIN Sports (international).
+            return ["dazn", "bein sport", "eleven sports", "proximus sports"]
+        case "soccer/tur.1":
+            // Turkish Süper Lig: beIN Sports worldwide.
+            return ["bein sport", "bein sports", "beinsports", "s sport", "ssport"]
+        case "soccer/gre.1":
+            // Greek Super League: COSMOTE Sport, Novasports.
+            return ["cosmote sport", "cosmote", "novasports", "nova sport", "ert sports"]
+        case "soccer/aut.1":
+            // Austrian Bundesliga: Sky Austria.
+            return ["sky sport austria", "sky sport", "puls 4", "puls4"]
+        case "soccer/sui.1":
+            // Swiss Super League: RSI, SRF, RTS, Blue Sport.
+            return ["blue sport", "bluesport", "rsi", "srf", "rts", "mysports"]
+        case "soccer/den.1":
+            // Danish Superliga: TV2 Denmark.
+            return ["tv2 sport", "tv 2 sport", "discovery plus", "discovery+", "viaplay"]
+        case "soccer/swe.1":
+            // Allsvenskan: TV4, Telia.
+            return ["tv4 sport", "tv4", "telia", "viaplay", "c more"]
+        case "soccer/pol.1":
+            // Ekstraklasa: Canal+ Poland.
+            return ["canal plus", "polsat sport", "tvp sport"]
+        case "soccer/nor.1":
+            // Eliteserien: TV2 Norway.
+            return ["tv2 sport", "tv 2 sport", "viaplay", "max sport"]
+        case "soccer/rom.1":
+            // Romanian SuperLiga: Digi Sport, Prima Sport, Orange Sport.
+            return ["digi sport", "prima sport", "orange sport", "primasport"]
+        case "soccer/sau.1":
+            // Saudi Pro League: Thmanyah, SSC, beIN Sports.
+            return ["ssc", "thmanyah", "bein sport", "bein sports", "beinsports"]
+        case "soccer/qat.1":
+            // Qatar Stars League: Al Kass.
+            return ["al kass", "alkass", "bein sport", "qatar tv"]
+        case "soccer/jpn.1":
+            // J1 League: DAZN Japan.
+            return ["dazn", "nhk", "fuji tv", "j sports"]
+        case "soccer/kor.1", "soccer/kor.2":
+            // K League: Coupang Play.
+            return ["coupang", "coupang play", "spotv", "jtbc"]
+        case "soccer/aus.1", "soccer/aus.nwsl":
+            // A-League: Paramount+ (Australia).
+            return ["paramount plus", "paramount+", "10 play", "ten play", "paramount"]
+        case "soccer/rsa.1":
+            // South African Premiership: SuperSport, Canal+.
+            return ["supersport", "super sport", "canal plus", "dstv"]
+        case "soccer/can.1":
+            // Canadian Premier League: OneSoccer.
+            return ["onesoccer", "one soccer", "cbcsports", "cbc sports"]
+        case "soccer/mex.1":
+            // Liga MX: Televisa channels, TV Azteca, Fox Sports Mexico, Prime Video (Chivas).
+            return [
+                "canal 5", "tudn", "las estrellas", "azteca", "azteca 7",
+                "fox sports", "fox deportes", "prime video", "amazon prime",
+                "tdn", "claro sports", "claro video"
+            ]
+        case "soccer/bra.1", "soccer/bra.2":
+            // Brazilian Série A/B: Globo, Premiere, Amazon Prime Video, SporTV, Record, CazéTV.
+            return [
+                "premiere", "globo", "sportv", "spor tv", "amazon prime", "prime video",
+                "record", "cazé tv", "caze tv", "cazetv", "ge tv", "getv"
+            ]
+        case "soccer/arg.1":
+            // Argentine LPF: TNT Sports Argentina, ESPN.
+            return ["tnt sports", "tntsports", "espn", "directv sports", "dsports"]
+        case "soccer/col.1":
+            // Colombian Liga BetPlay: Win Sports.
+            return ["win sports", "winsports", "espn", "rcn", "caracol"]
+        case "soccer/chi.1":
+            // Chilean Liga de Primera: TNT Sports Chile.
+            return ["tnt sports", "tntsports", "canal 13", "chilevisión", "chilevision"]
+        case "soccer/per.1":
+            // Peruvian Liga 1: L1 MAX.
+            return ["l1 max", "l1max", "liga 1 max", "america tv", "gol peru"]
+        case "soccer/ecu.1":
+            // Ecuadorian LigaPro: Zapping.
+            return ["zapping", "gol tv", "tc sports", "tcs"]
+        case "soccer/mor.1":
+            // Moroccan Botola Pro: Arryadia, 2M.
+            return ["arryadia", "2m", "snrt", "bein sport"]
+        case "soccer/concacaf.champions":
+            // Concacaf Champions Cup: OneSoccer (Canada), Fox Sports (USA), Televisa (Mexico).
+            return [
+                "onesoccer", "one soccer", "fox sports", "fox deportes", "tudn",
+                "televisa", "cbs sports", "paramount"
+            ]
         case "soccer/fifa.world", "soccer/fifa.wwc":
             return [
                 "fox", "fs1", "telemundo", "peacock", "tnt sports", "bbc", "itv", "bein sport",
@@ -442,10 +552,21 @@ nonisolated enum SourceMatcher {
         "viaplay", "ziggo sport", "sport1", "sport tv", "eleven sports",
         "arena sport", "sportklub", "sport klub", "cosmote sport",
         "setanta", "nova sport",
+        // South American
+        "premiere", "sportv", "globo", "win sports", "dsports", "directv sports",
+        "l1 max", "l1max", "zapping",
+        // Asian / Oceanic
+        "coupang play", "j sports", "paramount plus",
+        // African / Middle East
+        "al kass", "alkass", "arryadia", "thmanyah", "ssc",
+        // European regional
+        "premier sports", "digi sport", "prima sport", "orange sport",
+        "proximus sports", "blue sport", "bluesport", "polsat sport", "tvp sport",
         // Fighting / niche
         "fightbox", "fight network", "fight sports",
         // Streaming dedicated
-        "flo", "flo sports", "f1tv", "motogp", "nfl game", "nhl game"
+        "flo", "flo sports", "f1tv", "motogp", "nfl game", "nhl game",
+        "onesoccer", "one soccer", "fubo"
     ]
 
     private static func isKnownSportsNetwork(_ haystack: String) -> Bool {

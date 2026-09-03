@@ -37,6 +37,7 @@ enum ScheduleDay: String, CaseIterable, Identifiable {
 // MARK: - Home View
 
 struct HomeView: View {
+    var switchToFollowing: (() -> Void)? = nil
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var fantasyStore: FantasyStore
@@ -223,30 +224,36 @@ struct HomeView: View {
     }
 
     private var noTeamsPlayingCard: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "calendar")
-                .font(.callout)
-                .foregroundStyle(Theme.textSecondary)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("No followed teams play today")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                if let next = viewModel.favoriteTeamUpcoming.first {
-                    Text("Next: \(next.shortName) · \(next.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(1)
+        Button {
+            switchToFollowing?()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "calendar")
+                    .font(.callout)
+                    .foregroundStyle(Theme.textSecondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("No followed teams play today")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    if let next = viewModel.favoriteTeamUpcoming.first {
+                        Text("Next: \(next.shortName) · \(next.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))")
+                            .font(.caption2)
+                            .foregroundStyle(Theme.textSecondary)
+                            .lineLimit(1)
+                    }
                 }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary.opacity(0.5))
             }
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right")
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(Theme.textSecondary.opacity(0.5))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
+        .buttonStyle(.plain)
     }
 
     // MARK: - Fantasy Context
@@ -1648,8 +1655,19 @@ final class HomeViewModel: ObservableObject {
         }
         func score(_ match: Match) -> Int { scores[match.id] ?? 0 }
 
+        // Compute featured IDs up front so liveNow can include matches whose
+        // countdown hit zero but whose ESPN state hasn't flipped to .live yet.
+        var syncedFeaturedMatches = Dictionary(uniqueKeysWithValues: featuredPicks.map { ($0.id, $0.streamMatch) })
+        for match in allMatches.sorted(by: { score($0) > score($1) }) {
+            for pick in featuredCalendar.matchingPicks(for: match) {
+                syncedFeaturedMatches[pick.id] = match
+            }
+        }
+        featuredMatchesByPickID = syncedFeaturedMatches
+        let featuredIDs = Set(syncedFeaturedMatches.values.map { $0.id })
+
         liveNow = allMatches
-            .filter { $0.state == .live }
+            .filter { $0.state == .live || (featuredIDs.contains($0.id) && $0.date <= now && $0.state == .pre) }
             .sorted { score($0) > score($1) }
         favoriteTeamLiveMatches = liveNow
             .filter { involvesFavorite($0, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames) }
@@ -1664,15 +1682,6 @@ final class HomeViewModel: ObservableObject {
             .sorted { $0.date < $1.date }
             .prefix(3)
             .map { $0 }
-        // Compute featured IDs first so we can suppress duplicates below
-        var syncedFeaturedMatches = Dictionary(uniqueKeysWithValues: featuredPicks.map { ($0.id, $0.streamMatch) })
-        for match in allMatches.sorted(by: { score($0) > score($1) }) {
-            for pick in featuredCalendar.matchingPicks(for: match) {
-                syncedFeaturedMatches[pick.id] = match
-            }
-        }
-        featuredMatchesByPickID = syncedFeaturedMatches
-        let featuredIDs = Set(syncedFeaturedMatches.values.map { $0.id })
         let soonWindow = now.addingTimeInterval(6 * 60 * 60)
         startingSoon = allMatches
             .filter { $0.state == .pre && $0.date > now && $0.date <= soonWindow && !featuredIDs.contains($0.id) }

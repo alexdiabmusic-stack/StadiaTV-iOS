@@ -62,6 +62,10 @@ struct MyApp: App {
     }
 }
 
+enum AppTab: String, Hashable {
+    case home, following, live, discover, settings
+}
+
 struct RootView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var podcastStore: PodcastStore
@@ -72,6 +76,7 @@ struct RootView: View {
     @StateObject private var epgRepository = EPGRepository()
     @StateObject private var guideStore = GuideChannelStore()
     @State private var showingFavoriteNotificationPrompt = false
+    @State private var selectedTab: AppTab = .home
 
     // Applying safeAreaInset to each Tab's content (not the TabView) is the correct
     // way to place content between the tab content and the tab bar chrome.
@@ -83,24 +88,24 @@ struct RootView: View {
     }
 
     var body: some View {
-        TabView {
-            Tab("Home", systemImage: "house.fill") {
-                HomeView()
+        TabView(selection: $selectedTab) {
+            Tab("Home", systemImage: "house.fill", value: AppTab.home) {
+                HomeView(switchToFollowing: { selectedTab = .following })
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }
-            Tab("Following", systemImage: "star.circle.fill") {
+            Tab("Following", systemImage: "star.circle.fill", value: AppTab.following) {
                 MatchesView()
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }
-            Tab("Live", systemImage: "dot.radiowaves.left.and.right") {
+            Tab("Live", systemImage: "dot.radiowaves.left.and.right", value: AppTab.live) {
                 LiveView()
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }
-            Tab("Discover", systemImage: "safari.fill") {
+            Tab("Discover", systemImage: "safari.fill", value: AppTab.discover) {
                 DiscoverView()
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }
-            Tab("Settings", systemImage: "gearshape.fill") {
+            Tab("Settings", systemImage: "gearshape.fill", value: AppTab.settings) {
                 MoreView()
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }

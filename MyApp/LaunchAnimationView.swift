@@ -21,9 +21,12 @@ import UIKit
 ///  0.20 s  TV starts animating white → Stadia blue (easeInOut 0.45 s).
 ///  0.65 s  Fully branded wordmark at rest. Startup pipeline is running.
 ///  1.10 s  Minimum brand duration met.
-///  ~1.25 s Logo flies from centre → nav-bar header (0.58 s, custom ease).
-///           Background fades to transparent simultaneously (0.35 s ease-in).
-///  ~1.9 s  Overlay removed; toolbar BrandMark takes over seamlessly.
+///  ~1.25 s Logo flies from centre → nav-bar header (0.65 s, custom ease).
+///           Background fades to transparent (0.5 s easeInOut, 0.1 s delay).
+///           Home sections begin rising upward while logo is still moving.
+///           Tab-bar cover fades last (0.35 s, 0.4 s delay) so the bar
+///           never appears against a blank content area.
+///  ~1.9 s  Overlay removed; toolbar BrandMark takes over in same frame.
 struct LaunchAnimationView: View {
     @EnvironmentObject private var coordinator: StartupCoordinator
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -36,6 +39,13 @@ struct LaunchAnimationView: View {
             ZStack {
                 splashBackground
                     .ignoresSafeArea()
+
+                // Separate cover for the tab-bar area so it lingers longer than
+                // the main background, preventing the tab bar from appearing against
+                // a still-blank content area. Skipped when Reduce Motion is on.
+                if !reduceMotion {
+                    tabBarCover
+                }
 
                 animatedBrandMark(in: geo)
             }
@@ -50,18 +60,42 @@ struct LaunchAnimationView: View {
     private var splashBackground: some View {
         // Use the exact same colour as Theme.background (dark: #080A0F) so
         // the transition from the native launch screen is a single seamless frame.
+        // Delayed 0.1 s so content sections have already begun rising before the
+        // background lifts, creating the "emerging from dark" feel.
         Color(hex: 0x080A0F)
             .opacity(backgroundOpacity)
             .animation(
                 reduceMotion
                     ? .easeOut(duration: 0.25)
-                    : .easeIn(duration: 0.35),
+                    : .easeInOut(duration: 0.5).delay(0.1),
                 value: coordinator.isTransitioningToHome
             )
     }
 
     private var backgroundOpacity: Double {
         coordinator.isTransitioningToHome ? 0.0 : 1.0
+    }
+
+    // MARK: - Tab-bar cover
+
+    /// Pinned strip that covers the tab-bar + home-indicator region. Fades later
+    /// than the main background so the tab bar only appears once content is visible.
+    private var tabBarCover: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            Color(hex: 0x080A0F)
+                .frame(height: tabBarCoverHeight())
+                .opacity(coordinator.isTransitioningToHome ? 0 : 1)
+                .animation(.easeOut(duration: 0.35).delay(0.4), value: coordinator.isTransitioningToHome)
+        }
+        .ignoresSafeArea(edges: .bottom)
+    }
+
+    private func tabBarCoverHeight() -> CGFloat {
+        let bottomInset = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.keyWindow?.safeAreaInsets.bottom ?? 34
+        return 49 + bottomInset
     }
 
     // MARK: - Brand Mark
@@ -74,7 +108,7 @@ struct LaunchAnimationView: View {
             .animation(
                 // No position/scale animation when Reduce Motion is enabled —
                 // the colour change still plays; the overlay simply fades out.
-                reduceMotion ? nil : .timingCurve(0.4, 0.0, 0.2, 1.0, duration: 0.58),
+                reduceMotion ? nil : .timingCurve(0.4, 0.0, 0.2, 1.0, duration: 0.65),
                 value: coordinator.isTransitioningToHome
             )
     }

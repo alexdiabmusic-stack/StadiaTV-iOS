@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - LaunchAnimationView
 
@@ -93,14 +94,17 @@ struct LaunchAnimationView: View {
         coordinator.isTransitioningToHome ? 1.0 : Self.splashScale
     }
 
-    /// Pixel-accurate vertical offset that places the BrandMark at the same
-    /// Y as the navigation-bar principal item once the transition fires.
+    /// Vertical offset that places the BrandMark at the nav-bar principal-item Y.
     ///
-    /// The ZStack centres the BrandMark at `geo.size.height / 2`.
-    /// Navigation-bar centre sits at `safeAreaTop + 22` pt from the screen top.
+    /// The ZStack centres the BrandMark at `geo.size.height / 2` (full-screen
+    /// centre). `geo.safeAreaInsets.top` reports 0 inside `.ignoresSafeArea()`,
+    /// so we read the actual status-bar height from the UIKit window instead.
     private func logoOffset(in geo: GeometryProxy) -> CGFloat {
         guard coordinator.isTransitioningToHome && !reduceMotion else { return 0 }
-        let navBarCentreY = geo.safeAreaInsets.top + 22
+        let statusBarHeight = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.keyWindow?.safeAreaInsets.top ?? geo.safeAreaInsets.top
+        let navBarCentreY = statusBarHeight + 22
         let currentCentreY = geo.size.height / 2
         return navBarCentreY - currentCentreY
     }

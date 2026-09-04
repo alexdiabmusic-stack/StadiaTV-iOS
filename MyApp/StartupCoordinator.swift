@@ -147,8 +147,10 @@ final class StartupCoordinator: ObservableObject {
         isTransitioningToHome = true
 
         Task { @MainActor in
-            // Wait for the animation to fully complete before removing the overlay.
-            try? await Task.sleep(for: .milliseconds(650))
+            // Wait for the logo animation to fully complete before removing the overlay.
+            // 750 ms matches the 0.65 s logo travel + ~100 ms buffer for the
+            // tab-bar cover strip, which fades out over 0.35 s starting at T+400 ms.
+            try? await Task.sleep(for: .milliseconds(750))
             self.phase = .home
             #if DEBUG
             self.mark("home phase active — overlay removed")

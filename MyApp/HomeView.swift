@@ -83,23 +83,22 @@ struct HomeView: View {
                 morningDigestEnabled: prefs.morningDigestEnabled
             )
             viewModel.startAutoRefresh()
-            // Safety-net: markAppShellReady is also called when isLoading flips to
-            // false (Phase 1 done), but this catches any edge case where that
-            // onChange doesn't fire (e.g. load completes before the view appears).
+            // Safety-net: markAppShellReady is called here after all phases, and also
+        // earlier via onChange(of: viewModel.isLoading) when Phase 1 finishes.
             launchCoordinator.markAppShellReady()
         }
         // Fire markAppShellReady as soon as Phase 1 (live snapshot) completes so
         // the coordinator can begin the transition without waiting for Phase 2/3.
+        // markAppShellReady() is idempotent — safe to call multiple times.
         .onChange(of: viewModel.isLoading) { _, isLoading in
             if !isLoading { launchCoordinator.markAppShellReady() }
         }
-        // Begin staggered section reveal the moment the logo starts moving — content
-        // rises upward while the logo is still in flight.
+        // PRIMARY reveal trigger: begin the staggered section rise the moment the
+        // logo starts moving. Content builds upward while the logo is in flight.
         .onChange(of: launchCoordinator.isTransitioningToHome) { _, transitioning in
-            guard transitioning else { return }
+            guard transitioning && !homeRevealed else { return }
             homeRevealed = true
             if reduceMotion {
-                // Reduce Motion: no offsets, shorter simultaneous fade.
                 withAnimation(.easeOut(duration: 0.25)) {
                     showGreeting = true; showHero = true; showSportsDay = true
                     showLiveNow = true; showSchedule = true; showRemaining = true
@@ -121,9 +120,21 @@ struct HomeView: View {
                 }
             }
         }
+        // FALLBACK reveal: covers the edge case where isTransitioningToHome onChange
+        // was missed (e.g., HomeView mounted after the transition already began).
+        .onChange(of: launchCoordinator.phase) { _, phase in
+            if phase == .home && !homeRevealed {
+                homeRevealed = true
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showGreeting = true; showHero = true; showSportsDay = true
+                    showLiveNow = true; showSchedule = true; showRemaining = true
+                }
+            }
+        }
         .onAppear {
-            // Returning to Home after launch completed, or HomeView mounted mid-transition.
-            if launchCoordinator.phase == .home || launchCoordinator.isTransitioningToHome {
+            // Re-appearance after launch: reveal immediately without animation.
+            // During launch itself the isTransitioningToHome onChange handles reveals.
+            if launchCoordinator.phase == .home && !homeRevealed {
                 homeRevealed = true
                 showGreeting = true; showHero = true; showSportsDay = true
                 showLiveNow = true; showSchedule = true; showRemaining = true
@@ -210,52 +221,52 @@ struct HomeView: View {
 
                 greetingSection
                     .opacity(showGreeting ? 1 : 0)
-                    .offset(y: (showGreeting || reduceMotion) ? 0 : 20)
+                    .offset(y: (showGreeting || reduceMotion) ? 0 : 18)
                     .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.45), value: showGreeting)
 
                 heroSection
                     .opacity(showHero ? 1 : 0)
-                    .offset(y: (showHero || reduceMotion) ? 0 : 24)
+                    .offset(y: (showHero || reduceMotion) ? 0 : 26)
                     .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.5), value: showHero)
 
                 sportsDaySummaryCard
                     .opacity(showSportsDay ? 1 : 0)
-                    .offset(y: (showSportsDay || reduceMotion) ? 0 : 26)
+                    .offset(y: (showSportsDay || reduceMotion) ? 0 : 30)
                     .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.5), value: showSportsDay)
 
                 fantasyContextCard
                     .opacity(showSportsDay ? 1 : 0)
-                    .offset(y: (showSportsDay || reduceMotion) ? 0 : 26)
+                    .offset(y: (showSportsDay || reduceMotion) ? 0 : 30)
                     .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.5), value: showSportsDay)
 
                 liveNowSection
                     .opacity(showLiveNow ? 1 : 0)
-                    .offset(y: (showLiveNow || reduceMotion) ? 0 : 28)
+                    .offset(y: (showLiveNow || reduceMotion) ? 0 : 34)
                     .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.5), value: showLiveNow)
 
                 if !viewModel.liveNow.isEmpty && !viewModel.startingSoon.isEmpty {
                     StartingSoonTimeline(matches: viewModel.startingSoon)
                         .opacity(showLiveNow ? 1 : 0)
-                        .offset(y: (showLiveNow || reduceMotion) ? 0 : 28)
+                        .offset(y: (showLiveNow || reduceMotion) ? 0 : 34)
                         .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.5), value: showLiveNow)
                 }
 
                 scheduleSection
                     .opacity(showSchedule ? 1 : 0)
-                    .offset(y: (showSchedule || reduceMotion) ? 0 : 30)
+                    .offset(y: (showSchedule || reduceMotion) ? 0 : 38)
                     .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.5), value: showSchedule)
 
                 if !viewModel.recentHighlights.isEmpty {
                     TrendingSection(highlights: viewModel.recentHighlights)
                         .opacity(showRemaining ? 1 : 0)
-                        .offset(y: (showRemaining || reduceMotion) ? 0 : 32)
+                        .offset(y: (showRemaining || reduceMotion) ? 0 : 40)
                         .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.45), value: showRemaining)
                 }
 
                 if !watchStore.history.isEmpty {
                     ContinueWatchingSection(entries: watchStore.history) { playingChannel = $0 }
                         .opacity(showRemaining ? 1 : 0)
-                        .offset(y: (showRemaining || reduceMotion) ? 0 : 32)
+                        .offset(y: (showRemaining || reduceMotion) ? 0 : 40)
                         .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.45), value: showRemaining)
                 }
             }

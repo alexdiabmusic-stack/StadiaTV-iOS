@@ -124,7 +124,7 @@ struct MatchDetailView: View {
                     }
                 }
                 .padding(16)
-                .padding(.bottom, isPickingMultiscreen ? 92 : 0)
+                .padding(.bottom, isPickingMultiscreen ? 92 : 24)
             }
 
             if isPickingMultiscreen {
@@ -655,12 +655,22 @@ struct MatchDetailView: View {
     @ViewBuilder private var playByPlaySection: some View {
         if let summary = gameSummary, match.state != .pre, !summary.plays.isEmpty {
             if entitlements.isPremium {
-                PlayByPlaySectionView(plays: summary.plays, match: match)
+                if match.league.group == .baseball {
+                    MLBPlayByPlayView(plays: summary.plays, match: match)
+                } else {
+                    PlayByPlaySectionView(plays: summary.plays, match: match)
+                }
             } else {
                 ZStack {
-                    PlayByPlaySectionView(plays: Array(summary.plays.prefix(4)), match: match)
-                        .blur(radius: 7)
-                        .allowsHitTesting(false)
+                    Group {
+                        if match.league.group == .baseball {
+                            MLBPlayByPlayView(plays: Array(summary.plays.prefix(6)), match: match)
+                        } else {
+                            PlayByPlaySectionView(plays: Array(summary.plays.prefix(4)), match: match)
+                        }
+                    }
+                    .blur(radius: 7)
+                    .allowsHitTesting(false)
                     PremiumGateOverlay(
                         icon: "list.bullet.clipboard.fill",
                         title: "Play by Play",
@@ -2780,6 +2790,386 @@ private struct PlayRowView: View {
             return Color(hex: 0xE24A6B)
         }
         return Theme.textSecondary.opacity(0.5)
+    }
+}
+
+// MARK: - MLB Play by Play
+
+private struct MLBHalfInningGroup: Identifiable {
+    let id: String         // stable key e.g. "top-4", "bot-7"
+    let label: String      // "Top 4th", "Bot 7th"
+    let inningNumber: Int
+    let isTop: Bool
+    var plays: [PlayByPlayEntry]
+
+    var runsScored: Int {
+        guard plays.count > 1 else {
+            return plays.first.flatMap { $0.isScoringPlay ? 1 : nil } ?? 0
+        }
+        var count = 0
+        for i in 1..<plays.count {
+            let prev = plays[i - 1]
+            let cur  = plays[i]
+            if isTop {
+                let prevA = Int(prev.awayScore ?? "") ?? 0
+                let curA  = Int(cur.awayScore  ?? "") ?? 0
+                if curA > prevA { count += curA - prevA }
+            } else {
+                let prevH = Int(prev.homeScore ?? "") ?? 0
+                let curH  = Int(cur.homeScore  ?? "") ?? 0
+                if curH > prevH { count += curH - prevH }
+            }
+        }
+        return count
+    }
+
+    var hitsCount: Int {
+        plays.filter { play in
+            let badge = play.mlbBadge
+            return badge == "1B" || badge == "2B" || badge == "3B" || badge == "HR"
+        }.count
+    }
+}
+
+private extension PlayByPlayEntry {
+    // Splits "EventType: rest of description" — eventType is everything before first ": "
+    var mlbEventTypeName: String? {
+        guard let range = text.range(of: ": ") else { return nil }
+        return String(text[..<range.lowerBound])
+    }
+
+    var mlbDescriptionBody: String {
+        guard let range = text.range(of: ": ") else { return text }
+        return String(text[range.upperBound...])
+    }
+
+    var mlbBadge: String {
+        let et = mlbEventTypeName?.lowercased() ?? ""
+        let body = mlbDescriptionBody.lowercased()
+        if et.contains("home run")           { return "HR" }
+        if et.contains("triple")             { return "3B" }
+        if et.contains("double play")        { return "DP" }
+        if et.contains("double")             { return "2B" }
+        if et.contains("single")             { return "1B" }
+        if et.contains("strikeout")          { return "K"  }
+        if et.contains("walk") || et.contains("base on balls") { return "BB" }
+        if et.contains("hit by pitch")       { return "HBP" }
+        if et.contains("stolen base")        { return "SB"  }
+        if et.contains("caught stealing")    { return "CS"  }
+        if et.contains("error")              { return "E"   }
+        if et.contains("sac fly") || et.contains("sacrifice fly")   { return "SF" }
+        if et.contains("sac bunt") || et.contains("sacrifice bunt") { return "SH" }
+        if et.contains("wild pitch")         { return "WP"  }
+        if et.contains("passed ball")        { return "PB"  }
+        if et.contains("pickoff")            { return "PO"  }
+        if et.contains("balk")               { return "BLK" }
+        if et.contains("fielder") && (et.contains("choice") || body.contains("fielder's choice")) { return "FC" }
+        if et.contains("groundout") || et.contains("ground out") { return "OUT" }
+        if et.contains("flyout") || et.contains("fly out")       { return "OUT" }
+        if et.contains("lineout") || et.contains("line out")     { return "OUT" }
+        if et.contains("pop out") || et.contains("popup")        { return "OUT" }
+        return "•"
+    }
+
+    var mlbIsOut: Bool {
+        let b = mlbBadge
+        return b == "K" || b == "OUT" || b == "DP" || b == "SF" || b == "SH" || b == "CS"
+    }
+
+    // Tier: 3 = highlight (HR/3B), 2 = hit/BB, 1 = out/other
+    var mlbTier: Int {
+        let b = mlbBadge
+        if b == "HR" || b == "3B" || isScoringPlay { return 3 }
+        if b == "1B" || b == "2B" || b == "BB" || b == "HBP" || b == "SB" || b == "WP" || b == "PB" { return 2 }
+        return 1
+    }
+
+    // Extract batter/player name from description body
+    var mlbBatterName: String? {
+        let body = mlbDescriptionBody
+        // Verbs that immediately follow the player name
+        let verbs: [String] = [
+            "grounds ", "flies ", "lines ", "pops ", "strikes ",
+            "walks ", "is hit", "homers", "singles", "doubles", "triples",
+            "reaches ", "bats ", "pinch", "steals ", "caught ", "scores",
+            "advances", "out on", "hits "
+        ]
+        for verb in verbs {
+            if let r = body.range(of: verb, options: .caseInsensitive) {
+                let candidate = String(body[..<r.lowerBound]).trimmingCharacters(in: .whitespaces)
+                if candidate.count > 1, candidate.count < 45,
+                   candidate.first?.isUppercase == true,
+                   !candidate.contains(": ") {
+                    return candidate
+                }
+            }
+        }
+        return nil
+    }
+
+    // Shortened description removing the batter name prefix and expanding fielder abbrs
+    var mlbShortDescription: String {
+        var desc = mlbDescriptionBody
+        if let name = mlbBatterName, desc.hasPrefix(name) {
+            desc = String(desc.dropFirst(name.count)).trimmingCharacters(in: .whitespaces)
+            if desc.hasPrefix(",") { desc = String(desc.dropFirst()).trimmingCharacters(in: .whitespaces) }
+        }
+        // Shorten fielder position names
+        let replacements: [(String, String)] = [
+            ("center fielder", "CF"), ("right fielder", "RF"), ("left fielder", "LF"),
+            ("first baseman", "1B"), ("second baseman", "2B"), ("third baseman", "3B"),
+            ("shortstop", "SS"), ("pitcher", "P"), ("catcher", "C")
+        ]
+        for (long, short) in replacements {
+            desc = desc.replacingOccurrences(of: long, with: short, options: .caseInsensitive)
+        }
+        // Strip trailing "." if too long
+        if desc.hasSuffix(".") && desc.count > 60 {
+            desc = String(desc.dropLast())
+        }
+        return desc.trimmingCharacters(in: .whitespaces)
+    }
+
+    var mlbIsTopInning: Bool {
+        period?.lowercased().hasPrefix("top") == true
+    }
+}
+
+private func groupMLBPlays(_ plays: [PlayByPlayEntry]) -> [MLBHalfInningGroup] {
+    var groups: [MLBHalfInningGroup] = []
+    var indexMap: [String: Int] = [:]
+    for play in plays {
+        let rawLabel = play.period ?? "Game"
+        // Normalize "Bot" vs "Bottom"
+        let label = rawLabel.hasPrefix("Bottom") ? "Bot" + rawLabel.dropFirst(6) : rawLabel
+        let isTop = label.lowercased().hasPrefix("top")
+        let num   = play.periodNumber ?? 0
+        let key   = "\(isTop ? "top" : "bot")-\(num)"
+        if let idx = indexMap[key] {
+            groups[idx].plays.append(play)
+        } else {
+            indexMap[key] = groups.count
+            groups.append(MLBHalfInningGroup(
+                id: key, label: label, inningNumber: num, isTop: isTop, plays: [play]
+            ))
+        }
+    }
+    return groups
+}
+
+private struct MLBPlayByPlayView: View {
+    let plays: [PlayByPlayEntry]
+    let match: Match
+
+    private var groups: [MLBHalfInningGroup] { groupMLBPlays(plays) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // Section header
+            HStack(spacing: 8) {
+                Image(systemName: "list.bullet.clipboard")
+                Text("Play by Play")
+                Spacer()
+                if match.state == .live {
+                    Text("LIVE")
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(Theme.live)
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(Theme.live.opacity(0.12), in: Capsule())
+                }
+            }
+            .font(.headline.weight(.bold))
+            .foregroundStyle(Theme.accent)
+
+            // Half-inning sections, newest first
+            let reversed = groups.reversed() as [MLBHalfInningGroup]
+            ForEach(Array(reversed.enumerated()), id: \.element.id) { idx, group in
+                let isActive    = idx == 0 && match.state == .live
+                let isRecent    = idx == 1 && match.state == .live
+                MLBHalfInningSection(group: group, isActive: isActive, isRecentlyCompleted: isRecent, match: match)
+            }
+        }
+    }
+}
+
+private struct MLBHalfInningSection: View {
+    let group: MLBHalfInningGroup
+    let isActive: Bool
+    let isRecentlyCompleted: Bool
+    let match: Match
+
+    @State private var isExpanded: Bool
+
+    init(group: MLBHalfInningGroup, isActive: Bool, isRecentlyCompleted: Bool, match: Match) {
+        self.group = group
+        self.isActive = isActive
+        self.isRecentlyCompleted = isRecentlyCompleted
+        self.match = match
+        self._isExpanded = State(initialValue: isActive || isRecentlyCompleted)
+    }
+
+    private var battingTeam: TeamSide { group.isTop ? match.away : match.home }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Section header row
+            Button {
+                withAnimation(.snappy(duration: 0.22)) { isExpanded.toggle() }
+                #if os(iOS)
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                #endif
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(isActive ? Theme.accent : Theme.textSecondary)
+                        .frame(width: 14)
+
+                    Text(group.label.uppercased())
+                        .font(.caption.weight(.heavy))
+                        .foregroundStyle(isActive ? Theme.accent : Theme.textSecondary)
+
+                    if isActive {
+                        Text("NOW BATTING")
+                            .font(.caption2.weight(.heavy))
+                            .foregroundStyle(Theme.live)
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .background(Theme.live.opacity(0.12), in: Capsule())
+                    }
+
+                    Spacer()
+
+                    if !isExpanded {
+                        HStack(spacing: 6) {
+                            if group.runsScored > 0 {
+                                Text("\(group.runsScored) R")
+                                    .font(.caption2.weight(.heavy))
+                                    .foregroundStyle(Theme.accent)
+                            }
+                            if group.hitsCount > 0 {
+                                Text("·  \(group.hitsCount) H")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                            if group.runsScored == 0 && group.hitsCount == 0 {
+                                Text(battingTeam.abbreviation)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                        }
+                    } else {
+                        Text("\(battingTeam.abbreviation) batting")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            }
+            .buttonStyle(.plain)
+            .background(isActive ? Theme.accent.opacity(0.06) : Theme.surface)
+
+            // Plays
+            if isExpanded {
+                let sorted = group.plays.sorted { ($0.periodNumber ?? 0) == ($1.periodNumber ?? 0)
+                    ? (Int($0.id) ?? 0) > (Int($1.id) ?? 0)
+                    : ($0.periodNumber ?? 0) > ($1.periodNumber ?? 0)
+                }
+                VStack(spacing: 0) {
+                    ForEach(Array(sorted.enumerated()), id: \.element.id) { idx, play in
+                        MLBPlayRow(play: play, match: match)
+                        if idx < sorted.count - 1 {
+                            Divider().overlay(Theme.hairline).padding(.leading, 52)
+                        }
+                    }
+                }
+                .background(Theme.surface)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(
+            isActive ? Theme.accent.opacity(0.3) : Theme.hairline
+        ))
+    }
+}
+
+private struct MLBPlayRow: View {
+    let play: PlayByPlayEntry
+    let match: Match
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            // Event badge
+            MLBEventBadge(badge: play.mlbBadge, tier: play.mlbTier)
+                .frame(width: 36, alignment: .center)
+
+            // Description block
+            VStack(alignment: .leading, spacing: 3) {
+                if let batter = play.mlbBatterName {
+                    Text(batter)
+                        .font(.subheadline.weight(play.mlbTier == 3 ? .bold : .semibold))
+                        .foregroundStyle(play.mlbTier == 3 ? Theme.textPrimary : Theme.textSecondary.opacity(0.9))
+                        .lineLimit(1)
+                }
+                Text(play.mlbShortDescription)
+                    .font(.caption)
+                    .foregroundStyle(play.mlbTier >= 2 ? Theme.textSecondary : Theme.textSecondary.opacity(0.6))
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if play.isScoringPlay, let away = play.awayScore, let home = play.homeScore {
+                    HStack(spacing: 4) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 7))
+                            .foregroundStyle(Theme.accent)
+                        Text("\(match.away.abbreviation) \(away)  –  \(home) \(match.home.abbreviation)")
+                            .font(.caption2.weight(.heavy).monospacedDigit())
+                            .foregroundStyle(Theme.accent)
+                    }
+                    .padding(.top, 1)
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(play.mlbTier == 3 ? Theme.accent.opacity(0.05) : Color.clear)
+    }
+}
+
+private struct MLBEventBadge: View {
+    let badge: String
+    let tier: Int
+
+    private var badgeColor: Color {
+        switch badge {
+        case "HR":        return Color(hex: 0xF5C842)
+        case "3B":        return Theme.accent
+        case "2B":        return Theme.accent.opacity(0.75)
+        case "1B":        return Theme.accent.opacity(0.55)
+        case "BB", "HBP": return Color(hex: 0x5B9CF5)
+        case "K":         return Theme.textSecondary.opacity(0.5)
+        case "E":         return Color(hex: 0xE24A6B)
+        case "DP":        return Theme.textSecondary.opacity(0.45)
+        case "SB":        return Color(hex: 0x52C28E)
+        case "CS":        return Color(hex: 0xE24A6B).opacity(0.7)
+        case "WP", "PB":  return Theme.textSecondary.opacity(0.4)
+        case "OUT":       return Theme.textSecondary.opacity(0.4)
+        default:          return Theme.textSecondary.opacity(0.3)
+        }
+    }
+
+    var body: some View {
+        Text(badge)
+            .font(.system(size: badge.count > 2 ? 8.5 : 10, weight: .heavy, design: .rounded))
+            .foregroundStyle(tier == 3 ? badgeColor : badgeColor.opacity(0.9))
+            .padding(.horizontal, badge.count > 2 ? 4 : 5)
+            .padding(.vertical, 3)
+            .background(badgeColor.opacity(tier == 3 ? 0.2 : 0.1),
+                        in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .strokeBorder(badgeColor.opacity(tier == 3 ? 0.4 : 0.2), lineWidth: 0.5))
     }
 }
 

@@ -43,6 +43,7 @@ struct HomeView: View {
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
     @StateObject private var viewModel = HomeViewModel()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var playingChannel: Channel?
     @State private var selectedLiveSport: SportGroup?
     @State private var selectedScheduleDay: ScheduleDay = .today
@@ -74,6 +75,18 @@ struct HomeView: View {
             viewModel.startAutoRefresh()
         }
         .onDisappear { viewModel.stopAutoRefresh() }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task {
+                await viewModel.load(
+                    leagues: prefs.followedLeagues,
+                    favorites: prefs.favoriteTeams,
+                    notificationsEnabled: prefs.matchNotificationsEnabled,
+                    notificationLeadTime: prefs.matchReminderLeadTime,
+                    morningDigestEnabled: prefs.morningDigestEnabled
+                )
+            }
+        }
         .alert("Notifications", isPresented: $showingNotificationAlert) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -1507,6 +1520,8 @@ final class HomeViewModel: ObservableObject {
     private var lastLoadedLeagueIDs: Set<String> = []
     private var lastLoadedAt: Date?
     private let cacheLifetime: TimeInterval = 120
+    // Shorter cache window while live games are in progress so state stays current
+    private let cacheLifetimeLive: TimeInterval = 25
 
     private var demandScoreCache: [String: Int] = [:]
 
@@ -1517,7 +1532,10 @@ final class HomeViewModel: ObservableObject {
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 60 * 1_000_000_000)
+                // Refresh more aggressively when live games are in progress.
+                let hasLive = await MainActor.run { self?.liveNow.isEmpty == false }
+                let nanoseconds: UInt64 = hasLive ? 30_000_000_000 : 60_000_000_000
+                try? await Task.sleep(nanoseconds: nanoseconds)
                 guard !Task.isCancelled, let self, let args = self.lastLoadArgs else { continue }
                 await self.load(leagues: args.leagues, favorites: args.favorites, notificationsEnabled: args.notificationsEnabled, notificationLeadTime: args.notificationLeadTime, morningDigestEnabled: args.morningDigestEnabled)
             }
@@ -1537,8 +1555,9 @@ final class HomeViewModel: ObservableObject {
         let discoveryLeagueIDs = Set(discoveryLeagues.map(\.id))
         featuredPicks = featuredCalendar.picks()
         let hasData = !(liveNow.isEmpty && upcoming.isEmpty && favoriteTeamUpcoming.isEmpty)
+        let effectiveCacheLifetime = liveNow.isEmpty ? cacheLifetime : cacheLifetimeLive
         if !force, hasData, discoveryLeagueIDs == lastLoadedLeagueIDs,
-           let lastLoadedAt, Date().timeIntervalSince(lastLoadedAt) < cacheLifetime {
+           let lastLoadedAt, Date().timeIntervalSince(lastLoadedAt) < effectiveCacheLifetime {
             return
         }
         guard !isLoading else { return }
@@ -1561,7 +1580,10 @@ final class HomeViewModel: ObservableObject {
             nextLimit: 8
         )
         let firstError = liveSnapshot.failures.first
-        for match in liveSnapshot.live + liveSnapshot.startingSoon + liveSnapshot.next {
+        // Include pastStartToday so games that started but still show as scheduled are
+        // present in allMatches — they can appear in Live Now via the featured-IDs special
+        // case and will be correctly matched to featured picks.
+        for match in liveSnapshot.live + liveSnapshot.startingSoon + liveSnapshot.next + liveSnapshot.pastStartToday {
             matchesByLeague[match.league.id, default: []].append(match)
         }
         if !matchesByLeague.isEmpty {
@@ -1658,9 +1680,15 @@ final class HomeViewModel: ObservableObject {
         // Compute featured IDs up front so liveNow can include matches whose
         // countdown hit zero but whose ESPN state hasn't flipped to .live yet.
         var syncedFeaturedMatches = Dictionary(uniqueKeysWithValues: featuredPicks.map { ($0.id, $0.streamMatch) })
+        // Iterate from highest-scoring to lowest. Track which picks have already been
+        // matched so a lower-quality (e.g. stale "scheduled") match cannot overwrite
+        // a live match that was processed first.
+        var matchedPickIDs = Set<String>()
         for match in allMatches.sorted(by: { score($0) > score($1) }) {
             for pick in featuredCalendar.matchingPicks(for: match) {
-                syncedFeaturedMatches[pick.id] = match
+                if matchedPickIDs.insert(pick.id).inserted {
+                    syncedFeaturedMatches[pick.id] = match
+                }
             }
         }
         featuredMatchesByPickID = syncedFeaturedMatches
@@ -1696,12 +1724,28 @@ final class HomeViewModel: ObservableObject {
     }
 
     private func mergeMatches(_ matches: [Match]) -> [Match] {
-        var seenIDs: Set<String> = []
-        var unique: [Match] = []
-        for match in matches.sorted(by: { $0.date < $1.date }) where seenIDs.insert(match.id).inserted {
-            unique.append(match)
+        // For duplicate IDs, prefer the highest-quality state so a stale "scheduled"
+        // entry never evicts a "live" entry that arrived from a different fetch path.
+        var bestByID: [String: Match] = [:]
+        for match in matches {
+            if let existing = bestByID[match.id] {
+                if matchQuality(match) > matchQuality(existing) {
+                    bestByID[match.id] = match
+                }
+            } else {
+                bestByID[match.id] = match
+            }
         }
-        return unique
+        return bestByID.values.sorted { $0.date < $1.date }
+    }
+
+    private func matchQuality(_ match: Match) -> Int {
+        var q = 0
+        if match.state == .live { q += 1000 }
+        if match.state == .final { q += 500 }
+        if match.hasDisplayScore { q += 100 }
+        if !match.broadcasts.isEmpty { q += 10 }
+        return q
     }
 
     private func primeScore(_ match: Match, favoriteIDs: Set<String> = [], favoriteNames: Set<String> = []) -> Int {

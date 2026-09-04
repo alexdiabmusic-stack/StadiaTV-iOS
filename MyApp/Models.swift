@@ -252,6 +252,12 @@ struct Match: Identifiable, Hashable {
         }
         return isUsefulScore(home.score) || isUsefulScore(away.score)
     }
+
+    func withBroadcasts(_ newBroadcasts: [String]) -> Match {
+        Match(id: id, league: league, date: date, name: name, shortName: shortName,
+              state: state, statusDetail: statusDetail, home: home, away: away,
+              broadcasts: newBroadcasts, venue: venue)
+    }
 }
 
 // MARK: - Racing

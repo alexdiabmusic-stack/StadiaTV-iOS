@@ -42,11 +42,16 @@ struct HomeView: View {
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
+    @EnvironmentObject private var launchCoordinator: StartupCoordinator
     @StateObject private var viewModel = HomeViewModel()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var playingChannel: Channel?
     @State private var selectedLiveSport: SportGroup?
     @State private var selectedScheduleDay: ScheduleDay = .today
     @State private var showingNotificationAlert = false
+    /// Becomes true once the launch overlay has fully completed. Used to
+    /// drive subtle content reveal animations that greet the user on first open.
+    @State private var homeRevealed = false
     @State private var notificationAlertMessage = ""
 
     var body: some View {
@@ -72,8 +77,33 @@ struct HomeView: View {
                 morningDigestEnabled: prefs.morningDigestEnabled
             )
             viewModel.startAutoRefresh()
+            // Signal the launch coordinator that the Home shell has data to show.
+            // markAppShellReady() is idempotent — safe to call on every reload.
+            launchCoordinator.markAppShellReady()
+        }
+        .onChange(of: launchCoordinator.phase) { _, newPhase in
+            if newPhase == .home && !homeRevealed {
+                withAnimation(.easeOut(duration: 0.35)) { homeRevealed = true }
+            }
+        }
+        .onAppear {
+            // If returning to Home after the launch sequence already completed,
+            // reveal content immediately without animation.
+            if launchCoordinator.phase == .home { homeRevealed = true }
         }
         .onDisappear { viewModel.stopAutoRefresh() }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            Task {
+                await viewModel.load(
+                    leagues: prefs.followedLeagues,
+                    favorites: prefs.favoriteTeams,
+                    notificationsEnabled: prefs.matchNotificationsEnabled,
+                    notificationLeadTime: prefs.matchReminderLeadTime,
+                    morningDigestEnabled: prefs.morningDigestEnabled
+                )
+            }
+        }
         .alert("Notifications", isPresented: $showingNotificationAlert) {
             Button("OK", role: .cancel) {}
         } message: {
@@ -103,27 +133,37 @@ struct HomeView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .principal) { BrandMark() }
+        // Hidden until the launch overlay has fully completed. The overlay's
+        // animated BrandMark travels to this position and is replaced here.
+        ToolbarItem(placement: .principal) {
+            BrandMark()
+                .opacity(launchCoordinator.phase == .home ? 1 : 0)
+                .animation(.easeIn(duration: 0.12), value: launchCoordinator.phase == .home)
+        }
+        // Search fades in during the latter half of the logo travel animation.
         ToolbarItem(placement: .primaryAction) {
             NavigationLink(destination: SearchView()) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(Theme.textPrimary)
             }
+            .opacity(homeRevealed ? 1 : 0)
+            .animation(.easeIn(duration: 0.25), value: homeRevealed)
         }
     }
 
     @ViewBuilder
     private var mainContent: some View {
-        if viewModel.isLoading && viewModel.liveNow.isEmpty && viewModel.upcoming.isEmpty {
-            VStack(spacing: 16) {
-                ProgressView().tint(Theme.accent)
-                Text("Loading your sports day…")
-                    .font(.callout).foregroundStyle(Theme.textSecondary)
-            }
-        } else if let msg = viewModel.errorMessage, viewModel.liveNow.isEmpty && viewModel.upcoming.isEmpty {
+        // The blocking spinner is intentionally removed. The launch overlay
+        // covers the screen while data loads; Home is revealed only once the
+        // coordinator signals it's ready, so users never see a blank shell.
+        // Network errors that produce a completely empty state still surface
+        // the error view; partial data always renders immediately.
+        if let msg = viewModel.errorMessage, viewModel.liveNow.isEmpty && viewModel.upcoming.isEmpty {
             errorView(msg)
         } else {
             scrollContent
+                .opacity(homeRevealed ? 1 : 0)
+                .animation(.easeOut(duration: 0.3), value: homeRevealed)
         }
     }
 
@@ -1507,6 +1547,8 @@ final class HomeViewModel: ObservableObject {
     private var lastLoadedLeagueIDs: Set<String> = []
     private var lastLoadedAt: Date?
     private let cacheLifetime: TimeInterval = 120
+    // Shorter cache window while live games are in progress so state stays current
+    private let cacheLifetimeLive: TimeInterval = 25
 
     private var demandScoreCache: [String: Int] = [:]
 
@@ -1517,7 +1559,10 @@ final class HomeViewModel: ObservableObject {
         refreshTask?.cancel()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 60 * 1_000_000_000)
+                // Refresh more aggressively when live games are in progress.
+                let hasLive = await MainActor.run { self?.liveNow.isEmpty == false }
+                let nanoseconds: UInt64 = hasLive ? 30_000_000_000 : 60_000_000_000
+                try? await Task.sleep(nanoseconds: nanoseconds)
                 guard !Task.isCancelled, let self, let args = self.lastLoadArgs else { continue }
                 await self.load(leagues: args.leagues, favorites: args.favorites, notificationsEnabled: args.notificationsEnabled, notificationLeadTime: args.notificationLeadTime, morningDigestEnabled: args.morningDigestEnabled)
             }
@@ -1537,8 +1582,9 @@ final class HomeViewModel: ObservableObject {
         let discoveryLeagueIDs = Set(discoveryLeagues.map(\.id))
         featuredPicks = featuredCalendar.picks()
         let hasData = !(liveNow.isEmpty && upcoming.isEmpty && favoriteTeamUpcoming.isEmpty)
+        let effectiveCacheLifetime = liveNow.isEmpty ? cacheLifetime : cacheLifetimeLive
         if !force, hasData, discoveryLeagueIDs == lastLoadedLeagueIDs,
-           let lastLoadedAt, Date().timeIntervalSince(lastLoadedAt) < cacheLifetime {
+           let lastLoadedAt, Date().timeIntervalSince(lastLoadedAt) < effectiveCacheLifetime {
             return
         }
         guard !isLoading else { return }
@@ -1561,7 +1607,10 @@ final class HomeViewModel: ObservableObject {
             nextLimit: 8
         )
         let firstError = liveSnapshot.failures.first
-        for match in liveSnapshot.live + liveSnapshot.startingSoon + liveSnapshot.next {
+        // Include pastStartToday so games that started but still show as scheduled are
+        // present in allMatches — they can appear in Live Now via the featured-IDs special
+        // case and will be correctly matched to featured picks.
+        for match in liveSnapshot.live + liveSnapshot.startingSoon + liveSnapshot.next + liveSnapshot.pastStartToday {
             matchesByLeague[match.league.id, default: []].append(match)
         }
         if !matchesByLeague.isEmpty {
@@ -1576,27 +1625,79 @@ final class HomeViewModel: ObservableObject {
             errorMessage = firstError ?? "No live or upcoming games were returned for today."
         }
 
-        // Phase 2 — 7-day range for followed leagues (fills the schedule section).
-        // Staggered so ESPN never sees more than one in-flight request per 300 ms.
-        for (i, league) in leagues.enumerated() {
-            guard !Task.isCancelled else { break }
-            if i > 0 { try? await Task.sleep(nanoseconds: 300_000_000) }
-            let extended = (try? await SportsRepository.shared.legacyScoreboards(for: league, starting: Date(), days: 7)) ?? []
-            guard !extended.isEmpty else { continue }
-            matchesByLeague[league.id] = mergeMatches((matchesByLeague[league.id] ?? []) + extended)
-            rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+        // Phase 2 — 7-day schedule for all followed leagues, now fully concurrent.
+        // The old 300 ms stagger protected ESPN; today each league routes to its own
+        // first-party provider (NHL/MLB/NBA/NFL official APIs, Apple Sports for
+        // soccer/tennis/golf/racing — ESPN is only a fallback). The scheduleDeduplicator
+        // inside SportsRepository coalesces any duplicate in-flight keys, so shared
+        // providers never see double requests. UI rebuilds progressively as each league
+        // arrives rather than waiting for the slowest one.
+        if !leagues.isEmpty {
+            var phase2Iterator = leagues.makeIterator()
+            await withTaskGroup(of: (String, [Match]).self) { group in
+                let concurrency = min(leagues.count, 6)
+                for _ in 0..<concurrency {
+                    guard let league = phase2Iterator.next() else { break }
+                    group.addTask {
+                        let matches = (try? await SportsRepository.shared.legacyScoreboards(
+                            for: league, starting: Date(), days: 7
+                        )) ?? []
+                        return (league.id, matches)
+                    }
+                }
+                for await (leagueID, matches) in group {
+                    if Task.isCancelled { group.cancelAll(); break }
+                    if !matches.isEmpty {
+                        matchesByLeague[leagueID] = mergeMatches((matchesByLeague[leagueID] ?? []) + matches)
+                        rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+                    }
+                    if let next = phase2Iterator.next() {
+                        group.addTask {
+                            let matches = (try? await SportsRepository.shared.legacyScoreboards(
+                                for: next, starting: Date(), days: 7
+                            )) ?? []
+                            return (next.id, matches)
+                        }
+                    }
+                }
+            }
         }
 
-        // Phase 3 — 365-day data for favorite-team leagues (powers the favorite
-        // team schedule card). Staggered at 500 ms to stay well within rate limits.
+        // Phase 3 — 365-day schedule for leagues that include a followed team.
+        // Slightly tighter concurrency (4) because year-range payloads are larger.
         let favoriteLeagueIDs = Set(favorites.flatMap { [$0.leaguePath, $0.leagueStadiaKey] })
-        for (i, league) in League.all.filter({ favoriteLeagueIDs.contains($0.id) || favoriteLeagueIDs.contains($0.stadiaKey) }).enumerated() {
-            guard !Task.isCancelled else { break }
-            if i > 0 { try? await Task.sleep(nanoseconds: 500_000_000) }
-            let yearData = (try? await SportsRepository.shared.legacyScoreboards(for: league, starting: Date(), days: 365)) ?? []
-            guard !yearData.isEmpty else { continue }
-            matchesByLeague[league.id] = mergeMatches((matchesByLeague[league.id] ?? []) + yearData)
-            rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+        let favoriteLeagues = League.all.filter {
+            favoriteLeagueIDs.contains($0.id) || favoriteLeagueIDs.contains($0.stadiaKey)
+        }
+        if !favoriteLeagues.isEmpty {
+            var phase3Iterator = favoriteLeagues.makeIterator()
+            await withTaskGroup(of: (String, [Match]).self) { group in
+                let concurrency = min(favoriteLeagues.count, 4)
+                for _ in 0..<concurrency {
+                    guard let league = phase3Iterator.next() else { break }
+                    group.addTask {
+                        let matches = (try? await SportsRepository.shared.legacyScoreboards(
+                            for: league, starting: Date(), days: 365
+                        )) ?? []
+                        return (league.id, matches)
+                    }
+                }
+                for await (leagueID, matches) in group {
+                    if Task.isCancelled { group.cancelAll(); break }
+                    if !matches.isEmpty {
+                        matchesByLeague[leagueID] = mergeMatches((matchesByLeague[leagueID] ?? []) + matches)
+                        rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+                    }
+                    if let next = phase3Iterator.next() {
+                        group.addTask {
+                            let matches = (try? await SportsRepository.shared.legacyScoreboards(
+                                for: next, starting: Date(), days: 365
+                            )) ?? []
+                            return (next.id, matches)
+                        }
+                    }
+                }
+            }
         }
 
         if notificationsEnabled {
@@ -1658,9 +1759,15 @@ final class HomeViewModel: ObservableObject {
         // Compute featured IDs up front so liveNow can include matches whose
         // countdown hit zero but whose ESPN state hasn't flipped to .live yet.
         var syncedFeaturedMatches = Dictionary(uniqueKeysWithValues: featuredPicks.map { ($0.id, $0.streamMatch) })
+        // Iterate from highest-scoring to lowest. Track which picks have already been
+        // matched so a lower-quality (e.g. stale "scheduled") match cannot overwrite
+        // a live match that was processed first.
+        var matchedPickIDs = Set<String>()
         for match in allMatches.sorted(by: { score($0) > score($1) }) {
             for pick in featuredCalendar.matchingPicks(for: match) {
-                syncedFeaturedMatches[pick.id] = match
+                if matchedPickIDs.insert(pick.id).inserted {
+                    syncedFeaturedMatches[pick.id] = match
+                }
             }
         }
         featuredMatchesByPickID = syncedFeaturedMatches
@@ -1696,12 +1803,28 @@ final class HomeViewModel: ObservableObject {
     }
 
     private func mergeMatches(_ matches: [Match]) -> [Match] {
-        var seenIDs: Set<String> = []
-        var unique: [Match] = []
-        for match in matches.sorted(by: { $0.date < $1.date }) where seenIDs.insert(match.id).inserted {
-            unique.append(match)
+        // For duplicate IDs, prefer the highest-quality state so a stale "scheduled"
+        // entry never evicts a "live" entry that arrived from a different fetch path.
+        var bestByID: [String: Match] = [:]
+        for match in matches {
+            if let existing = bestByID[match.id] {
+                if matchQuality(match) > matchQuality(existing) {
+                    bestByID[match.id] = match
+                }
+            } else {
+                bestByID[match.id] = match
+            }
         }
-        return unique
+        return bestByID.values.sorted { $0.date < $1.date }
+    }
+
+    private func matchQuality(_ match: Match) -> Int {
+        var q = 0
+        if match.state == .live { q += 1000 }
+        if match.state == .final { q += 500 }
+        if match.hasDisplayScore { q += 100 }
+        if !match.broadcasts.isEmpty { q += 10 }
+        return q
     }
 
     private func primeScore(_ match: Match, favoriteIDs: Set<String> = [], favoriteNames: Set<String> = []) -> Int {

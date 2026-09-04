@@ -158,9 +158,14 @@ final class PlaylistStore: ObservableObject {
         persist()
     }
 
+    /// Refreshes all playlists concurrently rather than serially.
+    /// Each playlist's network request is independent, so there is no
+    /// reason to wait for one before starting the next.
     func refreshAll() async {
-        for playlist in playlists {
-            await refresh(playlist)
+        await withTaskGroup(of: Void.self) { group in
+            for playlist in playlists {
+                group.addTask { await self.refresh(playlist) }
+            }
         }
     }
 

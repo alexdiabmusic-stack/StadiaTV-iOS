@@ -896,6 +896,10 @@ actor SportsDataCache {
         entries.removeAll()
     }
 
+    func remove(for key: SportsCacheKey) {
+        entries.removeValue(forKey: key.rawValue)
+    }
+
     static func defaultTTL(for capability: SportsDataCapability, containsLiveGames: Bool = false) -> TimeInterval {
         switch capability {
         case .liveScores:
@@ -1230,6 +1234,9 @@ struct SportsLiveMatchSnapshot {
     let startingSoon: [Match]
     let next: [Match]
     let failures: [String]
+    /// Games that started today (date <= now) but still have state == .pre — may be live
+    /// but the provider hasn't reported it yet. Included so callers can surface them.
+    let pastStartToday: [Match]
 }
 
 private struct SportsLiveLeagueLoadResult {
@@ -1287,8 +1294,23 @@ struct SportsRepository: Sendable {
     func liveScores(for league: League) async throws -> [StadiaGame] {
         let key = cacheKey(league: league, capability: .liveScores, scope: "today")
         if let cached: [StadiaGame] = await cache.value(for: key) {
-            await recordDiagnostics(league: league, capability: .liveScores, currentProvider: cached.first?.provenance.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
-            return cached
+            // Bypass stale cache: if any game started >10 min ago but still shows as scheduled,
+            // the cached state is outdated and we must fetch fresh data.
+            let now = Date()
+            let hasStaleScheduled = cached.contains { game in
+                game.status == .scheduled &&
+                now.timeIntervalSince(game.scheduledStart) > 600 &&
+                Calendar.current.isDate(game.scheduledStart, inSameDayAs: now)
+            }
+            if !hasStaleScheduled {
+                await recordDiagnostics(league: league, capability: .liveScores, currentProvider: cached.first?.provenance.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
+                return cached
+            }
+            // Remove stale entry so the deduplicator will issue a fresh request
+            await cache.remove(for: key)
+#if DEBUG
+            print("[LiveScores] Bypassing stale cache for \(league.shortName) — games past start still showing scheduled")
+#endif
         }
         return try await scoreDeduplicator.value(for: key.rawValue) {
             try await requestScores(for: league, key: key)
@@ -1298,8 +1320,23 @@ struct SportsRepository: Sendable {
     func schedule(for league: League, range: SportsDateRange) async throws -> StadiaSchedule {
         let key = cacheKey(league: league, capability: .schedule, scope: "\(Int(range.start.timeIntervalSince1970))-\(Int(range.end.timeIntervalSince1970))")
         if let cached: StadiaSchedule = await cache.value(for: key) {
-            await recordDiagnostics(league: league, capability: .schedule, currentProvider: cached.provenance.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
-            return cached
+            // Bypass stale cache: schedule TTL for non-live data is 60 minutes. If a game
+            // started >10 min ago but the cached schedule still shows it as scheduled, the
+            // 60-minute cache is serving obsolete state and must be discarded.
+            let now = Date()
+            let hasStaleScheduled = cached.games.contains { game in
+                game.status == .scheduled &&
+                now.timeIntervalSince(game.scheduledStart) > 600 &&
+                Calendar.current.isDate(game.scheduledStart, inSameDayAs: now)
+            }
+            if !hasStaleScheduled {
+                await recordDiagnostics(league: league, capability: .schedule, currentProvider: cached.provenance.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
+                return cached
+            }
+            await cache.remove(for: key)
+#if DEBUG
+            print("[Schedule] Bypassing stale cache for \(league.shortName) — past-start game still scheduled")
+#endif
         }
         return try await scheduleDeduplicator.value(for: key.rawValue) {
             try await requestSchedule(for: league, range: range, key: key)
@@ -1413,12 +1450,24 @@ struct SportsRepository: Sendable {
             .sorted { $0.date < $1.date }
             .prefix(nextLimit)
             .map { $0 }
+        // Games that started today but provider still reports as scheduled — the stale-cache
+        // bypass above should cause a fresh fetch that corrects this, but include them here
+        // so callers can surface them (e.g. featured event matching) even before the next fetch.
+        let liveIDs = Set(liveMatches.map(\.id))
+        let dayStart = Calendar.current.startOfDay(for: now)
+        let pastStartToday = merged.filter {
+            !liveIDs.contains($0.id) &&
+            $0.state == .pre &&
+            $0.date > dayStart &&
+            $0.date <= now
+        }
 
         return SportsLiveMatchSnapshot(
             live: liveMatches,
             startingSoon: startingSoon,
             next: next,
-            failures: failures
+            failures: failures,
+            pastStartToday: pastStartToday
         )
     }
 
@@ -1702,18 +1751,33 @@ struct SportsRepository: Sendable {
     }
 
     private func mergeLiveAggregationMatches(_ matches: [Match]) -> [Match] {
+        let now = Date()
         var byKey: [String: Match] = [:]
+        // Track all broadcasts seen per key so the winning entry never silently loses them.
+        var broadcastsByKey: [String: [String]] = [:]
         for match in matches {
             let key = liveAggregationKey(for: match)
-            if let existing = byKey[key] {
-                if liveAggregationSortKey(match, now: Date()) > liveAggregationSortKey(existing, now: Date()) {
+            // Accumulate broadcasts from every provider for this game.
+            if !match.broadcasts.isEmpty {
+                var existing = broadcastsByKey[key, default: []]
+                for b in match.broadcasts where !existing.contains(b) { existing.append(b) }
+                broadcastsByKey[key] = existing
+            }
+            if let current = byKey[key] {
+                if liveAggregationSortKey(match, now: now) > liveAggregationSortKey(current, now: now) {
                     byKey[key] = match
                 }
             } else {
                 byKey[key] = match
             }
         }
-        return Array(byKey.values)
+        // Hydrate broadcasts onto the winner if it came from a source that omits them.
+        return byKey.map { key, match in
+            guard let allBroadcasts = broadcastsByKey[key], !allBroadcasts.isEmpty, match.broadcasts.isEmpty else {
+                return match
+            }
+            return match.withBroadcasts(allBroadcasts)
+        }
     }
 
     private func isLiveAggregationMatch(_ match: Match, now: Date) -> Bool {

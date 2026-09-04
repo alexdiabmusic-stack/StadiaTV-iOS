@@ -14,6 +14,7 @@ struct MyApp: App {
     @StateObject private var groupPrefsStore = GroupPreferencesStore()
     @StateObject private var fantasyStore = FantasyStore.shared
     @StateObject private var stadiaFantasyStore = StadiaFantasyStore.shared
+    @StateObject private var launchCoordinator = StartupCoordinator()
 
     var body: some Scene {
         WindowGroup {
@@ -47,17 +48,41 @@ struct MyApp: App {
             .environmentObject(ProgrammeReminderStore.shared)
             .environmentObject(RecordingService.shared)
             .environmentObject(ParentalControlStore.shared)
+            .environmentObject(launchCoordinator)
             .task { channelPrefsStore.migrateLegacyFavorites(watchStore.favorites) }
             #if !os(tvOS)
             .dynamicTypeSize(Theme.isPad ? DynamicTypeSize.xLarge... : DynamicTypeSize.xSmall...)
             #endif
             .preferredColorScheme(preferences.appearance.colorScheme)
+            // Channel refresh — parallel across all playlists (see PlaylistStore.refreshAll).
             .task { await playlistStore.refreshAll() }
+            // Fantasy — load local state first, then refresh ESPN and event contexts concurrently.
             .task {
                 await stadiaFantasyStore.load()
-                await fantasyStore.refresh(channels: playlistStore.allChannels, preferredLanguages: preferences.preferredStreamLanguages)
-                await stadiaFantasyStore.refreshEventContexts(channels: playlistStore.allChannels, preferredLanguages: preferences.preferredStreamLanguages)
+                async let espnRefresh: Void = fantasyStore.refresh(
+                    channels: playlistStore.allChannels,
+                    preferredLanguages: preferences.preferredStreamLanguages
+                )
+                async let eventContextRefresh: Void = stadiaFantasyStore.refreshEventContexts(
+                    channels: playlistStore.allChannels,
+                    preferredLanguages: preferences.preferredStreamLanguages
+                )
+                _ = await (espnRefresh, eventContextRefresh)
             }
+            // Cold-launch brand animation — starts the visual sequence immediately.
+            // The startup pipeline runs concurrently; `markAppShellReady()` is called
+            // from HomeView once the first batch of data is available.
+            .task { launchCoordinator.startBrandSequence() }
+            // Overlay — present during every launch phase except `.home`.
+            // Removed from the hierarchy once the transition is fully complete.
+            #if !os(tvOS)
+            .overlay {
+                if launchCoordinator.phase != .home {
+                    LaunchAnimationView()
+                        .environmentObject(launchCoordinator)
+                }
+            }
+            #endif
         }
     }
 }
@@ -139,8 +164,16 @@ struct RootView: View {
 
     private func refreshFantasyContexts(force: Bool = false) async {
         await stadiaFantasyStore.load()
-        await fantasyStore.refresh(channels: playlistStore.allChannels, preferredLanguages: prefs.preferredStreamLanguages, force: force)
-        await stadiaFantasyStore.refreshEventContexts(channels: playlistStore.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
+        async let espnRefresh: Void = fantasyStore.refresh(
+            channels: playlistStore.allChannels,
+            preferredLanguages: prefs.preferredStreamLanguages,
+            force: force
+        )
+        async let eventContextRefresh: Void = stadiaFantasyStore.refreshEventContexts(
+            channels: playlistStore.allChannels,
+            preferredLanguages: prefs.preferredStreamLanguages
+        )
+        _ = await (espnRefresh, eventContextRefresh)
     }
 
     private func updateFavoriteNotificationPrompt() {
@@ -169,5 +202,6 @@ struct RootView: View {
         .environmentObject(PodcastStore())
         .environmentObject(FantasyStore.shared)
         .environmentObject(StadiaFantasyStore.shared)
+        .environmentObject(StartupCoordinator())
         .preferredColorScheme(.dark)
 }

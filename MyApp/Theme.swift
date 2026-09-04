@@ -61,12 +61,16 @@ extension View {
 }
 
 struct BrandMark: View {
+    /// Color for the "TV" portion. Defaults to Stadia blue.
+    /// Pass `.white` during the launch animation's initial white-logo state.
+    var tvColor: Color = Theme.accent
+
     var body: some View {
         HStack(spacing: 0) {
             Text("STADIA")
                 .foregroundStyle(Theme.textPrimary)
             Text("TV")
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(tvColor)
         }
         .font(.system(size: Theme.scaled(20), weight: .heavy))
         .tracking(1)

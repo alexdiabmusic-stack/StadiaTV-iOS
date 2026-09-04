@@ -42,12 +42,16 @@ struct HomeView: View {
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
+    @EnvironmentObject private var launchCoordinator: StartupCoordinator
     @StateObject private var viewModel = HomeViewModel()
     @Environment(\.scenePhase) private var scenePhase
     @State private var playingChannel: Channel?
     @State private var selectedLiveSport: SportGroup?
     @State private var selectedScheduleDay: ScheduleDay = .today
     @State private var showingNotificationAlert = false
+    /// Becomes true once the launch overlay has fully completed. Used to
+    /// drive subtle content reveal animations that greet the user on first open.
+    @State private var homeRevealed = false
     @State private var notificationAlertMessage = ""
 
     var body: some View {
@@ -73,6 +77,19 @@ struct HomeView: View {
                 morningDigestEnabled: prefs.morningDigestEnabled
             )
             viewModel.startAutoRefresh()
+            // Signal the launch coordinator that the Home shell has data to show.
+            // markAppShellReady() is idempotent — safe to call on every reload.
+            launchCoordinator.markAppShellReady()
+        }
+        .onChange(of: launchCoordinator.phase) { _, newPhase in
+            if newPhase == .home && !homeRevealed {
+                withAnimation(.easeOut(duration: 0.35)) { homeRevealed = true }
+            }
+        }
+        .onAppear {
+            // If returning to Home after the launch sequence already completed,
+            // reveal content immediately without animation.
+            if launchCoordinator.phase == .home { homeRevealed = true }
         }
         .onDisappear { viewModel.stopAutoRefresh() }
         .onChange(of: scenePhase) { _, newPhase in
@@ -116,27 +133,37 @@ struct HomeView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .principal) { BrandMark() }
+        // Hidden until the launch overlay has fully completed. The overlay's
+        // animated BrandMark travels to this position and is replaced here.
+        ToolbarItem(placement: .principal) {
+            BrandMark()
+                .opacity(launchCoordinator.phase == .home ? 1 : 0)
+                .animation(.easeIn(duration: 0.12), value: launchCoordinator.phase == .home)
+        }
+        // Search fades in during the latter half of the logo travel animation.
         ToolbarItem(placement: .primaryAction) {
             NavigationLink(destination: SearchView()) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(Theme.textPrimary)
             }
+            .opacity(homeRevealed ? 1 : 0)
+            .animation(.easeIn(duration: 0.25), value: homeRevealed)
         }
     }
 
     @ViewBuilder
     private var mainContent: some View {
-        if viewModel.isLoading && viewModel.liveNow.isEmpty && viewModel.upcoming.isEmpty {
-            VStack(spacing: 16) {
-                ProgressView().tint(Theme.accent)
-                Text("Loading your sports day…")
-                    .font(.callout).foregroundStyle(Theme.textSecondary)
-            }
-        } else if let msg = viewModel.errorMessage, viewModel.liveNow.isEmpty && viewModel.upcoming.isEmpty {
+        // The blocking spinner is intentionally removed. The launch overlay
+        // covers the screen while data loads; Home is revealed only once the
+        // coordinator signals it's ready, so users never see a blank shell.
+        // Network errors that produce a completely empty state still surface
+        // the error view; partial data always renders immediately.
+        if let msg = viewModel.errorMessage, viewModel.liveNow.isEmpty && viewModel.upcoming.isEmpty {
             errorView(msg)
         } else {
             scrollContent
+                .opacity(homeRevealed ? 1 : 0)
+                .animation(.easeOut(duration: 0.3), value: homeRevealed)
         }
     }
 
@@ -1598,27 +1625,79 @@ final class HomeViewModel: ObservableObject {
             errorMessage = firstError ?? "No live or upcoming games were returned for today."
         }
 
-        // Phase 2 — 7-day range for followed leagues (fills the schedule section).
-        // Staggered so ESPN never sees more than one in-flight request per 300 ms.
-        for (i, league) in leagues.enumerated() {
-            guard !Task.isCancelled else { break }
-            if i > 0 { try? await Task.sleep(nanoseconds: 300_000_000) }
-            let extended = (try? await SportsRepository.shared.legacyScoreboards(for: league, starting: Date(), days: 7)) ?? []
-            guard !extended.isEmpty else { continue }
-            matchesByLeague[league.id] = mergeMatches((matchesByLeague[league.id] ?? []) + extended)
-            rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+        // Phase 2 — 7-day schedule for all followed leagues, now fully concurrent.
+        // The old 300 ms stagger protected ESPN; today each league routes to its own
+        // first-party provider (NHL/MLB/NBA/NFL official APIs, Apple Sports for
+        // soccer/tennis/golf/racing — ESPN is only a fallback). The scheduleDeduplicator
+        // inside SportsRepository coalesces any duplicate in-flight keys, so shared
+        // providers never see double requests. UI rebuilds progressively as each league
+        // arrives rather than waiting for the slowest one.
+        if !leagues.isEmpty {
+            var phase2Iterator = leagues.makeIterator()
+            await withTaskGroup(of: (String, [Match]).self) { group in
+                let concurrency = min(leagues.count, 6)
+                for _ in 0..<concurrency {
+                    guard let league = phase2Iterator.next() else { break }
+                    group.addTask {
+                        let matches = (try? await SportsRepository.shared.legacyScoreboards(
+                            for: league, starting: Date(), days: 7
+                        )) ?? []
+                        return (league.id, matches)
+                    }
+                }
+                for await (leagueID, matches) in group {
+                    if Task.isCancelled { group.cancelAll(); break }
+                    if !matches.isEmpty {
+                        matchesByLeague[leagueID] = mergeMatches((matchesByLeague[leagueID] ?? []) + matches)
+                        rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+                    }
+                    if let next = phase2Iterator.next() {
+                        group.addTask {
+                            let matches = (try? await SportsRepository.shared.legacyScoreboards(
+                                for: next, starting: Date(), days: 7
+                            )) ?? []
+                            return (next.id, matches)
+                        }
+                    }
+                }
+            }
         }
 
-        // Phase 3 — 365-day data for favorite-team leagues (powers the favorite
-        // team schedule card). Staggered at 500 ms to stay well within rate limits.
+        // Phase 3 — 365-day schedule for leagues that include a followed team.
+        // Slightly tighter concurrency (4) because year-range payloads are larger.
         let favoriteLeagueIDs = Set(favorites.flatMap { [$0.leaguePath, $0.leagueStadiaKey] })
-        for (i, league) in League.all.filter({ favoriteLeagueIDs.contains($0.id) || favoriteLeagueIDs.contains($0.stadiaKey) }).enumerated() {
-            guard !Task.isCancelled else { break }
-            if i > 0 { try? await Task.sleep(nanoseconds: 500_000_000) }
-            let yearData = (try? await SportsRepository.shared.legacyScoreboards(for: league, starting: Date(), days: 365)) ?? []
-            guard !yearData.isEmpty else { continue }
-            matchesByLeague[league.id] = mergeMatches((matchesByLeague[league.id] ?? []) + yearData)
-            rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+        let favoriteLeagues = League.all.filter {
+            favoriteLeagueIDs.contains($0.id) || favoriteLeagueIDs.contains($0.stadiaKey)
+        }
+        if !favoriteLeagues.isEmpty {
+            var phase3Iterator = favoriteLeagues.makeIterator()
+            await withTaskGroup(of: (String, [Match]).self) { group in
+                let concurrency = min(favoriteLeagues.count, 4)
+                for _ in 0..<concurrency {
+                    guard let league = phase3Iterator.next() else { break }
+                    group.addTask {
+                        let matches = (try? await SportsRepository.shared.legacyScoreboards(
+                            for: league, starting: Date(), days: 365
+                        )) ?? []
+                        return (league.id, matches)
+                    }
+                }
+                for await (leagueID, matches) in group {
+                    if Task.isCancelled { group.cancelAll(); break }
+                    if !matches.isEmpty {
+                        matchesByLeague[leagueID] = mergeMatches((matchesByLeague[leagueID] ?? []) + matches)
+                        rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+                    }
+                    if let next = phase3Iterator.next() {
+                        group.addTask {
+                            let matches = (try? await SportsRepository.shared.legacyScoreboards(
+                                for: next, starting: Date(), days: 365
+                            )) ?? []
+                            return (next.id, matches)
+                        }
+                    }
+                }
+            }
         }
 
         if notificationsEnabled {

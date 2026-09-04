@@ -1400,26 +1400,36 @@ struct SportsRepository: Sendable {
         await withTaskGroup(of: SportsLiveLeagueLoadResult.self) { group in
             for league in uniqueLeagues {
                 group.addTask {
-                    var leagueLive: [Match] = []
-                    var leagueScheduled: [Match] = []
+                    // Fire liveScores and schedule concurrently rather than serially.
+                    // The old approach meant per-league wall time = liveScores + schedule;
+                    // now it's max(liveScores, schedule). We collect raw StadiaGame arrays
+                    // first (off main actor), then do a single combined MainActor.run at
+                    // the end for the toLegacyMatch mapping — halving main-actor round-trips
+                    // compared to the original two-hop approach.
+                    async let liveFetch = liveScores(for: league)
+                    async let schedFetch = schedule(for: league, range: scheduleRange)
+
                     var leagueFailures: [String] = []
 
+                    let rawLive: [StadiaGame]
                     do {
-                        let games = try await liveScores(for: league)
-                        leagueLive = await MainActor.run {
-                            games.map { $0.toLegacyMatch(league: league) }
-                        }
+                        rawLive = try await liveFetch
                     } catch {
                         leagueFailures.append("\(league.shortName) live: \(error.localizedDescription)")
+                        rawLive = []
                     }
 
+                    let rawScheduled: [StadiaGame]
                     do {
-                        let games = try await schedule(for: league, range: scheduleRange).games
-                        leagueScheduled = await MainActor.run {
-                            games.map { $0.toLegacyMatch(league: league) }
-                        }
+                        rawScheduled = try await schedFetch.games
                     } catch {
                         leagueFailures.append("\(league.shortName) schedule: \(error.localizedDescription)")
+                        rawScheduled = []
+                    }
+
+                    let (leagueLive, leagueScheduled) = await MainActor.run {
+                        (rawLive.map { $0.toLegacyMatch(league: league) },
+                         rawScheduled.map { $0.toLegacyMatch(league: league) })
                     }
 
                     return SportsLiveLeagueLoadResult(

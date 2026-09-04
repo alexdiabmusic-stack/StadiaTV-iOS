@@ -647,6 +647,7 @@ private struct TeamSportStatsTab: View {
     private func teamBox(for side: TeamSide, fallbackIndex: Int) -> GameSummary.TeamBox? {
         guard let gameSummary else { return nil }
         if let id = side.teamID, let box = gameSummary.teams.first(where: { $0.id == id }) { return box }
+        if let canonical = side.canonicalIDString, let box = gameSummary.teams.first(where: { $0.id == canonical }) { return box }
         return gameSummary.teams.indices.contains(fallbackIndex) ? gameSummary.teams[fallbackIndex] : nil
     }
 

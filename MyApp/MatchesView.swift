@@ -108,11 +108,17 @@ struct MatchesView: View {
             }
             for await batch in group { articles.append(contentsOf: batch) }
         }
-        news = Array(
-            articles
-                .sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
-                .prefix(8)
-        )
+        var seenIDs: Set<String> = []
+        var seenHeadlines: Set<String> = []
+        let deduped = articles
+            .sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
+            .filter { article in
+                let normalizedHeadline = article.headline.lowercased()
+                guard seenIDs.insert(article.id).inserted,
+                      seenHeadlines.insert(normalizedHeadline).inserted else { return false }
+                return true
+            }
+        news = Array(deduped.prefix(8))
         newsLoading = false
     }
 

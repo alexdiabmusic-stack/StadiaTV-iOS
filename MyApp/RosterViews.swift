@@ -302,7 +302,29 @@ struct PlayerDetailView: View {
 
     private func load() async {
         isLoading = true
-        overview = try? await SportsRepository.shared.legacyAthleteOverview(for: league, athleteID: athlete.id)
+        if let espnOverview = try? await SportsRepository.shared.legacyAthleteOverview(for: league, athleteID: athlete.id),
+           !espnOverview.stats.isEmpty || !espnOverview.headlineStats.isEmpty {
+            overview = espnOverview
+            isLoading = false
+            return
+        }
+        // Fallback for providers (e.g. MLB) whose numeric player IDs don't map to ESPN
+        if athlete.id.allSatisfy(\.isNumber) {
+            let playerEntityID = StadiaEntityID(rawValue: athlete.id)
+            if let playerStats = try? await SportsRepository.shared.playerStats(for: league, playerIDs: Set([playerEntityID]), range: nil),
+               let stat = playerStats.first, !stat.stats.isEmpty {
+                let year = Calendar.current.component(.year, from: Date())
+                let statValues = stat.stats.map { StatValue(label: $0.displayName, displayName: $0.displayName, value: $0.value) }
+                let headlineKeys: Set<String> = ["AB", "AVG", "HR", "RBI", "OPS", "IP", "ERA", "SO", "W", "L"]
+                let headline = statValues.filter { headlineKeys.contains($0.label) }.prefix(4).map { $0 }
+                overview = AthleteOverview(
+                    statlineLabel: "\(year) Season",
+                    stats: statValues,
+                    headlineStats: headline,
+                    news: []
+                )
+            }
+        }
         isLoading = false
     }
 }

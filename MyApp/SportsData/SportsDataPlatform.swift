@@ -1625,6 +1625,32 @@ struct SportsRepository: Sendable {
         try await ESPNService().athleteOverview(for: league, athleteID: athleteID)
     }
 
+    func playerStats(for league: League, playerIDs: Set<StadiaEntityID>, range: SportsDateRange?) async throws -> [StadiaPlayerStat] {
+        let scopeKey = playerIDs.map(\.rawValue).sorted().joined(separator: ",")
+        let key = cacheKey(league: league, capability: .playerStats, scope: scopeKey)
+        if let cached: [StadiaPlayerStat] = await cache.value(for: key) { return cached }
+        let providers = await router.providers(for: league, capability: .playerStats, as: (any PlayerStatsProvider).self)
+        guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.playerStats, league.path) }
+        var fallbacks: [SportsDataProviderID] = []
+        var failures: [String] = []
+        for provider in providers {
+            let start = Date()
+            do {
+                let stats = try await provider.playerStats(for: league, playerIDs: playerIDs, range: range)
+                let latency = Date().timeIntervalSince(start)
+                await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
+                await cache.store(stats, for: key, ttl: SportsDataCache.defaultTTL(for: .playerStats))
+                await recordDiagnostics(league: league, capability: .playerStats, currentProvider: provider.metadata.id, latency: latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
+                return stats
+            } catch {
+                failures.append("\(provider.metadata.name): \(error.localizedDescription)")
+                await router.healthMonitor.recordFailure(providerID: provider.metadata.id, error: error)
+                fallbacks.append(provider.metadata.id)
+            }
+        }
+        throw SportsDataError.unavailable
+    }
+
     func legacyRacers(for league: League) async throws -> [Racer] {
         try await ESPNService().racers(for: league)
     }
@@ -1929,12 +1955,16 @@ struct SportsRepository: Sendable {
         let providerTeamID = SportsIdentityResolver.providerID(from: stat.teamID, provider: .appleSports)
             ?? SportsIdentityResolver.providerID(from: stat.teamID, provider: .nhl)
             ?? SportsIdentityResolver.providerID(from: stat.teamID, provider: .espn)
+            ?? SportsIdentityResolver.providerID(from: stat.teamID, provider: .mlb)
             ?? stat.teamID.rawValue
-        let side = [match.away, match.home].first { $0.teamID == providerTeamID }
+        let canonicalRaw = stat.teamID.rawValue
+        let side = [match.away, match.home].first {
+            $0.teamID == providerTeamID || $0.canonicalIDString == canonicalRaw
+        }
         return GameSummary.TeamBox(
             id: providerTeamID,
-            name: side?.displayName ?? providerTeamID,
-            abbreviation: side?.abbreviation ?? providerTeamID,
+            name: side?.displayName ?? stat.teamID.rawValue,
+            abbreviation: side?.abbreviation ?? stat.teamID.rawValue,
             stats: stat.stats.map { GameSummary.GameStat(label: $0.displayName, displayValue: $0.value) }
         )
     }

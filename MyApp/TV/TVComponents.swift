@@ -6,6 +6,7 @@ import SwiftUI
 /// Focusable match card sized for horizontal shelves.
 struct TVMatchCard: View {
     let match: Match
+    var streamCount: Int = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -14,6 +15,17 @@ struct TVMatchCard: View {
                     .font(.caption2.weight(.heavy))
                     .foregroundStyle(Theme.accent)
                 Spacer()
+                if streamCount > 0 && match.state != .final {
+                    HStack(spacing: 3) {
+                        Image(systemName: "play.tv")
+                            .font(.system(size: 9, weight: .bold))
+                        Text("\(streamCount)")
+                            .font(.system(size: 9, weight: .bold).monospacedDigit())
+                    }
+                    .foregroundStyle(Theme.accent)
+                    .padding(.horizontal, 6).padding(.vertical, 3)
+                    .background(Theme.accent.opacity(0.12), in: Capsule())
+                }
                 stateLabel
             }
 
@@ -381,7 +393,21 @@ struct TVEmptyState: View {
 struct TVSourceTile: View {
     let channel: Channel
     let score: Int
+    var subtitle: String? = nil
+    var evidenceCategories: Set<StreamEvidenceCategory> = []
     let action: () -> Void
+
+    private var strongest: StreamEvidenceCategory? {
+        evidenceCategories.max { $0.priority < $1.priority }
+    }
+
+    private var borderColor: Color {
+        switch strongest {
+        case .guideListsMatch: return .green.opacity(0.6)
+        case .broadcastRightsMatch: return Theme.accent.opacity(0.5)
+        default: return score > 60 ? Theme.accent.opacity(0.3) : Theme.hairline
+        }
+    }
 
     var body: some View {
         Button(action: action) {
@@ -393,11 +419,17 @@ struct TVSourceTile: View {
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
-                    if let group = channel.group, !group.isEmpty {
-                        Text(group)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(Theme.textSecondary)
-                            .lineLimit(1)
+                    Text(subtitle ?? channel.group ?? channel.playlistName)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
+                    if let label = strongest?.displayLabel {
+                        Text(label)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(strongest == .guideListsMatch ? Color.green : Theme.accent)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background((strongest == .guideListsMatch ? Color.green : Theme.accent).opacity(0.15),
+                                        in: Capsule())
                     }
                 }
                 Label("Watch", systemImage: "play.fill")
@@ -408,11 +440,11 @@ struct TVSourceTile: View {
                     .background(Theme.accent, in: Capsule())
             }
             .padding(18)
-            .frame(width: 200, height: 200)
+            .frame(width: 200, height: 220)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(score > 60 ? Theme.accent.opacity(0.4) : Theme.hairline)
+                    .strokeBorder(borderColor)
             )
         }
         .buttonStyle(.card)

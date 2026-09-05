@@ -12,6 +12,7 @@ struct MatchDetailView: View {
     @EnvironmentObject private var predictions: PredictionsStore
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
+    @EnvironmentObject private var epgRepository: EPGRepository
     @State private var showingAllChannels = false
     @State private var spoilerRevealed = false
     @State private var playingChannel: Channel?
@@ -157,12 +158,13 @@ struct MatchDetailView: View {
         .task(id: match.id) {
             await loadOdds()
         }
-        .task(id: "\(playlists.allChannels.count)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))") {
+        .task(id: "\(match.id)-\(playlists.allChannels.count)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))") {
             await rankSources()
         }
     }
 
-    /// Scores the playlist channels against this match off the main thread.
+    /// Scores the playlist channels against this match off the main thread,
+    /// then enriches results with EPG evidence from the guide index.
     private func rankSources() async {
         guard match.state != .final else {
             rankedSources = []
@@ -173,9 +175,55 @@ struct MatchDetailView: View {
         let channels = playlists.allChannels
         let match = self.match
         let preferredLanguages = prefs.preferredStreamLanguages
-        let ranked = await Task.detached(priority: .userInitiated) {
+        var ranked = await Task.detached(priority: .userInitiated) {
             SourceMatcher.rank(match: match, channels: channels, preferredLanguages: preferredLanguages)
         }.value
+
+        // Enrich with EPG evidence: find programmes near the match window and
+        // map them back to ranked sources via the canonical channel index.
+        let titleHints = [match.name, match.shortName, match.home.displayName, match.away.displayName]
+            .filter { !$0.isEmpty }
+        let broadcastNetworks = match.broadcasts.filter { !$0.isEmpty }
+        let joins = epgRepository.programmesNear(
+            start: match.date,
+            titleHints: titleHints,
+            broadcastNetworks: broadcastNetworks
+        )
+
+        // Build a lookup from canonical channel ID → best-scoring join.
+        var bestJoinByCanonical: [String: ProgrammeEventJoin] = [:]
+        for join in joins {
+            if let existing = bestJoinByCanonical[join.canonicalChannelId] {
+                if join.score > existing.score { bestJoinByCanonical[join.canonicalChannelId] = join }
+            } else {
+                bestJoinByCanonical[join.canonicalChannelId] = join
+            }
+        }
+
+        let channelToCanonical = epgRepository.channelToCanonicalMap
+
+        ranked = ranked.map { source in
+            guard let canonicalId = channelToCanonical[source.channel.id],
+                  let join = bestJoinByCanonical[canonicalId],
+                  // Require strong title similarity, or a network match corroborated by
+                  // at least partial title overlap — network-only is not specific enough.
+                  join.titleSimilarity >= 0.6 || (join.networkMatches && join.titleSimilarity >= 0.4) else {
+                return source
+            }
+            var enriched = source
+            enriched.epgProgramme = join.programme
+            enriched.canonicalChannelId = canonicalId
+            enriched.evidenceCategories.insert(.guideListsMatch)
+            return enriched
+        }
+
+        // Sort by strongest evidence tier, then score within tier.
+        ranked.sort {
+            let lp = $0.strongestEvidence?.priority ?? 0
+            let rp = $1.strongestEvidence?.priority ?? 0
+            if lp != rp { return lp > rp }
+            return $0.score > $1.score
+        }
         rankedSources = Array(ranked.prefix(30))
         isRankingSources = false
     }
@@ -1604,6 +1652,19 @@ struct MatchDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             sourcesHeader
 
+            if let top = rankedSources.first, !isPickingMultiscreen {
+                Button { handleSourceTap(top.channel) } label: {
+                    Label(
+                        match.state == .live ? "Watch on \(top.channel.name)" : "Stream \(top.channel.name) when live",
+                        systemImage: "play.fill"
+                    )
+                    .font(.subheadline.weight(.bold))
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(match.state == .live ? Theme.live : Theme.accent)
+            }
+
             if playlists.allChannels.count >= 2 && !isPickingMultiscreen {
                 splitScreenButton
             }
@@ -1626,9 +1687,10 @@ struct MatchDetailView: View {
                     LazyVStack(spacing: 12) {
                         ForEach(filteredMatchedSources) { source in
                             SourceRow(name: source.channel.name,
-                                      subtitle: source.channel.group ?? source.channel.playlistName,
+                                      subtitle: source.epgProgramme?.title ?? source.channel.group ?? source.channel.playlistName,
                                       logoURL: source.channel.logoURL,
                                       score: source.score,
+                                      evidenceCategories: source.evidenceCategories,
                                       isPicking: false,
                                       isSelected: false) {
                                 handleSourceTap(source.channel)
@@ -1653,9 +1715,10 @@ struct MatchDetailView: View {
                 LazyVStack(spacing: 12) {
                     ForEach(filteredMatchedSources) { source in
                         SourceRow(name: source.channel.name,
-                                  subtitle: source.channel.group ?? source.channel.playlistName,
+                                  subtitle: source.epgProgramme?.title ?? source.channel.group ?? source.channel.playlistName,
                                   logoURL: source.channel.logoURL,
                                   score: source.score,
+                                  evidenceCategories: source.evidenceCategories,
                                   isPicking: false,
                                   isSelected: false) {
                             handleSourceTap(source.channel)
@@ -2520,6 +2583,7 @@ private struct SourceRow: View {
     let subtitle: String
     let logoURL: URL?
     let score: Int?
+    var evidenceCategories: Set<StreamEvidenceCategory> = []
     let isPicking: Bool
     let isSelected: Bool
     let action: () -> Void
@@ -2550,7 +2614,7 @@ private struct SourceRow: View {
                 }
                 Spacer()
                 if let score, !isPicking {
-                    MatchStrengthBadge(score: score)
+                    MatchStrengthBadge(score: score, evidenceCategories: evidenceCategories)
                 }
                 trailingIcon
             }
@@ -2582,23 +2646,29 @@ private struct SourceRow: View {
     }
 }
 
-/// Shows how confident the matcher is about a source.
+/// Badge showing why a channel was matched to this event.
+/// Prefers a named evidence category label; falls back to score thresholds.
 private struct MatchStrengthBadge: View {
     let score: Int
+    var evidenceCategories: Set<StreamEvidenceCategory> = []
+
+    private var strongest: StreamEvidenceCategory? {
+        evidenceCategories.max { $0.priority < $1.priority }
+    }
 
     private var label: String {
+        if let e = strongest { return e.displayLabel }
         switch score {
-        case 100...: return "Best"
-        case 50..<100: return "Strong"
-        case 25..<50: return "Likely"
-        default: return "Possible"
+        case 100...: return "Teams Listed"
+        case 50..<100: return "Broadcaster"
+        default: return "League"
         }
     }
 
     private var color: Color {
-        switch score {
-        case 100...: return Theme.accent
-        case 50..<100: return Color(hex: 0x3DBE6B)
+        switch strongest {
+        case .guideListsMatch: return .green
+        case .broadcastRightsMatch: return Theme.accent
         default: return Theme.textSecondary
         }
     }

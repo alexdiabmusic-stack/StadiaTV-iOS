@@ -54,6 +54,8 @@ struct RosterAthlete: Identifiable, Hashable {
     let experienceYears: Int?
     let birthPlace: String?
     let isInjured: Bool
+    /// Provider-qualified canonical player ID (e.g. "player:nba:espn:12345"). Used for platform stat routing.
+    var canonicalID: String? = nil
 }
 
 /// A positional grouping of roster athletes (e.g. "Offense", "Guards").

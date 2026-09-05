@@ -60,6 +60,12 @@ nonisolated private extension Data {
 final class EPGRepository: ObservableObject {
 
     @Published private(set) var canonicalChannels: [CanonicalChannel] = []
+    /// Flat map from `providerChannelId` → canonical channel ID, rebuilt whenever `canonicalChannels` changes.
+    /// Used by MatchDetailView and TVMatchDetailView so they don't rebuild the map on every ranking call.
+    private(set) var channelToCanonicalMap: [String: String] = [:]
+    /// Streams that passed the hide filter but matched no curated channel.
+    /// Available for global event-to-stream matching so uncatalogued feeds are not silently dropped.
+    @Published private(set) var unresolvedStreams: [ChannelStream] = []
     @Published private(set) var refreshState: EPGRefreshState = .idle
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var importProgress = LiveTVImportProgress()
@@ -69,6 +75,8 @@ final class EPGRepository: ObservableObject {
     private var programmeIndex: [String: [EPGProgramme]] = [:]
     // EPG channel id -> canonical channel id
     private var epgToCanonical: [String: String] = [:]
+    // Coverage range per canonical channel, rebuilt on every finalizeProgrammeIndex call
+    private var coverageIndex: [String: ProgrammeCoverage] = [:]
 
     private var config: CuratedGuideConfig?
     private var normalizer: ChannelNormalizer?
@@ -191,6 +199,8 @@ final class EPGRepository: ObservableObject {
 
             guard !Task.isCancelled, self.importGeneration == generation else { return }
             self.canonicalChannels = canonicals
+            self.rebuildChannelToCanonicalMap()
+            self.unresolvedStreams = buildResult.unresolvedStreams
             self.importProgress.state = .loadingEPG
             self.importProgress.canonicalChannels = canonicals.count
             self.logger.info("Live TV lineup ready filtered=\(buildResult.filteredStreams, privacy: .public) matched=\(buildResult.matchedStreams, privacy: .public) canonical=\(canonicals.count, privacy: .public)")
@@ -227,6 +237,9 @@ final class EPGRepository: ObservableObject {
         let filteredStreams: Int
         let matchedStreams: Int
         var diagnostics: LiveTVImportDiagnostics
+        /// Streams that passed the hide filter but did not match any curated channel.
+        /// Retained for global matching so uncatalogued feeds remain in the matching universe.
+        let unresolvedStreams: [ChannelStream]
     }
 
     nonisolated private static func channelFingerprint(_ channels: [Channel]) -> String {
@@ -247,7 +260,8 @@ final class EPGRepository: ObservableObject {
         var diagnostics = LiveTVImportDiagnostics()
         guard let config = CuratedGuideConfig.load() else {
             diagnostics.unmatched = channels.count
-            return CanonicalLineupBuildResult(channels: [], filteredStreams: 0, matchedStreams: 0, diagnostics: diagnostics)
+            return CanonicalLineupBuildResult(channels: [], filteredStreams: 0, matchedStreams: 0,
+                                              diagnostics: diagnostics, unresolvedStreams: [])
         }
 
         let normalizer = ChannelNormalizer(config: config)
@@ -260,6 +274,8 @@ final class EPGRepository: ObservableObject {
             if Task.isCancelled { break }
             let filterText = [channel.name, channel.group].compactMap { $0 }.joined(separator: " ")
             guard !normalizer.shouldHide(channelName: filterText) else { continue }
+            // Extract pre-normalization metadata before stripping removes slot numbers, dates, etc.
+            let metadata = normalizer.extractStreamMetadata(from: channel.name)
             let normName = normalizer.normalize(channel.name)
             var stream = ChannelStream(
                 id: channel.id,
@@ -267,7 +283,7 @@ final class EPGRepository: ObservableObject {
                 originalName: channel.name,
                 normalizedName: normName,
                 streamURL: channel.streamURL,
-                tvgId: nil,
+                tvgId: channel.tvgId,
                 tvgName: channel.name,
                 tvgLogoURL: channel.logoURL,
                 groupTitle: channel.group,
@@ -276,12 +292,14 @@ final class EPGRepository: ObservableObject {
                 playlistName: channel.playlistName
             )
             stream.countryHint = normalizer.extractCountryHint(from: channel.name)
+            stream.streamMetadata = metadata
             visible.append(stream)
         }
         diagnostics.prefilterDuration = Date().timeIntervalSince(prefilterStart)
 
         let matchStart = Date()
         var matches: [ChannelMatchResult] = []
+        var unresolvedStreams: [ChannelStream] = []
         matches.reserveCapacity(min(visible.count, config.channels.count * 4))
         for stream in visible {
             if Task.isCancelled { break }
@@ -301,6 +319,7 @@ final class EPGRepository: ObservableObject {
                 }
             } else {
                 diagnostics.unmatched += 1
+                unresolvedStreams.append(stream)
             }
         }
         diagnostics.canonicalMatchDuration = Date().timeIntervalSince(matchStart)
@@ -313,7 +332,8 @@ final class EPGRepository: ObservableObject {
             channels: canonicals,
             filteredStreams: visible.count,
             matchedStreams: matches.count,
-            diagnostics: diagnostics
+            diagnostics: diagnostics,
+            unresolvedStreams: unresolvedStreams
         )
     }
 
@@ -573,7 +593,10 @@ final class EPGRepository: ObservableObject {
                 updated[i].epgChannelId = epgId
             }
         }
-        Task { @MainActor in self.canonicalChannels = updated }
+        Task { @MainActor in
+            self.canonicalChannels = updated
+            self.rebuildChannelToCanonicalMap()
+        }
     }
 
     // MARK: - Programme Index
@@ -618,6 +641,7 @@ final class EPGRepository: ObservableObject {
             finalized[key] = deduplicate(programmes.sorted { $0.start < $1.start })
         }
         programmeIndex = finalized
+        rebuildCoverageIndex()
         saveProgrammeIndex()
     }
 
@@ -655,6 +679,134 @@ final class EPGRepository: ObservableObject {
 
     func hasProgrammes(for channelId: String) -> Bool {
         !(programmeIndex[channelId]?.isEmpty ?? true)
+    }
+
+    // MARK: - Coverage API
+
+    /// Returns the coverage range for a canonical channel, or nil if no programmes are indexed.
+    func coverage(for channelId: String) -> ProgrammeCoverage? {
+        coverageIndex[channelId]
+    }
+
+    /// All canonical channel IDs that have programmes overlapping the given window.
+    func channelsWithCoverage(in window: ClosedRange<Date>) -> [String] {
+        coverageIndex.values
+            .filter { $0.overlaps(start: window.lowerBound, end: window.upperBound) }
+            .map(\.channelId)
+    }
+
+    /// Canonical channel IDs that have an EPG.pw mapping but no current or near-future coverage.
+    /// These are candidates for a background enrichment fetch.
+    var channelsNeedingEnrichment: [String] {
+        let soon = Date().addingTimeInterval(2 * 3600)
+        return canonicalChannels.compactMap { channel -> String? in
+            guard epgpwMappings.mapping(for: channel.id) != nil else { return nil }
+            if let cov = coverageIndex[channel.id] { return cov.latestEnd < soon ? channel.id : nil }
+            return channel.id
+        }
+    }
+
+    // MARK: - Event-programme join
+
+    /// Returns programmes that likely cover a specific sports event, ranked by evidence.
+    ///
+    /// Parameters are kept EPG-generic so callers don't need to import sports types.
+    ///
+    /// - Parameters:
+    ///   - start: Scheduled event start time.
+    ///   - duration: Expected event length (default 3 h); used as the matching window.
+    ///   - titleHints: Event name variants (e.g. game name and short name). Used for title similarity.
+    ///   - broadcastNetworks: Known rights-holder network names from the event's broadcast record.
+    func programmesNear(
+        start: Date,
+        duration: TimeInterval = 3 * 3600,
+        titleHints: [String],
+        broadcastNetworks: [String]
+    ) -> [ProgrammeEventJoin] {
+        let searchEnd   = start.addingTimeInterval(duration)
+        // Include pre-show (30 min before) and post-show (30 min after) programmes.
+        let windowStart = start.addingTimeInterval(-1800)
+        let windowEnd   = searchEnd.addingTimeInterval(1800)
+
+        let networkSet    = Set(broadcastNetworks.map { $0.lowercased() })
+        let hintTokenSets = titleHints.map { epgTokenize($0) }.filter { !$0.isEmpty }
+
+        // Build O(1) channel-network lookup for this call.
+        var channelNetworks: [String: String] = [:]
+        for ch in canonicalChannels {
+            if let net = ch.network { channelNetworks[ch.id] = net.lowercased() }
+        }
+
+        var joins: [ProgrammeEventJoin] = []
+        for (channelId, programmes) in programmeIndex {
+            let channelNet    = channelNetworks[channelId]
+            let networkMatches = channelNet.map { networkSet.contains($0) } ?? false
+
+            for programme in programmes {
+                guard programme.end > windowStart && programme.start < windowEnd else { continue }
+                let overlapStart = max(programme.start, start)
+                let overlapEnd   = min(programme.end, searchEnd)
+                let overlap      = max(0, overlapEnd.timeIntervalSince(overlapStart))
+
+                let progTokens   = epgTokenize(programme.title)
+                let similarity   = hintTokenSets.map { epgJaccard(progTokens, $0) }.max() ?? 0
+
+                guard similarity >= 0.10 || networkMatches else { continue }
+
+                joins.append(ProgrammeEventJoin(
+                    programme: programme,
+                    canonicalChannelId: channelId,
+                    titleSimilarity: similarity,
+                    timeOverlap: overlap,
+                    networkMatches: networkMatches
+                ))
+            }
+        }
+
+        return joins.sorted { $0.score > $1.score }
+    }
+
+    // MARK: - Coverage rebuild
+
+    private func rebuildChannelToCanonicalMap() {
+        var map: [String: String] = [:]
+        map.reserveCapacity(canonicalChannels.count * 2)
+        for canonical in canonicalChannels {
+            for stream in canonical.allStreams {
+                map[stream.providerChannelId] = canonical.id
+            }
+        }
+        channelToCanonicalMap = map
+    }
+
+    private func rebuildCoverageIndex() {
+        var index: [String: ProgrammeCoverage] = [:]
+        index.reserveCapacity(programmeIndex.count)
+        for (channelId, programmes) in programmeIndex where !programmes.isEmpty {
+            index[channelId] = ProgrammeCoverage(
+                channelId: channelId,
+                earliestStart: programmes[0].start,
+                latestEnd: programmes[programmes.count - 1].end,
+                programmeCount: programmes.count
+            )
+        }
+        coverageIndex = index
+    }
+
+    // MARK: - Event-join helpers
+
+    private func epgTokenize(_ text: String) -> Set<String> {
+        Set(
+            text.lowercased()
+                .components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .filter { $0.count >= 3 }
+        )
+    }
+
+    private func epgJaccard(_ a: Set<String>, _ b: Set<String>) -> Double {
+        let unionCount = a.union(b).count
+        guard unionCount > 0 else { return 0 }
+        return Double(a.intersection(b).count) / Double(unionCount)
     }
 
     // MARK: - Persistence

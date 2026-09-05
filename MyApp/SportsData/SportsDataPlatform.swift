@@ -1838,6 +1838,9 @@ struct SportsRepository: Sendable {
     }
 
     private func canonicalGameID(for match: Match) -> StadiaEntityID {
+        if let canonical = match.canonicalID {
+            return StadiaEntityID(rawValue: canonical)
+        }
         if match.id.hasPrefix("game:") {
             return StadiaEntityID(rawValue: match.id)
         }
@@ -2470,7 +2473,7 @@ struct ESPNProvider: ScoreProvider, ScheduleProvider, TeamProvider, StandingsPro
 
 extension StadiaPlayer {
     func toLegacyRosterAthlete() -> RosterAthlete {
-        RosterAthlete(
+        var athlete = RosterAthlete(
             id: aliases.first { $0.provider == .espn }?.id ?? aliases.first?.id ?? id.rawValue,
             displayName: displayName,
             jersey: jerseyNumber,
@@ -2485,6 +2488,8 @@ extension StadiaPlayer {
             birthPlace: nil,
             isInjured: false
         )
+        athlete.canonicalID = id.rawValue
+        return athlete
     }
 }
 
@@ -2579,7 +2584,7 @@ extension StadiaNewsArticle {
 
 extension StadiaGame {
     func toLegacyMatch(league: League) -> Match {
-        Match(
+        var match = Match(
             id: aliases.first { $0.provider == .espn }?.id ?? aliases.first?.id ?? id.rawValue,
             league: league,
             date: scheduledStart,
@@ -2593,6 +2598,9 @@ extension StadiaGame {
             venue: venue?.name,
             liveContext: MatchLiveContextMapper.context(from: self, league: league)
         )
+        match.canonicalID = id.rawValue
+        match.broadcastDetails = broadcasts
+        return match
     }
 }
 

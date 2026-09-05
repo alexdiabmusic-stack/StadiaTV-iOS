@@ -4,6 +4,7 @@ import SwiftUI
 struct TVFollowingView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var fantasyStore: FantasyStore
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
     @StateObject private var viewModel = MatchesViewModel()
 
     @State private var selectedEntityID: String = "all"
@@ -88,7 +89,7 @@ struct TVFollowingView: View {
                     if !remaining.isEmpty {
                         TVShelfRow(title: "Coming Up", systemImage: "calendar", tint: Color(hex: 0x3DBE6B)) {
                             ForEach(remaining.prefix(12)) { match in
-                                NavigationLink(value: match) { TVMatchCard(match: match) }.buttonStyle(.card)
+                                NavigationLink(value: match) { TVMatchCard(match: match, streamCount: streamStore.count(for: match.id)) }.buttonStyle(.card)
                             }
                         }
                     }
@@ -97,7 +98,7 @@ struct TVFollowingView: View {
                 if !recentResults.isEmpty {
                     TVShelfRow(title: "Recent Results", systemImage: "flag.checkered", tint: Theme.textSecondary) {
                         ForEach(recentResults.prefix(10)) { match in
-                            NavigationLink(value: match) { TVMatchCard(match: match) }.buttonStyle(.card)
+                            NavigationLink(value: match) { TVMatchCard(match: match, streamCount: streamStore.count(for: match.id)) }.buttonStyle(.card)
                         }
                     }
                 }

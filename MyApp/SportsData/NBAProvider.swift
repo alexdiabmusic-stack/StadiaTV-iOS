@@ -36,21 +36,42 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
 
     func schedule(for league: League, range: SportsDateRange) async throws -> StadiaSchedule {
         try ensureNBA(league)
-        var games: [StadiaGame] = []
-        for day in NBASeason.days(in: range) {
-            if Calendar.current.isDate(day, inSameDayAs: Date()) {
-                do {
-                    let response = try await client.todayScoreboard()
-                    games.append(contentsOf: (response.scoreboard?.games ?? []).compactMap { mapGame($0, league: league) })
-                } catch {
-                    let response = try await client.scoreboardV3(date: NBADateFormatter.statsDayString(from: day))
-                    games.append(contentsOf: mapScoreboardV3(response, league: league))
+        // Cap at 90 days to bound the request count; fetch in parallel chunks of 7.
+        let allDays = NBASeason.days(in: range)
+        let days = Array(allDays.prefix(90))
+        let chunkSize = 7
+        let today = Date()
+        let localProvider = self  // struct copy — safe to capture across task boundaries
+
+        var games: [StadiaGame] = await withTaskGroup(of: [StadiaGame].self) { group in
+            var offset = 0
+            while offset < days.count {
+                let chunk = Array(days[offset..<min(offset + chunkSize, days.count)])
+                group.addTask(priority: .utility) {
+                    var dayGames: [StadiaGame] = []
+                    for day in chunk {
+                        do {
+                            if Calendar.current.isDate(day, inSameDayAs: today) {
+                                let r = try await localProvider.client.todayScoreboard()
+                                let dtos = r.scoreboard?.games ?? []
+                                let mapped = await MainActor.run { dtos.compactMap { localProvider.mapGame($0, league: league) } }
+                                dayGames.append(contentsOf: mapped)
+                            } else {
+                                let r = try await localProvider.client.scoreboardV3(date: NBADateFormatter.statsDayString(from: day))
+                                let mapped = await MainActor.run { localProvider.mapScoreboardV3(r, league: league) }
+                                dayGames.append(contentsOf: mapped)
+                            }
+                        } catch { }
+                    }
+                    return dayGames
                 }
-            } else {
-                let response = try await client.scoreboardV3(date: NBADateFormatter.statsDayString(from: day))
-                games.append(contentsOf: mapScoreboardV3(response, league: league))
+                offset += chunkSize
             }
+            var result: [StadiaGame] = []
+            for await dayGames in group { result.append(contentsOf: dayGames) }
+            return result
         }
+
         var seen = Set<StadiaEntityID>()
         games = games.filter { seen.insert($0.id).inserted }
             .filter { $0.scheduledStart >= range.start && $0.scheduledStart <= range.end }
@@ -939,7 +960,7 @@ enum NBASeason {
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: range.start)
         let end = calendar.startOfDay(for: range.end)
-        let count = min(max(1, (calendar.dateComponents([.day], from: start, to: end).day ?? 0) + 1), 14)
+        let count = max(1, (calendar.dateComponents([.day], from: start, to: end).day ?? 0) + 1)
         return (0..<count).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
     }
 }
@@ -969,14 +990,26 @@ enum NBAStatusFormatter {
 }
 
 extension StadiaGameStatus {
+    // Status codes take priority over text patterns.
+    // Code 1 = scheduled, code 2 = live/in-progress, code 3 = final.
+    // Text fallbacks only apply when the code is absent (nil).
     init(nbaStatusCode: Int?, text: String?, start: Date) {
         let normalized = (text ?? "").lowercased()
-        if nbaStatusCode == 3 || normalized.contains("final") { self = .final }
-        else if nbaStatusCode == 2 || normalized.contains("qtr") || normalized.contains("halftime") || normalized.contains("ot") || normalized.contains(":") { self = .live }
-        else if normalized.contains("postpon") { self = .postponed }
-        else if normalized.contains("delay") { self = .delayed }
-        else if start.timeIntervalSinceNow < 900 && start.timeIntervalSinceNow > -900 { self = .pregame }
-        else { self = .scheduled }
+        switch nbaStatusCode {
+        case 3:
+            self = .final
+        case 2:
+            self = .live
+        case 1:
+            self = .scheduled
+        default:
+            if normalized.contains("final") { self = .final }
+            else if normalized.contains("qtr") || normalized.contains("halftime") || normalized.contains("ot") { self = .live }
+            else if normalized.contains("postpon") { self = .postponed }
+            else if normalized.contains("delay") { self = .delayed }
+            else if start.timeIntervalSinceNow < 900 && start.timeIntervalSinceNow > -900 { self = .pregame }
+            else { self = .scheduled }
+        }
     }
 }
 

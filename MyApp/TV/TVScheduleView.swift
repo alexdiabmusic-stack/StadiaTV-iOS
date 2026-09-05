@@ -3,6 +3,7 @@ import SwiftUI
 
 struct TVScheduleView: View {
     @EnvironmentObject private var prefs: PreferencesStore
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
     @StateObject private var viewModel = MatchesViewModel()
     @State private var favoritesOnly = false
 
@@ -89,7 +90,7 @@ struct TVScheduleView: View {
                     if !viewModel.liveMatches.isEmpty {
                         TVShelfRow(title: "Live Now", systemImage: "dot.radiowaves.left.and.right", tint: Theme.live) {
                             ForEach(viewModel.liveMatches) { match in
-                                NavigationLink(value: match) { TVMatchCard(match: match) }.buttonStyle(.card)
+                                NavigationLink(value: match) { TVMatchCard(match: match, streamCount: streamStore.count(for: match.id)) }.buttonStyle(.card)
                             }
                         }
                     }
@@ -98,7 +99,7 @@ struct TVScheduleView: View {
                     if !viewModel.upcomingMatches.isEmpty {
                         TVShelfRow(title: "Upcoming", systemImage: "clock", tint: Color(hex: 0x3DBE6B)) {
                             ForEach(viewModel.upcomingMatches) { match in
-                                NavigationLink(value: match) { TVMatchCard(match: match) }.buttonStyle(.card)
+                                NavigationLink(value: match) { TVMatchCard(match: match, streamCount: streamStore.count(for: match.id)) }.buttonStyle(.card)
                             }
                         }
                     }
@@ -107,7 +108,7 @@ struct TVScheduleView: View {
                     if !viewModel.finishedMatches.isEmpty {
                         TVShelfRow(title: "Results", systemImage: "flag.checkered", tint: Theme.textSecondary) {
                             ForEach(viewModel.finishedMatches) { match in
-                                NavigationLink(value: match) { TVMatchCard(match: match) }.buttonStyle(.card)
+                                NavigationLink(value: match) { TVMatchCard(match: match, streamCount: streamStore.count(for: match.id)) }.buttonStyle(.card)
                             }
                         }
                     }

@@ -8,6 +8,7 @@ struct LiveView: View {
     @EnvironmentObject private var viewModel: LiveViewModel
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
     @AppStorage("live.filter.v1") private var savedFilterRaw: String = LiveFilter.forYou.rawValue
     @State private var filter: LiveFilter = .forYou
     @State private var selectedSport: SportGroup?
@@ -112,7 +113,8 @@ struct LiveView: View {
                                 onAddToCalendar: { Task { await addToCalendar(match) } },
                                 onHide: { hide(match) },
                                 showScoreBar: prefs.showLiveScoreBar,
-                                fantasyContext: liveFantasyContext(for: match)
+                                fantasyContext: liveFantasyContext(for: match),
+                                streamCount: streamStore.count(for: match.id)
                             )
                         }
                             .buttonStyle(.plain)
@@ -252,7 +254,8 @@ struct LiveView: View {
                         onSetAlert: { Task { await setAlert(for: match) } },
                         onAddToCalendar: { Task { await addToCalendar(match) } },
                         onHide: { hide(match) },
-                        showScoreBar: prefs.showLiveScoreBar
+                        showScoreBar: prefs.showLiveScoreBar,
+                        streamCount: streamStore.count(for: match.id)
                     )
                 }
                 .buttonStyle(.plain)
@@ -409,6 +412,9 @@ struct LiveMatchCard: View {
     let onHide: () -> Void
     var showScoreBar: Bool = false
     var fantasyContext: [FantasyPlayerGame] = []
+    var streamCount: Int = 0
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
+    @State private var showingQuickStream = false
 
     private var fantasyLabel: String? {
         guard !fantasyContext.isEmpty else { return nil }
@@ -477,6 +483,20 @@ struct LiveMatchCard: View {
                         .lineLimit(1)
                 }
                 Spacer()
+                if streamCount > 0 {
+                    Button { showingQuickStream = true } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "play.tv")
+                                .font(.system(size: 9, weight: .bold))
+                            Text("\(streamCount)")
+                                .font(.system(size: 9, weight: .bold).monospacedDigit())
+                        }
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Theme.accent.opacity(0.12), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
                 Text(match.statusDetail)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.live)
@@ -511,6 +531,14 @@ struct LiveMatchCard: View {
             Button("Add to Calendar", systemImage: "calendar.badge.plus") { onAddToCalendar() }
             Divider()
             Button("Hide", systemImage: "eye.slash", role: .destructive) { onHide() }
+        }
+        .sheet(isPresented: $showingQuickStream) {
+            QuickStreamSheet(
+                match: match,
+                sources: streamStore.topRanked(for: match.id)
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
     }
 

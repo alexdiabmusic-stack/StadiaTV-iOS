@@ -24,6 +24,25 @@ nonisolated final class ChannelNormalizer {
         // [BK], [HD], [BACKUP], [FHD] etc.
         pattern: #"\[[A-Z0-9\s]{1,12}\]"#, options: .caseInsensitive)
 
+    // Patterns for pre-normalization metadata extraction
+    // Slot: "PEACOCK 01: " / "TSN+ 7: " / "APPLE TV+ SERIES 8 HD" / "STAN EVENT 4"
+    private static let slotWithColonRe = try! NSRegularExpression(
+        pattern: #"(?:^|(?:SERIE[S]?\s+|EVENT\s+))(\d{1,2})\s*:\s*$"#, options: .caseInsensitive)
+    private static let namedSlotRe = try! NSRegularExpression(
+        pattern: #"(?:SERIE[S]?|EVENT)\s+(\d{1,2})(?:\s|$)"#, options: .caseInsensitive)
+    // Event date: YYYY-MM-DD or standalone 4-digit year
+    private static let isoDateRe = try! NSRegularExpression(
+        pattern: #"\b(20\d{2}-\d{2}-\d{2})\b"#, options: [])
+    private static let yearOnlyRe = try! NSRegularExpression(
+        pattern: #"\b(20\d{2})\b"#, options: [])
+    // Backup marker
+    private static let backupRe = try! NSRegularExpression(
+        pattern: #"\[(BACKUP|BK)\]"#, options: .caseInsensitive)
+    // Language tag in brackets: [ESP], [FRA], [GER] etc.
+    private static let languageTagRe = try! NSRegularExpression(
+        pattern: #"\b(ESP|FRA|GER|ITA|POR|ARA|TUR|POL|NLD|ZHO|JPN|KOR|HIN|RUS|ENG)\b"#,
+        options: .caseInsensitive)
+
     private static let numberedSuffixRe = try! NSRegularExpression(
         // Strip trailing 3+ digit stream indices ("ESPN+ 449", "Flo 682").
         // 1-2 digit numbers like "RDS 2" are intentional channel names — keep them.
@@ -110,6 +129,71 @@ nonisolated final class ChannelNormalizer {
             }
         }
         return nil
+    }
+
+    // MARK: - Pre-normalization metadata extraction
+
+    /// Extracts metadata that the normalizer will otherwise strip (slot numbers, dates, backup flags).
+    /// Must be called on the raw name BEFORE `normalize()` runs.
+    nonisolated func extractStreamMetadata(from name: String) -> StreamMetadata {
+        let nsName = name as NSString
+        let range = NSRange(location: 0, length: nsName.length)
+
+        // Slot number: trailing "NN:" pattern or SERIES/EVENT NN
+        var slotNumber: Int? = nil
+        var slotLabel: String? = nil
+        if let m = Self.slotWithColonRe.firstMatch(in: name, range: range),
+           m.numberOfRanges > 1, m.range(at: 1).location != NSNotFound {
+            let digits = nsName.substring(with: m.range(at: 1))
+            slotNumber = Int(digits)
+            // Label = everything before the colon, stripped of decoration
+            let full = nsName.substring(with: m.range).trimmingCharacters(in: .whitespaces)
+            slotLabel = full.components(separatedBy: ":").first?.trimmingCharacters(in: .whitespaces)
+        } else if let m = Self.namedSlotRe.firstMatch(in: name, range: range),
+                  m.numberOfRanges > 1, m.range(at: 1).location != NSNotFound {
+            let digits = nsName.substring(with: m.range(at: 1))
+            slotNumber = Int(digits)
+            slotLabel = nsName.substring(with: m.range).trimmingCharacters(in: .whitespaces)
+        }
+
+        // Event date: ISO date preferred over year-only
+        var eventDate: String? = nil
+        if let m = Self.isoDateRe.firstMatch(in: name, range: range),
+           m.numberOfRanges > 1, m.range(at: 1).location != NSNotFound {
+            eventDate = nsName.substring(with: m.range(at: 1))
+        } else if let m = Self.yearOnlyRe.firstMatch(in: name, range: range),
+                  m.numberOfRanges > 1, m.range(at: 1).location != NSNotFound {
+            eventDate = nsName.substring(with: m.range(at: 1))
+        }
+
+        // Backup marker
+        let isBackup = Self.backupRe.firstMatch(in: name, range: range) != nil
+
+        // Language hint from bracket tag
+        var languageHint: String? = nil
+        if let m = Self.languageTagRe.firstMatch(in: name, range: range) {
+            languageHint = nsName.substring(with: m.range).uppercased()
+                .trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        }
+
+        // Event description from long bracket suffix (captured before longBracketSuffixRe strips it)
+        var eventDescription: String? = nil
+        if let m = Self.longBracketSuffixRe.firstMatch(in: name, range: range) {
+            let bracket = nsName.substring(with: m.range).trimmingCharacters(in: .whitespaces)
+            // Strip outer brackets to get the description text
+            if bracket.hasPrefix("[") && bracket.hasSuffix("]") {
+                eventDescription = String(bracket.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
+            }
+        }
+
+        return StreamMetadata(
+            slotNumber: slotNumber,
+            slotLabel: slotLabel,
+            eventDate: eventDate,
+            isBackup: isBackup,
+            languageHint: languageHint,
+            eventDescription: eventDescription
+        )
     }
 
     // MARK: - Hide check

@@ -1674,6 +1674,41 @@ final class HomeViewModel: ObservableObject {
         let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
         var matchesByLeague: [String: [Match]] = [:]
 
+        // Compute favourite leagues upfront so Phase 3 fetches can start at T=0
+        // alongside the live snapshot, rather than waiting for Phase 2 to finish.
+        let favoriteLeagueIDs = Set(favorites.flatMap { [$0.leaguePath, $0.leagueStadiaKey] })
+        let favoriteLeagues = League.all.filter {
+            favoriteLeagueIDs.contains($0.id) || favoriteLeagueIDs.contains($0.stadiaKey)
+        }
+
+        // Fire every schedule request immediately — no concurrency cap, no sliding window.
+        // Phase 2 (7-day) and Phase 3 (365-day) tasks are all launched here, before Phase 1
+        // even starts, so all league fetches race in parallel with the live-snapshot below.
+        // By the time the home screen opens most results are already buffered.
+        let p2Leagues = leagues
+        let p3Leagues = favoriteLeagues
+        async let schedulesFuture: [(String, [Match])] = withTaskGroup(of: (String, [Match]).self) { group in
+            for league in p2Leagues {
+                group.addTask {
+                    let m = (try? await SportsRepository.shared.legacyScoreboards(
+                        for: league, starting: Date(), days: 7
+                    )) ?? []
+                    return (league.id, m)
+                }
+            }
+            for league in p3Leagues {
+                group.addTask {
+                    let m = (try? await SportsRepository.shared.legacyScoreboards(
+                        for: league, starting: Date(), days: 365
+                    )) ?? []
+                    return (league.id, m)
+                }
+            }
+            var collected = [(String, [Match])]()
+            for await result in group { collected.append(result) }
+            return collected
+        }
+
         // Phase 1: live-first aggregation across the supported catalog. This
         // goes through the provider router's liveScores capability and only asks
         // schedule providers for the near-future cards.
@@ -1701,79 +1736,16 @@ final class HomeViewModel: ObservableObject {
             errorMessage = firstError ?? "No live or upcoming games were returned for today."
         }
 
-        // Phase 2 — 7-day schedule for all followed leagues, now fully concurrent.
-        // The old 300 ms stagger protected ESPN; today each league routes to its own
-        // first-party provider (NHL/MLB/NBA/NFL official APIs, Apple Sports for
-        // soccer/tennis/golf/racing — ESPN is only a fallback). The scheduleDeduplicator
-        // inside SportsRepository coalesces any duplicate in-flight keys, so shared
-        // providers never see double requests. UI rebuilds progressively as each league
-        // arrives rather than waiting for the slowest one.
-        if !leagues.isEmpty {
-            var phase2Iterator = leagues.makeIterator()
-            await withTaskGroup(of: (String, [Match]).self) { group in
-                let concurrency = min(leagues.count, 6)
-                for _ in 0..<concurrency {
-                    guard let league = phase2Iterator.next() else { break }
-                    group.addTask {
-                        let matches = (try? await SportsRepository.shared.legacyScoreboards(
-                            for: league, starting: Date(), days: 7
-                        )) ?? []
-                        return (league.id, matches)
-                    }
-                }
-                for await (leagueID, matches) in group {
-                    if Task.isCancelled { group.cancelAll(); break }
-                    if !matches.isEmpty {
-                        matchesByLeague[leagueID] = mergeMatches((matchesByLeague[leagueID] ?? []) + matches)
-                        rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
-                    }
-                    if let next = phase2Iterator.next() {
-                        group.addTask {
-                            let matches = (try? await SportsRepository.shared.legacyScoreboards(
-                                for: next, starting: Date(), days: 7
-                            )) ?? []
-                            return (next.id, matches)
-                        }
-                    }
-                }
-            }
+        // Phase 2 + Phase 3 — all schedule fetches were started concurrently with
+        // Phase 1 above via schedulesFuture. Await the collected results and apply
+        // them in one batch. Since every request has been in-flight since T=0,
+        // most arrive immediately or arrive very shortly after Phase 1 completes.
+        for (leagueID, matches) in await schedulesFuture where !matches.isEmpty {
+            if Task.isCancelled { break }
+            matchesByLeague[leagueID] = mergeMatches((matchesByLeague[leagueID] ?? []) + matches)
         }
-
-        // Phase 3 — 365-day schedule for leagues that include a followed team.
-        // Slightly tighter concurrency (4) because year-range payloads are larger.
-        let favoriteLeagueIDs = Set(favorites.flatMap { [$0.leaguePath, $0.leagueStadiaKey] })
-        let favoriteLeagues = League.all.filter {
-            favoriteLeagueIDs.contains($0.id) || favoriteLeagueIDs.contains($0.stadiaKey)
-        }
-        if !favoriteLeagues.isEmpty {
-            var phase3Iterator = favoriteLeagues.makeIterator()
-            await withTaskGroup(of: (String, [Match]).self) { group in
-                let concurrency = min(favoriteLeagues.count, 4)
-                for _ in 0..<concurrency {
-                    guard let league = phase3Iterator.next() else { break }
-                    group.addTask {
-                        let matches = (try? await SportsRepository.shared.legacyScoreboards(
-                            for: league, starting: Date(), days: 365
-                        )) ?? []
-                        return (league.id, matches)
-                    }
-                }
-                for await (leagueID, matches) in group {
-                    if Task.isCancelled { group.cancelAll(); break }
-                    if !matches.isEmpty {
-                        matchesByLeague[leagueID] = mergeMatches((matchesByLeague[leagueID] ?? []) + matches)
-                        rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
-                    }
-                    if let next = phase3Iterator.next() {
-                        group.addTask {
-                            let matches = (try? await SportsRepository.shared.legacyScoreboards(
-                                for: next, starting: Date(), days: 365
-                            )) ?? []
-                            return (next.id, matches)
-                        }
-                    }
-                }
-            }
+        if !p2Leagues.isEmpty || !p3Leagues.isEmpty {
+            rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
         }
 
         if notificationsEnabled {

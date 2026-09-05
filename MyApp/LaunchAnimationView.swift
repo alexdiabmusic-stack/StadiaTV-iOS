@@ -32,6 +32,8 @@ struct LaunchAnimationView: View {
     // Splash scale relative to the standard toolbar BrandMark (which is scale 1.0).
     private static let splashScale: CGFloat = 2.0
 
+    @State private var bounceScale: CGFloat = 1.0
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -72,7 +74,7 @@ struct LaunchAnimationView: View {
     @ViewBuilder
     private func animatedBrandMark(in geo: GeometryProxy) -> some View {
         BrandMark(tvColor: tvColor)
-            .scaleEffect(logoScale)
+            .scaleEffect(logoScale * bounceScale)
             .offset(y: logoOffset(in: geo))
             .animation(
                 // No position/scale animation when Reduce Motion is enabled —
@@ -80,6 +82,21 @@ struct LaunchAnimationView: View {
                 reduceMotion ? nil : .timingCurve(0.4, 0.0, 0.2, 1.0, duration: 0.58),
                 value: coordinator.isTransitioningToHome
             )
+            .onChange(of: coordinator.phase) { _, newPhase in
+                guard newPhase == .brandComplete && !reduceMotion else { return }
+                // Spring pulse: logo scales up ~6 % then bounces back to rest.
+                // Completes ~500 ms before the travel animation fires.
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(80))
+                    withAnimation(.spring(response: 0.2, dampingFraction: 0.65)) {
+                        bounceScale = 1.06
+                    }
+                    try? await Task.sleep(for: .milliseconds(220))
+                    withAnimation(.spring(response: 0.38, dampingFraction: 0.42)) {
+                        bounceScale = 1.0
+                    }
+                }
+            }
     }
 
     // MARK: - Animated properties

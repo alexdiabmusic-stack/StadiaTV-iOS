@@ -100,6 +100,7 @@ struct RootView: View {
     @StateObject private var liveViewModel = LiveViewModel()
     @StateObject private var epgRepository = EPGRepository()
     @StateObject private var guideStore = GuideChannelStore()
+    @StateObject private var streamStore = StreamAvailabilityStore()
     @State private var showingFavoriteNotificationPrompt = false
     @State private var selectedTab: AppTab = .home
 
@@ -140,10 +141,18 @@ struct RootView: View {
         .environmentObject(liveViewModel)
         .environmentObject(epgRepository)
         .environmentObject(guideStore)
+        .environmentObject(streamStore)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: podcastStore.nowPlaying != nil)
         .task { updateFavoriteNotificationPrompt() }
         .task { await liveViewModel.load(favoriteTeams: prefs.favoriteTeams) }
         .task { epgRepository.setupWithChannels(playlistStore.allChannels) }
+        .task(id: "\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.allChannels.count)") {
+            await streamStore.scan(
+                matches: liveViewModel.allLive + liveViewModel.startingSoon,
+                channels: playlistStore.allChannels,
+                preferredLanguages: prefs.preferredStreamLanguages
+            )
+        }
         .onChange(of: playlistStore.channelsByPlaylist) {
             epgRepository.setupWithChannels(playlistStore.allChannels)
             Task { await refreshFantasyContexts(force: true) }

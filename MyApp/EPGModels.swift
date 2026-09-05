@@ -59,6 +59,31 @@ nonisolated struct CanonicalChannel: Identifiable, Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
+// MARK: - Stream pre-normalization metadata
+
+/// Metadata extracted from the raw channel name before normalization strips it.
+/// Slot numbers, event dates and backup markers are removed by the normalizer;
+/// they must be captured here to remain available for identity matching.
+nonisolated struct StreamMetadata: Equatable, Sendable {
+    /// Slot index in a numbered event feed, e.g. 1 from "PEACOCK 01:", 7 from "TSN+ 7:".
+    var slotNumber: Int?
+    /// Raw label before the slot colon, e.g. "PEACOCK 01" or "STAN EVENT 3".
+    var slotLabel: String?
+    /// Date-like string found in the channel name, e.g. "2025-09-06" or "2025".
+    var eventDate: String?
+    /// True when the name contains [BACKUP] or [BK].
+    var isBackup: Bool
+    /// Explicit language code from a bracket tag, e.g. "ESP", "FRA".
+    var languageHint: String?
+    /// Text content from a long bracket event-description suffix before it was stripped.
+    var eventDescription: String?
+
+    static let empty = StreamMetadata(
+        slotNumber: nil, slotLabel: nil, eventDate: nil,
+        isBackup: false, languageHint: nil, eventDescription: nil
+    )
+}
+
 // MARK: - Channel Stream
 
 nonisolated struct ChannelStream: Identifiable, Hashable {
@@ -80,6 +105,8 @@ nonisolated struct ChannelStream: Identifiable, Hashable {
     var archiveEnabled: Bool = false
     var archiveDuration: Int = 0
     var countryHint: String? = nil
+    /// Pre-normalization metadata extracted before display-name cleanup.
+    var streamMetadata: StreamMetadata = .empty
 
     static func == (lhs: ChannelStream, rhs: ChannelStream) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
@@ -220,6 +247,46 @@ nonisolated struct GuideCategory: Identifiable, Hashable {
 
     static func == (lhs: GuideCategory, rhs: GuideCategory) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}
+
+// MARK: - Programme coverage
+
+/// Temporal extent of a channel's programme data in the live index.
+/// Rebuilt on every `finalizeProgrammeIndex` call; O(1) lookup from `EPGRepository.coverage(for:)`.
+nonisolated struct ProgrammeCoverage: Sendable {
+    let channelId: String
+    let earliestStart: Date
+    let latestEnd: Date
+    let programmeCount: Int
+
+    var spanHours: Double { latestEnd.timeIntervalSince(earliestStart) / 3600 }
+
+    func covers(_ date: Date) -> Bool { date >= earliestStart && date <= latestEnd }
+
+    func overlaps(start: Date, end: Date) -> Bool { start < latestEnd && end > earliestStart }
+}
+
+// MARK: - Programme-event join
+
+/// A programme that is likely covering a specific sports event, with evidence scores.
+/// Returned by `EPGRepository.programmesNear(start:duration:titleHints:broadcastNetworks:)`.
+nonisolated struct ProgrammeEventJoin: Sendable {
+    let programme: EPGProgramme
+    let canonicalChannelId: String
+    /// Jaccard token similarity between programme title and any of the supplied event title hints (0–1).
+    let titleSimilarity: Double
+    /// Overlap between the programme and the nominal event window (before pre/post-show padding).
+    let timeOverlap: TimeInterval
+    /// True when the channel's curated network name is in the caller-supplied broadcast-network list.
+    let networkMatches: Bool
+
+    /// Composite relevance score. Higher = more likely to carry this event.
+    var score: Double {
+        let titleWeight  = titleSimilarity * 0.55
+        let overlapScore = min(timeOverlap / (2 * 3600), 1.0) * 0.30
+        let networkBonus = networkMatches ? 0.15 : 0.0
+        return titleWeight + overlapScore + networkBonus
+    }
 }
 
 // MARK: - Refresh state

@@ -512,7 +512,8 @@ private struct ProgrammeGridView: View {
                     width: w,
                     now: now,
                     hasCatchup: channel.hasCatchup,
-                    fantasyIndicatorCount: fantasyStore.settings.showFantasyIndicatorsInGuide ? fantasyStore.fantasyIndicatorCount(for: prog, channel: channel) + nativeFantasyStore.fantasyIndicatorCount(for: prog, channel: channel) : 0
+                    fantasyIndicatorCount: fantasyStore.settings.showFantasyIndicatorsInGuide ? fantasyStore.fantasyIndicatorCount(for: prog, channel: channel) + nativeFantasyStore.fantasyIndicatorCount(for: prog, channel: channel) : 0,
+                    streamCount: channel.allStreams.count
                 ) {
                     onProgramTap(prog, channel)
                 }
@@ -779,12 +780,14 @@ struct ProgrammeCell: View {
     let now: Date
     var hasCatchup: Bool = false
     var fantasyIndicatorCount: Int = 0
+    var streamCount: Int = 0
     let onTap: () -> Void
 
     private var isCurrent: Bool { programme.isOnNow(at: now) }
     private var isPast: Bool { programme.isPast(at: now) }
     private var showCatchupBadge: Bool { isPast && hasCatchup && width >= 80 }
     private var showFantasyBadge: Bool { fantasyIndicatorCount > 0 && width >= 42 }
+    private var showStreamBadge: Bool { isCurrent && streamCount > 0 && width >= 36 }
 
     // Static formatter to avoid re-creating DateFormatter on every cell render.
     nonisolated static let timeFmt: DateFormatter = {
@@ -823,6 +826,14 @@ struct ProgrammeCell: View {
                     Image(systemName: "clock.arrow.circlepath")
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(Theme.accent.opacity(0.8))
+                        .padding(3)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                }
+
+                if showStreamBadge {
+                    Image(systemName: "play.tv")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(Theme.accent)
                         .padding(3)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                 }

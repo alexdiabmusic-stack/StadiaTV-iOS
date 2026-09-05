@@ -165,7 +165,8 @@ struct LiveChannel: Identifiable, Codable, Sendable, Hashable {
             logoURL: logoURL ?? primaryStream?.tvgLogoURL,
             group: groupTitle,
             playlistID: providerID,
-            playlistName: playlistName
+            playlistName: playlistName,
+            tvgId: tvgID
         )
     }
 

@@ -30,6 +30,7 @@ struct MatchesView: View {
     @EnvironmentObject private var predictions: PredictionsStore
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var playlists: PlaylistStore
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
 
     @State private var mode: FollowingMode = .following
     @State private var selectedSelection: FollowingSelection = .all
@@ -71,6 +72,13 @@ struct MatchesView: View {
         }
         .tint(Theme.accent)
         .task(id: loadKey) { await loadAll() }
+        .task(id: streamScanKey) {
+            await streamStore.scan(
+                matches: viewModel.allFollowedMatches + viewModel.matches,
+                channels: playlists.allChannels,
+                preferredLanguages: prefs.preferredStreamLanguages
+            )
+        }
         .onAppear { viewModel.startAutoRefresh() }
         .onDisappear { viewModel.stopAutoRefresh() }
         .onChange(of: prefs.favoriteTeams) { _, _ in
@@ -83,6 +91,10 @@ struct MatchesView: View {
             prefs.explicitlyFollowedLeagues.map(\.id).sorted().joined(separator: ","),
             prefs.favoriteTeams.map(\.id).sorted().joined(separator: ","),
         ].joined(separator: "|")
+    }
+
+    private var streamScanKey: String {
+        "\(viewModel.allFollowedMatches.count)-\(viewModel.matches.count)-\(playlists.allChannels.count)"
     }
 
     private func loadAll() async {
@@ -182,7 +194,8 @@ struct MatchesView: View {
                     matches: comingUpPreviewMatches,
                     fullScheduleMatches: comingUpMatches,
                     sportFilter: $comingUpSportFilter,
-                    availableSports: comingUpAvailableSports
+                    availableSports: comingUpAvailableSports,
+                    streamCountByMatchId: streamStore.countByMatchId
                 )
                 .padding(.bottom, 28)
 
@@ -780,6 +793,7 @@ private struct FollowingComingUpSection: View {
     let fullScheduleMatches: [Match]
     @Binding var sportFilter: SportGroup?
     let availableSports: [SportGroup]
+    var streamCountByMatchId: [String: Int] = [:]
 
     private struct DateGroup: Identifiable {
         let title: String
@@ -846,7 +860,8 @@ private struct FollowingComingUpSection: View {
                             .padding(.horizontal, 20)
                         ForEach(group.matches) { match in
                             NavigationLink(value: match) {
-                                FollowingEventRow(match: match)
+                                FollowingEventRow(match: match,
+                                                  streamCount: streamCountByMatchId[match.id] ?? 0)
                             }
                             .buttonStyle(.plain)
                             .padding(.horizontal, 20)
@@ -859,7 +874,8 @@ private struct FollowingComingUpSection: View {
                     FollowingFullScheduleView(
                         matches: fullScheduleMatches,
                         availableSports: availableSports,
-                        initialSportFilter: sportFilter
+                        initialSportFilter: sportFilter,
+                        streamCountByMatchId: streamCountByMatchId
                     )
                 } label: {
                     HStack(spacing: 4) {
@@ -914,11 +930,14 @@ private struct FollowingComingUpSection: View {
 private struct FollowingFullScheduleView: View {
     let matches: [Match]
     let availableSports: [SportGroup]
+    let streamCountByMatchId: [String: Int]
     @State private var sportFilter: SportGroup?
 
-    init(matches: [Match], availableSports: [SportGroup], initialSportFilter: SportGroup?) {
+    init(matches: [Match], availableSports: [SportGroup], initialSportFilter: SportGroup?,
+         streamCountByMatchId: [String: Int] = [:]) {
         self.matches = matches
         self.availableSports = availableSports
+        self.streamCountByMatchId = streamCountByMatchId
         _sportFilter = State(initialValue: initialSportFilter)
     }
 
@@ -978,7 +997,8 @@ private struct FollowingFullScheduleView: View {
                                     .padding(.horizontal, 20)
                                 ForEach(group.matches) { match in
                                     NavigationLink(value: match) {
-                                        FollowingEventRow(match: match)
+                                        FollowingEventRow(match: match,
+                                                          streamCount: streamCountByMatchId[match.id] ?? 0)
                                     }
                                     .buttonStyle(.plain)
                                     .padding(.horizontal, 20)
@@ -1036,6 +1056,9 @@ private struct FollowingFullScheduleView: View {
 
 private struct FollowingEventRow: View {
     let match: Match
+    var streamCount: Int = 0
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
+    @State private var showingQuickStream = false
 
     private var isRacing: Bool { match.league.group == .racing }
 
@@ -1064,6 +1087,20 @@ private struct FollowingEventRow: View {
             Spacer()
 
             HStack(spacing: 6) {
+                if streamCount > 0 && match.state != .final {
+                    Button { showingQuickStream = true } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "play.tv")
+                                .font(.system(size: 9, weight: .bold))
+                            Text("\(streamCount)")
+                                .font(.system(size: 9, weight: .bold).monospacedDigit())
+                        }
+                        .foregroundStyle(Theme.accent)
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Theme.accent.opacity(0.12), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
                 if match.state == .live {
                     HStack(spacing: 4) {
                         PulsingLiveBadge()
@@ -1088,6 +1125,14 @@ private struct FollowingEventRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityText)
         .accessibilityHint("Opens \(isRacing ? "Event" : "Game") Centre")
+        .sheet(isPresented: $showingQuickStream) {
+            QuickStreamSheet(
+                match: match,
+                sources: streamStore.topRanked(for: match.id)
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
     }
 
     private var cleanTitle: String {

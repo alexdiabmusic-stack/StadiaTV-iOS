@@ -1083,6 +1083,7 @@ private struct LiveNowCommandCenter: View {
     @Binding var selectedSport: SportGroup?
     let onSetAlert: (Match) -> Void
     let onAddToCalendar: (Match) -> Void
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
     @State private var hiddenMatchIDs: Set<String> = []
 
     private var visibleMatches: [Match] {
@@ -1152,7 +1153,8 @@ private struct LiveNowCommandCenter: View {
                             match: match,
                             onSetAlert: { onSetAlert(match) },
                             onAddToCalendar: { onAddToCalendar(match) },
-                            onHide: { hiddenMatchIDs.insert(match.id) }
+                            onHide: { hiddenMatchIDs.insert(match.id) },
+                            streamCount: streamStore.count(for: match.id)
                         )
                     }
                     .buttonStyle(.plain)

@@ -308,9 +308,11 @@ struct PlayerDetailView: View {
             isLoading = false
             return
         }
-        // Fallback for providers (e.g. MLB) whose numeric player IDs don't map to ESPN
-        if athlete.id.allSatisfy(\.isNumber) {
-            let playerEntityID = StadiaEntityID(rawValue: athlete.id)
+        // Use the canonical qualified ID for platform stat lookup when available.
+        // Fall back to the bare numeric ID check for legacy ESPN-sourced athletes.
+        let entityIDValue = athlete.canonicalID ?? (athlete.id.allSatisfy(\.isNumber) ? athlete.id : nil)
+        if let entityIDValue {
+            let playerEntityID = StadiaEntityID(rawValue: entityIDValue)
             if let playerStats = try? await SportsRepository.shared.playerStats(for: league, playerIDs: Set([playerEntityID]), range: nil),
                let stat = playerStats.first, !stat.stats.isEmpty {
                 let year = Calendar.current.component(.year, from: Date())

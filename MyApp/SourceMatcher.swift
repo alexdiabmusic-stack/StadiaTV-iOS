@@ -35,19 +35,31 @@ nonisolated enum SourceMatcher {
         for channel in channels {
             let haystack = normalize([channel.name, channel.group ?? "", channel.playlistName].joined(separator: " "))
             let haystackTokens = Set(haystack.split(separator: " ").map(String.init))
-            var score = 0
 
-            let homeHit = matches(homeTokens, in: haystack, tokens: haystackTokens) || aliasMatches(homeAliases, in: haystack, tokens: haystackTokens)
-            let awayHit = matches(awayTokens, in: haystack, tokens: haystackTokens) || aliasMatches(awayAliases, in: haystack, tokens: haystackTokens)
+            // Channels whose name marks them as news or finance content never carry live sports.
+            guard haystackTokens.isDisjoint(with: Self.nonSportsNameTokens) else { continue }
+
+            let paddedHaystack = " \(haystack) "
+            var score = 0
+            var evidence: Set<StreamEvidenceCategory> = []
+
+            let homeHit = matches(homeTokens, in: haystack, tokens: haystackTokens) || aliasMatches(homeAliases, padded: paddedHaystack, tokens: haystackTokens)
+            let awayHit = matches(awayTokens, in: haystack, tokens: haystackTokens) || aliasMatches(awayAliases, padded: paddedHaystack, tokens: haystackTokens)
 
             // Both teams named -> almost certainly the event feed.
-            if homeHit && awayHit { score += 100 }
-            else if homeHit || awayHit { score += 40 }
+            if homeHit && awayHit {
+                score += 100
+                evidence.insert(.teamNameMatch)
+            } else if homeHit || awayHit {
+                // Single-team hit: score boost but not enough to claim both teams are listed.
+                score += 40
+            }
 
             // Event-title feeds matter for non-team sports and special broadcasts
             // such as Tour de France stages.
             if eventTitleMatches(eventTokens, in: haystack, tokens: haystackTokens) {
                 score += 80
+                evidence.insert(.eventTitleMatch)
             }
 
             // Abbreviation matches (whole-token only, 3-char minimum to prevent
@@ -56,36 +68,54 @@ nonisolated enum SourceMatcher {
             if homeAbbr.count >= 3, haystackTokens.contains(homeAbbr) { score += 15 }
             if awayAbbr.count >= 3, haystackTokens.contains(awayAbbr) { score += 15 }
 
-            // Broadcast network on the channel name.
+            // Broadcast network on the channel name — require whole-word (single-word networks)
+            // or phrase-boundary (multi-word networks) to avoid "fox" matching "fox news".
             for network in broadcasts where !network.isEmpty {
-                if haystack.contains(network) { score += 35 }
+                let hit = network.contains(" ")
+                    ? paddedHaystack.contains(" \(network) ")
+                    : haystackTokens.contains(network)
+                if hit {
+                    score += 35
+                    evidence.insert(.broadcastRightsMatch)
+                }
             }
 
             // Known event-specific rights holders, used when ESPN's broadcast
             // payload is sparse for events such as Tour de France stages.
-            if eventBroadcasterMatches(eventSpecificBroadcasters, in: haystack, tokens: haystackTokens) {
+            if eventBroadcasterMatches(eventSpecificBroadcasters, padded: paddedHaystack, tokens: haystackTokens) {
                 score += 70
+                evidence.insert(.broadcastRightsMatch)
             }
 
-            // League keywords.
-            for keyword in leagueKeywords where haystack.contains(keyword) {
-                score += 12
+            // League keywords — word-boundary only to prevent "nba" matching inside "wnba".
+            var leagueKeywordHit = false
+            for keyword in leagueKeywords {
+                let hit = keyword.contains(" ")
+                    ? paddedHaystack.contains(" \(keyword) ")
+                    : haystackTokens.contains(keyword)
+                if hit {
+                    score += 12
+                    leagueKeywordHit = true
+                }
             }
             // Dedicated league-branded channel bonus: channels like "NHL GAME 07",
             // "DAZN NBA 1", or "SKY SPORT F1" contain the league's short name as a
             // whole word and deserve a bigger boost than a generic keyword substring hit.
             if haystackTokens.contains(leagueShort) {
                 score += 30
-            } else if !leagueShort.isEmpty && haystack.contains(leagueShort) {
-                score += 12
+                leagueKeywordHit = true
             }
+            if leagueKeywordHit { evidence.insert(.leagueKeyword) }
 
             // Sports group / generic sports network bonus.
             if let group = channel.group?.lowercased(),
                group.contains("sport") || group.contains(match.league.group.rawValue.lowercased()) {
                 score += 6
             }
-            if isKnownSportsNetwork(haystack) { score += 5 }
+            if isKnownSportsNetwork(haystack) {
+                score += 5
+                evidence.insert(.networkNameMatch)
+            }
 
             // Language preference: boost streams tagged with a preferred
             // language (e.g. "EN:" means an English stream), deprioritize
@@ -98,7 +128,9 @@ nonisolated enum SourceMatcher {
             }
 
             if score >= minimumScore(for: match) {
-                ranked.append(RankedSource(channel: channel, score: score))
+                var result = RankedSource(channel: channel, score: score)
+                result.evidenceCategories = evidence
+                ranked.append(result)
             }
         }
 
@@ -160,14 +192,17 @@ nonisolated enum SourceMatcher {
         }
     }
 
-    private static func eventBroadcasterMatches(_ aliases: [String], in haystack: String, tokens haystackTokens: Set<String>) -> Bool {
-        aliasMatches(aliases, in: haystack, tokens: haystackTokens)
+    private static func eventBroadcasterMatches(_ aliases: [String], padded paddedHaystack: String, tokens haystackTokens: Set<String>) -> Bool {
+        aliasMatches(aliases, padded: paddedHaystack, tokens: haystackTokens)
     }
 
-    private static func aliasMatches(_ aliases: [String], in haystack: String, tokens haystackTokens: Set<String>) -> Bool {
+    /// Matches any alias against a channel haystack using whole-word boundaries.
+    /// Single-word aliases require a whole token; multi-word phrases require space-padded
+    /// containment so "nba tv" does not match inside "wnba tv".
+    private static func aliasMatches(_ aliases: [String], padded paddedHaystack: String, tokens haystackTokens: Set<String>) -> Bool {
         aliases.contains { alias in
             guard !alias.isEmpty else { return false }
-            if alias.contains(" ") { return haystack.contains(alias) }
+            if alias.contains(" ") { return paddedHaystack.contains(" \(alias) ") }
             return haystackTokens.contains(alias)
         }
     }
@@ -226,250 +261,21 @@ nonisolated enum SourceMatcher {
     }
 
     private static func eventBroadcasterAliases(for match: Match) -> [String] {
+        // For motorsport events, detect the session type so session-specific policies apply.
+        // (e.g. ESPN carries F1 qualifying + race but not practice sessions in the US.)
+        let session: RacingSessionKind = match.league.group == .racing
+            ? RacingSessionKind.detect(from: "\(match.name) \(match.shortName)")
+            : .unknown
+
+        let aliases = BroadcastRightsStore.shared.broadcasters(for: match.league.path, at: match.date, session: session)
+        if !aliases.isEmpty { return aliases }
+
+        // Tour de France: not in the ESPN league catalog, detected by event title pattern.
         let title = normalize("\(match.name) \(match.shortName) \(match.league.name)")
-
-        switch match.league.path {
-
-        // ── Soccer ──────────────────────────────────────────────────────────
-        case "soccer/usa.1":
-            // "apple tv" and "apple" are intentionally excluded: Apple TV+ SERIES numbered
-            // slots are entertainment channels and would false-positive here.
-            // "fox"/"fs1"/"fs2" are covered by the broadcasts[] array from ESPN data.
-            return [
-                "mls season pass", "season pass", "mls 360", "mls wrap up",
-                "tudn", "univision", "tsn", "rds", "one soccer", "onesoccer"
-            ]
-        case "soccer/eng.1":
-            // UK: Sky Sports, TNT Sports. Canada: Fubo. USA: NBC Sports/Peacock.
-            return [
-                "sky sports", "sky sports premier league", "tnt sports", "tntsports",
-                "bt sport", "peacock", "nbc sports", "nbcsn", "optus sport",
-                "hub premier", "premier sports", "fubo"
-            ]
-        case "soccer/eng.2", "soccer/eng.3", "soccer/eng.4":
-            // EFL Championship / League One / Two: Sky Sports, TNT Sports in UK; beIN internationally
-            return [
-                "sky sports", "tnt sports", "tntsports", "bein sport", "espn"
-            ]
-        case "soccer/eng.fa_cup":
-            return ["bbc", "itv", "tnt sports", "tntsports", "bt sport", "espn"]
-        case "soccer/uefa.champions", "soccer/uefa.europa":
-            return [
-                "cbs sports", "cbs", "paramount", "tnt sports", "tntsports",
-                "dazn", "canal plus", "sky sport", "bein sport"
-            ]
-        case "soccer/esp.1":
-            // Spain: DAZN. USA: ESPN. Canada: TSN/RDS. International: beIN Sports.
-            return [
-                "dazn", "espn", "abc", "sky sports", "bein sport",
-                "movistar", "m sport", "laliga tv", "la liga tv",
-                "tsn", "rds"
-            ]
-        case "soccer/ita.1":
-            // Italy: DAZN, Sky. USA: CBS/Paramount+. Canada: Fubo.
-            return [
-                "dazn", "sky sport serie a", "sky sport", "espn",
-                "peacock", "bein sport", "paramount", "cbs sports", "fubo"
-            ]
-        case "soccer/ger.1":
-            // Germany: Sky, DAZN, RTL. Canada: OneSoccer/DAZN. USA: USA Sports/Telemundo.
-            return [
-                "sky sport bundesliga", "sky sport", "dazn", "espn", "bein sport", "sport1",
-                "rtl", "onesoccer", "one soccer", "telemundo"
-            ]
-        case "soccer/fra.1":
-            // France: Ligue 1+, Canal+, DAZN, beIN Sports.
-            return [
-                "canal plus", "dazn", "bein sport", "amazon prime", "prime video",
-                "ligue 1", "ligue1"
-            ]
-        case "soccer/ned.1":
-            // Netherlands: ESPN. International: Viaplay, beIN Sports.
-            return [
-                "viaplay", "ziggo sport", "espn", "espn nl", "espn netherlands",
-                "espn eredivisie", "dazn", "bein sport"
-            ]
-        case "soccer/por.1":
-            // Portugal: SPORT TV, BTV (Benfica home), Eleven Sports.
-            return ["sport tv", "benfica tv", "eleven sports", "dazn", "btv"]
-        case "soccer/sco.1":
-            // Scottish Premiership: Sky Sports UK, Premier Sports.
-            return ["sky sports", "premier sports", "bein sport", "espn"]
-        case "soccer/bel.1":
-            // Belgian Pro League: DAZN (domestic), beIN Sports (international).
-            return ["dazn", "bein sport", "eleven sports", "proximus sports"]
-        case "soccer/tur.1":
-            // Turkish Süper Lig: beIN Sports worldwide.
-            return ["bein sport", "bein sports", "beinsports", "s sport", "ssport"]
-        case "soccer/gre.1":
-            // Greek Super League: COSMOTE Sport, Novasports.
-            return ["cosmote sport", "cosmote", "novasports", "nova sport", "ert sports"]
-        case "soccer/aut.1":
-            // Austrian Bundesliga: Sky Austria.
-            return ["sky sport austria", "sky sport", "puls 4", "puls4"]
-        case "soccer/sui.1":
-            // Swiss Super League: RSI, SRF, RTS, Blue Sport.
-            return ["blue sport", "bluesport", "rsi", "srf", "rts", "mysports"]
-        case "soccer/den.1":
-            // Danish Superliga: TV2 Denmark.
-            return ["tv2 sport", "tv 2 sport", "discovery plus", "discovery+", "viaplay"]
-        case "soccer/swe.1":
-            // Allsvenskan: TV4, Telia.
-            return ["tv4 sport", "tv4", "telia", "viaplay", "c more"]
-        case "soccer/pol.1":
-            // Ekstraklasa: Canal+ Poland.
-            return ["canal plus", "polsat sport", "tvp sport"]
-        case "soccer/nor.1":
-            // Eliteserien: TV2 Norway.
-            return ["tv2 sport", "tv 2 sport", "viaplay", "max sport"]
-        case "soccer/rom.1":
-            // Romanian SuperLiga: Digi Sport, Prima Sport, Orange Sport.
-            return ["digi sport", "prima sport", "orange sport", "primasport"]
-        case "soccer/sau.1":
-            // Saudi Pro League: Thmanyah, SSC, beIN Sports.
-            return ["ssc", "thmanyah", "bein sport", "bein sports", "beinsports"]
-        case "soccer/qat.1":
-            // Qatar Stars League: Al Kass.
-            return ["al kass", "alkass", "bein sport", "qatar tv"]
-        case "soccer/jpn.1":
-            // J1 League: DAZN Japan.
-            return ["dazn", "nhk", "fuji tv", "j sports"]
-        case "soccer/kor.1", "soccer/kor.2":
-            // K League: Coupang Play.
-            return ["coupang", "coupang play", "spotv", "jtbc"]
-        case "soccer/aus.1", "soccer/aus.nwsl":
-            // A-League: Paramount+ (Australia).
-            return ["paramount plus", "paramount+", "10 play", "ten play", "paramount"]
-        case "soccer/rsa.1":
-            // South African Premiership: SuperSport, Canal+.
-            return ["supersport", "super sport", "canal plus", "dstv"]
-        case "soccer/can.1":
-            // Canadian Premier League: OneSoccer.
-            return ["onesoccer", "one soccer", "cbcsports", "cbc sports"]
-        case "soccer/mex.1":
-            // Liga MX: Televisa channels, TV Azteca, Fox Sports Mexico, Prime Video (Chivas).
-            return [
-                "canal 5", "tudn", "las estrellas", "azteca", "azteca 7",
-                "fox sports", "fox deportes", "prime video", "amazon prime",
-                "tdn", "claro sports", "claro video"
-            ]
-        case "soccer/bra.1", "soccer/bra.2":
-            // Brazilian Série A/B: Globo, Premiere, Amazon Prime Video, SporTV, Record, CazéTV.
-            return [
-                "premiere", "globo", "sportv", "spor tv", "amazon prime", "prime video",
-                "record", "cazé tv", "caze tv", "cazetv", "ge tv", "getv"
-            ]
-        case "soccer/arg.1":
-            // Argentine LPF: TNT Sports Argentina, ESPN.
-            return ["tnt sports", "tntsports", "espn", "directv sports", "dsports"]
-        case "soccer/col.1":
-            // Colombian Liga BetPlay: Win Sports.
-            return ["win sports", "winsports", "espn", "rcn", "caracol"]
-        case "soccer/chi.1":
-            // Chilean Liga de Primera: TNT Sports Chile.
-            return ["tnt sports", "tntsports", "canal 13", "chilevisión", "chilevision"]
-        case "soccer/per.1":
-            // Peruvian Liga 1: L1 MAX.
-            return ["l1 max", "l1max", "liga 1 max", "america tv", "gol peru"]
-        case "soccer/ecu.1":
-            // Ecuadorian LigaPro: Zapping.
-            return ["zapping", "gol tv", "tc sports", "tcs"]
-        case "soccer/mor.1":
-            // Moroccan Botola Pro: Arryadia, 2M.
-            return ["arryadia", "2m", "snrt", "bein sport"]
-        case "soccer/concacaf.champions":
-            // Concacaf Champions Cup: OneSoccer (Canada), Fox Sports (USA), Televisa (Mexico).
-            return [
-                "onesoccer", "one soccer", "fox sports", "fox deportes", "tudn",
-                "televisa", "cbs sports", "paramount"
-            ]
-        case "soccer/fifa.world", "soccer/fifa.wwc":
-            return [
-                "fox", "fs1", "telemundo", "peacock", "tnt sports", "bbc", "itv", "bein sport",
-                "fifa wc"
-            ]
-
-        // ── Football ────────────────────────────────────────────────────────
-        case "football/nfl":
-            return [
-                "cbs", "fox", "nbc", "abc", "espn", "nfl network", "prime",
-                "amazon", "peacock", "paramount", "dazn nfl"
-            ]
-
-        // ── Hockey ───────────────────────────────────────────────────────────
-        case "hockey/nhl":
-            return [
-                "espn", "abc", "tnt", "tbs", "sportsnet", "tsn", "rds",
-                "nhl network", "nhln", "peacock", "tva sports"
-            ]
-
-        // ── Basketball ──────────────────────────────────────────────────────
-        case "basketball/nba":
-            return ["tnt", "abc", "espn", "nba tv", "nbatv", "dazn nba", "bein sports"]
-
-        // ── Baseball ─────────────────────────────────────────────────────────
-        case "baseball/mlb":
-            return [
-                "fox", "fs1", "espn", "apple tv", "apple", "peacock",
-                "mlb network", "mlbn", "tbs"
-            ]
-
-        // ── Racing ───────────────────────────────────────────────────────────
-        case "racing/f1":
-            return [
-                "sky sport f1", "sky sports f1", "sky f1", "dazn f1", "f1tv", "f1 tv",
-                "formula 1 tv", "alwan f1", "f1 tv pro", "channel 4", "espn f1"
-            ]
-        case "racing/nascar-premier", "racing/nascar-truck":
-            return [
-                "fox", "nbc", "nbc sports", "tntsports", "tnt sports",
-                "peacock", "fs1", "fs2"
-            ]
-        case "racing/irl":
-            return [
-                "fox", "fox sports", "fs1", "fs2", "indycar", "indy car", "ntt indycar",
-                "peacock", "nbc", "nbc sports", "sky sports f1", "dazn"
-            ]
-
-        // ── Golf ─────────────────────────────────────────────────────────────
-        case "golf/pga", "golf/lpga", "golf/champions-tour":
-            return [
-                "golf channel", "pga tour", "cbs", "nbc", "peacock",
-                "sky sports golf", "sky sport golf", "bbc sport"
-            ]
-        case "golf/eur":
-            return ["sky sports golf", "sky sport golf", "eurosport", "golf channel"]
-
-        // ── Tennis ───────────────────────────────────────────────────────────
-        case "tennis/atp", "tennis/wta":
-            return [
-                "tennis channel", "espn", "bein sport", "bein sports",
-                "eurosport", "amazon prime", "prime video",
-                "sky sports", "sky sport", "wowow", "supertennis"
-            ]
-
-        default:
-            break
-        }
-
-        // ── Tour de France (event-title based) ──────────────────────────────
         guard isTourDeFrance(title) else { return [] }
-
-        return [
-            // France Télévisions channels. "france 2 " and "france 3 " use a trailing
-            // space so that "france 24" (a news channel) does not false-positive —
-            // "france 24" normalises to "france 24" which does not contain "france 2 ".
-            "france 2 ", "france 3 ", "france televisions", "france tv sport",
-            "eurosport", "eurosport extra",
-            "hbo max", "ard", "servus tv", "servus",
-            "rtbf", "vrt", "czech tv", "ct sport", "dktv2", "tv2 norway", "tv2", "rtve", "tg4",
-            "rai sports", "rai sport", "rai", "rtl", "nos", "tnt sports", "eitb", "rtp", "stvr",
-            "rtv slovenija", "rtv slo", "srg ssr", "mtva", "okko", "s4c", "abu dhabi sports",
-            "supersport", "bein sport asia", "bein sports asia", "bein sport", "zhubo tv", "cctv",
-            "j sports", "wowow", "elta", "coupang", "sbs", "sky sport", "espn", "flosports",
-            "caracol tv", "caracol", "canal rcn", "rcn", "nbc sports", "peacock", "tv5monde"
-        ]
+        return BroadcastRightsStore.shared.broadcasters(for: "cycling/tour-de-france", at: match.date)
     }
+
 
     private static func isTourDeFrance(_ normalizedTitle: String) -> Bool {
         normalizedTitle.contains("tour") && normalizedTitle.contains("france")
@@ -570,6 +376,11 @@ nonisolated enum SourceMatcher {
     ]
 
     private static func isKnownSportsNetwork(_ haystack: String) -> Bool {
-        knownNetworks.contains { haystack.contains($0) }
+        let padded = " \(haystack) "
+        return knownNetworks.contains { padded.contains(" \($0) ") }
     }
+
+    /// Tokens in a channel name that indicate the channel is non-sports content.
+    /// Channels with these tokens are excluded before any scoring.
+    private static let nonSportsNameTokens: Set<String> = ["news", "business"]
 }

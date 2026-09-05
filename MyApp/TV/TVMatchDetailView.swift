@@ -5,15 +5,9 @@ struct TVMatchDetailView: View {
     let match: Match
     @EnvironmentObject private var playlistStore: PlaylistStore
     @EnvironmentObject private var prefs: PreferencesStore
+    @EnvironmentObject private var epgRepository: EPGRepository
+    @State private var rankedSources: [RankedSource] = []
     @State private var playingChannel: Channel?
-
-    private var rankedSources: [RankedSource] {
-        SourceMatcher.rank(
-            match: match,
-            channels: playlistStore.allChannels,
-            preferredLanguages: prefs.preferredStreamLanguages
-        )
-    }
 
     var body: some View {
         ZStack {
@@ -24,7 +18,9 @@ struct TVMatchDetailView: View {
                     if !rankedSources.isEmpty {
                         TVShelfRow(title: "Stream Sources", systemImage: "play.tv.fill") {
                             ForEach(rankedSources) { source in
-                                TVSourceTile(channel: source.channel, score: source.score) {
+                                TVSourceTile(channel: source.channel, score: source.score,
+                                             subtitle: source.epgProgramme?.title,
+                                             evidenceCategories: source.evidenceCategories) {
                                     playingChannel = source.channel
                                 }
                             }
@@ -42,9 +38,63 @@ struct TVMatchDetailView: View {
             }
         }
         .navigationTitle(match.shortName)
+        .task(id: "\(playlistStore.allChannels.count)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))") {
+            await rankSources()
+        }
         .fullScreenCover(item: $playingChannel) { channel in
             TVPlayerView(channel: channel)
         }
+    }
+
+    private func rankSources() async {
+        guard match.state != .final else { rankedSources = []; return }
+
+        let channels = playlistStore.allChannels
+        let match = self.match
+        let preferredLanguages = prefs.preferredStreamLanguages
+        var ranked = await Task.detached(priority: .userInitiated) {
+            SourceMatcher.rank(match: match, channels: channels, preferredLanguages: preferredLanguages)
+        }.value
+
+        let titleHints = [match.name, match.shortName, match.home.displayName, match.away.displayName]
+            .filter { !$0.isEmpty }
+        let broadcastNetworks = match.broadcasts.filter { !$0.isEmpty }
+        let joins = epgRepository.programmesNear(
+            start: match.date,
+            titleHints: titleHints,
+            broadcastNetworks: broadcastNetworks
+        )
+
+        var bestJoinByCanonical: [String: ProgrammeEventJoin] = [:]
+        for join in joins {
+            if let existing = bestJoinByCanonical[join.canonicalChannelId] {
+                if join.score > existing.score { bestJoinByCanonical[join.canonicalChannelId] = join }
+            } else {
+                bestJoinByCanonical[join.canonicalChannelId] = join
+            }
+        }
+
+        let channelToCanonical = epgRepository.channelToCanonicalMap
+        ranked = ranked.map { source in
+            guard let canonicalId = channelToCanonical[source.channel.id],
+                  let join = bestJoinByCanonical[canonicalId],
+                  join.titleSimilarity >= 0.6 || (join.networkMatches && join.titleSimilarity >= 0.4) else {
+                return source
+            }
+            var enriched = source
+            enriched.epgProgramme = join.programme
+            enriched.canonicalChannelId = canonicalId
+            enriched.evidenceCategories.insert(.guideListsMatch)
+            return enriched
+        }
+
+        ranked.sort {
+            let lp = $0.strongestEvidence?.priority ?? 0
+            let rp = $1.strongestEvidence?.priority ?? 0
+            if lp != rp { return lp > rp }
+            return $0.score > $1.score
+        }
+        rankedSources = Array(ranked.prefix(20))
     }
 
     // MARK: - Hero scoreboard

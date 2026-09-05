@@ -4,6 +4,7 @@ import SwiftUI
 struct TVHomeView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var watchStore: WatchStore
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
     @StateObject private var viewModel = HomeViewModel()
     @State private var selectedChannel: Channel?
 
@@ -141,7 +142,7 @@ struct TVHomeView: View {
         if !viewModel.liveNow.isEmpty {
             TVShelfRow(title: "Live Now", systemImage: "dot.radiowaves.left.and.right", tint: Theme.live) {
                 ForEach(viewModel.liveNow.prefix(12)) { match in
-                    NavigationLink(value: match) { TVMatchCard(match: match) }.buttonStyle(.card)
+                    NavigationLink(value: match) { TVMatchCard(match: match, streamCount: streamStore.count(for: match.id)) }.buttonStyle(.card)
                 }
             }
         }
@@ -151,7 +152,7 @@ struct TVHomeView: View {
         if !viewModel.startingSoon.isEmpty {
             TVShelfRow(title: "Starting Soon", systemImage: "clock.badge.fill", tint: Theme.starting) {
                 ForEach(viewModel.startingSoon.prefix(10)) { match in
-                    NavigationLink(value: match) { TVMatchCard(match: match) }.buttonStyle(.card)
+                    NavigationLink(value: match) { TVMatchCard(match: match, streamCount: streamStore.count(for: match.id)) }.buttonStyle(.card)
                 }
             }
         }
@@ -164,7 +165,7 @@ struct TVHomeView: View {
         if !matches.isEmpty {
             TVShelfRow(title: "Your Teams", systemImage: "star.fill", tint: Theme.accent) {
                 ForEach(matches.prefix(8)) { match in
-                    NavigationLink(value: match) { TVMatchCard(match: match) }.buttonStyle(.card)
+                    NavigationLink(value: match) { TVMatchCard(match: match, streamCount: streamStore.count(for: match.id)) }.buttonStyle(.card)
                 }
             }
         }
@@ -177,7 +178,7 @@ struct TVHomeView: View {
         if !matches.isEmpty {
             TVShelfRow(title: "Upcoming Games", systemImage: "calendar", tint: Color(hex: 0x3DBE6B)) {
                 ForEach(matches) { match in
-                    NavigationLink(value: match) { TVMatchCard(match: match) }.buttonStyle(.card)
+                    NavigationLink(value: match) { TVMatchCard(match: match, streamCount: streamStore.count(for: match.id)) }.buttonStyle(.card)
                 }
             }
         }

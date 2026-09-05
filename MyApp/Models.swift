@@ -478,6 +478,10 @@ struct Match: Identifiable, Hashable {
     let broadcasts: [String]
     let venue: String?
     let liveContext: MatchLiveContext
+    /// Provider-qualified canonical game ID (e.g. "game:espn:nba:401234"). Preserved for routing.
+    var canonicalID: String? = nil
+    /// Full broadcast records with country/type metadata. Use for stream matching; use `broadcasts` for display.
+    var broadcastDetails: [StadiaBroadcast] = []
 
     static func == (lhs: Match, rhs: Match) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
@@ -519,15 +523,21 @@ struct Match: Identifiable, Hashable {
     }
 
     func withBroadcasts(_ newBroadcasts: [String]) -> Match {
-        Match(id: id, league: league, date: date, name: name, shortName: shortName,
-              state: state, statusDetail: statusDetail, home: home, away: away,
-              broadcasts: newBroadcasts, venue: venue, liveContext: liveContext)
+        var m = Match(id: id, league: league, date: date, name: name, shortName: shortName,
+                      state: state, statusDetail: statusDetail, home: home, away: away,
+                      broadcasts: newBroadcasts, venue: venue, liveContext: liveContext)
+        m.canonicalID = canonicalID
+        m.broadcastDetails = broadcastDetails
+        return m
     }
 
     func withLiveContext(_ newContext: MatchLiveContext) -> Match {
-        Match(id: id, league: league, date: date, name: name, shortName: shortName,
-              state: state, statusDetail: statusDetail, home: home, away: away,
-              broadcasts: broadcasts, venue: venue, liveContext: newContext)
+        var m = Match(id: id, league: league, date: date, name: name, shortName: shortName,
+                      state: state, statusDetail: statusDetail, home: home, away: away,
+                      broadcasts: broadcasts, venue: venue, liveContext: newContext)
+        m.canonicalID = canonicalID
+        m.broadcastDetails = broadcastDetails
+        return m
     }
 }
 
@@ -667,13 +677,65 @@ struct Channel: Identifiable, Hashable {
     let group: String?
     let playlistID: UUID
     let playlistName: String
+    var tvgId: String? = nil    // Provider EPG ID (tvg-id), preserved from M3U for guide matching
 }
 
-/// A channel paired with a relevance score for a given match.
+/// Named evidence signals that explain why a stream was surfaced for an event.
+/// Multiple categories can be active simultaneously; the highest-priority one drives the badge label.
+enum StreamEvidenceCategory: String, Hashable, Sendable, CaseIterable {
+    /// The channel's EPG guide lists a programme whose title matches this event at its scheduled time.
+    case guideListsMatch
+    /// The channel's curated network is a known broadcast rights holder for this league.
+    case broadcastRightsMatch
+    /// Both competing team names appear in the stream title.
+    case teamNameMatch
+    /// The event title (e.g. "Tour de France Stage 12") appears in the stream title.
+    case eventTitleMatch
+    /// A recognized sports network name is part of the channel identifier.
+    case networkNameMatch
+    /// A league or sport keyword matches the channel name or group.
+    case leagueKeyword
+
+    var displayLabel: String {
+        switch self {
+        case .guideListsMatch:      return "Guide Match"
+        case .broadcastRightsMatch: return "Rights Holder"
+        case .teamNameMatch:        return "Teams Listed"
+        case .eventTitleMatch:      return "Event Listed"
+        case .networkNameMatch:     return "Broadcaster"
+        case .leagueKeyword:        return "League"
+        }
+    }
+
+    /// Higher priority = stronger evidence. Used to select the badge label when multiple fire.
+    var priority: Int {
+        switch self {
+        case .guideListsMatch:      return 6
+        case .broadcastRightsMatch: return 5
+        case .teamNameMatch:        return 4
+        case .eventTitleMatch:      return 3
+        case .networkNameMatch:     return 2
+        case .leagueKeyword:        return 1
+        }
+    }
+}
+
+/// A channel paired with a relevance score and named evidence for a given match.
 struct RankedSource: Identifiable, Hashable {
     let channel: Channel
     let score: Int
+    /// Named signals that explain why this channel was surfaced.
+    var evidenceCategories: Set<StreamEvidenceCategory> = []
+    /// EPG programme confirmed to cover this event on this channel. Non-nil when the guide matches.
+    var epgProgramme: EPGProgramme? = nil
+    /// Canonical channel key from the curated lineup, populated by the match-page ranking pass.
+    var canonicalChannelId: String? = nil
     var id: String { channel.id }
+
+    /// The single strongest piece of evidence, used to drive the badge label.
+    var strongestEvidence: StreamEvidenceCategory? {
+        evidenceCategories.max { $0.priority < $1.priority }
+    }
 }
 
 // MARK: - News

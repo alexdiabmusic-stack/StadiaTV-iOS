@@ -4,6 +4,7 @@ import SwiftUI
 struct TVLiveSportsView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var liveViewModel: LiveViewModel
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
 
     @State private var selectedSport: SportGroup? = nil
 
@@ -153,7 +154,7 @@ struct TVLiveSportsView: View {
                 spacing: 20
             ) {
                 ForEach(displayedMatches) { match in
-                    NavigationLink(value: match) { TVMatchCard(match: match) }.buttonStyle(.card)
+                    NavigationLink(value: match) { TVMatchCard(match: match, streamCount: streamStore.count(for: match.id)) }.buttonStyle(.card)
                 }
             }
         }
@@ -162,7 +163,7 @@ struct TVLiveSportsView: View {
     private var startingSoonSection: some View {
         TVShelfRow(title: "Starting Soon", systemImage: "clock.badge.fill", tint: Theme.starting) {
             ForEach(liveViewModel.startingSoon.prefix(10)) { match in
-                NavigationLink(value: match) { TVMatchCard(match: match) }.buttonStyle(.card)
+                NavigationLink(value: match) { TVMatchCard(match: match, streamCount: streamStore.count(for: match.id)) }.buttonStyle(.card)
             }
         }
     }

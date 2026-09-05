@@ -147,9 +147,15 @@ struct PlayerView: View {
     @State private var isScoreExpanded = false
     @State private var isScoreDismissed = false
     @State private var scoreFetchTask: Task<Void, Never>?
+    @State private var matchResolutionState: PlayerMatchResolutionState = .resolving
     @State private var selectedPlayerTab: SportPlayerTab = .game
     @State private var isLandscapeGameCentreVisible = false
     @State private var showPaywall = false
+    @State private var showingSourceSelector = false
+    #if os(iOS)
+    @State private var dismissalDragOffset: CGSize = .zero
+    @State private var activeDismissalGesture: PlayerDismissalGestureKind?
+    #endif
 
     init(channel: Channel, zapChannels: [Channel] = [], currentIndex: Int = 0, showsLiveTVControls: Bool = true) {
         self.channel = channel
@@ -207,11 +213,35 @@ struct PlayerView: View {
             }
     }
 
+    private var activePlaybackChannel: Channel {
+        streamSelection.activeChannel
+    }
+
+    private var playerScaleForDismissal: CGFloat {
+        #if os(iOS)
+        let travel = max(dismissalDragOffset.width, dismissalDragOffset.height, 0)
+        return max(0.92, 1 - travel / 1800)
+        #else
+        return 1
+        #endif
+    }
+
+    private var playerDimForDismissal: Double {
+        #if os(iOS)
+        let travel = max(dismissalDragOffset.width, dismissalDragOffset.height, 0)
+        return max(0.58, 1 - Double(travel / 650))
+        #else
+        return 1
+        #endif
+    }
+
     var body: some View {
         MatchPlayerScreen(
-            channel: currentZapChannel,
+            channel: activePlaybackChannel,
             canonicalChannel: canonicalChannel,
-            match: prefs.showLiveScoreBadge && !isScoreDismissed ? liveScoreMatch : nil,
+            match: liveScoreMatch,
+            scoreBugMatch: prefs.showLiveScoreBadge && !isScoreDismissed ? liveScoreMatch : nil,
+            matchResolutionState: matchResolutionState,
             selectedTab: $selectedPlayerTab,
             isChromeVisible: isChromeVisible,
             isLandscapeGameCentreVisible: $isLandscapeGameCentreVisible,
@@ -227,21 +257,23 @@ struct PlayerView: View {
             onChannels: { showingChannelList = true },
             onRecents: { showingRecents = true },
             onMore: { showingMore = true },
+            onSourceSelector: { showingSourceSelector = true; revealChromeTemporarily() },
+            onCycleSource: cycleSource(direction:),
             onToggleOrientation: { toggleOrientation() },
             orientation: preferredOrientation
         ) {
             StreamTile(
-                channel: currentZapChannel,
+                channel: activePlaybackChannel,
                 isPrimary: true,
                 showsChrome: false,
                 bufferProfile: bufferProfile,
                 onFailure: {
-                    guard currentZapChannel.id == channel.id else { return }
+                    guard activePlaybackChannel.id == streamSelection.activeChannel.id else { return }
                     streamSelection.handlePlaybackFailure()
                 },
                 onMetadata: { metadata in
                     activeStreamMetadata = metadata
-                    if currentZapChannel.id == channel.id, let streamID = streamSelection.activeStream?.id {
+                    if let streamID = streamSelection.activeStream?.id {
                         streamSelection.updateRuntimeMetadata(metadata, for: streamID)
                     }
                 },
@@ -249,11 +281,17 @@ struct PlayerView: View {
                     handlePlayerItemReady(item)
                 }
             )
-            .id(currentZapChannel.id)
+            .id(activePlaybackChannel.id)
         }
+        #if os(iOS)
+        .offset(x: dismissalDragOffset.width, y: max(0, dismissalDragOffset.height))
+        .scaleEffect(playerScaleForDismissal)
+        .opacity(playerDimForDismissal)
+        .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.86), value: dismissalDragOffset)
+        #endif
         .contentShape(Rectangle())
         #if os(iOS)
-        .gesture(swipeDownToDismiss)
+        .simultaneousGesture(playerDismissalGesture)
         .simultaneousGesture(TapGesture().onEnded { toggleChromeVisibility() })
         .overlay {
             ZStack {
@@ -401,9 +439,21 @@ struct PlayerView: View {
                                     selectedChannelIDs: $selectedMultiChannelIDs,
                                     startAction: startMultiscreen)
         }
+        .sheet(isPresented: $showingSourceSelector) {
+            NavigationStack {
+                StreamSourceSelectionView(selection: streamSelection)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") { showingSourceSelector = false }
+                        }
+                    }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .sheet(isPresented: $showingMore) {
             PlayerMoreSheet(
-                channel: currentZapChannel,
+                channel: activePlaybackChannel,
                 streamSelection: streamSelection,
                 bufferProfile: $bufferProfile,
                 audioGroup: audioGroup,
@@ -529,21 +579,58 @@ struct PlayerView: View {
             .ignoresSafeArea()
         }
     }
-    /// Swipe down from the centre of the screen to exit the player.
-    /// The gesture only triggers in the middle vertical third of the screen,
-    /// leaving the top and bottom thirds free for brightness/volume adjustments.
-    private var swipeDownToDismiss: some Gesture {
-        DragGesture(minimumDistance: 30, coordinateSpace: .local)
-            .onEnded { value in
-                let isDownward = value.translation.height > 90
-                let startedInMiddle = value.startLocation.y > UIScreen.main.bounds.height * 0.25
-                    && value.startLocation.y < UIScreen.main.bounds.height * 0.75
-                // Require mostly-vertical drag (less than 45° off vertical)
-                let isVertical = abs(value.translation.height) > abs(value.translation.width)
-                if isDownward && startedInMiddle && isVertical {
-                    dismiss()
+    private var playerDismissalGesture: some Gesture {
+        DragGesture(minimumDistance: 18, coordinateSpace: .local)
+            .onChanged { value in
+                if activeDismissalGesture == nil {
+                    activeDismissalGesture = dismissalGestureKind(for: value)
+                }
+                guard let gesture = activeDismissalGesture else { return }
+                switch gesture {
+                case .edgePop:
+                    dismissalDragOffset = CGSize(width: max(0, value.translation.width), height: 0)
+                case .pullDown:
+                    dismissalDragOffset = CGSize(width: 0, height: max(0, value.translation.height))
                 }
             }
+            .onEnded { value in
+                guard let gesture = activeDismissalGesture else {
+                    resetDismissalDrag()
+                    return
+                }
+                let shouldDismiss: Bool
+                switch gesture {
+                case .edgePop:
+                    shouldDismiss = value.translation.width > 110 || value.predictedEndTranslation.width > 220
+                case .pullDown:
+                    shouldDismiss = value.translation.height > 150 || value.predictedEndTranslation.height > 300
+                }
+                if shouldDismiss {
+                    dismiss()
+                } else {
+                    resetDismissalDrag()
+                }
+            }
+    }
+
+    private func dismissalGestureKind(for value: DragGesture.Value) -> PlayerDismissalGestureKind? {
+        let horizontal = value.translation.width
+        let vertical = value.translation.height
+        if value.startLocation.x <= 24, horizontal > 18, abs(horizontal) > abs(vertical) * 1.25 {
+            return .edgePop
+        }
+        let upperPlayerLimit = UIScreen.main.bounds.height * 0.46
+        if value.startLocation.y <= upperPlayerLimit, vertical > 18, abs(vertical) > abs(horizontal) * 1.2 {
+            return .pullDown
+        }
+        return nil
+    }
+
+    private func resetDismissalDrag() {
+        withAnimation(.interactiveSpring(response: 0.32, dampingFraction: 0.82)) {
+            dismissalDragOffset = .zero
+            activeDismissalGesture = nil
+        }
     }
     #endif
 
@@ -643,6 +730,16 @@ struct PlayerView: View {
         revealChromeTemporarily()
     }
 
+    private func cycleSource(direction: Int) {
+        let candidates = streamSelection.displayCandidates.filter { $0.health != .unavailable }
+        guard candidates.count > 1 else { return }
+        let currentID = streamSelection.activeStream?.id ?? candidates.first?.stream.id
+        let currentIndex = candidates.firstIndex { $0.stream.id == currentID } ?? 0
+        let nextIndex = (currentIndex + direction + candidates.count) % candidates.count
+        streamSelection.selectManual(streamID: candidates[nextIndex].stream.id)
+        revealChromeTemporarily()
+    }
+
     private func startDwellTimer() {
         dwellTask?.cancel()
         let ch = currentZapChannel
@@ -689,46 +786,108 @@ struct PlayerView: View {
 
     private func findAndPollLiveMatch(for targetChannel: Channel) async {
         let channel = targetChannel
+        matchResolutionState = .resolving
+        let programme = currentProgramme(for: channel)
         let leaguePaths = [
-            "football/nfl", "basketball/nba", "hockey/nhl", "baseball/mlb",
-            "soccer/eng.1", "soccer/esp.1", "soccer/ger.1", "soccer/ita.1",
-            "soccer/usa.1", "soccer/mex.1", "racing/f1"
+            "football/nfl", "football/college-football", "football/cfl", "basketball/nba", "basketball/wnba",
+            "hockey/nhl", "baseball/mlb", "soccer/eng.1", "soccer/esp.1", "soccer/ger.1",
+            "soccer/ita.1", "soccer/usa.1", "soccer/mex.1", "racing/f1"
         ]
         let leagues = leaguePaths.compactMap { path in League.all.first { $0.path == path } }
+        let today = Calendar.current.startOfDay(for: Date())
 
-        var liveMatches: [Match] = []
+        var candidates: [Match] = []
         await withTaskGroup(of: [Match].self) { group in
             for league in leagues {
                 group.addTask {
-                    (try? await SportsRepository.shared.legacyScoreboard(for: league)) ?? []
+                    let live = (try? await SportsRepository.shared.legacyScoreboard(for: league)) ?? []
+                    let todaySchedule = (try? await SportsRepository.shared.legacyScoreboards(for: league, starting: today, days: 1)) ?? []
+                    return live + todaySchedule
                 }
             }
             for await matches in group {
-                liveMatches.append(contentsOf: matches.filter { $0.state == .live })
+                candidates.append(contentsOf: matches.filter { $0.state == .live || $0.state == .pre })
             }
         }
-        guard !Task.isCancelled, !liveMatches.isEmpty else { return }
+        guard !Task.isCancelled else { return }
 
-        // Pick the live match with the highest SourceMatcher score for our channel
-        var bestMatch: Match? = nil
+        var seenIDs = Set<String>()
+        let uniqueCandidates = candidates.filter { seenIDs.insert($0.id).inserted }
+        var bestMatch: Match?
         var bestScore = 0
-        for match in liveMatches {
-            let score = SourceMatcher.rank(match: match, channels: [channel], preferredLanguages: []).first?.score ?? 0
-            if score > bestScore { bestScore = score; bestMatch = match }
+        for match in uniqueCandidates {
+            let score = matchCandidateScore(match, channel: channel, programme: programme)
+            if score > bestScore {
+                bestScore = score
+                bestMatch = match
+            }
         }
 
-        guard !Task.isCancelled, let match = bestMatch, bestScore >= 35 else { return }
-        liveScoreMatch = await SportsRepository.shared.enrichedLegacyMatch(match)
+        guard let match = bestMatch, bestScore >= 48 else {
+            liveScoreMatch = nil
+            matchResolutionState = .unavailable
+            return
+        }
 
-        // Poll for score updates every 30 seconds
+        matchResolutionState = .loadingData
+        let enriched = await SportsRepository.shared.enrichedLegacyMatch(match)
+        guard !Task.isCancelled else { return }
+        liveScoreMatch = enriched
+        matchResolutionState = .connected
+
         while !Task.isCancelled {
             try? await Task.sleep(nanoseconds: 30_000_000_000)
             guard !Task.isCancelled else { break }
             if let updated = try? await SportsRepository.shared.legacyScoreboard(for: match.league).first(where: { $0.id == match.id }) {
                 liveScoreMatch = await SportsRepository.shared.enrichedLegacyMatch(updated)
+                matchResolutionState = .connected
                 if updated.state == .final { break }
+            } else {
+                matchResolutionState = .apiFailed
             }
         }
+    }
+
+    private func currentProgramme(for channel: Channel) -> EPGProgramme? {
+        if let canonicalChannel {
+            return epgRepository.currentProgramme(for: canonicalChannel.id)
+        }
+        if let canonical = epgRepository.canonicalChannels.first(where: { candidate in
+            candidate.id == channel.id || candidate.allStreams.contains { $0.providerChannelId == channel.id }
+        }) {
+            return epgRepository.currentProgramme(for: canonical.id)
+        }
+        return nil
+    }
+
+    private func matchCandidateScore(_ match: Match, channel: Channel, programme: EPGProgramme?) -> Int {
+        var score = SourceMatcher.rank(match: match, channels: [channel], preferredLanguages: prefs.preferredStreamLanguages).first?.score ?? 0
+        let programmeText = [programme?.title, programme?.subtitle, programme?.description, programme?.categories.joined(separator: " ")]
+            .compactMap { $0 }
+            .joined(separator: " ")
+        if !programmeText.isEmpty {
+            score += metadataMatchScore(match: match, text: programmeText)
+        }
+        if let programme, programme.isOnNow() {
+            score += 8
+        }
+        return score
+    }
+
+    private func metadataMatchScore(match: Match, text: String) -> Int {
+        let normalizedText = PlayerMatchTextNormalizer.normalized(text)
+        guard !normalizedText.isEmpty else { return 0 }
+        var score = 0
+        let titleTokens = PlayerMatchTextNormalizer.tokens(from: [match.name, match.shortName].joined(separator: " "))
+        let teamTokens = PlayerMatchTextNormalizer.tokens(from: [
+            match.away.displayName, match.away.shortName, match.away.abbreviation,
+            match.home.displayName, match.home.shortName, match.home.abbreviation
+        ].joined(separator: " "))
+        let leagueTokens = PlayerMatchTextNormalizer.tokens(from: ([match.league.name, match.league.shortName] + match.league.keywords).joined(separator: " "))
+        score += titleTokens.filter { normalizedText.contains($0) }.count * 12
+        score += teamTokens.filter { normalizedText.contains($0) }.count * 10
+        score += leagueTokens.filter { normalizedText.contains($0) }.count * 4
+        return score
     }
 
     #if os(iOS)
@@ -814,7 +973,37 @@ private enum PlayerAdjustmentSide {
     case brightness
     case volume
 }
+
+private enum PlayerDismissalGestureKind {
+    case edgePop
+    case pullDown
+}
 #endif
+
+private enum PlayerMatchResolutionState: Equatable {
+    case resolving
+    case loadingData
+    case connected
+    case unavailable
+    case apiFailed
+
+    var isPending: Bool {
+        self == .resolving || self == .loadingData
+    }
+}
+
+private enum PlayerMatchTextNormalizer {
+    static func normalized(_ value: String) -> String {
+        value.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .replacingOccurrences(of: "[^a-z0-9]+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func tokens(from value: String) -> Set<String> {
+        let words = normalized(value).split(separator: " ").map(String.init)
+        return Set(words.filter { $0.count >= 3 })
+    }
+}
 
 // MARK: - Sports-first Match Player
 
@@ -873,6 +1062,8 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
     let channel: Channel
     let canonicalChannel: CanonicalChannel?
     let match: Match?
+    let scoreBugMatch: Match?
+    let matchResolutionState: PlayerMatchResolutionState
     @Binding var selectedTab: SportPlayerTab
     let isChromeVisible: Bool
     @Binding var isLandscapeGameCentreVisible: Bool
@@ -888,6 +1079,8 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
     let onChannels: () -> Void
     let onRecents: () -> Void
     let onMore: () -> Void
+    let onSourceSelector: () -> Void
+    let onCycleSource: (Int) -> Void
     let onToggleOrientation: () -> Void
     let orientation: PlayerOrientation
     let videoContent: VideoContent
@@ -896,6 +1089,8 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
         channel: Channel,
         canonicalChannel: CanonicalChannel?,
         match: Match?,
+        scoreBugMatch: Match?,
+        matchResolutionState: PlayerMatchResolutionState,
         selectedTab: Binding<SportPlayerTab>,
         isChromeVisible: Bool,
         isLandscapeGameCentreVisible: Binding<Bool>,
@@ -911,6 +1106,8 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
         onChannels: @escaping () -> Void,
         onRecents: @escaping () -> Void,
         onMore: @escaping () -> Void,
+        onSourceSelector: @escaping () -> Void,
+        onCycleSource: @escaping (Int) -> Void,
         onToggleOrientation: @escaping () -> Void,
         orientation: PlayerOrientation,
         @ViewBuilder videoContent: () -> VideoContent
@@ -918,6 +1115,8 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
         self.channel = channel
         self.canonicalChannel = canonicalChannel
         self.match = match
+        self.scoreBugMatch = scoreBugMatch
+        self.matchResolutionState = matchResolutionState
         self._selectedTab = selectedTab
         self.isChromeVisible = isChromeVisible
         self._isLandscapeGameCentreVisible = isLandscapeGameCentreVisible
@@ -933,6 +1132,8 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
         self.onChannels = onChannels
         self.onRecents = onRecents
         self.onMore = onMore
+        self.onSourceSelector = onSourceSelector
+        self.onCycleSource = onCycleSource
         self.onToggleOrientation = onToggleOrientation
         self.orientation = orientation
         self.videoContent = videoContent()
@@ -959,13 +1160,15 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
         VStack(spacing: 0) {
             PlayerVideoContainer(
                 channel: channel,
-                match: match,
+                match: scoreBugMatch,
                 sport: sport,
                 isChromeVisible: isChromeVisible,
                 streamSummary: streamSummary,
                 orientation: orientation,
                 onDismiss: onDismiss,
                 onMore: onMore,
+                onSourceSelector: onSourceSelector,
+                onCycleSource: onCycleSource,
                 onToggleOrientation: onToggleOrientation,
                 videoContent: { videoContent }
             )
@@ -975,7 +1178,7 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
                 VStack(alignment: .leading, spacing: 14) {
                     MatchMetadataHeader(match: match, channel: channel)
                     MatchTabs(tabs: sport.tabs, selection: $selectedTab)
-                    SportGameCentre(match: match, sport: sport, selectedTab: effectiveTab)
+                    SportGameCentre(match: match, state: matchResolutionState, sport: sport, selectedTab: effectiveTab)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -990,13 +1193,15 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
         ZStack(alignment: .trailing) {
             PlayerVideoContainer(
                 channel: channel,
-                match: match,
+                match: scoreBugMatch,
                 sport: sport,
                 isChromeVisible: isChromeVisible,
                 streamSummary: streamSummary,
                 orientation: orientation,
                 onDismiss: onDismiss,
                 onMore: onMore,
+                onSourceSelector: onSourceSelector,
+                onCycleSource: onCycleSource,
                 onToggleOrientation: onToggleOrientation,
                 videoContent: { videoContent }
             )
@@ -1047,6 +1252,8 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
     let orientation: PlayerOrientation
     let onDismiss: () -> Void
     let onMore: () -> Void
+    let onSourceSelector: () -> Void
+    let onCycleSource: (Int) -> Void
     let onToggleOrientation: () -> Void
     let videoContent: VideoContent
 
@@ -1059,6 +1266,8 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
         orientation: PlayerOrientation,
         onDismiss: @escaping () -> Void,
         onMore: @escaping () -> Void,
+        onSourceSelector: @escaping () -> Void,
+        onCycleSource: @escaping (Int) -> Void,
         onToggleOrientation: @escaping () -> Void,
         @ViewBuilder videoContent: () -> VideoContent
     ) {
@@ -1070,52 +1279,62 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
         self.orientation = orientation
         self.onDismiss = onDismiss
         self.onMore = onMore
+        self.onSourceSelector = onSourceSelector
+        self.onCycleSource = onCycleSource
         self.onToggleOrientation = onToggleOrientation
         self.videoContent = videoContent()
     }
 
     var body: some View {
-        ZStack {
-            videoContent
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
+        GeometryReader { proxy in
+            ZStack {
+                videoContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
 
-            LinearGradient(colors: [.black.opacity(0.66), .clear, .black.opacity(0.55)],
-                           startPoint: .top,
-                           endPoint: .bottom)
-                .allowsHitTesting(false)
+                LinearGradient(colors: [.black.opacity(0.66), .clear, .black.opacity(0.55)],
+                               startPoint: .top,
+                               endPoint: .bottom)
+                    .allowsHitTesting(false)
 
-            VStack(spacing: 0) {
-                if isChromeVisible {
-                    PlayerTopOverlay(
-                        title: match?.shortName ?? channel.name,
-                        subtitle: streamSummary,
-                        orientation: orientation,
-                        onDismiss: onDismiss,
-                        onMore: onMore,
-                        onToggleOrientation: onToggleOrientation
-                    )
-                    .padding(.horizontal, 14)
-                    .padding(.top, 12)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-
-                Spacer()
-
-                VStack(spacing: 10) {
-                    if let match {
-                        LiveScoreBug(match: match, sport: sport)
-                            .padding(.horizontal, 18)
-                            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                VStack(spacing: 0) {
+                    if isChromeVisible {
+                        PlayerTopOverlay(
+                            title: match?.shortName ?? channel.name,
+                            subtitle: streamSummary,
+                            orientation: orientation,
+                            onDismiss: onDismiss,
+                            onMore: onMore,
+                            onToggleOrientation: onToggleOrientation
+                        )
+                        .padding(.horizontal, 14)
+                        .padding(.top, max(proxy.safeAreaInsets.top, 8) + 8)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                     }
 
-                    if isChromeVisible {
-                        PlayerBottomOverlay(channel: channel, streamSummary: streamSummary, onMore: onMore)
+                    Spacer()
+
+                    VStack(spacing: 8) {
+                        if let match {
+                            LiveScoreBug(match: match, sport: sport)
+                                .padding(.horizontal, 18)
+                                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                        }
+
+                        if isChromeVisible {
+                            PlayerBottomOverlay(
+                                channel: channel,
+                                streamSummary: streamSummary,
+                                onSourceSelector: onSourceSelector,
+                                onCycleSource: onCycleSource,
+                                onMore: onMore
+                            )
                             .padding(.horizontal, 14)
                             .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        }
                     }
+                    .padding(.bottom, max(proxy.safeAreaInsets.bottom, 8) + 4)
                 }
-                .padding(.bottom, 14)
             }
         }
         .background(Color.black)
@@ -1162,46 +1381,76 @@ private struct PlayerTopOverlay: View {
 private struct PlayerBottomOverlay: View {
     let channel: Channel
     let streamSummary: String
+    let onSourceSelector: () -> Void
+    let onCycleSource: (Int) -> Void
     let onMore: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 9) {
             HStack(spacing: 6) {
                 PulsingDot(color: Theme.live)
                 Text("LIVE")
                     .font(.caption2.weight(.heavy))
                     .foregroundStyle(.white)
             }
-            .padding(.horizontal, 10)
-            .frame(height: 34)
+            .padding(.horizontal, 9)
+            .frame(height: 32)
             .background(Theme.live.opacity(0.82), in: Capsule())
 
-            Text(channel.group ?? channel.playlistName)
+            Text(compactChannelName)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.72))
+                .foregroundStyle(.white.opacity(0.78))
                 .lineLimit(1)
+                .frame(maxWidth: 120, alignment: .leading)
 
-            Spacer()
+            Button(action: onSourceSelector) {
+                HStack(spacing: 5) {
+                    Text(streamSummary)
+                        .font(.caption.weight(.bold))
+                        .lineLimit(1)
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.heavy))
+                }
+                .foregroundStyle(.white)
+                .frame(height: 32)
+                .padding(.horizontal, 9)
+                .background(.white.opacity(0.10), in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Choose stream source, \(streamSummary)")
+            #if os(iOS)
+            .gesture(
+                DragGesture(minimumDistance: 18)
+                    .onEnded { value in
+                        guard abs(value.translation.width) > abs(value.translation.height), abs(value.translation.width) > 34 else { return }
+                        onCycleSource(value.translation.width < 0 ? 1 : -1)
+                    }
+            )
+            #endif
 
-            Text(streamSummary)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.white.opacity(0.72))
-                .lineLimit(1)
+            Spacer(minLength: 4)
 
             Button(action: onMore) {
                 Image(systemName: "slider.horizontal.3")
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(.white)
-                    .frame(width: 36, height: 34)
+                    .frame(width: 34, height: 32)
                     .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Player options")
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.12)))
+        .padding(.vertical, 7)
+        .background(.black.opacity(0.62), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(.white.opacity(0.12)))
+    }
+
+    private var compactChannelName: String {
+        channel.name
+            .replacingOccurrences(of: #"^[A-Z]{2,4}\s*[★*⭐]\s*"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\s+(HD|FHD|UHD|4K)\b"#, with: "", options: [.regularExpression, .caseInsensitive])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
@@ -1302,39 +1551,25 @@ private struct MatchMetadataHeader: View {
     let channel: Channel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 8) {
-                Text(match?.league.shortName.uppercased() ?? (channel.group ?? "LIVE"))
+                Text(match.map { "\($0.league.shortName.uppercased()) · \($0.state.label.uppercased())" } ?? "LIVE STREAM")
                     .font(.caption.weight(.heavy))
-                    .foregroundStyle(Theme.textSecondary)
+                    .foregroundStyle(match?.state == .live ? Theme.live : Theme.textSecondary)
                 if match?.state == .live {
-                    Text("LIVE")
-                        .font(.caption2.weight(.heavy))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .background(Theme.live, in: Capsule())
-                } else if let state = match?.state {
-                    Text(state.label.uppercased())
-                        .font(.caption2.weight(.heavy))
-                        .foregroundStyle(Theme.textSecondary)
+                    PulsingDot(color: Theme.live)
                 }
             }
 
             Text(match?.name ?? channel.name)
-                .font(.title3.weight(.heavy))
+                .font(match == nil ? .headline.weight(.heavy) : .title3.weight(.heavy))
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(2)
 
-            let details = [match?.venue, channel.group ?? channel.playlistName].compactMap { value in
-                value?.isEmpty == false ? value : nil
-            }
-            if !details.isEmpty {
-                Text(details.joined(separator: " · "))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Theme.textSecondary)
-                    .lineLimit(2)
-            }
+            Text(match == nil ? (channel.group ?? channel.playlistName) : "Watching on \(channel.name)")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.textSecondary)
+                .lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -1368,24 +1603,29 @@ private struct MatchTabs: View {
 
 private struct SportGameCentre: View {
     let match: Match?
+    let state: PlayerMatchResolutionState
     let sport: StadiaSport
     let selectedTab: SportPlayerTab
 
     var body: some View {
         VStack(spacing: 12) {
-            switch selectedTab {
-            case .game, .match:
-                sportGameContent
-            case .stats, .teamStats:
-                TeamStatsPlaceholder(match: match, sport: sport)
-            case .plays, .events:
-                EventsPlaceholder(match: match, sport: sport)
-            case .boxScore:
-                BoxScorePlaceholder(match: match, sport: sport)
-            case .lineups:
-                LineupsPlaceholder(match: match, sport: sport)
-            case .drives:
-                DrivesPlaceholder(match: match)
+            if let match {
+                switch selectedTab {
+                case .game, .match:
+                    sportGameContent
+                case .stats, .teamStats:
+                    TeamStatsPlaceholder(match: match, sport: sport)
+                case .plays, .events:
+                    EventsPlaceholder(match: match, state: state, sport: sport)
+                case .boxScore:
+                    BoxScorePlaceholder(match: match, sport: sport)
+                case .lineups:
+                    LineupsPlaceholder(match: match, sport: sport)
+                case .drives:
+                    DrivesPlaceholder(match: match)
+                }
+            } else {
+                MatchUnavailableCard(state: state)
             }
         }
     }
@@ -1398,6 +1638,58 @@ private struct SportGameCentre: View {
         case .soccer: SoccerGameCentre(match: match)
         case .basketball: BasketballGameCentre(match: match)
         default: GenericGameCentre(match: match)
+        }
+    }
+}
+
+private struct MatchUnavailableCard: View {
+    let state: PlayerMatchResolutionState
+
+    var body: some View {
+        GameCentreCard(title: title) {
+            HStack(alignment: .top, spacing: 12) {
+                if state.isPending {
+                    ProgressView()
+                        .tint(Theme.accent)
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "link.badge.plus")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(message)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    if !state.isPending {
+                        Button("Find match") {}
+                            .font(.caption.weight(.bold))
+                            .buttonStyle(.bordered)
+                            .tint(Theme.accent)
+                            .disabled(true)
+                    }
+                }
+            }
+        }
+    }
+
+    private var title: String {
+        switch state {
+        case .resolving: return "Resolving Match"
+        case .loadingData: return "Loading Match Data"
+        case .connected: return "Match Centre"
+        case .unavailable: return "Match Unavailable"
+        case .apiFailed: return "Match Data Error"
+        }
+    }
+
+    private var message: String {
+        switch state {
+        case .resolving: return "Identifying the event from this channel and guide data."
+        case .loadingData: return "Loading live game state."
+        case .connected: return "Match data unavailable for this broadcast."
+        case .unavailable: return "Match data unavailable for this broadcast."
+        case .apiFailed: return "Live sports data failed to update. Video playback is unaffected."
         }
     }
 }
@@ -1664,6 +1956,7 @@ private struct TeamStatsPlaceholder: View {
 
 private struct EventsPlaceholder: View {
     let match: Match?
+    var state: PlayerMatchResolutionState = .connected
     let sport: StadiaSport
 
     var body: some View {
@@ -1809,14 +2102,20 @@ private struct LandscapeGameCentrePanel: View {
                 .font(.caption.weight(.heavy))
                 .foregroundStyle(Theme.textSecondary)
                 .textCase(.uppercase)
-            ScoreboardRow(match: match, stateLabel: match?.statusDetail)
-            Divider().overlay(Theme.hairline)
-            compactSituation
+            if let match {
+                ScoreboardRow(match: match, stateLabel: match.statusDetail)
+                Divider().overlay(Theme.hairline)
+                compactSituation
+            } else {
+                Text("Match data unavailable for this broadcast.")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+            }
         }
         .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.white.opacity(0.14)))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(.black.opacity(0.70), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.14)))
     }
 
     private var panelTitle: String {
@@ -1834,7 +2133,13 @@ private struct LandscapeGameCentrePanel: View {
         case .hockey:
             SituationGrid(items: [("Clock", match?.statusDetail), ("Shots", nil), ("Power Play", nil)])
         case .americanFootball:
-            SituationGrid(items: [("Clock", match?.statusDetail), ("Down", nil), ("Ball", nil)])
+            let football = match?.liveContext.football
+            SituationGrid(items: [
+                ("Clock", football?.clock ?? match?.liveContext.clock?.displayValue ?? match?.statusDetail),
+                ("Down", football.flatMap { footballDownDistance($0) }),
+                ("Ball", football?.ballPosition),
+                ("Possession", football?.possessionTeamAbbreviation)
+            ])
         case .soccer:
             SituationGrid(items: [("Minute", match?.statusDetail), ("Possession", nil), ("Shots", nil)])
         case .basketball:
@@ -1842,6 +2147,12 @@ private struct LandscapeGameCentrePanel: View {
         default:
             SituationGrid(items: [("Status", match?.statusDetail)])
         }
+    }
+
+    private func footballDownDistance(_ situation: FootballSituation) -> String? {
+        guard let down = situation.down, let distance = situation.distance else { return nil }
+        let ordinal = ["1ST", "2ND", "3RD", "4TH"].indices.contains(down - 1) ? ["1ST", "2ND", "3RD", "4TH"][down - 1] : "\(down)TH"
+        return "\(ordinal) & \(distance)"
     }
 }
 
@@ -2969,8 +3280,19 @@ private struct PlayerChromeButton: View {
             .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
         }
-        .buttonStyle(.plain)
+        .playerChromeButtonStyle()
         .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func playerChromeButtonStyle() -> some View {
+        if #available(iOS 26.0, tvOS 26.0, macOS 26.0, *) {
+            self.buttonStyle(.glass)
+        } else {
+            self.buttonStyle(.plain)
+        }
     }
 }
 

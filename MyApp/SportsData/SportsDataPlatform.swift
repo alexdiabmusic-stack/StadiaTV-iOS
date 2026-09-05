@@ -874,22 +874,36 @@ actor SportsDataCache {
         let value: Any
         let fetchedAt: Date
         let ttl: TimeInterval
+        var lastAccessedAt: Date
     }
 
+    private let maxEntryCount = 400
     private var entries: [String: Entry] = [:]
 
     func value<T>(for key: SportsCacheKey, as type: T.Type = T.self, now: Date = Date()) -> T? {
-        guard let entry = entries[key.rawValue], now.timeIntervalSince(entry.fetchedAt) < entry.ttl else { return nil }
+        guard var entry = entries[key.rawValue] else { return nil }
+        guard !isExpired(entry, now: now) else {
+            entries.removeValue(forKey: key.rawValue)
+            return nil
+        }
+        entry.lastAccessedAt = now
+        entries[key.rawValue] = entry
         return entry.value as? T
     }
 
     func age(for key: SportsCacheKey, now: Date = Date()) -> TimeInterval? {
-        guard let entry = entries[key.rawValue], now.timeIntervalSince(entry.fetchedAt) < entry.ttl else { return nil }
+        guard let entry = entries[key.rawValue] else { return nil }
+        guard !isExpired(entry, now: now) else {
+            entries.removeValue(forKey: key.rawValue)
+            return nil
+        }
         return now.timeIntervalSince(entry.fetchedAt)
     }
 
     func store<T: Sendable>(_ value: T, for key: SportsCacheKey, ttl: TimeInterval, now: Date = Date()) {
-        entries[key.rawValue] = Entry(value: value, fetchedAt: now, ttl: ttl)
+        cleanupExpired(now: now)
+        entries[key.rawValue] = Entry(value: value, fetchedAt: now, ttl: ttl, lastAccessedAt: now)
+        enforceSizeLimit()
     }
 
     func removeAll() {
@@ -898,6 +912,24 @@ actor SportsDataCache {
 
     func remove(for key: SportsCacheKey) {
         entries.removeValue(forKey: key.rawValue)
+    }
+
+    private func isExpired(_ entry: Entry, now: Date) -> Bool {
+        now.timeIntervalSince(entry.fetchedAt) >= entry.ttl
+    }
+
+    private func cleanupExpired(now: Date) {
+        entries = entries.filter { !isExpired($0.value, now: now) }
+    }
+
+    private func enforceSizeLimit() {
+        guard entries.count > maxEntryCount else { return }
+        let overflowCount = entries.count - maxEntryCount
+        let evictionKeys = entries
+            .sorted { $0.value.lastAccessedAt < $1.value.lastAccessedAt }
+            .prefix(overflowCount)
+            .map(\.key)
+        evictionKeys.forEach { entries.removeValue(forKey: $0) }
     }
 
     static func defaultTTL(for capability: SportsDataCapability, containsLiveGames: Bool = false) -> TimeInterval {
@@ -1318,29 +1350,32 @@ struct SportsRepository: Sendable {
     }
 
     func schedule(for league: League, range: SportsDateRange) async throws -> StadiaSchedule {
-        let key = cacheKey(league: league, capability: .schedule, scope: "\(Int(range.start.timeIntervalSince1970))-\(Int(range.end.timeIntervalSince1970))")
+        let cacheRange = scheduleCacheRange(for: range)
+        let key = cacheKey(league: league, capability: .schedule, scope: scheduleCacheScope(for: cacheRange))
         if let cached: StadiaSchedule = await cache.value(for: key) {
             // Bypass stale cache: schedule TTL for non-live data is 60 minutes. If a game
             // started >10 min ago but the cached schedule still shows it as scheduled, the
             // 60-minute cache is serving obsolete state and must be discarded.
             let now = Date()
-            let hasStaleScheduled = cached.games.contains { game in
+            let exactSchedule = filterSchedule(cached, to: range, league: league)
+            let hasStaleScheduled = exactSchedule.games.contains { game in
                 game.status == .scheduled &&
                 now.timeIntervalSince(game.scheduledStart) > 600 &&
                 Calendar.current.isDate(game.scheduledStart, inSameDayAs: now)
             }
             if !hasStaleScheduled {
                 await recordDiagnostics(league: league, capability: .schedule, currentProvider: cached.provenance.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
-                return cached
+                return exactSchedule
             }
             await cache.remove(for: key)
 #if DEBUG
-            print("[Schedule] Bypassing stale cache for \(league.shortName) — past-start game still scheduled")
+            print("[Schedule] Bypassing stale cache for \(league.shortName) - past-start game still scheduled")
 #endif
         }
-        return try await scheduleDeduplicator.value(for: key.rawValue) {
-            try await requestSchedule(for: league, range: range, key: key)
+        let schedule = try await scheduleDeduplicator.value(for: key.rawValue) {
+            try await requestSchedule(for: league, range: cacheRange, key: key)
         }
+        return filterSchedule(schedule, to: range, league: league)
     }
 
     func gameDetails(for league: League, gameID: StadiaEntityID) async throws -> StadiaGame {
@@ -1387,6 +1422,41 @@ struct SportsRepository: Sendable {
         }
     }
 
+    private func loadLiveSnapshot(league: League, scheduleRange: SportsDateRange) async -> SportsLiveLeagueLoadResult {
+        async let liveFetch = liveScores(for: league)
+        async let scheduleFetch = schedule(for: league, range: scheduleRange)
+
+        var leagueFailures: [String] = []
+
+        let rawLive: [StadiaGame]
+        do {
+            rawLive = try await liveFetch
+        } catch {
+            leagueFailures.append("\(league.shortName) live: \(error.localizedDescription)")
+            rawLive = []
+        }
+
+        let rawScheduled: [StadiaGame]
+        do {
+            rawScheduled = try await scheduleFetch.games
+        } catch {
+            leagueFailures.append("\(league.shortName) schedule: \(error.localizedDescription)")
+            rawScheduled = []
+        }
+
+        let (leagueLive, leagueScheduled) = await MainActor.run {
+            (rawLive.map { $0.toLegacyMatch(league: league) },
+             rawScheduled.map { $0.toLegacyMatch(league: league) })
+        }
+
+        return SportsLiveLeagueLoadResult(
+            leagueID: league.stadiaKey,
+            live: leagueLive,
+            scheduled: leagueScheduled,
+            failures: leagueFailures
+        )
+    }
+
     func liveMatchSnapshot(leagues: [League], startingSoonWindow: TimeInterval = 4 * 3600, nextLimit: Int = 12) async -> SportsLiveMatchSnapshot {
         var seenLeagueIDs: Set<String> = []
         let uniqueLeagues = leagues.filter { seenLeagueIDs.insert($0.stadiaKey).inserted }
@@ -1398,53 +1468,27 @@ struct SportsRepository: Sendable {
         var failures: [String] = []
 
         await withTaskGroup(of: SportsLiveLeagueLoadResult.self) { group in
-            for league in uniqueLeagues {
+            let maxConcurrentLoads = 4
+            var nextLeagueIndex = 0
+
+            func enqueueNextLeague() {
+                guard nextLeagueIndex < uniqueLeagues.count else { return }
+                let league = uniqueLeagues[nextLeagueIndex]
+                nextLeagueIndex += 1
                 group.addTask {
-                    // Fire liveScores and schedule concurrently rather than serially.
-                    // The old approach meant per-league wall time = liveScores + schedule;
-                    // now it's max(liveScores, schedule). We collect raw StadiaGame arrays
-                    // first (off main actor), then do a single combined MainActor.run at
-                    // the end for the toLegacyMatch mapping — halving main-actor round-trips
-                    // compared to the original two-hop approach.
-                    async let liveFetch = liveScores(for: league)
-                    async let schedFetch = schedule(for: league, range: scheduleRange)
-
-                    var leagueFailures: [String] = []
-
-                    let rawLive: [StadiaGame]
-                    do {
-                        rawLive = try await liveFetch
-                    } catch {
-                        leagueFailures.append("\(league.shortName) live: \(error.localizedDescription)")
-                        rawLive = []
-                    }
-
-                    let rawScheduled: [StadiaGame]
-                    do {
-                        rawScheduled = try await schedFetch.games
-                    } catch {
-                        leagueFailures.append("\(league.shortName) schedule: \(error.localizedDescription)")
-                        rawScheduled = []
-                    }
-
-                    let (leagueLive, leagueScheduled) = await MainActor.run {
-                        (rawLive.map { $0.toLegacyMatch(league: league) },
-                         rawScheduled.map { $0.toLegacyMatch(league: league) })
-                    }
-
-                    return SportsLiveLeagueLoadResult(
-                        leagueID: league.stadiaKey,
-                        live: leagueLive,
-                        scheduled: leagueScheduled,
-                        failures: leagueFailures
-                    )
+                    await loadLiveSnapshot(league: league, scheduleRange: scheduleRange)
                 }
             }
 
-            for await result in group {
+            for _ in 0..<min(maxConcurrentLoads, uniqueLeagues.count) {
+                enqueueNextLeague()
+            }
+
+            while let result = await group.next() {
                 live.append(contentsOf: result.live)
                 scheduled.append(contentsOf: result.scheduled)
                 failures.append(contentsOf: result.failures)
+                enqueueNextLeague()
             }
         }
 
@@ -1911,6 +1955,30 @@ struct SportsRepository: Sendable {
         if match.away.displayName != "TBD" && match.home.displayName != "TBD" { score += 100 }
         score -= max(0, Int(abs(match.date.timeIntervalSince(now)) / 60))
         return score
+    }
+
+    private func scheduleCacheRange(for range: SportsDateRange, calendar: Calendar = .current) -> SportsDateRange {
+        let start = calendar.startOfDay(for: range.start)
+        let endDayStart = calendar.startOfDay(for: range.end)
+        let end = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: endDayStart) ?? range.end
+        return SportsDateRange.dateRange(start: start, end: end)
+    }
+
+    private func scheduleCacheScope(for range: SportsDateRange) -> String {
+        "days-\(Int(range.start.timeIntervalSince1970))-\(Int(range.end.timeIntervalSince1970))"
+    }
+
+    private func filterSchedule(_ schedule: StadiaSchedule, to range: SportsDateRange, league: League) -> StadiaSchedule {
+        let games = schedule.games.filter { game in
+            game.scheduledStart >= range.start && game.scheduledStart <= range.end
+        }
+        return StadiaSchedule(
+            id: StadiaEntityID(rawValue: "schedule:\(league.stadiaKey):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
+            leagueID: schedule.leagueID,
+            range: range,
+            games: games,
+            provenance: schedule.provenance
+        )
     }
 
     private func cacheKey(league: League, capability: SportsDataCapability, scope: String) -> SportsCacheKey {

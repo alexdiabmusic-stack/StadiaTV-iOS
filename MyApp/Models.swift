@@ -229,6 +229,242 @@ struct TeamSide: Hashable {
     }
 }
 
+struct MatchLiveContext: Hashable, Sendable {
+    var clock: MatchClock?
+    var period: MatchPeriod?
+    var baseball: BaseballSituation?
+    var hockey: HockeySituation?
+    var football: FootballSituation?
+    var soccer: SoccerSituation?
+    var basketball: BasketballSituation?
+    var teamStats: [MatchTeamStats]
+    var leaders: [MatchLeader]
+    var playByPlay: [MatchPlay]
+    var boxScore: MatchBoxScore?
+    var formations: [TeamFormation]
+    var drives: [FootballDrive]
+    /// Future stream-delay support: consumers should compare provider event timestamps
+    /// through this offset before triggering major-event animations.
+    var sportsDataDelay: TimeInterval?
+
+    static let empty = MatchLiveContext()
+
+    init(
+        clock: MatchClock? = nil,
+        period: MatchPeriod? = nil,
+        baseball: BaseballSituation? = nil,
+        hockey: HockeySituation? = nil,
+        football: FootballSituation? = nil,
+        soccer: SoccerSituation? = nil,
+        basketball: BasketballSituation? = nil,
+        teamStats: [MatchTeamStats] = [],
+        leaders: [MatchLeader] = [],
+        playByPlay: [MatchPlay] = [],
+        boxScore: MatchBoxScore? = nil,
+        formations: [TeamFormation] = [],
+        drives: [FootballDrive] = [],
+        sportsDataDelay: TimeInterval? = nil
+    ) {
+        self.clock = clock
+        self.period = period
+        self.baseball = baseball
+        self.hockey = hockey
+        self.football = football
+        self.soccer = soccer
+        self.basketball = basketball
+        self.teamStats = teamStats
+        self.leaders = leaders
+        self.playByPlay = playByPlay
+        self.boxScore = boxScore
+        self.formations = formations
+        self.drives = drives
+        self.sportsDataDelay = sportsDataDelay
+    }
+}
+
+struct MatchClock: Hashable, Sendable {
+    var displayValue: String?
+    var remainingSeconds: Int?
+    var isRunning: Bool?
+}
+
+struct MatchPeriod: Hashable, Sendable {
+    var number: Int?
+    var displayName: String?
+}
+
+struct BaseballSituation: Hashable, Sendable {
+    var inning: String?
+    var inningHalf: String?
+    var outs: Int?
+    var balls: Int?
+    var strikes: Int?
+    var runnerOnFirst: Bool?
+    var runnerOnSecond: Bool?
+    var runnerOnThird: Bool?
+    var batterName: String?
+    var pitcherName: String?
+}
+
+struct HockeySituation: Hashable, Sendable {
+    var period: String?
+    var clock: String?
+    var powerPlayTeamID: String?
+    var powerPlayTeamAbbreviation: String?
+    var powerPlayTimeRemaining: String?
+    var strengthState: String?
+    var delayedPenaltyTeamID: String?
+    var emptyNetTeamID: String?
+}
+
+struct FootballSituation: Hashable, Sendable {
+    var quarter: String?
+    var clock: String?
+    var possessionTeamID: String?
+    var possessionTeamAbbreviation: String?
+    var down: Int?
+    var distance: Int?
+    var ballPosition: String?
+    var yardLine: Int?
+    var isRedZone: Bool?
+    var homeTimeoutsRemaining: Int?
+    var awayTimeoutsRemaining: Int?
+}
+
+struct SoccerSituation: Hashable, Sendable {
+    var minute: String?
+    var stoppageTime: String?
+    var aggregateScore: String?
+    var homeRedCards: Int?
+    var awayRedCards: Int?
+    var latestEvent: MatchPlay?
+}
+
+struct BasketballSituation: Hashable, Sendable {
+    var quarter: String?
+    var clock: String?
+    var possessionTeamID: String?
+    var possessionTeamAbbreviation: String?
+    var homeTimeoutsRemaining: Int?
+    var awayTimeoutsRemaining: Int?
+    var homeBonus: Bool?
+    var awayBonus: Bool?
+    var scoringByPeriod: [LineScorePeriod]
+}
+
+struct LineScorePeriod: Identifiable, Hashable, Sendable {
+    var id: String { label }
+    let label: String
+    let awayScore: String?
+    let homeScore: String?
+}
+
+struct MatchTeamStats: Identifiable, Hashable, Sendable {
+    var id: String { teamID ?? side.rawValue }
+    let side: MatchTeamSide
+    let teamID: String?
+    let teamAbbreviation: String?
+    let stats: [MatchStat]
+}
+
+enum MatchTeamSide: String, Hashable, Sendable {
+    case home
+    case away
+}
+
+struct MatchStat: Identifiable, Hashable, Sendable {
+    var id: String { key }
+    let key: String
+    let displayName: String
+    let value: String
+}
+
+struct MatchLeader: Identifiable, Hashable, Sendable {
+    var id: String { key }
+    let key: String
+    let displayName: String
+    let players: [MatchPlayerStat]
+}
+
+struct MatchPlayerStat: Identifiable, Hashable, Sendable {
+    let id: String
+    let displayName: String
+    let teamAbbreviation: String?
+    let headshotURL: URL?
+    let stats: [MatchStat]
+}
+
+struct MatchPlay: Identifiable, Hashable, Sendable {
+    let id: String
+    let sequence: Int?
+    let period: MatchPeriod?
+    let clock: MatchClock?
+    let text: String
+    let teamID: String?
+    let teamAbbreviation: String?
+    let awayScore: String?
+    let homeScore: String?
+    let isScoringPlay: Bool
+    let eventType: MatchEventType?
+    let providerTimestamp: Date?
+}
+
+enum MatchEventType: String, Hashable, Sendable {
+    case goal
+    case penalty
+    case powerPlay
+    case touchdown
+    case fieldGoal
+    case turnover
+    case homeRun
+    case run
+    case basket
+    case substitution
+    case yellowCard
+    case redCard
+    case periodStart
+    case periodEnd
+    case other
+}
+
+struct MatchBoxScore: Hashable, Sendable {
+    var teamStats: [MatchTeamStats]
+    var playerStats: [MatchPlayerStat]
+}
+
+struct TeamFormation: Identifiable, Hashable, Sendable {
+    var id: String { teamID ?? teamAbbreviation ?? formationName ?? "formation" }
+    let teamID: String?
+    let teamAbbreviation: String?
+    let formationName: String?
+    let groups: [LineupGroup]
+}
+
+struct LineupGroup: Identifiable, Hashable, Sendable {
+    var id: String { title }
+    let title: String
+    let players: [LineupPlayer]
+}
+
+struct LineupPlayer: Identifiable, Hashable, Sendable {
+    let id: String
+    let displayName: String
+    let position: String?
+    let jerseyNumber: String?
+    let x: Double?
+    let y: Double?
+}
+
+struct FootballDrive: Identifiable, Hashable, Sendable {
+    let id: String
+    let teamID: String?
+    let teamAbbreviation: String?
+    let result: String?
+    let summary: String?
+    let isCurrent: Bool
+    let plays: [MatchPlay]
+}
+
 struct Match: Identifiable, Hashable {
     let id: String
     let league: League
@@ -241,9 +477,38 @@ struct Match: Identifiable, Hashable {
     let away: TeamSide
     let broadcasts: [String]
     let venue: String?
+    let liveContext: MatchLiveContext
 
     static func == (lhs: Match, rhs: Match) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
+
+    init(
+        id: String,
+        league: League,
+        date: Date,
+        name: String,
+        shortName: String,
+        state: GameState,
+        statusDetail: String,
+        home: TeamSide,
+        away: TeamSide,
+        broadcasts: [String],
+        venue: String?,
+        liveContext: MatchLiveContext = .empty
+    ) {
+        self.id = id
+        self.league = league
+        self.date = date
+        self.name = name
+        self.shortName = shortName
+        self.state = state
+        self.statusDetail = statusDetail
+        self.home = home
+        self.away = away
+        self.broadcasts = broadcasts
+        self.venue = venue
+        self.liveContext = liveContext
+    }
 
     var hasDisplayScore: Bool {
         func isUsefulScore(_ value: String?) -> Bool {
@@ -256,7 +521,13 @@ struct Match: Identifiable, Hashable {
     func withBroadcasts(_ newBroadcasts: [String]) -> Match {
         Match(id: id, league: league, date: date, name: name, shortName: shortName,
               state: state, statusDetail: statusDetail, home: home, away: away,
-              broadcasts: newBroadcasts, venue: venue)
+              broadcasts: newBroadcasts, venue: venue, liveContext: liveContext)
+    }
+
+    func withLiveContext(_ newContext: MatchLiveContext) -> Match {
+        Match(id: id, league: league, date: date, name: name, shortName: shortName,
+              state: state, statusDetail: statusDetail, home: home, away: away,
+              broadcasts: broadcasts, venue: venue, liveContext: newContext)
     }
 }
 

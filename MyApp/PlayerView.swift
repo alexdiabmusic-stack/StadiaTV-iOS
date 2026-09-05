@@ -147,6 +147,8 @@ struct PlayerView: View {
     @State private var isScoreExpanded = false
     @State private var isScoreDismissed = false
     @State private var scoreFetchTask: Task<Void, Never>?
+    @State private var selectedPlayerTab: SportPlayerTab = .game
+    @State private var isLandscapeGameCentreVisible = false
     @State private var showPaywall = false
 
     init(channel: Channel, zapChannels: [Channel] = [], currentIndex: Int = 0, showsLiveTVControls: Bool = true) {
@@ -206,8 +208,28 @@ struct PlayerView: View {
     }
 
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
+        MatchPlayerScreen(
+            channel: currentZapChannel,
+            canonicalChannel: canonicalChannel,
+            match: prefs.showLiveScoreBadge && !isScoreDismissed ? liveScoreMatch : nil,
+            selectedTab: $selectedPlayerTab,
+            isChromeVisible: isChromeVisible,
+            isLandscapeGameCentreVisible: $isLandscapeGameCentreVisible,
+            streamSummary: streamSelection.currentSummary,
+            canStartMultiscreen: canStartMultiscreen,
+            hasPreviousChannel: zapIndex > 0,
+            hasNextChannel: zapIndex < zapChannels.count - 1,
+            showsLiveTVControls: showsLiveTVControls,
+            onDismiss: { dismiss() },
+            onPreviousChannel: { zapTo(index: zapIndex - 1) },
+            onNextChannel: { zapTo(index: zapIndex + 1) },
+            onGuide: { showingGuideFromPlayer = true },
+            onChannels: { showingChannelList = true },
+            onRecents: { showingRecents = true },
+            onMore: { showingMore = true },
+            onToggleOrientation: { toggleOrientation() },
+            orientation: preferredOrientation
+        ) {
             StreamTile(
                 channel: currentZapChannel,
                 isPrimary: true,
@@ -228,12 +250,11 @@ struct PlayerView: View {
                 }
             )
             .id(currentZapChannel.id)
-            .ignoresSafeArea()
         }
         .contentShape(Rectangle())
         #if os(iOS)
         .gesture(swipeDownToDismiss)
-        .overlay { playerGestureZones }
+        .simultaneousGesture(TapGesture().onEnded { toggleChromeVisibility() })
         .overlay {
             ZStack {
                 ScreenBrightnessHost(controller: brightnessController)
@@ -267,7 +288,7 @@ struct PlayerView: View {
         #endif
         // Live score badge — always visible while a matched live game is tracked
         .overlay(alignment: .top) {
-            if let match = liveScoreMatch, prefs.showLiveScoreBadge, !isScoreDismissed {
+            if false, let match = liveScoreMatch, prefs.showLiveScoreBadge, !isScoreDismissed {
                 LiveScoreBadge(match: match, isExpanded: $isScoreExpanded) {
                     withAnimation(.spring(duration: 0.28)) { isScoreDismissed = true }
                 }
@@ -310,7 +331,7 @@ struct PlayerView: View {
         .animation(.easeInOut(duration: 0.2), value: showGestureHint)
         #endif
         .overlay(alignment: .topLeading) {
-            if isChromeVisible {
+            if false, isChromeVisible {
                 PlayerChromeButton(systemImage: "chevron.backward", title: "Back", accessibilityLabel: "Back") {
                     dismiss()
                 }
@@ -320,7 +341,7 @@ struct PlayerView: View {
             }
         }
         .overlay(alignment: .topTrailing) {
-            if isChromeVisible {
+            if false, isChromeVisible {
                 HStack(spacing: 8) {
                     if streamSelection.hasSelectableStreams && currentZapChannel.id == channel.id {
                         StreamQualityMenu(selection: streamSelection) {
@@ -339,7 +360,7 @@ struct PlayerView: View {
             }
         }
         .overlay(alignment: .bottomLeading) {
-            if isChromeVisible, let canonicalChannel, let programme = epgRepository.currentProgramme(for: canonicalChannel.id) {
+            if false, isChromeVisible, let canonicalChannel, let programme = epgRepository.currentProgramme(for: canonicalChannel.id) {
                 PlayerNowOnOverlay(
                     channelName: canonicalChannel.name,
                     currentProgramme: programme,
@@ -351,7 +372,7 @@ struct PlayerView: View {
             }
         }
         .overlay(alignment: .bottomTrailing) {
-            if isChromeVisible, fantasyStore.settings.showFantasyPlayerOverlay, !currentChannelFantasyGames.isEmpty {
+            if false, isChromeVisible, fantasyStore.settings.showFantasyPlayerOverlay, !currentChannelFantasyGames.isEmpty {
                 PlayerFantasyOverlay(games: currentChannelFantasyGames)
                     .padding(.trailing, 16)
                     .padding(.bottom, 84)
@@ -359,7 +380,7 @@ struct PlayerView: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if isChromeVisible {
+            if false, isChromeVisible {
                 PlayerControlBar(
                     hasPrev: zapIndex > 0,
                     hasNext: zapIndex < zapChannels.count - 1,
@@ -383,6 +404,7 @@ struct PlayerView: View {
         .sheet(isPresented: $showingMore) {
             PlayerMoreSheet(
                 channel: currentZapChannel,
+                streamSelection: streamSelection,
                 bufferProfile: $bufferProfile,
                 audioGroup: audioGroup,
                 selectedAudioIndex: $selectedAudioIndex,
@@ -696,14 +718,14 @@ struct PlayerView: View {
         }
 
         guard !Task.isCancelled, let match = bestMatch, bestScore >= 35 else { return }
-        liveScoreMatch = match
+        liveScoreMatch = await SportsRepository.shared.enrichedLegacyMatch(match)
 
         // Poll for score updates every 30 seconds
         while !Task.isCancelled {
             try? await Task.sleep(nanoseconds: 30_000_000_000)
             guard !Task.isCancelled else { break }
             if let updated = try? await SportsRepository.shared.legacyScoreboard(for: match.league).first(where: { $0.id == match.id }) {
-                liveScoreMatch = updated
+                liveScoreMatch = await SportsRepository.shared.enrichedLegacyMatch(updated)
                 if updated.state == .final { break }
             }
         }
@@ -793,6 +815,1125 @@ private enum PlayerAdjustmentSide {
     case volume
 }
 #endif
+
+// MARK: - Sports-first Match Player
+
+private enum StadiaSport: String {
+    case baseball
+    case hockey
+    case americanFootball
+    case soccer
+    case basketball
+    case golf
+    case tennis
+    case racing
+    case other
+
+    init(league: League?) {
+        switch league?.group {
+        case .baseball: self = .baseball
+        case .hockey: self = .hockey
+        case .football: self = .americanFootball
+        case .soccer: self = .soccer
+        case .basketball: self = .basketball
+        case .golf: self = .golf
+        case .tennis: self = .tennis
+        case .racing: self = .racing
+        case .cycling, .wrestling, .esports, .none: self = .other
+        }
+    }
+
+    var tabs: [SportPlayerTab] {
+        switch self {
+        case .baseball: return [.game, .plays, .boxScore, .lineups]
+        case .hockey: return [.game, .plays, .stats, .lineups]
+        case .americanFootball: return [.game, .plays, .stats, .drives]
+        case .soccer: return [.match, .events, .stats, .lineups]
+        case .basketball: return [.game, .plays, .boxScore, .teamStats]
+        default: return [.game, .events, .stats]
+        }
+    }
+}
+
+private enum SportPlayerTab: String, CaseIterable, Identifiable {
+    case game = "Game"
+    case match = "Match"
+    case plays = "Plays"
+    case events = "Events"
+    case stats = "Stats"
+    case boxScore = "Box Score"
+    case lineups = "Lineups"
+    case drives = "Drives"
+    case teamStats = "Team Stats"
+
+    var id: String { rawValue }
+}
+
+private struct MatchPlayerScreen<VideoContent: View>: View {
+    let channel: Channel
+    let canonicalChannel: CanonicalChannel?
+    let match: Match?
+    @Binding var selectedTab: SportPlayerTab
+    let isChromeVisible: Bool
+    @Binding var isLandscapeGameCentreVisible: Bool
+    let streamSummary: String
+    let canStartMultiscreen: Bool
+    let hasPreviousChannel: Bool
+    let hasNextChannel: Bool
+    let showsLiveTVControls: Bool
+    let onDismiss: () -> Void
+    let onPreviousChannel: () -> Void
+    let onNextChannel: () -> Void
+    let onGuide: () -> Void
+    let onChannels: () -> Void
+    let onRecents: () -> Void
+    let onMore: () -> Void
+    let onToggleOrientation: () -> Void
+    let orientation: PlayerOrientation
+    let videoContent: VideoContent
+
+    init(
+        channel: Channel,
+        canonicalChannel: CanonicalChannel?,
+        match: Match?,
+        selectedTab: Binding<SportPlayerTab>,
+        isChromeVisible: Bool,
+        isLandscapeGameCentreVisible: Binding<Bool>,
+        streamSummary: String,
+        canStartMultiscreen: Bool,
+        hasPreviousChannel: Bool,
+        hasNextChannel: Bool,
+        showsLiveTVControls: Bool,
+        onDismiss: @escaping () -> Void,
+        onPreviousChannel: @escaping () -> Void,
+        onNextChannel: @escaping () -> Void,
+        onGuide: @escaping () -> Void,
+        onChannels: @escaping () -> Void,
+        onRecents: @escaping () -> Void,
+        onMore: @escaping () -> Void,
+        onToggleOrientation: @escaping () -> Void,
+        orientation: PlayerOrientation,
+        @ViewBuilder videoContent: () -> VideoContent
+    ) {
+        self.channel = channel
+        self.canonicalChannel = canonicalChannel
+        self.match = match
+        self._selectedTab = selectedTab
+        self.isChromeVisible = isChromeVisible
+        self._isLandscapeGameCentreVisible = isLandscapeGameCentreVisible
+        self.streamSummary = streamSummary
+        self.canStartMultiscreen = canStartMultiscreen
+        self.hasPreviousChannel = hasPreviousChannel
+        self.hasNextChannel = hasNextChannel
+        self.showsLiveTVControls = showsLiveTVControls
+        self.onDismiss = onDismiss
+        self.onPreviousChannel = onPreviousChannel
+        self.onNextChannel = onNextChannel
+        self.onGuide = onGuide
+        self.onChannels = onChannels
+        self.onRecents = onRecents
+        self.onMore = onMore
+        self.onToggleOrientation = onToggleOrientation
+        self.orientation = orientation
+        self.videoContent = videoContent()
+    }
+
+    private var sport: StadiaSport { StadiaSport(league: match?.league) }
+    private var effectiveTab: SportPlayerTab { sport.tabs.contains(selectedTab) ? selectedTab : sport.tabs.first ?? .game }
+
+    var body: some View {
+        GeometryReader { proxy in
+            if proxy.size.width > proxy.size.height {
+                landscapeLayout
+            } else {
+                portraitLayout(height: proxy.size.height)
+            }
+        }
+        .background(Color.black.ignoresSafeArea())
+        .onChange(of: sport.rawValue) { _, _ in
+            selectedTab = sport.tabs.first ?? .game
+        }
+    }
+
+    private func portraitLayout(height: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            PlayerVideoContainer(
+                channel: channel,
+                match: match,
+                sport: sport,
+                isChromeVisible: isChromeVisible,
+                streamSummary: streamSummary,
+                orientation: orientation,
+                onDismiss: onDismiss,
+                onMore: onMore,
+                onToggleOrientation: onToggleOrientation,
+                videoContent: { videoContent }
+            )
+            .frame(height: max(320, height * 0.43))
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    MatchMetadataHeader(match: match, channel: channel)
+                    MatchTabs(tabs: sport.tabs, selection: $selectedTab)
+                    SportGameCentre(match: match, sport: sport, selectedTab: effectiveTab)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 34)
+            }
+            .background(Theme.background)
+        }
+        .ignoresSafeArea(edges: .top)
+    }
+
+    private var landscapeLayout: some View {
+        ZStack(alignment: .trailing) {
+            PlayerVideoContainer(
+                channel: channel,
+                match: match,
+                sport: sport,
+                isChromeVisible: isChromeVisible,
+                streamSummary: streamSummary,
+                orientation: orientation,
+                onDismiss: onDismiss,
+                onMore: onMore,
+                onToggleOrientation: onToggleOrientation,
+                videoContent: { videoContent }
+            )
+            .ignoresSafeArea()
+
+            if isChromeVisible {
+                VStack {
+                    Spacer()
+                    HStack(spacing: 10) {
+                        if hasPreviousChannel {
+                            PlayerChromeButton(systemImage: "chevron.left", accessibilityLabel: "Previous channel", action: onPreviousChannel)
+                        }
+                        if hasNextChannel {
+                            PlayerChromeButton(systemImage: "chevron.right", accessibilityLabel: "Next channel", action: onNextChannel)
+                        }
+                        if showsLiveTVControls {
+                            PlayerChromeButton(systemImage: "rectangle.grid.1x2.fill", title: "Guide", accessibilityLabel: "Open guide", action: onGuide)
+                            PlayerChromeButton(systemImage: "clock.arrow.circlepath", accessibilityLabel: "Recent channels", action: onRecents)
+                        }
+                        PlayerChromeButton(
+                            systemImage: isLandscapeGameCentreVisible ? "sidebar.right" : "chart.bar.xaxis",
+                            accessibilityLabel: "Toggle game information"
+                        ) {
+                            withAnimation(.snappy) { isLandscapeGameCentreVisible.toggle() }
+                        }
+                    }
+                    .padding(.bottom, 26)
+                }
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+
+            if isLandscapeGameCentreVisible {
+                LandscapeGameCentrePanel(match: match, sport: sport)
+                    .frame(maxWidth: 310)
+                    .padding(.trailing, 14)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+    }
+}
+
+private struct PlayerVideoContainer<VideoContent: View>: View {
+    let channel: Channel
+    let match: Match?
+    let sport: StadiaSport
+    let isChromeVisible: Bool
+    let streamSummary: String
+    let orientation: PlayerOrientation
+    let onDismiss: () -> Void
+    let onMore: () -> Void
+    let onToggleOrientation: () -> Void
+    let videoContent: VideoContent
+
+    init(
+        channel: Channel,
+        match: Match?,
+        sport: StadiaSport,
+        isChromeVisible: Bool,
+        streamSummary: String,
+        orientation: PlayerOrientation,
+        onDismiss: @escaping () -> Void,
+        onMore: @escaping () -> Void,
+        onToggleOrientation: @escaping () -> Void,
+        @ViewBuilder videoContent: () -> VideoContent
+    ) {
+        self.channel = channel
+        self.match = match
+        self.sport = sport
+        self.isChromeVisible = isChromeVisible
+        self.streamSummary = streamSummary
+        self.orientation = orientation
+        self.onDismiss = onDismiss
+        self.onMore = onMore
+        self.onToggleOrientation = onToggleOrientation
+        self.videoContent = videoContent()
+    }
+
+    var body: some View {
+        ZStack {
+            videoContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+
+            LinearGradient(colors: [.black.opacity(0.66), .clear, .black.opacity(0.55)],
+                           startPoint: .top,
+                           endPoint: .bottom)
+                .allowsHitTesting(false)
+
+            VStack(spacing: 0) {
+                if isChromeVisible {
+                    PlayerTopOverlay(
+                        title: match?.shortName ?? channel.name,
+                        subtitle: streamSummary,
+                        orientation: orientation,
+                        onDismiss: onDismiss,
+                        onMore: onMore,
+                        onToggleOrientation: onToggleOrientation
+                    )
+                    .padding(.horizontal, 14)
+                    .padding(.top, 12)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                Spacer()
+
+                VStack(spacing: 10) {
+                    if let match {
+                        LiveScoreBug(match: match, sport: sport)
+                            .padding(.horizontal, 18)
+                            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    }
+
+                    if isChromeVisible {
+                        PlayerBottomOverlay(channel: channel, streamSummary: streamSummary, onMore: onMore)
+                            .padding(.horizontal, 14)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+                }
+                .padding(.bottom, 14)
+            }
+        }
+        .background(Color.black)
+    }
+}
+
+private struct PlayerTopOverlay: View {
+    let title: String
+    let subtitle: String
+    let orientation: PlayerOrientation
+    let onDismiss: () -> Void
+    let onMore: () -> Void
+    let onToggleOrientation: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            PlayerChromeButton(systemImage: "chevron.backward", accessibilityLabel: "Back", action: onDismiss)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.62))
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            #if os(iOS)
+            AirPlayButton()
+                .frame(width: 42, height: 38)
+                .background(.black.opacity(0.56), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.12)))
+            #endif
+
+            PlayerChromeButton(systemImage: orientation.systemImage, accessibilityLabel: orientation.accessibilityLabel, action: onToggleOrientation)
+            PlayerChromeButton(systemImage: "ellipsis", accessibilityLabel: "More options", action: onMore)
+        }
+    }
+}
+
+private struct PlayerBottomOverlay: View {
+    let channel: Channel
+    let streamSummary: String
+    let onMore: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 6) {
+                PulsingDot(color: Theme.live)
+                Text("LIVE")
+                    .font(.caption2.weight(.heavy))
+                    .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 34)
+            .background(Theme.live.opacity(0.82), in: Capsule())
+
+            Text(channel.group ?? channel.playlistName)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.72))
+                .lineLimit(1)
+
+            Spacer()
+
+            Text(streamSummary)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.72))
+                .lineLimit(1)
+
+            Button(action: onMore) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 34)
+                    .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Player options")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.12)))
+    }
+}
+
+private struct LiveScoreBug: View {
+    let match: Match
+    let sport: StadiaSport
+
+    var body: some View {
+        VStack(spacing: 7) {
+            HStack(spacing: 10) {
+                scoreTeam(match.away, alignment: .leading)
+                Text(match.away.score ?? "0")
+                    .font(.title3.weight(.black).monospacedDigit())
+                Text("–")
+                    .font(.headline.weight(.heavy))
+                    .foregroundStyle(.white.opacity(0.44))
+                Text(match.home.score ?? "0")
+                    .font(.title3.weight(.black).monospacedDigit())
+                scoreTeam(match.home, alignment: .trailing)
+            }
+            .foregroundStyle(.white)
+
+            HStack(spacing: 8) {
+                Text(scoreState)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white.opacity(0.78))
+                    .lineLimit(1)
+                if match.state == .live {
+                    Spacer(minLength: 6)
+                    HStack(spacing: 5) {
+                        PulsingDot(color: Theme.live)
+                        Text("LIVE")
+                    }
+                    .font(.caption2.weight(.heavy))
+                    .foregroundStyle(Theme.live)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .frame(maxWidth: 360)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.white.opacity(0.16)))
+        .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(match.away.abbreviation) \(match.away.score ?? "0"), \(match.home.abbreviation) \(match.home.score ?? "0"), \(scoreState)")
+    }
+
+    private func scoreTeam(_ team: TeamSide, alignment: HorizontalAlignment) -> some View {
+        HStack(spacing: 6) {
+            if alignment == .trailing {
+                Text(team.abbreviation)
+            }
+            TeamLogo(url: team.logoURL, size: 22)
+            if alignment == .leading {
+                Text(team.abbreviation)
+            }
+        }
+        .font(.subheadline.weight(.black))
+        .frame(maxWidth: .infinity, alignment: alignment == .leading ? .leading : .trailing)
+        .lineLimit(1)
+    }
+
+    private var scoreState: String {
+        let detail = match.statusDetail.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !detail.isEmpty else { return match.state.label.uppercased() }
+        switch sport {
+        case .baseball:
+            let situation = match.liveContext.baseball
+            let count = [situation?.balls, situation?.strikes].compactMap { $0 }.count == 2 ? "\(situation?.balls ?? 0)-\(situation?.strikes ?? 0)" : nil
+            return [situation?.inning, count.map { "Count \($0)" }, situation?.outs.map { "\($0) Out\($0 == 1 ? "" : "s")" }].compactMap { $0 }.first ?? detail.uppercased()
+        case .hockey:
+            let situation = match.liveContext.hockey
+            return [situation?.period, situation?.clock, situation?.powerPlayTeamAbbreviation.map { "\($0) PP" }].compactMap { $0 }.joined(separator: " · ").nilIfEmpty ?? detail.uppercased()
+        case .americanFootball:
+            let situation = match.liveContext.football
+            let downDistance = situation.flatMap { footballDownDistance($0) }
+            return [situation?.quarter, situation?.clock, downDistance, situation?.ballPosition].compactMap { $0 }.joined(separator: " · ").nilIfEmpty ?? detail.uppercased()
+        case .soccer:
+            return (match.liveContext.soccer?.minute ?? detail).replacingOccurrences(of: "Half", with: "H")
+        case .basketball:
+            let situation = match.liveContext.basketball
+            return [situation?.quarter, situation?.clock].compactMap { $0 }.joined(separator: " · ").nilIfEmpty ?? detail.uppercased()
+        default: return detail
+        }
+    }
+
+    private func footballDownDistance(_ situation: FootballSituation) -> String? {
+        guard let down = situation.down, let distance = situation.distance else { return nil }
+        let ordinal = ["1ST", "2ND", "3RD", "4TH"].indices.contains(down - 1) ? ["1ST", "2ND", "3RD", "4TH"][down - 1] : "\(down)TH"
+        return "\(ordinal) & \(distance)"
+    }
+}
+
+private struct MatchMetadataHeader: View {
+    let match: Match?
+    let channel: Channel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(match?.league.shortName.uppercased() ?? (channel.group ?? "LIVE"))
+                    .font(.caption.weight(.heavy))
+                    .foregroundStyle(Theme.textSecondary)
+                if match?.state == .live {
+                    Text("LIVE")
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Theme.live, in: Capsule())
+                } else if let state = match?.state {
+                    Text(state.label.uppercased())
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+
+            Text(match?.name ?? channel.name)
+                .font(.title3.weight(.heavy))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(2)
+
+            let details = [match?.venue, channel.group ?? channel.playlistName].compactMap { value in
+                value?.isEmpty == false ? value : nil
+            }
+            if !details.isEmpty {
+                Text(details.joined(separator: " · "))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct MatchTabs: View {
+    let tabs: [SportPlayerTab]
+    @Binding var selection: SportPlayerTab
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(tabs) { tab in
+                    Button {
+                        withAnimation(.snappy) { selection = tab }
+                    } label: {
+                        Text(tab.rawValue)
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(selection == tab ? .white : Theme.textSecondary)
+                            .padding(.horizontal, 14)
+                            .frame(height: 38)
+                            .background(selection == tab ? Theme.accent : Theme.surfaceElevated, in: Capsule())
+                            .overlay(Capsule().strokeBorder(selection == tab ? Color.white.opacity(0.12) : Theme.hairline))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+}
+
+private struct SportGameCentre: View {
+    let match: Match?
+    let sport: StadiaSport
+    let selectedTab: SportPlayerTab
+
+    var body: some View {
+        VStack(spacing: 12) {
+            switch selectedTab {
+            case .game, .match:
+                sportGameContent
+            case .stats, .teamStats:
+                TeamStatsPlaceholder(match: match, sport: sport)
+            case .plays, .events:
+                EventsPlaceholder(match: match, sport: sport)
+            case .boxScore:
+                BoxScorePlaceholder(match: match, sport: sport)
+            case .lineups:
+                LineupsPlaceholder(match: match, sport: sport)
+            case .drives:
+                DrivesPlaceholder(match: match)
+            }
+        }
+    }
+
+    @ViewBuilder private var sportGameContent: some View {
+        switch sport {
+        case .baseball: BaseballGameCentre(match: match)
+        case .hockey: HockeyGameCentre(match: match)
+        case .americanFootball: FootballGameCentre(match: match)
+        case .soccer: SoccerGameCentre(match: match)
+        case .basketball: BasketballGameCentre(match: match)
+        default: GenericGameCentre(match: match)
+        }
+    }
+}
+
+private struct BaseballGameCentre: View {
+    let match: Match?
+    var body: some View {
+        GameCentreCard(title: "Current Game") {
+            ScoreboardRow(match: match, stateLabel: match?.statusDetail)
+            Divider().overlay(Theme.hairline)
+            if let situation = match?.liveContext.baseball {
+                BaseballBasesView(situation: situation)
+            }
+            SituationGrid(items: [
+                ("Inning", match?.liveContext.baseball?.inning ?? match?.statusDetail),
+                ("Count", baseballCount),
+                ("Outs", match?.liveContext.baseball?.outs.map(String.init)),
+                ("Batter", match?.liveContext.baseball?.batterName),
+                ("Pitcher", match?.liveContext.baseball?.pitcherName)
+            ])
+        }
+        EventsPlaceholder(match: match, sport: .baseball)
+    }
+
+    private var baseballCount: String? {
+        guard let balls = match?.liveContext.baseball?.balls, let strikes = match?.liveContext.baseball?.strikes else { return nil }
+        return "\(balls)-\(strikes)"
+    }
+}
+
+private struct HockeyGameCentre: View {
+    let match: Match?
+    var body: some View {
+        GameCentreCard(title: "Game State") {
+            ScoreboardRow(match: match, stateLabel: match?.statusDetail)
+            Divider().overlay(Theme.hairline)
+            SituationGrid(items: [
+                ("Period", match?.liveContext.hockey?.period ?? match?.liveContext.period?.displayName ?? match?.statusDetail),
+                ("Clock", match?.liveContext.hockey?.clock ?? match?.liveContext.clock?.displayValue),
+                ("Power Play", match?.liveContext.hockey?.powerPlayTeamAbbreviation),
+                ("Strength", match?.liveContext.hockey?.strengthState)
+            ])
+        }
+        TeamStatsPlaceholder(match: match, sport: .hockey)
+    }
+}
+
+private struct FootballGameCentre: View {
+    let match: Match?
+    var body: some View {
+        GameCentreCard(title: "Current Drive") {
+            ScoreboardRow(match: match, stateLabel: match?.statusDetail)
+            Divider().overlay(Theme.hairline)
+            SituationGrid(items: [
+                ("Quarter", match?.liveContext.football?.quarter ?? match?.liveContext.period?.displayName),
+                ("Clock", match?.liveContext.football?.clock ?? match?.liveContext.clock?.displayValue),
+                ("Down", downDistance),
+                ("Ball", match?.liveContext.football?.ballPosition),
+                ("Possession", match?.liveContext.football?.possessionTeamAbbreviation)
+            ])
+        }
+        TeamStatsPlaceholder(match: match, sport: .americanFootball)
+    }
+
+    private var downDistance: String? {
+        guard let down = match?.liveContext.football?.down, let distance = match?.liveContext.football?.distance else { return nil }
+        return "\(down) & \(distance)"
+    }
+}
+
+private struct SoccerGameCentre: View {
+    let match: Match?
+    var body: some View {
+        GameCentreCard(title: match?.league.name.uppercased() ?? "Match") {
+            ScoreboardRow(match: match, stateLabel: match?.statusDetail)
+        }
+        TeamStatsPlaceholder(match: match, sport: .soccer)
+    }
+}
+
+private struct BasketballGameCentre: View {
+    let match: Match?
+    var body: some View {
+        GameCentreCard(title: "Game Leaders") {
+            ScoreboardRow(match: match, stateLabel: match?.statusDetail)
+            Divider().overlay(Theme.hairline)
+            if let leaders = match?.liveContext.leaders, !leaders.isEmpty {
+                ForEach(leaders.prefix(3)) { leader in
+                    LeaderSummaryRow(leader: leader)
+                }
+            } else {
+                SituationGrid(items: [
+                    ("Quarter", match?.liveContext.basketball?.quarter ?? match?.statusDetail),
+                    ("Clock", match?.liveContext.basketball?.clock ?? match?.liveContext.clock?.displayValue)
+                ])
+            }
+        }
+        TeamStatsPlaceholder(match: match, sport: .basketball)
+    }
+}
+
+private struct GenericGameCentre: View {
+    let match: Match?
+    var body: some View {
+        GameCentreCard(title: "Live") {
+            ScoreboardRow(match: match, stateLabel: match?.statusDetail)
+        }
+    }
+}
+
+private struct GameCentreCard<Content: View>: View {
+    let title: String
+    let content: Content
+
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.caption.weight(.heavy))
+                .foregroundStyle(Theme.textSecondary)
+                .textCase(.uppercase)
+            content
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.hairline))
+    }
+}
+
+private struct ScoreboardRow: View {
+    let match: Match?
+    let stateLabel: String?
+
+    var body: some View {
+        HStack(spacing: 14) {
+            team(match?.away, alignment: .leading)
+            VStack(spacing: 4) {
+                Text(scoreText)
+                    .font(.system(.title, design: .rounded, weight: .black).monospacedDigit())
+                    .foregroundStyle(Theme.textPrimary)
+                if let stateLabel, !stateLabel.isEmpty {
+                    Text(stateLabel)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(match?.state == .live ? Theme.live : Theme.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+            team(match?.home, alignment: .trailing)
+        }
+    }
+
+    private var scoreText: String {
+        guard let match else { return "0 - 0" }
+        return "\(match.away.score ?? "0") - \(match.home.score ?? "0")"
+    }
+
+    private func team(_ side: TeamSide?, alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 6) {
+            TeamLogo(url: side?.logoURL, size: 34)
+            Text(side?.abbreviation ?? "TBD")
+                .font(.subheadline.weight(.heavy))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: alignment == .leading ? .leading : .trailing)
+    }
+}
+
+private struct SituationGrid: View {
+    let items: [(String, String?)]
+    private var visibleItems: [(String, String)] {
+        items.compactMap { label, value in
+            guard let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            return (label, value)
+        }
+    }
+
+    var body: some View {
+        if !visibleItems.isEmpty {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(visibleItems, id: \.0) { item in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.0)
+                            .font(.caption2.weight(.heavy))
+                            .foregroundStyle(Theme.textTertiary)
+                            .textCase(.uppercase)
+                        Text(item.1)
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(Theme.textPrimary)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+            }
+        }
+    }
+}
+
+private struct TeamStatsPlaceholder: View {
+    let match: Match?
+    let sport: StadiaSport
+
+    var body: some View {
+        GameCentreCard(title: statsTitle) {
+            if let teamStats = match?.liveContext.teamStats, !teamStats.isEmpty {
+                VStack(spacing: 10) {
+                    ForEach(statLabels, id: \.self) { label in
+                        if let row = comparisonRow(label: label, teamStats: teamStats) {
+                            HStack {
+                                Text(row.away)
+                                    .font(.subheadline.weight(.bold).monospacedDigit())
+                                    .foregroundStyle(Theme.textPrimary)
+                                    .frame(width: 54, alignment: .leading)
+                                Text(label)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(Theme.textSecondary)
+                                    .frame(maxWidth: .infinity)
+                                Text(row.home)
+                                    .font(.subheadline.weight(.bold).monospacedDigit())
+                                    .foregroundStyle(Theme.textPrimary)
+                                    .frame(width: 54, alignment: .trailing)
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text("Team stats will appear here when the provider exposes them.")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        }
+    }
+
+    private var statsTitle: String { sport == .soccer ? "Match Stats" : "Team Stats" }
+    private var statLabels: [String] {
+        switch sport {
+        case .baseball: return ["Hits", "Errors", "Runners", "Bullpen"]
+        case .hockey: return ["Shots", "Faceoff %", "Power Play", "Hits"]
+        case .americanFootball: return ["Total Yards", "Passing", "Rushing", "Turnovers"]
+        case .soccer: return ["Possession", "Shots", "Shots on Target", "Corners"]
+        case .basketball: return ["FG", "3PT", "Rebounds", "Assists"]
+        default: return ["Live stats"]
+        }
+    }
+
+    private func comparisonRow(label: String, teamStats: [MatchTeamStats]) -> (away: String, home: String)? {
+        let normalized = label.lowercased()
+        func value(for side: MatchTeamSide) -> String? {
+            teamStats.first(where: { $0.side == side })?.stats.first {
+                $0.displayName.lowercased() == normalized || $0.key.lowercased().contains(normalized.replacingOccurrences(of: " ", with: "_"))
+            }?.value
+        }
+        guard let away = value(for: .away), let home = value(for: .home) else { return nil }
+        return (away, home)
+    }
+}
+
+private struct EventsPlaceholder: View {
+    let match: Match?
+    let sport: StadiaSport
+
+    var body: some View {
+        GameCentreCard(title: sport == .soccer ? "Recent Events" : "Recent") {
+            if let plays = match?.liveContext.playByPlay, !plays.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(plays.suffix(8).reversed()) { play in
+                        PlayTimelineRow(play: play)
+                        if play.id != plays.suffix(8).first?.id {
+                            Divider().overlay(Theme.hairline)
+                        }
+                    }
+                }
+            } else if let match {
+                Text(match.state == .live ? "Live event feed will appear here as provider data arrives." : match.statusDetail)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+            } else {
+                Text("Match data is still loading.")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        }
+    }
+}
+
+private struct BoxScorePlaceholder: View {
+    let match: Match?
+    let sport: StadiaSport
+    var body: some View {
+        GameCentreCard(title: sport == .basketball ? "Box Score" : "Line Score") {
+            if let boxScore = match?.liveContext.boxScore, !boxScore.playerStats.isEmpty {
+                VStack(spacing: 8) {
+                    ForEach(boxScore.playerStats.prefix(8)) { player in
+                        HStack {
+                            Text(player.displayName)
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(Theme.textPrimary)
+                                .lineLimit(1)
+                            Spacer()
+                            Text(player.stats.prefix(3).map { "\($0.displayName) \($0.value)" }.joined(separator: " · "))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(Theme.textSecondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+            } else {
+                ScoreboardRow(match: match, stateLabel: match?.statusDetail)
+            }
+        }
+    }
+}
+
+private struct LineupsPlaceholder: View {
+    let match: Match?
+    let sport: StadiaSport
+    var body: some View {
+        GameCentreCard(title: sport == .hockey ? "Lineups" : "Lineups") {
+            if let formations = match?.liveContext.formations, !formations.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(formations) { formation in
+                        Text([formation.teamAbbreviation, formation.formationName].compactMap { $0 }.joined(separator: " · "))
+                            .font(.subheadline.weight(.heavy))
+                            .foregroundStyle(Theme.textPrimary)
+                        ForEach(formation.groups) { group in
+                            Text(group.title)
+                                .font(.caption.weight(.heavy))
+                                .foregroundStyle(Theme.textSecondary)
+                            Text(group.players.map(\.displayName).joined(separator: "  "))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Theme.textPrimary)
+                        }
+                    }
+                }
+            } else {
+                Text(lineupCopy)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        }
+    }
+
+    private var lineupCopy: String {
+        switch sport {
+        case .hockey: return "Forward lines, defensive pairings, and goalies will render here when lineup groups are available."
+        case .soccer: return "Formation view will render here when provider formation data is available."
+        default: return "Team lineups will render here when provider roster data is available."
+        }
+    }
+}
+
+private struct DrivesPlaceholder: View {
+    let match: Match?
+    var body: some View {
+        GameCentreCard(title: "Drives") {
+            if let drives = match?.liveContext.drives, !drives.isEmpty {
+                VStack(spacing: 10) {
+                    ForEach(drives) { drive in
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack {
+                                Text(drive.teamAbbreviation ?? "Drive")
+                                    .font(.subheadline.weight(.heavy))
+                                    .foregroundStyle(Theme.textPrimary)
+                                if drive.isCurrent {
+                                    Text("LIVE")
+                                        .font(.caption2.weight(.heavy))
+                                        .foregroundStyle(Theme.live)
+                                }
+                                Spacer()
+                                if let result = drive.result {
+                                    Text(result)
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(Theme.textSecondary)
+                                }
+                            }
+                            if let summary = drive.summary {
+                                Text(summary)
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                        }
+                        .padding(10)
+                        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                }
+            } else {
+                Text(match?.state == .live ? "Current and completed drives will appear here when play-by-play is available." : "Drive chart unavailable before kickoff.")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        }
+    }
+}
+
+private struct LandscapeGameCentrePanel: View {
+    let match: Match?
+    let sport: StadiaSport
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(panelTitle)
+                .font(.caption.weight(.heavy))
+                .foregroundStyle(Theme.textSecondary)
+                .textCase(.uppercase)
+            ScoreboardRow(match: match, stateLabel: match?.statusDetail)
+            Divider().overlay(Theme.hairline)
+            compactSituation
+        }
+        .padding(14)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.white.opacity(0.14)))
+    }
+
+    private var panelTitle: String {
+        switch sport {
+        case .americanFootball: return "Drive"
+        case .soccer: return "Match"
+        default: return "Game"
+        }
+    }
+
+    @ViewBuilder private var compactSituation: some View {
+        switch sport {
+        case .baseball:
+            SituationGrid(items: [("Inning", match?.statusDetail), ("Count", nil), ("Outs", nil)])
+        case .hockey:
+            SituationGrid(items: [("Clock", match?.statusDetail), ("Shots", nil), ("Power Play", nil)])
+        case .americanFootball:
+            SituationGrid(items: [("Clock", match?.statusDetail), ("Down", nil), ("Ball", nil)])
+        case .soccer:
+            SituationGrid(items: [("Minute", match?.statusDetail), ("Possession", nil), ("Shots", nil)])
+        case .basketball:
+            SituationGrid(items: [("Clock", match?.statusDetail), ("FG", nil), ("Last", nil)])
+        default:
+            SituationGrid(items: [("Status", match?.statusDetail)])
+        }
+    }
+}
+
+private struct BaseballBasesView: View {
+    let situation: BaseballSituation
+
+    var body: some View {
+        HStack(spacing: 18) {
+            base(isOccupied: situation.runnerOnThird)
+            VStack(spacing: 5) {
+                base(isOccupied: situation.runnerOnSecond)
+                base(isOccupied: situation.runnerOnFirst)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 4)
+    }
+
+    private func base(isOccupied: Bool?) -> some View {
+        RoundedRectangle(cornerRadius: 3, style: .continuous)
+            .fill((isOccupied == true ? Theme.live : Theme.surfaceElevated).opacity(isOccupied == nil ? 0.35 : 1))
+            .frame(width: 14, height: 14)
+            .rotationEffect(.degrees(45))
+            .overlay(
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.18))
+                    .rotationEffect(.degrees(45))
+            )
+    }
+}
+
+private struct LeaderSummaryRow: View {
+    let leader: MatchLeader
+
+    var body: some View {
+        if let first = leader.players.first {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(leader.displayName)
+                        .font(.caption2.weight(.heavy))
+                        .foregroundStyle(Theme.textTertiary)
+                        .textCase(.uppercase)
+                    Text(first.displayName)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Text(first.stats.first?.value ?? "")
+                    .font(.title3.weight(.black).monospacedDigit())
+                    .foregroundStyle(Theme.textPrimary)
+            }
+        }
+    }
+}
+
+private struct PlayTimelineRow: View {
+    let play: MatchPlay
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(play.clock?.displayValue ?? play.period?.displayName ?? "")
+                .font(.caption.weight(.heavy).monospacedDigit())
+                .foregroundStyle(play.isScoringPlay ? Theme.live : Theme.textTertiary)
+                .frame(width: 48, alignment: .leading)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(play.text)
+                    .font(.subheadline.weight(play.isScoringPlay ? .heavy : .semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                if let score = scoreText {
+                    Text(score)
+                        .font(.caption2.weight(.bold).monospacedDigit())
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+            Spacer()
+        }
+        .padding(.vertical, 9)
+    }
+
+    private var scoreText: String? {
+        guard let awayScore = play.awayScore, let homeScore = play.homeScore else { return nil }
+        return "\(awayScore)-\(homeScore)"
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        let cleaned = trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? nil : cleaned
+    }
+}
 
 private enum PlaybackQuality: String, CaseIterable, Identifiable {
     case auto = "Auto"
@@ -2061,6 +3202,7 @@ private struct PlayerControlBar: View {
 
 private struct PlayerMoreSheet: View {
     let channel: Channel
+    @ObservedObject var streamSelection: StreamSelectionState
     @Binding var bufferProfile: PlayerBufferProfile
     let audioGroup: AVMediaSelectionGroup?
     @Binding var selectedAudioIndex: Int?
@@ -2075,141 +3217,107 @@ private struct PlayerMoreSheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                // Channel info header
-                Section {
-                    HStack(spacing: 12) {
-                        AsyncImage(url: channel.logoURL) { phase in
-                            if case .success(let img) = phase { img.resizable().scaledToFit() }
-                            else { Image(systemName: "play.tv.fill").font(.title3).foregroundStyle(Theme.accent) }
-                        }
-                        .frame(width: 44, height: 44)
-                        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(channel.name).font(.headline).foregroundStyle(Theme.textPrimary).lineLimit(1)
-                            Text(channel.group ?? channel.playlistName).font(.caption).foregroundStyle(Theme.textSecondary).lineLimit(1)
-                        }
-                        Spacer()
-                        Text("LIVE").font(.caption2.weight(.heavy)).foregroundStyle(.white)
-                            .padding(.horizontal, 8).padding(.vertical, 4).background(Theme.live, in: Capsule())
-                    }
-                }
-                .listRowBackground(Theme.surface)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    optionsHeader
 
-                // Actions
-                Section {
-                    #if os(iOS)
-                    HStack {
-                        Label("AirPlay", systemImage: "airplayvideo")
-                            .foregroundStyle(Theme.textPrimary)
-                        Spacer()
-                        AirPlayButton().frame(width: 44, height: 34)
-                    }
-                    #endif
-                    Button {
-                        watchStore.toggleFavorite(channel)
-                        dismiss()
-                    } label: {
-                        Label(watchStore.isFavorite(channel) ? "Remove from Favourites" : "Add to Favourites",
-                              systemImage: watchStore.isFavorite(channel) ? "heart.slash" : "heart")
-                            .foregroundStyle(Theme.textPrimary)
-                    }
-                    Button(action: multiscreenAction) {
+                    PlayerOptionSection(title: "Playback") {
+                        #if os(iOS)
                         HStack {
-                            Label("Multiscreen", systemImage: "rectangle.grid.2x2").foregroundStyle(canStartMultiscreen ? Theme.textPrimary : Theme.textSecondary)
-                            if !entitlements.isPremium { Spacer(); Image(systemName: "lock.fill").foregroundStyle(Theme.accent) }
+                            PlayerOptionLabel(systemImage: "airplayvideo", title: "AirPlay", subtitle: "Cast to nearby screens")
+                            Spacer()
+                            AirPlayButton().frame(width: 46, height: 34)
                         }
-                    }
-                    .disabled(!canStartMultiscreen)
-                }
-                .listRowBackground(Theme.surface)
+                        #endif
 
-                // Audio tracks
-                if let group = audioGroup, group.options.count > 1 {
-                    Section("Audio Track") {
-                        ForEach(group.options.indices, id: \.self) { idx in
-                            Button {
-                                selectedAudioIndex = idx
-                                dismiss()
-                            } label: {
-                                HStack {
-                                    Text(group.options[idx].displayName).foregroundStyle(Theme.textPrimary)
-                                    Spacer()
-                                    if selectedAudioIndex == idx { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
-                                }
-                            }
+                        Button(action: multiscreenAction) {
+                            OptionRowContent(
+                                systemImage: "rectangle.grid.2x2",
+                                title: "Multiscreen",
+                                subtitle: entitlements.isPremium ? "Watch multiple sources" : "Premium",
+                                value: canStartMultiscreen ? nil : "Unavailable",
+                                showsChevron: false
+                            )
                         }
-                    }
-                    .listRowBackground(Theme.surface)
-                }
+                        .disabled(!canStartMultiscreen)
 
-                // Subtitle tracks
-                if let group = subtitleGroup {
-                    Section("Subtitles") {
                         Button {
-                            selectedSubtitleIndex = nil
-                            dismiss()
+                            watchStore.toggleFavorite(channel)
                         } label: {
-                            HStack {
-                                Text("Off").foregroundStyle(Theme.textPrimary)
-                                Spacer()
-                                if selectedSubtitleIndex == nil { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
-                            }
+                            OptionRowContent(
+                                systemImage: watchStore.isFavorite(channel) ? "heart.fill" : "heart",
+                                title: watchStore.isFavorite(channel) ? "Remove Favourite" : "Add to Favourites",
+                                subtitle: nil,
+                                value: nil,
+                                showsChevron: false
+                            )
                         }
-                        ForEach(group.options.indices, id: \.self) { idx in
-                            Button {
-                                selectedSubtitleIndex = idx
-                                dismiss()
+                    }
+
+                    PlayerOptionSection(title: "Stream") {
+                        NavigationLink {
+                            StreamSourceSelectionView(selection: streamSelection)
+                        } label: {
+                            OptionRowContent(systemImage: "dot.radiowaves.left.and.right", title: "Source", subtitle: nil, value: streamSelection.currentSummary, showsChevron: true)
+                        }
+
+                        NavigationLink {
+                            StreamQualitySelectionView(metadata: streamMetadata)
+                        } label: {
+                            OptionRowContent(systemImage: "sparkles.tv", title: "Quality", subtitle: nil, value: qualitySummary, showsChevron: true)
+                        }
+
+                        NavigationLink {
+                            BufferSelectionView(selection: $bufferProfile)
+                        } label: {
+                            OptionRowContent(systemImage: "gauge.with.dots.needle.33percent", title: "Buffer", subtitle: nil, value: bufferProfile.rawValue, showsChevron: true)
+                        }
+
+                        if let audioGroup, audioGroup.options.count > 1 {
+                            NavigationLink {
+                                MediaSelectionView(
+                                    title: "Audio Track",
+                                    options: audioGroup.options.map(\.displayName),
+                                    selectedIndex: $selectedAudioIndex,
+                                    includesOff: false
+                                )
                             } label: {
-                                HStack {
-                                    Text(group.options[idx].displayName).foregroundStyle(Theme.textPrimary)
-                                    Spacer()
-                                    if selectedSubtitleIndex == idx { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
-                                }
+                                OptionRowContent(systemImage: "waveform", title: "Audio Track", subtitle: nil, value: selectedMediaTitle(in: audioGroup, selectedIndex: selectedAudioIndex) ?? "Auto", showsChevron: true)
+                            }
+                        }
+
+                        if let subtitleGroup {
+                            NavigationLink {
+                                MediaSelectionView(
+                                    title: "Subtitles",
+                                    options: subtitleGroup.options.map(\.displayName),
+                                    selectedIndex: $selectedSubtitleIndex,
+                                    includesOff: true
+                                )
+                            } label: {
+                                OptionRowContent(systemImage: "captions.bubble", title: "Subtitles", subtitle: nil, value: selectedMediaTitle(in: subtitleGroup, selectedIndex: selectedSubtitleIndex) ?? "Off", showsChevron: true)
                             }
                         }
                     }
-                    .listRowBackground(Theme.surface)
-                }
 
-                // Buffer profile
-                Section("Buffer") {
-                    ForEach(PlayerBufferProfile.allCases) { profile in
-                        Button { bufferProfile = profile } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(profile.rawValue).foregroundStyle(Theme.textPrimary)
-                                    Text(profile.description).font(.caption).foregroundStyle(Theme.textSecondary)
-                                }
-                                Spacer()
-                                if bufferProfile == profile { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
-                            }
+                    PlayerOptionSection(title: "Picture") {
+                        OptionRowContent(systemImage: "rectangle.arrowtriangle.2.inward", title: "Fit", subtitle: "Preserve stream aspect ratio", value: "Aspect", showsChevron: false)
+                    }
+
+                    if let diagnostics = diagnosticsSummary {
+                        PlayerOptionSection(title: "Stream Summary") {
+                            Text(diagnostics)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Theme.textSecondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                 }
-                .listRowBackground(Theme.surface)
-
-                // Stream diagnostics
-                if let meta = streamMetadata {
-                    Section("Stream Info") {
-                        if let w = meta.width, let h = meta.height, w > 0 {
-                            LabeledContent("Resolution", value: "\(w)×\(h)")
-                        }
-                        if let fr = meta.frameRate, fr > 0 {
-                            LabeledContent("Frame Rate", value: String(format: "%.0f fps", fr))
-                        }
-                        if let codec = meta.codec, !codec.isEmpty {
-                            LabeledContent("Video Codec", value: codec)
-                        }
-                        if let bitrate = meta.bitrate, bitrate > 0 {
-                            LabeledContent("Bitrate", value: formatBitrate(bitrate))
-                        }
-                    }
-                    .listRowBackground(Theme.surface)
-                    .foregroundStyle(Theme.textPrimary)
-                }
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .padding(.bottom, 28)
             }
-            .listStyle(.insetGrouped)
+            .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Options")
             #if !os(tvOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -2223,10 +3331,325 @@ private struct PlayerMoreSheet: View {
         .tint(Theme.accent)
     }
 
+    private var optionsHeader: some View {
+        HStack(spacing: 12) {
+            AsyncImage(url: channel.logoURL) { phase in
+                if case .success(let img) = phase {
+                    img.resizable().scaledToFit()
+                } else {
+                    Image(systemName: "play.tv.fill")
+                        .font(.title3)
+                        .foregroundStyle(Theme.accent)
+                }
+            }
+            .frame(width: 48, height: 48)
+            .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(channel.name)
+                    .font(.headline.weight(.bold))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
+                Text(channel.group ?? channel.playlistName)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            Text("LIVE")
+                .font(.caption2.weight(.heavy))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Theme.live, in: Capsule())
+        }
+        .padding(14)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.hairline))
+    }
+
+    private var qualitySummary: String {
+        guard let streamMetadata else { return "Auto" }
+        var parts: [String] = []
+        if let width = streamMetadata.width, let height = streamMetadata.height, width > 0, height > 0 {
+            parts.append("\(height)p")
+        }
+        if let frameRate = streamMetadata.frameRate, frameRate > 0 {
+            parts.append(String(format: "%.0f fps", frameRate))
+        }
+        return parts.isEmpty ? "Auto" : parts.joined(separator: " · ")
+    }
+
+    private var diagnosticsSummary: String? {
+        guard let streamMetadata else { return nil }
+        var parts: [String] = []
+        if let width = streamMetadata.width, let height = streamMetadata.height, width > 0, height > 0 {
+            parts.append("Resolution \(width)x\(height)")
+        }
+        if let codec = streamMetadata.codec, !codec.isEmpty {
+            parts.append(codec)
+        }
+        if let bitrate = streamMetadata.bitrate, bitrate > 0 {
+            parts.append(formatBitrate(bitrate))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    private func selectedMediaTitle(in group: AVMediaSelectionGroup, selectedIndex: Int?) -> String? {
+        guard let selectedIndex, group.options.indices.contains(selectedIndex) else { return nil }
+        return group.options[selectedIndex].displayName
+    }
+
     private func formatBitrate(_ bps: Double) -> String {
         if bps >= 1_000_000 { return String(format: "%.1f Mbps", bps / 1_000_000) }
         if bps >= 1_000 { return String(format: "%.0f Kbps", bps / 1_000) }
         return String(format: "%.0f bps", bps)
+    }
+}
+
+private struct PlayerOptionSection<Content: View>: View {
+    let title: String
+    let content: Content
+
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.caption.weight(.heavy))
+                .foregroundStyle(Theme.textSecondary)
+                .textCase(.uppercase)
+                .padding(.horizontal, 2)
+            VStack(spacing: 0) {
+                content
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 4)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Theme.hairline))
+        }
+    }
+}
+
+private struct PlayerOptionLabel: View {
+    let systemImage: String
+    let title: String
+    let subtitle: String?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(Theme.accent)
+                .frame(width: 28, height: 28)
+                .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Theme.textPrimary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+        }
+        .padding(.vertical, 10)
+    }
+}
+
+private struct OptionRowContent: View {
+    let systemImage: String
+    let title: String
+    let subtitle: String?
+    let value: String?
+    let showsChevron: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            PlayerOptionLabel(systemImage: systemImage, title: title, subtitle: subtitle)
+            Spacer(minLength: 8)
+            if let value, !value.isEmpty {
+                Text(value)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+            }
+            if showsChevron {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Theme.textTertiary)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+}
+
+private struct BufferSelectionView: View {
+    @Binding var selection: PlayerBufferProfile
+
+    var body: some View {
+        SelectionList(title: "Buffer") {
+            ForEach(PlayerBufferProfile.allCases) { profile in
+                Button {
+                    selection = profile
+                } label: {
+                    SelectionRow(
+                        title: profile.rawValue,
+                        subtitle: profile.description,
+                        isSelected: selection == profile
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+private struct StreamSourceSelectionView: View {
+    @ObservedObject var selection: StreamSelectionState
+
+    var body: some View {
+        SelectionList(title: "Source") {
+            Button {
+                selection.selectAuto()
+            } label: {
+                SelectionRow(title: "Auto", subtitle: selection.autoSummary, isSelected: selection.mode == .auto)
+            }
+            .buttonStyle(.plain)
+
+            ForEach(selection.displayCandidates) { candidate in
+                Button {
+                    selection.selectManual(streamID: candidate.stream.id)
+                } label: {
+                    SelectionRow(
+                        title: candidate.primaryLabel,
+                        subtitle: streamDetail(for: candidate),
+                        isSelected: selection.mode == .manual(candidate.stream.id)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(candidate.health == .unavailable)
+            }
+        }
+    }
+
+    private func streamDetail(for candidate: RankedStreamCandidate) -> String? {
+        var parts: [String] = []
+        if let detail = candidate.detailLabel { parts.append(detail) }
+        if candidate.health != .unknown { parts.append(candidate.health.rawValue) }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+}
+
+private struct StreamQualitySelectionView: View {
+    let metadata: StreamRuntimeMetadata?
+
+    var body: some View {
+        SelectionList(title: "Quality") {
+            SelectionRow(title: "Auto", subtitle: currentDetail ?? "Use the best available stream", isSelected: true)
+        }
+    }
+
+    private var currentDetail: String? {
+        guard let metadata else { return nil }
+        var parts: [String] = []
+        if let width = metadata.width, let height = metadata.height, width > 0, height > 0 {
+            parts.append("\(width)x\(height)")
+        }
+        if let frameRate = metadata.frameRate, frameRate > 0 {
+            parts.append(String(format: "%.0f fps", frameRate))
+        }
+        if let codec = metadata.codec, !codec.isEmpty {
+            parts.append(codec)
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+}
+
+private struct MediaSelectionView: View {
+    let title: String
+    let options: [String]
+    @Binding var selectedIndex: Int?
+    let includesOff: Bool
+
+    var body: some View {
+        SelectionList(title: title) {
+            if includesOff {
+                Button {
+                    selectedIndex = nil
+                } label: {
+                    SelectionRow(title: "Off", subtitle: nil, isSelected: selectedIndex == nil)
+                }
+                .buttonStyle(.plain)
+            }
+
+            ForEach(options.indices, id: \.self) { index in
+                Button {
+                    selectedIndex = index
+                } label: {
+                    SelectionRow(title: options[index], subtitle: nil, isSelected: selectedIndex == index)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+private struct SelectionList<Content: View>: View {
+    let title: String
+    let content: Content
+
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 10) {
+                content
+            }
+            .padding(16)
+        }
+        .background(Theme.background.ignoresSafeArea())
+        .navigationTitle(title)
+        #if !os(tvOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+}
+
+private struct SelectionRow: View {
+    let title: String
+    let subtitle: String?
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Theme.textPrimary)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+            Spacer()
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Theme.accent)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(isSelected ? Theme.accent.opacity(0.38) : Theme.hairline))
     }
 }
 

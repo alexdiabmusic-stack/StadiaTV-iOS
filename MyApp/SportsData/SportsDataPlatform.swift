@@ -71,7 +71,7 @@ struct SportsDataProviderMetadata: Identifiable, Hashable, Sendable {
 struct StadiaEntityID: RawRepresentable, Codable, Hashable, Sendable, CustomStringConvertible {
     let rawValue: String
 
-    init(rawValue: String) {
+    nonisolated init(rawValue: String) {
         self.rawValue = rawValue
     }
 
@@ -1749,6 +1749,39 @@ struct SportsRepository: Sendable {
         try await schedule(for: league, range: .next(days: days, now: startDate)).games.map { $0.toLegacyMatch(league: league) }
     }
 
+    func enrichedLegacyMatch(_ match: Match) async -> Match {
+        let gameID = canonicalGameID(for: match)
+        let shouldLoadLiveSupplements = match.state == .live || match.state == .final
+
+        async let detailResult: StadiaGame? = try? gameDetails(for: match.league, gameID: gameID)
+        async let boxScoreResult: StadiaBoxScore? = shouldLoadLiveSupplements ? (try? boxScore(for: match.league, gameID: gameID)) : nil
+        async let playByPlayResult: StadiaPlayByPlay? = shouldLoadLiveSupplements ? (try? playByPlay(for: match.league, gameID: gameID)) : nil
+
+        let detail = await detailResult
+        let boxScore = await boxScoreResult
+        let playByPlay = await playByPlayResult
+
+        let base = detail?.toLegacyMatch(league: match.league) ?? match
+        return base.withLiveContext(
+            MatchLiveContext(
+                clock: detail?.clock.map(MatchClock.init),
+                period: detail?.period.map(MatchPeriod.init),
+                baseball: MatchLiveContextMapper.baseball(from: detail, match: base),
+                hockey: MatchLiveContextMapper.hockey(from: detail, match: base),
+                football: MatchLiveContextMapper.football(from: detail, match: base),
+                soccer: MatchLiveContextMapper.soccer(from: detail, match: base, plays: playByPlay?.plays ?? []),
+                basketball: MatchLiveContextMapper.basketball(from: detail, match: base),
+                teamStats: boxScore?.teamStats.map { MatchTeamStats(stadia: $0, match: base) } ?? [],
+                leaders: MatchLiveContextMapper.gameLeaders(from: boxScore, match: base),
+                playByPlay: playByPlay?.plays.map(MatchPlay.init) ?? [],
+                boxScore: boxScore.map(MatchBoxScore.init),
+                formations: [],
+                drives: MatchLiveContextMapper.drives(from: playByPlay?.plays ?? [], match: base),
+                sportsDataDelay: nil
+            )
+        )
+    }
+
     private func legacyCanonicalTeamID(league: League, teamID: String) -> StadiaEntityID {
         if teamID.hasPrefix("team:") { return StadiaEntityID(rawValue: teamID) }
         if teamID.hasPrefix("umc.") {
@@ -1758,6 +1791,38 @@ struct SportsRepository: Sendable {
             return StadiaEntityID(rawValue: "team:\(league.stadiaKey):nhl:\(teamID)")
         }
         return StadiaEntityID(rawValue: "team:\(league.stadiaKey):espn:\(teamID)")
+    }
+
+    private func canonicalGameID(for match: Match) -> StadiaEntityID {
+        if match.id.hasPrefix("game:") {
+            return StadiaEntityID(rawValue: match.id)
+        }
+        let provider = providerID(for: match.league)
+        if provider != .espn {
+            return StadiaEntityID(rawValue: "game:\(match.league.stadiaKey):\(provider.rawValue):\(match.id)")
+        }
+        guard let homeID = match.home.canonicalIDString.map(StadiaEntityID.init(rawValue:)),
+              let awayID = match.away.canonicalIDString.map(StadiaEntityID.init(rawValue:)) else {
+            return StadiaEntityID(rawValue: match.id)
+        }
+        return SportsIdentityResolver().canonicalGameID(
+            league: match.league,
+            provider: provider,
+            providerGameID: match.id,
+            home: StadiaTeam(id: homeID, leagueID: SportsIdentityResolver.canonicalLeagueID(for: match.league), displayName: match.home.displayName, shortName: match.home.shortName, abbreviation: match.home.abbreviation, logoURL: match.home.logoURL, aliases: [], provenance: nil),
+            away: StadiaTeam(id: awayID, leagueID: SportsIdentityResolver.canonicalLeagueID(for: match.league), displayName: match.away.displayName, shortName: match.away.shortName, abbreviation: match.away.abbreviation, logoURL: match.away.logoURL, aliases: [], provenance: nil),
+            scheduledStart: match.date
+        )
+    }
+
+    private func providerID(for league: League) -> SportsDataProviderID {
+        switch league.path {
+        case "baseball/mlb": return .mlb
+        case "hockey/nhl": return .nhl
+        case "basketball/nba": return .nba
+        case "football/nfl": return .nfl
+        default: return .espn
+        }
     }
 
     private func mergeLiveAggregationMatches(_ matches: [Match]) -> [Match] {
@@ -2457,7 +2522,279 @@ extension StadiaGame {
             home: homeTeam.toLegacyTeamSide(score: score.home),
             away: awayTeam.toLegacyTeamSide(score: score.away),
             broadcasts: broadcasts.compactMap(\.network),
+            venue: venue?.name,
+            liveContext: MatchLiveContextMapper.context(from: self, league: league)
+        )
+    }
+}
+
+private enum MatchLiveContextMapper {
+    static func context(from game: StadiaGame, league: League) -> MatchLiveContext {
+        let match = game.toLegacyMatchWithoutContext(league: league)
+        return MatchLiveContext(
+            clock: game.clock.map(MatchClock.init),
+            period: game.period.map(MatchPeriod.init),
+            baseball: baseball(from: game, match: match),
+            hockey: hockey(from: game, match: match),
+            football: football(from: game, match: match),
+            soccer: soccer(from: game, match: match, plays: []),
+            basketball: basketball(from: game, match: match)
+        )
+    }
+
+    static func baseball(from game: StadiaGame?, match: Match) -> BaseballSituation? {
+        guard match.league.group == .baseball else { return nil }
+        let period = game?.period?.displayName ?? match.statusDetail
+        return BaseballSituation(inning: clean(period), inningHalf: nil, outs: nil, balls: nil, strikes: nil, runnerOnFirst: nil, runnerOnSecond: nil, runnerOnThird: nil, batterName: nil, pitcherName: nil)
+    }
+
+    static func hockey(from game: StadiaGame?, match: Match) -> HockeySituation? {
+        guard match.league.group == .hockey else { return nil }
+        return HockeySituation(
+            period: clean(game?.period?.displayName),
+            clock: clean(game?.clock?.displayValue) ?? clean(match.statusDetail),
+            powerPlayTeamID: nil,
+            powerPlayTeamAbbreviation: nil,
+            powerPlayTimeRemaining: nil,
+            strengthState: nil,
+            delayedPenaltyTeamID: nil,
+            emptyNetTeamID: nil
+        )
+    }
+
+    static func football(from game: StadiaGame?, match: Match) -> FootballSituation? {
+        guard match.league.group == .football else { return nil }
+        return FootballSituation(
+            quarter: clean(game?.period?.displayName),
+            clock: clean(game?.clock?.displayValue) ?? clean(match.statusDetail),
+            possessionTeamID: nil,
+            possessionTeamAbbreviation: nil,
+            down: nil,
+            distance: nil,
+            ballPosition: nil,
+            yardLine: nil,
+            isRedZone: nil,
+            homeTimeoutsRemaining: nil,
+            awayTimeoutsRemaining: nil
+        )
+    }
+
+    static func soccer(from game: StadiaGame?, match: Match, plays: [StadiaPlay]) -> SoccerSituation? {
+        guard match.league.group == .soccer else { return nil }
+        return SoccerSituation(
+            minute: clean(game?.clock?.displayValue) ?? clean(match.statusDetail),
+            stoppageTime: nil,
+            aggregateScore: nil,
+            homeRedCards: nil,
+            awayRedCards: nil,
+            latestEvent: plays.last.map(MatchPlay.init)
+        )
+    }
+
+    static func basketball(from game: StadiaGame?, match: Match) -> BasketballSituation? {
+        guard match.league.group == .basketball else { return nil }
+        return BasketballSituation(
+            quarter: clean(game?.period?.displayName),
+            clock: clean(game?.clock?.displayValue) ?? clean(match.statusDetail),
+            possessionTeamID: nil,
+            possessionTeamAbbreviation: nil,
+            homeTimeoutsRemaining: nil,
+            awayTimeoutsRemaining: nil,
+            homeBonus: nil,
+            awayBonus: nil,
+            scoringByPeriod: []
+        )
+    }
+
+    static func drives(from plays: [StadiaPlay], match: Match) -> [FootballDrive] {
+        guard match.league.group == .football, !plays.isEmpty else { return [] }
+        let mapped = plays.map(MatchPlay.init)
+        return [FootballDrive(id: "drive:\(match.id):current", teamID: nil, teamAbbreviation: nil, result: nil, summary: nil, isCurrent: match.state == .live, plays: mapped)]
+    }
+
+    static func gameLeaders(from boxScore: StadiaBoxScore?, match: Match) -> [MatchLeader] {
+        guard let playerStats = boxScore?.playerStats, !playerStats.isEmpty else { return [] }
+        let leaderSpecs: [(key: String, title: String, aliases: Set<String>)]
+        switch match.league.group {
+        case .basketball:
+            leaderSpecs = [
+                ("points", "Points", ["points", "pts"]),
+                ("rebounds", "Rebounds", ["rebounds", "reb", "rebs"]),
+                ("assists", "Assists", ["assists", "ast"])
+            ]
+        case .hockey:
+            leaderSpecs = [
+                ("goals", "Goals", ["goals", "g"]),
+                ("assists", "Assists", ["assists", "a"]),
+                ("shots", "Shots", ["shots", "sog"])
+            ]
+        case .baseball:
+            leaderSpecs = [
+                ("hits", "Hits", ["hits", "h"]),
+                ("rbi", "RBI", ["rbi", "runs batted in"]),
+                ("strikeouts", "Strikeouts", ["strikeouts", "so", "k"])
+            ]
+        case .football:
+            leaderSpecs = [
+                ("passingYards", "Passing", ["passing yards", "pass yds", "yds"]),
+                ("rushingYards", "Rushing", ["rushing yards", "rush yds"]),
+                ("receivingYards", "Receiving", ["receiving yards", "rec yds"])
+            ]
+        default:
+            return []
+        }
+
+        return leaderSpecs.compactMap { spec in
+            let ranked = playerStats.compactMap { player -> (player: StadiaPlayerStat, stat: StadiaStatValue, value: Double)? in
+                guard let stat = player.stats.first(where: { matchesStat($0, aliases: spec.aliases) }),
+                      let value = numericValue(from: stat.value) else { return nil }
+                return (player, stat, value)
+            }
+            .sorted { $0.value > $1.value }
+            .prefix(2)
+
+            let players = ranked.map { item in
+                MatchPlayerStat(
+                    id: item.player.playerID.rawValue,
+                    displayName: item.player.playerDisplayName ?? item.player.playerID.rawValue,
+                    teamAbbreviation: item.player.teamAbbreviation,
+                    headshotURL: item.player.headshotURL,
+                    stats: [MatchStat(key: item.stat.key, displayName: item.stat.displayName, value: item.stat.value)]
+                )
+            }
+            guard !players.isEmpty else { return nil }
+            return MatchLeader(key: spec.key, displayName: spec.title, players: players)
+        }
+    }
+
+    private static func matchesStat(_ stat: StadiaStatValue, aliases: Set<String>) -> Bool {
+        aliases.contains(stat.key.lowercased()) || aliases.contains(stat.displayName.lowercased())
+    }
+
+    private static func numericValue(from value: String) -> Double? {
+        let filtered = value.filter { $0.isNumber || $0 == "." }
+        guard !filtered.isEmpty else { return nil }
+        return Double(filtered)
+    }
+
+    private static func clean(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
+        return value
+    }
+}
+
+private extension StadiaGame {
+    func toLegacyMatchWithoutContext(league: League) -> Match {
+        Match(
+            id: aliases.first { $0.provider == .espn }?.id ?? aliases.first?.id ?? id.rawValue,
+            league: league,
+            date: scheduledStart,
+            name: name,
+            shortName: shortName,
+            state: status.legacyGameState,
+            statusDetail: statusDetail,
+            home: homeTeam.toLegacyTeamSide(score: score.home),
+            away: awayTeam.toLegacyTeamSide(score: score.away),
+            broadcasts: broadcasts.compactMap(\.network),
             venue: venue?.name
+        )
+    }
+}
+
+private extension MatchClock {
+    nonisolated init(stadia: StadiaGameClock) {
+        self.init(displayValue: stadia.displayValue, remainingSeconds: stadia.remainingSeconds, isRunning: stadia.isRunning)
+    }
+}
+
+private extension MatchPeriod {
+    nonisolated init(stadia: StadiaPeriod) {
+        self.init(number: stadia.number, displayName: stadia.displayName)
+    }
+}
+
+private extension MatchTeamStats {
+    nonisolated init(stadia: StadiaTeamStat, match: Match) {
+        let rawID = stadia.teamID.rawValue
+        let side: MatchTeamSide = rawID == match.home.canonicalIDString ? .home : .away
+        self.init(
+            side: side,
+            teamID: rawID,
+            teamAbbreviation: side == .home ? match.home.abbreviation : match.away.abbreviation,
+            stats: stadia.stats.map(MatchStat.init)
+        )
+    }
+}
+
+private extension MatchStat {
+    nonisolated init(stadia: StadiaStatValue) {
+        self.init(key: stadia.key, displayName: stadia.displayName, value: stadia.value)
+    }
+}
+
+private extension MatchLeader {
+    nonisolated init(stadia: StadiaLeader) {
+        self.init(
+            key: stadia.statKey,
+            displayName: stadia.displayName,
+            players: stadia.players.map(MatchPlayerStat.init)
+        )
+    }
+}
+
+private extension MatchPlayerStat {
+    nonisolated init(stadia: StadiaPlayerStat) {
+        self.init(
+            id: stadia.playerID.rawValue,
+            displayName: stadia.playerDisplayName ?? stadia.playerID.rawValue,
+            teamAbbreviation: stadia.teamAbbreviation,
+            headshotURL: stadia.headshotURL,
+            stats: stadia.stats.map(MatchStat.init)
+        )
+    }
+}
+
+private extension MatchPlay {
+    nonisolated init(stadia: StadiaPlay) {
+        self.init(
+            id: stadia.id.rawValue,
+            sequence: stadia.sequence,
+            period: stadia.period.map(MatchPeriod.init),
+            clock: stadia.clock.map(MatchClock.init),
+            text: stadia.text,
+            teamID: stadia.teamID?.rawValue,
+            teamAbbreviation: nil,
+            awayScore: stadia.awayScore,
+            homeScore: stadia.homeScore,
+            isScoringPlay: stadia.isScoringPlay,
+            eventType: Self.eventType(from: stadia),
+            providerTimestamp: nil
+        )
+    }
+
+    nonisolated static func eventType(from play: StadiaPlay) -> MatchEventType? {
+        let text = play.text.lowercased()
+        if text.contains("touchdown") { return .touchdown }
+        if text.contains("field goal") { return .fieldGoal }
+        if text.contains("interception") || text.contains("fumble") || text.contains("turnover") { return .turnover }
+        if text.contains("home run") { return .homeRun }
+        if text.contains("goal") { return .goal }
+        if text.contains("penalty") { return .penalty }
+        if text.contains("substitution") { return .substitution }
+        if text.contains("yellow card") { return .yellowCard }
+        if text.contains("red card") { return .redCard }
+        if play.isScoringPlay { return .basket }
+        return nil
+    }
+}
+
+private extension MatchBoxScore {
+    nonisolated init(stadia: StadiaBoxScore) {
+        self.init(
+            teamStats: stadia.teamStats.map {
+                MatchTeamStats(side: .away, teamID: $0.teamID.rawValue, teamAbbreviation: nil, stats: $0.stats.map(MatchStat.init))
+            },
+            playerStats: stadia.playerStats.map(MatchPlayerStat.init)
         )
     }
 }

@@ -5,6 +5,8 @@ import UIKit
 
 struct TVPlayerView: View {
     let channel: Channel
+    /// Pre-resolved match from the detail screen; when set, skips league schedule search.
+    let initialMatch: Match?
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var playlistStore: PlaylistStore
@@ -42,7 +44,7 @@ struct TVPlayerView: View {
                 VStack {
                     HStack(spacing: 10) {
                         TVLiveBadge()
-                        Text("\(match.away.abbreviation) \(match.away.score ?? "0") – \(match.home.score ?? "0") \(match.home.abbreviation)")
+                        Text("\(match.away.abbreviation) \(match.away.score ?? "–") – \(match.home.score ?? "–") \(match.home.abbreviation)")
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(.white)
                         Button {
@@ -97,7 +99,13 @@ struct TVPlayerView: View {
             isScoreDismissed = false
             isScoreExpanded = false
             scoreFetchTask?.cancel()
-            scoreFetchTask = Task { await findAndPollLiveMatch() }
+            if let match = initialMatch {
+                liveScoreMatch = match
+                let m = match
+                scoreFetchTask = Task { await pollMatchUpdates(for: m) }
+            } else {
+                scoreFetchTask = Task { await findAndPollLiveMatch() }
+            }
         }
         .task(id: playlistStore.allChannels.count) {
             let channels = playlistStore.allChannels
@@ -217,6 +225,17 @@ struct TVPlayerView: View {
             try? await Task.sleep(nanoseconds: 4_000_000_000)
             guard !Task.isCancelled else { return }
             isChromeVisible = false
+        }
+    }
+
+    private func pollMatchUpdates(for match: Match) async {
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 30_000_000_000)
+            guard !Task.isCancelled else { break }
+            if let updated = try? await SportsRepository.shared.legacyScoreboard(for: match.league).first(where: { $0.id == match.id }) {
+                liveScoreMatch = updated
+                if updated.state == .final { break }
+            }
         }
     }
 

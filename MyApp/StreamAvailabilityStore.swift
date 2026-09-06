@@ -11,6 +11,10 @@ final class StreamAvailabilityStore: ObservableObject {
     /// 0 means scan ran but found no streams; absent means scan has not yet run for that match.
     @Published private(set) var countByMatchId: [String: Int] = [:]
 
+    /// Number of channels with strong event-specific evidence (guide, team name, or event title match).
+    /// Rights-only or keyword-only matches are candidates but not confirmed.
+    @Published private(set) var confirmedCountByMatchId: [String: Int] = [:]
+
     /// Full ranked source list from the last scan, keyed by match ID.
     /// Used by QuickStreamSheet to show channel names without re-running the scan.
     @Published private(set) var sourcesByMatchId: [String: [RankedSource]] = [:]
@@ -28,6 +32,7 @@ final class StreamAvailabilityStore: ObservableObject {
         // Always remove stale entries for matches that are now final.
         if !finalIds.isEmpty {
             countByMatchId = countByMatchId.filter { !finalIds.contains($0.key) }
+            confirmedCountByMatchId = confirmedCountByMatchId.filter { !finalIds.contains($0.key) }
             sourcesByMatchId = sourcesByMatchId.filter { !finalIds.contains($0.key) }
         }
 
@@ -39,6 +44,7 @@ final class StreamAvailabilityStore: ObservableObject {
 
         // Pre-populate with zeros — every evaluated match gets an explicit result.
         var freshCounts: [String: Int] = Dictionary(uniqueKeysWithValues: nonFinal.map { ($0.id, 0) })
+        var freshConfirmedCounts: [String: Int] = Dictionary(uniqueKeysWithValues: nonFinal.map { ($0.id, 0) })
         var freshSources: [String: [RankedSource]] = [:]
 
         if !channels.isEmpty {
@@ -56,6 +62,7 @@ final class StreamAvailabilityStore: ObservableObject {
                 }
                 for await (id, sources) in group {
                     freshCounts[id] = sources.count
+                    freshConfirmedCounts[id] = sources.filter(\.isConfirmed).count
                     if !sources.isEmpty { freshSources[id] = sources }
                 }
             }
@@ -70,12 +77,18 @@ final class StreamAvailabilityStore: ObservableObject {
         mergedCounts.merge(freshCounts) { _, new in new }
         countByMatchId = mergedCounts
 
+        var mergedConfirmed = confirmedCountByMatchId.filter { !evaluatedIds.contains($0.key) }
+        mergedConfirmed.merge(freshConfirmedCounts) { _, new in new }
+        confirmedCountByMatchId = mergedConfirmed
+
         var mergedSources = sourcesByMatchId.filter { !evaluatedIds.contains($0.key) }
         mergedSources.merge(freshSources) { _, new in new }
         sourcesByMatchId = mergedSources
     }
 
     func count(for matchId: String) -> Int { countByMatchId[matchId] ?? 0 }
+
+    func confirmedCount(for matchId: String) -> Int { confirmedCountByMatchId[matchId] ?? 0 }
 
     func topRanked(for matchId: String, limit: Int = 3) -> [RankedSource] {
         Array((sourcesByMatchId[matchId] ?? []).prefix(limit))

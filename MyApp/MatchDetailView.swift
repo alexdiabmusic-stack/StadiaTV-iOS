@@ -15,7 +15,7 @@ struct MatchDetailView: View {
     @EnvironmentObject private var epgRepository: EPGRepository
     @State private var showingAllChannels = false
     @State private var spoilerRevealed = false
-    @State private var playingChannel: Channel?
+    @State private var playbackContext: MatchPlaybackContext?
     @State private var isPickingMultiscreen = false
     @State private var multiscreenSlots: [MultiscreenSlot] = []
     @State private var liveMatchesForMultiscreen: [LiveGameOption] = []
@@ -133,8 +133,8 @@ struct MatchDetailView: View {
             }
         }
         .navigationTitle(match.league.name)
-        .fullScreenCover(item: $playingChannel) { channel in
-            PlayerView(channel: channel, showsLiveTVControls: false)
+        .fullScreenCover(item: $playbackContext) { context in
+            PlayerView(context: context, showsLiveTVControls: false)
         }
         .fullScreenCover(item: $multiscreenSession) { session in
             MultiScreenPlayerView(channels: session.channels)
@@ -396,7 +396,7 @@ struct MatchDetailView: View {
                 }
 
                 if let channel = context.matchedChannel?.channel, match.state != .final {
-                    Button { playingChannel = channel } label: {
+                    Button { playbackContext = MatchPlaybackContext(match: match, channel: channel, rankedSources: rankedSources) } label: {
                         Label(match.state == .live ? "Watch" : "Watch when live", systemImage: "play.fill")
                             .font(.subheadline.weight(.bold))
                             .frame(maxWidth: .infinity)
@@ -1663,6 +1663,20 @@ struct MatchDetailView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(match.state == .live ? Theme.live : Theme.accent)
+
+                if !isRankingSources && rankedSources.filter(\.isConfirmed).isEmpty {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        Text("No confirmed stream found — channels below matched on broadcast rights only. Browse manually if they don't work.")
+                            .font(.caption)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.orange.opacity(0.25)))
+                }
             }
 
             if playlists.allChannels.count >= 2 && !isPickingMultiscreen {
@@ -2204,7 +2218,7 @@ struct MatchDetailView: View {
         #if os(iOS)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         #endif
-        playingChannel = channel
+        playbackContext = MatchPlaybackContext(match: match, channel: channel, rankedSources: rankedSources)
     }
 
     private func startMultiscreen() {

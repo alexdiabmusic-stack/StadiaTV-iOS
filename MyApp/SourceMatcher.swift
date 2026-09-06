@@ -43,8 +43,14 @@ nonisolated enum SourceMatcher {
             var score = 0
             var evidence: Set<StreamEvidenceCategory> = []
 
-            let homeHit = matches(homeTokens, in: haystack, tokens: haystackTokens) || aliasMatches(homeAliases, padded: paddedHaystack, tokens: haystackTokens)
-            let awayHit = matches(awayTokens, in: haystack, tokens: haystackTokens) || aliasMatches(awayAliases, padded: paddedHaystack, tokens: haystackTokens)
+            // Eliminate tokens shared by both teams before matching — "Los Angeles" appearing in both
+            // Lakers and Clippers cannot confirm either team from a channel named "ABC Los Angeles".
+            let sharedTeamTokens = Set(homeTokens).intersection(Set(awayTokens))
+            let distinctHome = sharedTeamTokens.isEmpty ? homeTokens : homeTokens.filter { !sharedTeamTokens.contains($0) }
+            let distinctAway = sharedTeamTokens.isEmpty ? awayTokens : awayTokens.filter { !sharedTeamTokens.contains($0) }
+
+            let homeHit = matches(distinctHome.isEmpty ? homeTokens : distinctHome, in: haystack, tokens: haystackTokens) || aliasMatches(homeAliases, padded: paddedHaystack, tokens: haystackTokens)
+            let awayHit = matches(distinctAway.isEmpty ? awayTokens : distinctAway, in: haystack, tokens: haystackTokens) || aliasMatches(awayAliases, padded: paddedHaystack, tokens: haystackTokens)
 
             // Both teams named -> almost certainly the event feed.
             if homeHit && awayHit {
@@ -297,6 +303,8 @@ nonisolated enum SourceMatcher {
             let after = s.index(after: starIndex)
             s = String(s[after...])
         }
+        // Preserve "+" as "plus" so ESPN+ stays distinguishable from ESPN after punctuation strip.
+        s = s.replacingOccurrences(of: "+", with: "plus")
         let allowed = s.map { char -> Character in
             char.isLetter || char.isNumber ? char : " "
         }
@@ -382,5 +390,12 @@ nonisolated enum SourceMatcher {
 
     /// Tokens in a channel name that indicate the channel is non-sports content.
     /// Channels with these tokens are excluded before any scoring.
-    private static let nonSportsNameTokens: Set<String> = ["news", "business"]
+    private static let nonSportsNameTokens: Set<String> = [
+        "news", "business", "finance", "financial",
+        "weather", "forecast",
+        "shopping", "infomercial",
+        "cooking", "food",
+        "cartoon", "anime",
+        "worship", "church", "religious", "faith"
+    ]
 }

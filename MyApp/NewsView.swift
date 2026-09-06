@@ -197,6 +197,7 @@ final class NewsViewModel: ObservableObject {
     }
 
     func load(leagues: [League]) async {
+        // Keep existing articles visible during a refresh — don't blank the feed while fetching.
         pagesByLeague = [:]
         exhaustedLeagues = []
         followedLeagueIDs = leagues.map(\.id)
@@ -208,7 +209,11 @@ final class NewsViewModel: ObservableObject {
                 }
             }
             for await (id, articles) in group {
-                articlesByLeague[id] = articles
+                // Only overwrite stale content when the refresh returns results;
+                // on failure (empty), preserve what was already visible.
+                if !articles.isEmpty {
+                    articlesByLeague[id] = articles
+                }
                 pagesByLeague[id] = 1
             }
         }
@@ -256,19 +261,23 @@ final class NewsViewModel: ObservableObject {
                 if newArticles.isEmpty {
                     exhaustedLeagues.insert(id)
                 } else {
-                    articlesByLeague[id, default: []].append(contentsOf: newArticles)
-                    pagesByLeague[id] = nextPage
+                    let existingIDs = Set(articlesByLeague[id, default: []].map(\.id))
+                    let fresh = newArticles.filter { !existingIDs.contains($0.id) }
+                    if fresh.isEmpty {
+                        // Provider returned only duplicates — treat as exhausted.
+                        exhaustedLeagues.insert(id)
+                    } else {
+                        articlesByLeague[id, default: []].append(contentsOf: fresh)
+                        pagesByLeague[id] = nextPage
+                    }
                 }
             }
         }
     }
 
     private func fetch(league: League, page: Int) async -> [ESPNArticle] {
-        // Only the site feed is league-specific. ESPN's "Now" feed ignores its
-        // league parameter and returns global headlines, which made every
-        // filter show the same stories under a different tag.
         do {
-            return try await SportsRepository.shared.legacyNews(for: league, limit: 50)
+            return try await SportsRepository.shared.legacyNews(for: league, limit: 50, page: page)
         } catch {
             lastError = error.localizedDescription
             return []

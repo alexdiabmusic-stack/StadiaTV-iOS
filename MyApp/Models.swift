@@ -736,6 +736,34 @@ struct RankedSource: Identifiable, Hashable {
     var strongestEvidence: StreamEvidenceCategory? {
         evidenceCategories.max { $0.priority < $1.priority }
     }
+
+    /// True when event-specific evidence exists (EPG match, both team names, or event title).
+    /// False when only broadcaster rights or league keywords matched — those are unconfirmed candidates.
+    var isConfirmed: Bool {
+        evidenceCategories.contains(.guideListsMatch) ||
+        evidenceCategories.contains(.teamNameMatch) ||
+        evidenceCategories.contains(.eventTitleMatch)
+    }
+}
+
+/// Carries the explicitly-selected event identity from match selection into the media player.
+/// PlayerView must never independently discover or replace this event.
+struct MatchPlaybackContext: Identifiable, Sendable {
+    let match: Match
+    let channel: Channel
+    let rankedSources: [RankedSource]
+
+    var id: String { "\(match.id)-\(channel.id)" }
+
+    init(match: Match, channel: Channel, rankedSources: [RankedSource] = []) {
+        self.match = match
+        self.channel = channel
+        self.rankedSources = rankedSources
+    }
+
+    var selectedSource: RankedSource? {
+        rankedSources.first { $0.channel.id == channel.id } ?? rankedSources.first
+    }
 }
 
 // MARK: - News

@@ -705,7 +705,14 @@ protocol GolfTournamentProvider: SportsProvider {
 }
 
 protocol SportsNewsProvider: SportsProvider {
-    func newsMetadata(for league: League, limit: Int) async throws -> [StadiaNewsArticle]
+    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [StadiaNewsArticle]
+    /// Returns false for providers that ignore the page parameter (e.g. Yahoo). The repository
+    /// skips these when page > 1 so they don't repeat page-1 content in response to pagination.
+    var supportsPagination: Bool { get }
+}
+
+extension SportsNewsProvider {
+    var supportsPagination: Bool { true }
 }
 
 // MARK: - Identity
@@ -1567,20 +1574,22 @@ struct SportsRepository: Sendable {
         throw SportsDataError.unavailable
     }
 
-    func newsMetadata(for league: League, limit: Int = 10) async throws -> [StadiaNewsArticle] {
-        let key = cacheKey(league: league, capability: .newsMetadata, scope: "limit-\(limit)")
+    func newsMetadata(for league: League, limit: Int = 10, page: Int = 1) async throws -> [StadiaNewsArticle] {
+        let key = cacheKey(league: league, capability: .newsMetadata, scope: "limit-\(limit)-page-\(page)")
         if let cached: [StadiaNewsArticle] = await cache.value(for: key) {
             await recordDiagnostics(league: league, capability: .newsMetadata, currentProvider: cached.first?.provenance?.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
             return cached
         }
-        let providers = await router.providers(for: league, capability: .newsMetadata, as: (any SportsNewsProvider).self)
+        let allProviders = await router.providers(for: league, capability: .newsMetadata, as: (any SportsNewsProvider).self)
+        // When fetching beyond page 1, skip providers that don't support pagination — they'd just repeat page 1.
+        let providers = page > 1 ? allProviders.filter(\.supportsPagination) : allProviders
         guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.newsMetadata, league.path) }
         var fallbacks: [SportsDataProviderID] = []
         var failures: [String] = []
         for provider in providers {
             let start = Date()
             do {
-                let articles = try await provider.newsMetadata(for: league, limit: limit)
+                let articles = try await provider.newsMetadata(for: league, limit: limit, page: page)
                 let latency = Date().timeIntervalSince(start)
                 await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
                 await cache.store(articles, for: key, ttl: SportsDataCache.defaultTTL(for: .newsMetadata))
@@ -1775,8 +1784,8 @@ struct SportsRepository: Sendable {
         }
     }
 
-    func legacyNews(for league: League, limit: Int = 10) async throws -> [ESPNArticle] {
-        try await newsMetadata(for: league, limit: limit).map { $0.toLegacyArticle(league: league) }
+    func legacyNews(for league: League, limit: Int = 10, page: Int = 1) async throws -> [ESPNArticle] {
+        try await newsMetadata(for: league, limit: limit, page: page).map { $0.toLegacyArticle(league: league) }
     }
 
     func legacyScoreboard(for league: League, on date: Date? = nil) async throws -> [Match] {
@@ -2401,9 +2410,9 @@ struct ESPNProvider: ScoreProvider, ScheduleProvider, TeamProvider, StandingsPro
         }
     }
 
-    func newsMetadata(for league: League, limit: Int) async throws -> [StadiaNewsArticle] {
+    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [StadiaNewsArticle] {
         do {
-            return try await service.realtimeNews(for: league, limit: limit).map { article in
+            return try await service.news(for: league, limit: limit, page: page).map { article in
                 StadiaNewsArticle(
                     id: StadiaEntityID(rawValue: "news:espn:\(article.id)"),
                     headline: article.headline,

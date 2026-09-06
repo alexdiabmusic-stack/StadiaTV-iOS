@@ -121,7 +121,7 @@ struct YahooSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider
         return game
     }
 
-    func newsMetadata(for league: League, limit: Int) async throws -> [StadiaNewsArticle] {
+    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [StadiaNewsArticle] {
         try ensureSupported(league, capability: .newsMetadata)
         let payload = try await client.firstSuccessfulJSON(urls: YahooSportsEndpoint.newsURLs(league: league, limit: limit))
         let articles = WebSportsNewsMapper(providerID: .yahooSports).articles(from: payload, league: league, limit: limit)

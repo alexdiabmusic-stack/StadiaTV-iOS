@@ -94,6 +94,9 @@ struct PlayerView: View {
     /// When false, hides the Guide button (and other IPTV-only controls) from the control bar.
     /// Set to false when opening from a sports match context where EPG navigation is irrelevant.
     let showsLiveTVControls: Bool
+    /// Explicit event identity passed from the match detail screen. When set, the player skips
+    /// `findAndPollLiveMatch` and uses `pollMatchUpdates(for:)` on the known match instead.
+    let matchPlaybackContext: MatchPlaybackContext?
     @StateObject private var streamSelection: StreamSelectionState
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var watchStore: WatchStore
@@ -161,6 +164,7 @@ struct PlayerView: View {
         self.channel = channel
         self.canonicalChannel = nil
         self.showsLiveTVControls = showsLiveTVControls
+        self.matchPlaybackContext = nil
         let zap = zapChannels.isEmpty ? [channel] : zapChannels
         self.zapChannels = zap
         let idx = zap.indices.contains(currentIndex) ? currentIndex : 0
@@ -182,10 +186,22 @@ struct PlayerView: View {
         self.channel = channel
         self.canonicalChannel = canonicalChannel
         self.showsLiveTVControls = true
+        self.matchPlaybackContext = nil
         self.zapChannels = [channel]
         _currentZapChannel = State(initialValue: channel)
         _zapIndex = State(initialValue: 0)
         _streamSelection = StateObject(wrappedValue: StreamSelectionState(channel: channel, canonicalChannel: canonicalChannel))
+    }
+
+    init(context: MatchPlaybackContext, showsLiveTVControls: Bool = false) {
+        self.channel = context.channel
+        self.canonicalChannel = nil
+        self.showsLiveTVControls = showsLiveTVControls
+        self.matchPlaybackContext = context
+        self.zapChannels = [context.channel]
+        _currentZapChannel = State(initialValue: context.channel)
+        _zapIndex = State(initialValue: 0)
+        _streamSelection = StateObject(wrappedValue: StreamSelectionState(channel: context.channel))
     }
 
     // Sorting and deduping a big playlist is expensive, so it runs once off
@@ -543,8 +559,15 @@ struct PlayerView: View {
             isScoreDismissed = false
             isScoreExpanded = false
             scoreFetchTask?.cancel()
-            let zapChannel = currentZapChannel
-            scoreFetchTask = Task { await findAndPollLiveMatch(for: zapChannel) }
+            if let ctx = matchPlaybackContext {
+                liveScoreMatch = ctx.match
+                matchResolutionState = .connected
+                let match = ctx.match
+                scoreFetchTask = Task { await pollMatchUpdates(for: match) }
+            } else {
+                let zapChannel = currentZapChannel
+                scoreFetchTask = Task { await findAndPollLiveMatch(for: zapChannel) }
+            }
         }
         .task(id: playlistStore.allChannels.count) {
             let channels = playlistStore.allChannels
@@ -783,6 +806,23 @@ struct PlayerView: View {
     }
 
     // MARK: Live score tracking
+
+    /// Polls for live score updates when the match identity is already known (context-launched player).
+    /// Unlike `findAndPollLiveMatch`, this never searches league schedules — it only refreshes the
+    /// match we were explicitly handed.
+    private func pollMatchUpdates(for match: Match) async {
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 30_000_000_000)
+            guard !Task.isCancelled else { break }
+            if let updated = try? await SportsRepository.shared.legacyScoreboard(for: match.league).first(where: { $0.id == match.id }) {
+                liveScoreMatch = await SportsRepository.shared.enrichedLegacyMatch(updated)
+                matchResolutionState = .connected
+                if updated.state == .final { break }
+            } else {
+                matchResolutionState = .apiFailed
+            }
+        }
+    }
 
     private func findAndPollLiveMatch(for targetChannel: Channel) async {
         let channel = targetChannel
@@ -1147,7 +1187,7 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
             if proxy.size.width > proxy.size.height {
                 landscapeLayout
             } else {
-                portraitLayout(height: proxy.size.height)
+                portraitLayout(height: proxy.size.height, topSafeArea: proxy.safeAreaInsets.top)
             }
         }
         .background(Color.black.ignoresSafeArea())
@@ -1156,7 +1196,7 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
         }
     }
 
-    private func portraitLayout(height: CGFloat) -> some View {
+    private func portraitLayout(height: CGFloat, topSafeArea: CGFloat) -> some View {
         VStack(spacing: 0) {
             PlayerVideoContainer(
                 channel: channel,
@@ -1170,6 +1210,7 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
                 onSourceSelector: onSourceSelector,
                 onCycleSource: onCycleSource,
                 onToggleOrientation: onToggleOrientation,
+                topSafeArea: topSafeArea,
                 videoContent: { videoContent }
             )
             .frame(height: max(320, height * 0.43))
@@ -1255,6 +1296,7 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
     let onSourceSelector: () -> Void
     let onCycleSource: (Int) -> Void
     let onToggleOrientation: () -> Void
+    let topSafeArea: CGFloat
     let videoContent: VideoContent
 
     init(
@@ -1269,6 +1311,7 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
         onSourceSelector: @escaping () -> Void,
         onCycleSource: @escaping (Int) -> Void,
         onToggleOrientation: @escaping () -> Void,
+        topSafeArea: CGFloat = 0,
         @ViewBuilder videoContent: () -> VideoContent
     ) {
         self.channel = channel
@@ -1282,6 +1325,7 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
         self.onSourceSelector = onSourceSelector
         self.onCycleSource = onCycleSource
         self.onToggleOrientation = onToggleOrientation
+        self.topSafeArea = topSafeArea
         self.videoContent = videoContent()
     }
 
@@ -1308,7 +1352,7 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
                             onToggleOrientation: onToggleOrientation
                         )
                         .padding(.horizontal, 14)
-                        .padding(.top, max(proxy.safeAreaInsets.top, 8) + 8)
+                        .padding(.top, max(topSafeArea, 8) + 8)
                         .transition(.opacity.combined(with: .move(edge: .top)))
                     }
 
@@ -1462,12 +1506,12 @@ private struct LiveScoreBug: View {
         VStack(spacing: 7) {
             HStack(spacing: 10) {
                 scoreTeam(match.away, alignment: .leading)
-                Text(match.away.score ?? "0")
+                Text(match.away.score ?? "–")
                     .font(.title3.weight(.black).monospacedDigit())
                 Text("–")
                     .font(.headline.weight(.heavy))
                     .foregroundStyle(.white.opacity(0.44))
-                Text(match.home.score ?? "0")
+                Text(match.home.score ?? "–")
                     .font(.title3.weight(.black).monospacedDigit())
                 scoreTeam(match.home, alignment: .trailing)
             }
@@ -1497,7 +1541,7 @@ private struct LiveScoreBug: View {
         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(.white.opacity(0.16)))
         .shadow(color: .black.opacity(0.28), radius: 18, y: 8)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(match.away.abbreviation) \(match.away.score ?? "0"), \(match.home.abbreviation) \(match.home.score ?? "0"), \(scoreState)")
+        .accessibilityLabel("\(match.away.abbreviation) \(match.away.score ?? "no score"), \(match.home.abbreviation) \(match.home.score ?? "no score"), \(scoreState)")
     }
 
     private func scoreTeam(_ team: TeamSide, alignment: HorizontalAlignment) -> some View {
@@ -1704,7 +1748,7 @@ private struct BaseballGameCentre: View {
                 BaseballBasesView(situation: situation)
             }
             SituationGrid(items: [
-                ("Inning", match?.liveContext.baseball?.inning ?? match?.statusDetail),
+                ("Inning", match?.liveContext.baseball?.inning ?? (match?.state == .live ? match?.statusDetail : nil)),
                 ("Count", baseballCount),
                 ("Outs", match?.liveContext.baseball?.outs.map(String.init)),
                 ("Batter", match?.liveContext.baseball?.batterName),
@@ -1727,7 +1771,7 @@ private struct HockeyGameCentre: View {
             ScoreboardRow(match: match, stateLabel: match?.statusDetail)
             Divider().overlay(Theme.hairline)
             SituationGrid(items: [
-                ("Period", match?.liveContext.hockey?.period ?? match?.liveContext.period?.displayName ?? match?.statusDetail),
+                ("Period", match?.liveContext.hockey?.period ?? match?.liveContext.period?.displayName ?? (match?.state == .live ? match?.statusDetail : nil)),
                 ("Clock", match?.liveContext.hockey?.clock ?? match?.liveContext.clock?.displayValue),
                 ("Power Play", match?.liveContext.hockey?.powerPlayTeamAbbreviation),
                 ("Strength", match?.liveContext.hockey?.strengthState)
@@ -1782,7 +1826,7 @@ private struct BasketballGameCentre: View {
                 }
             } else {
                 SituationGrid(items: [
-                    ("Quarter", match?.liveContext.basketball?.quarter ?? match?.statusDetail),
+                    ("Quarter", match?.liveContext.basketball?.quarter ?? (match?.state == .live ? match?.statusDetail : nil)),
                     ("Clock", match?.liveContext.basketball?.clock ?? match?.liveContext.clock?.displayValue)
                 ])
             }
@@ -3286,13 +3330,8 @@ private struct PlayerChromeButton: View {
 }
 
 private extension View {
-    @ViewBuilder
     func playerChromeButtonStyle() -> some View {
-        if #available(iOS 26.0, tvOS 26.0, macOS 26.0, *) {
-            self.buttonStyle(.glass)
-        } else {
-            self.buttonStyle(.plain)
-        }
+        buttonStyle(.plain)
     }
 }
 

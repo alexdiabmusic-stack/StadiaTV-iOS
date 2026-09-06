@@ -735,17 +735,35 @@ private struct TeamMatchupHero: View {
                     .foregroundStyle(Theme.live)
             }
         } else if let start = eventDate {
-            let secs = max(0, Int(start.timeIntervalSince(now)))
-            let h = secs / 3600
-            let mins = (secs % 3600) / 60
+            let secsRemaining = Int(start.timeIntervalSince(now))
             VStack(alignment: .leading, spacing: 1) {
-                Text(secs < 60 ? "STARTING" : "STARTS IN")
-                    .font(.system(size: 9, weight: .heavy))
-                    .foregroundStyle(.white.opacity(0.55))
-                    .tracking(1)
-                Text(secs == 0 ? "NOW" : h > 0 ? "\(h)h \(mins)m" : "\(mins)m")
-                    .font(.system(size: 28, weight: .black, design: .rounded).monospacedDigit())
-                    .foregroundStyle(.white)
+                if secsRemaining <= -300 {
+                    Text("STARTED")
+                        .font(.system(size: 9, weight: .heavy))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .tracking(1)
+                    Text(start, style: .time)
+                        .font(.system(size: 28, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                } else if secsRemaining > 24 * 3600 {
+                    Text("DATE")
+                        .font(.system(size: 9, weight: .heavy))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .tracking(1)
+                    Text(start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
+                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                } else {
+                    let h = max(0, secsRemaining) / 3600
+                    let mins = (max(0, secsRemaining) % 3600) / 60
+                    Text(secsRemaining < 60 ? "STARTING" : "STARTS IN")
+                        .font(.system(size: 9, weight: .heavy))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .tracking(1)
+                    Text(secsRemaining < 60 ? "NOW" : h > 0 ? "\(h)h \(mins)m" : "\(mins)m")
+                        .font(.system(size: 28, weight: .black, design: .rounded).monospacedDigit())
+                        .foregroundStyle(.white)
+                }
             }
         }
     }
@@ -754,7 +772,7 @@ private struct TeamMatchupHero: View {
     private var buttonsView: some View {
         if let m = match {
             NavigationLink(value: m) {
-                heroButton(m.state == .final ? "Highlights" : "Watch Live", icon: "play.fill", primary: true)
+                heroButton(m.state == .final ? "Highlights" : m.state == .live ? "Watch Live" : "Match Info", icon: "play.fill", primary: true)
             }
             .buttonStyle(.plain)
             NavigationLink(value: m) {
@@ -899,7 +917,7 @@ private struct EventHero: View {
                     HStack(spacing: 8) {
                         if let m = match {
                             NavigationLink(value: m) {
-                                eventButton("Watch Live", icon: "play.fill", primary: true)
+                                eventButton(m.state == .final ? "Highlights" : m.state == .live ? "Watch Live" : "Match Info", icon: "play.fill", primary: true)
                             }
                             .buttonStyle(.plain)
                             NavigationLink(value: m) {
@@ -958,20 +976,41 @@ private struct EventHero: View {
                 .tracking(1)
                 .padding(.bottom, 8)
         } else if let start = eventDate {
-            let secs = max(0, Int(start.timeIntervalSince(now)))
-            let h = secs / 3600
-            let mins = (secs % 3600) / 60
+            let secsRemaining = Int(start.timeIntervalSince(now))
             VStack(alignment: .leading, spacing: 1) {
-                Text(secs < 60 ? "STARTING" : "STARTS IN")
-                    .font(.system(size: 9, weight: .heavy))
-                    .foregroundStyle(.white.opacity(0.55))
-                    .tracking(1)
-                Text(secs == 0 ? "NOW" : h > 0 ? "\(h)h \(mins)m" : "\(mins)m")
-                    .font(.system(size: 30, weight: .black, design: .rounded).monospacedDigit())
-                    .foregroundStyle(.white)
-                Text(start, style: .time)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.55))
+                if secsRemaining <= -300 {
+                    Text("STARTED")
+                        .font(.system(size: 9, weight: .heavy))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .tracking(1)
+                    Text(start, style: .time)
+                        .font(.system(size: 30, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                } else if secsRemaining > 24 * 3600 {
+                    Text("DATE")
+                        .font(.system(size: 9, weight: .heavy))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .tracking(1)
+                    Text(start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
+                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                    Text(start, style: .time)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.55))
+                } else {
+                    let h = max(0, secsRemaining) / 3600
+                    let mins = (max(0, secsRemaining) % 3600) / 60
+                    Text(secsRemaining < 60 ? "STARTING" : "STARTS IN")
+                        .font(.system(size: 9, weight: .heavy))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .tracking(1)
+                    Text(secsRemaining < 60 ? "NOW" : h > 0 ? "\(h)h \(mins)m" : "\(mins)m")
+                        .font(.system(size: 30, weight: .black, design: .rounded).monospacedDigit())
+                        .foregroundStyle(.white)
+                    Text(start, style: .time)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.55))
+                }
             }
             .padding(.bottom, 6)
         }

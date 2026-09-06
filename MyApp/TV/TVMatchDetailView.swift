@@ -42,7 +42,7 @@ struct TVMatchDetailView: View {
             await rankSources()
         }
         .fullScreenCover(item: $playingChannel) { channel in
-            TVPlayerView(channel: channel)
+            TVPlayerView(channel: channel, initialMatch: match)
         }
     }
 

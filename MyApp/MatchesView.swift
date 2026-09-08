@@ -171,30 +171,71 @@ struct MatchesView: View {
     }
 
     private var mainScroll: some View {
-        ScrollView {
+        // Compute all derived match data in one pass so visibleMatches is evaluated only once per render.
+        let visible = visibleMatches
+        let now = Date()
+        let weekEnd = Calendar.current.date(byAdding: .day, value: 7, to: now) ?? now
+        var liveList: [Match] = []
+        var todayCount = 0
+        var thisWeekCount = 0
+        var upcomingAll: [Match] = []
+        var seenSports = Set<SportGroup>()
+        var availableSports: [SportGroup] = []
+        for match in visible {
+            if match.state == .live {
+                liveList.append(match)
+                if Calendar.current.isDateInToday(match.date) { todayCount += 1 }
+            } else if match.state == .pre {
+                if Calendar.current.isDateInToday(match.date) { todayCount += 1 }
+                if match.date >= now && match.date <= weekEnd { thisWeekCount += 1 }
+                if match.date >= now && !isTBDMatch(match) {
+                    upcomingAll.append(match)
+                    if seenSports.insert(match.league.group).inserted {
+                        availableSports.append(match.league.group)
+                    }
+                }
+            }
+        }
+        upcomingAll.sort { $0.date < $1.date }
+        let nextUp = upcomingAll.first
+        let comingUp = comingUpSportFilter.map { f in upcomingAll.filter { $0.league.group == f } } ?? upcomingAll
+
+        return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 entitySelector
                     .padding(.top, 8)
                     .padding(.bottom, 16)
 
                 FollowingSportsSummary(
-                    liveCount: liveMatches.count,
-                    todayCount: todayMatches.count,
-                    thisWeekCount: thisWeekMatches.count,
-                    nextUpcoming: nextUpcoming
+                    liveCount: liveList.count,
+                    todayCount: todayCount,
+                    thisWeekCount: thisWeekCount,
+                    nextUpcoming: nextUp
                 )
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20)
 
-                heroSection
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 28)
+                Group {
+                    if let live = liveList.first {
+                        FollowingLiveHero(match: live)
+                    } else if let next = nextUp {
+                        FollowingUpNextHero(
+                            match: next,
+                            isReminderSet: remindedMatchIDs.contains(next.id),
+                            onRemind: { Task { await toggleReminder(for: next) } }
+                        )
+                    } else if !viewModel.isLoadingFollowing {
+                        FollowingNoEventsCard()
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 28)
 
                 FollowingComingUpSection(
-                    matches: comingUpPreviewMatches,
-                    fullScheduleMatches: comingUpMatches,
+                    matches: Array(comingUp.prefix(6)),
+                    fullScheduleMatches: comingUp,
                     sportFilter: $comingUpSportFilter,
-                    availableSports: comingUpAvailableSports,
+                    availableSports: availableSports,
                     streamCountByMatchId: streamStore.countByMatchId
                 )
                 .padding(.bottom, 28)
@@ -288,23 +329,6 @@ struct MatchesView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: Hero
-
-    @ViewBuilder
-    private var heroSection: some View {
-        if let live = liveMatches.first {
-            FollowingLiveHero(match: live)
-        } else if let next = nextUpcoming {
-            FollowingUpNextHero(
-                match: next,
-                isReminderSet: remindedMatchIDs.contains(next.id),
-                onRemind: { Task { await toggleReminder(for: next) } }
-            )
-        } else if !viewModel.isLoadingFollowing {
-            FollowingNoEventsCard()
-        }
-    }
-
     // MARK: Derived data
 
     private var selectedMatches: [Match] {
@@ -317,42 +341,6 @@ struct MatchesView: View {
 
     private var visibleMatches: [Match] {
         selectedMatches.filter { !hiddenMatchIDs.contains($0.id) }
-    }
-
-    private var liveMatches: [Match] { visibleMatches.filter { $0.state == .live } }
-
-    private var todayMatches: [Match] {
-        visibleMatches.filter { Calendar.current.isDateInToday($0.date) && $0.state != .final }
-    }
-
-    private var thisWeekMatches: [Match] {
-        let end = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
-        return visibleMatches.filter { $0.state == .pre && $0.date >= Date() && $0.date <= end }
-    }
-
-    private var nextUpcoming: Match? {
-        visibleMatches
-            .filter { $0.state == .pre && $0.date >= Date() && !isTBDMatch($0) }
-            .min(by: { $0.date < $1.date })
-    }
-
-    private var comingUpMatches: [Match] {
-        var result = visibleMatches.filter { $0.state == .pre && $0.date >= Date() && !isTBDMatch($0) }
-        if let filter = comingUpSportFilter {
-            result = result.filter { $0.league.group == filter }
-        }
-        return result.sorted { $0.date < $1.date }
-    }
-
-    private var comingUpPreviewMatches: [Match] {
-        Array(comingUpMatches.prefix(6))
-    }
-
-    private var comingUpAvailableSports: [SportGroup] {
-        var seen = Set<SportGroup>()
-        return visibleMatches
-            .filter { $0.state == .pre && $0.date >= Date() && !isTBDMatch($0) }
-            .compactMap { seen.insert($0.league.group).inserted ? $0.league.group : nil }
     }
 
     private var newsLeagues: [League] {

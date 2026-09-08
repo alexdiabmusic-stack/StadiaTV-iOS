@@ -172,6 +172,7 @@ final class NewsViewModel: ObservableObject {
     private var pagesByLeague: [String: Int] = [:]   // last page fetched per league (1-indexed)
     private var exhaustedLeagues: Set<String> = []   // leagues with no more pages
     private var followedLeagueIDs: [String] = []     // kept so loadMore("All") knows which leagues to page
+    private var allArticlesCache: [ESPNArticle]? = nil
 
     func isLoadingLeague(_ league: League) -> Bool {
         loadingLeagueIDs.contains(league.id) || isLoading
@@ -182,15 +183,19 @@ final class NewsViewModel: ObservableObject {
         return exhaustedLeagues.count < followedLeagueIDs.count
     }
 
-    /// Articles for one league, or every loaded league merged when nil.
+    /// Articles for one league, or every loaded league merged+deduped when nil.
+    /// The merged "all" result is cached and only rebuilt when articlesByLeague changes.
     func articles(for league: League?) -> [ESPNArticle] {
-        let pool: [ESPNArticle]
-        if let league {
-            pool = articlesByLeague[league.id] ?? []
-        } else {
-            pool = articlesByLeague.values.flatMap { $0 }
+        guard let league else {
+            if let cached = allArticlesCache { return cached }
+            let pool = articlesByLeague.values.flatMap { $0 }
+            let byID = Dictionary(grouping: pool, by: \.id).compactMap { $0.value.first }
+            let unique = Dictionary(grouping: byID, by: { $0.headline.lowercased() }).compactMap { $0.value.first }
+            let result = unique.sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
+            allArticlesCache = result
+            return result
         }
-        // De-dupe by id, then by headline so the same story from both feeds collapses.
+        let pool = articlesByLeague[league.id] ?? []
         let byID = Dictionary(grouping: pool, by: \.id).compactMap { $0.value.first }
         let unique = Dictionary(grouping: byID, by: { $0.headline.lowercased() }).compactMap { $0.value.first }
         return unique.sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
@@ -213,6 +218,7 @@ final class NewsViewModel: ObservableObject {
                 // on failure (empty), preserve what was already visible.
                 if !articles.isEmpty {
                     articlesByLeague[id] = articles
+                    allArticlesCache = nil
                 }
                 pagesByLeague[id] = 1
             }
@@ -228,6 +234,7 @@ final class NewsViewModel: ObservableObject {
         defer { loadingLeagueIDs.remove(league.id) }
         let articles = await fetch(league: league, page: 1)
         articlesByLeague[league.id] = articles
+        allArticlesCache = nil
         pagesByLeague[league.id] = 1
         exhaustedLeagues.remove(league.id)
     }
@@ -268,6 +275,7 @@ final class NewsViewModel: ObservableObject {
                         exhaustedLeagues.insert(id)
                     } else {
                         articlesByLeague[id, default: []].append(contentsOf: fresh)
+                        allArticlesCache = nil
                         pagesByLeague[id] = nextPage
                     }
                 }
@@ -358,9 +366,13 @@ private struct NewsArticleCard: View {
         .buttonStyle(.plain)
     }
 
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
+        let f = RelativeDateTimeFormatter()
+        f.unitsStyle = .abbreviated
+        return f
+    }()
+
     private func relativeDate(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        Self.relativeDateFormatter.localizedString(for: date, relativeTo: Date())
     }
 }

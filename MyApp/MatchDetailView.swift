@@ -13,6 +13,7 @@ struct MatchDetailView: View {
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
     @EnvironmentObject private var epgRepository: EPGRepository
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
     @State private var showingAllChannels = false
     @State private var spoilerRevealed = false
     @State private var playbackContext: MatchPlaybackContext?
@@ -175,9 +176,18 @@ struct MatchDetailView: View {
         let channels = playlists.allChannels
         let match = self.match
         let preferredLanguages = prefs.preferredStreamLanguages
-        var ranked = await Task.detached(priority: .userInitiated) {
-            SourceMatcher.rank(match: match, channels: channels, preferredLanguages: preferredLanguages)
-        }.value
+
+        // Use pre-ranked sources from the background store if available so the
+        // channel list appears immediately without a spinner.
+        var ranked: [RankedSource]
+        if let cached = streamStore.sourcesByMatchId[match.id], !cached.isEmpty {
+            ranked = cached
+            isRankingSources = false
+        } else {
+            ranked = await Task.detached(priority: .userInitiated) {
+                SourceMatcher.rank(match: match, channels: channels, preferredLanguages: preferredLanguages)
+            }.value
+        }
 
         // Enrich with EPG evidence: find programmes near the match window and
         // map them back to ranked sources via the canonical channel index.

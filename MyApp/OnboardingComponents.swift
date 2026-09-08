@@ -95,12 +95,17 @@ struct OnboardingBottomBar: View {
             HStack(spacing: 12) {
                 if step != .sports {
                     Button(action: onBack) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Theme.textSecondary)
-                            .frame(width: 44, height: 50)
-                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Back")
+                                .font(.system(size: 15, weight: .medium))
+                        }
+                        .foregroundStyle(Theme.textSecondary)
+                        .frame(height: 50)
+                        .padding(.horizontal, 16)
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Back")

@@ -188,6 +188,7 @@ struct HomeView: View {
         // position; the toolbar logo takes over atomically in one frame.
         ToolbarItem(placement: .principal) {
             BrandMark()
+                .scaleEffect(1.15)
                 .opacity(launchCoordinator.phase == .home ? 1 : 0)
         }
         // Appears ~80 ms after the logo begins moving. `.buttonStyle(.plain)` removes
@@ -195,7 +196,8 @@ struct HomeView: View {
         ToolbarItem(placement: .primaryAction) {
             NavigationLink(destination: SearchView()) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundStyle(Theme.textPrimary)
+                    .font(.system(size: 16))
+                    .foregroundStyle(Theme.textSecondary)
             }
             .buttonStyle(.plain)
             .opacity(homeRevealed ? 1 : 0)
@@ -271,7 +273,7 @@ struct HomeView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 24)
+            .padding(.bottom, 104)
         }
     }
 
@@ -340,36 +342,41 @@ struct HomeView: View {
     }
 
     private var noTeamsPlayingCard: some View {
-        Button {
-            switchToFollowing?()
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "calendar")
-                    .font(.callout)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                Text("YOUR SPORTS DAY")
+                    .font(.caption.weight(.heavy))
                     .foregroundStyle(Theme.textSecondary)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("No followed teams play today")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(Theme.textPrimary)
-                    if let next = viewModel.favoriteTeamUpcoming.first {
-                        Text("Next: \(next.shortName) · \(next.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))")
-                            .font(.caption2)
-                            .foregroundStyle(Theme.textSecondary)
-                            .lineLimit(1)
-                    }
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Theme.textSecondary.opacity(0.5))
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
-            .contentShape(Rectangle())
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("No games today")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(Theme.textPrimary)
+                if let next = viewModel.favoriteTeamUpcoming.first {
+                    Text("Next: \(next.shortName)")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.textSecondary)
+                    Text(next.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))
+                        .font(.caption)
+                        .foregroundStyle(Theme.textTertiary)
+                }
+            }
+
+            Button("See upcoming schedule") {
+                switchToFollowing?()
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(Theme.accent)
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     // MARK: - Fantasy Context
@@ -662,7 +669,7 @@ private struct TeamMatchupHero: View {
                         .font(.system(size: 21, weight: .bold))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
-                        .lineLimit(2)
+                        .lineLimit(3)
                         .padding(.horizontal, 20)
                         .padding(.top, 10)
 
@@ -788,9 +795,11 @@ private struct TeamMatchupHero: View {
     private func heroButton(_ title: String, icon: String, primary: Bool) -> some View {
         Label(title, systemImage: icon)
             .font(.caption.weight(.bold))
+            .lineLimit(1)
             .foregroundStyle(.white)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
+            .fixedSize(horizontal: true, vertical: false)
             .background(
                 primary ? Theme.accent.opacity(0.9) : Color.white.opacity(0.10),
                 in: RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -1019,9 +1028,11 @@ private struct EventHero: View {
     private func eventButton(_ title: String, icon: String, primary: Bool) -> some View {
         Label(title, systemImage: icon)
             .font(.caption.weight(.bold))
+            .lineLimit(1)
             .foregroundStyle(.white)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
+            .fixedSize(horizontal: true, vertical: false)
             .background(
                 primary ? Theme.accent.opacity(0.9) : Color.white.opacity(0.10),
                 in: RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -1070,7 +1081,7 @@ private struct PrimeHeroCard: View {
                                  : "\(match.away.score ?? "-") – \(match.home.score ?? "-")")
                                 .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
                                 .foregroundStyle(Theme.textPrimary)
-                            Text(match.statusDetail)
+                            Text(primeHeroStatusText(for: match))
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(match.state == .live ? Theme.live : Theme.textSecondary)
                                 .lineLimit(1)
@@ -1110,6 +1121,16 @@ private struct PrimeHeroCard: View {
                 .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // Returns user-facing status text, suppressing backend scheduling strings for pre-game matches.
+    private func primeHeroStatusText(for match: Match) -> String {
+        guard match.state == .pre else { return match.statusDetail }
+        let raw = match.statusDetail
+        let isBackendPhrase = raw.localizedCaseInsensitiveContains("confirmed") ||
+                              raw.localizedCaseInsensitiveContains("scheduled") ||
+                              raw.isEmpty
+        return isBackendPhrase ? match.date.formatted(date: .omitted, time: .shortened) : raw
     }
 }
 

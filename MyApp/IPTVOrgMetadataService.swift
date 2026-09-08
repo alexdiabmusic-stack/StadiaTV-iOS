@@ -37,7 +37,7 @@ actor IPTVOrgMetadataService {
 
     init() {
         cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("StadiaTV_Metadata", isDirectory: true)
+            .appendingPathComponent("BannerTV_Metadata", isDirectory: true)
         let cfg = URLSessionConfiguration.default
         cfg.timeoutIntervalForResource = 120
         session = URLSession(configuration: cfg)

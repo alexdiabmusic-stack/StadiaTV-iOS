@@ -29,7 +29,7 @@ struct BleacherReportNewsProvider: SportsNewsProvider {
         )
     }
 
-    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [StadiaNewsArticle] {
+    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [BannerNewsArticle] {
         // Guard at the top so even if someone flips the flag we have a documented
         // explanation of why this throws — not a programming error.
         guard metadata.isEnabled else {

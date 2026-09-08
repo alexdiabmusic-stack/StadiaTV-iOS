@@ -7,7 +7,7 @@ struct LiveView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var viewModel: LiveViewModel
     @EnvironmentObject private var fantasyStore: FantasyStore
-    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
+    @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
     @EnvironmentObject private var streamStore: StreamAvailabilityStore
     @AppStorage("live.filter.v1") private var savedFilterRaw: String = LiveFilter.forYou.rawValue
     @State private var filter: LiveFilter = .forYou

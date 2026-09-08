@@ -21,19 +21,19 @@ struct CBSSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider {
         )
     }
 
-    func liveScores(for league: League) async throws -> [StadiaGame] {
+    func liveScores(for league: League) async throws -> [BannerGame] {
         try ensureSupported(league, capability: .liveScores)
         return try await games(for: league, range: .today())
             .filter { Calendar.current.isDate($0.scheduledStart, inSameDayAs: Date()) || $0.status == .live }
     }
 
-    func schedule(for league: League, range: SportsDateRange) async throws -> StadiaSchedule {
+    func schedule(for league: League, range: SportsDateRange) async throws -> BannerSchedule {
         try ensureSupported(league, capability: .schedule)
         let games = try await games(for: league, range: range)
             .filter { $0.scheduledStart >= range.start && $0.scheduledStart <= range.end }
             .sorted { $0.scheduledStart < $1.scheduledStart }
-        return StadiaSchedule(
-            id: StadiaEntityID(rawValue: "schedule:cbsSports:\(league.stadiaKey):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
+        return BannerSchedule(
+            id: BannerEntityID(rawValue: "schedule:cbsSports:\(league.bannerKey):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             range: range,
             games: games,
@@ -41,7 +41,7 @@ struct CBSSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider {
         )
     }
 
-    func gameDetails(for league: League, gameID: StadiaEntityID) async throws -> StadiaGame {
+    func gameDetails(for league: League, gameID: BannerEntityID) async throws -> BannerGame {
         try ensureSupported(league, capability: .gameDetails)
         let providerGameID = SportsIdentityResolver.providerID(from: gameID, provider: .cbsSports) ?? gameID.rawValue
         let payload = try await client.firstSuccessfulJSON(urls: CBSSportsEndpoint.detailsURLs(league: league, gameID: providerGameID))
@@ -49,11 +49,11 @@ struct CBSSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider {
         return game
     }
 
-    private func games(for league: League, range: SportsDateRange) async throws -> [StadiaGame] {
+    private func games(for league: League, range: SportsDateRange) async throws -> [BannerGame] {
         try await firstMappedGames(urls: CBSSportsEndpoint.scoreboardURLs(league: league, range: range), league: league)
     }
 
-    private func firstMappedGames(urls: [URL], league: League) async throws -> [StadiaGame] {
+    private func firstMappedGames(urls: [URL], league: League) async throws -> [BannerGame] {
         var lastError: Error = SportsDataError.unavailable
         for url in urls {
             do {
@@ -93,19 +93,19 @@ struct YahooSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider
         )
     }
 
-    func liveScores(for league: League) async throws -> [StadiaGame] {
+    func liveScores(for league: League) async throws -> [BannerGame] {
         try ensureSupported(league, capability: .liveScores)
         return try await games(for: league, range: .today())
             .filter { Calendar.current.isDate($0.scheduledStart, inSameDayAs: Date()) || $0.status == .live }
     }
 
-    func schedule(for league: League, range: SportsDateRange) async throws -> StadiaSchedule {
+    func schedule(for league: League, range: SportsDateRange) async throws -> BannerSchedule {
         try ensureSupported(league, capability: .schedule)
         let games = try await games(for: league, range: range)
             .filter { $0.scheduledStart >= range.start && $0.scheduledStart <= range.end }
             .sorted { $0.scheduledStart < $1.scheduledStart }
-        return StadiaSchedule(
-            id: StadiaEntityID(rawValue: "schedule:yahooSports:\(league.stadiaKey):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
+        return BannerSchedule(
+            id: BannerEntityID(rawValue: "schedule:yahooSports:\(league.bannerKey):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             range: range,
             games: games,
@@ -113,7 +113,7 @@ struct YahooSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider
         )
     }
 
-    func gameDetails(for league: League, gameID: StadiaEntityID) async throws -> StadiaGame {
+    func gameDetails(for league: League, gameID: BannerEntityID) async throws -> BannerGame {
         try ensureSupported(league, capability: .gameDetails)
         let providerGameID = SportsIdentityResolver.providerID(from: gameID, provider: .yahooSports) ?? gameID.rawValue
         let payload = try await client.firstSuccessfulJSON(urls: YahooSportsEndpoint.detailsURLs(league: league, gameID: providerGameID))
@@ -121,7 +121,7 @@ struct YahooSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider
         return game
     }
 
-    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [StadiaNewsArticle] {
+    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [BannerNewsArticle] {
         try ensureSupported(league, capability: .newsMetadata)
         let payload = try await client.firstSuccessfulJSON(urls: YahooSportsEndpoint.newsURLs(league: league, limit: limit))
         let articles = WebSportsNewsMapper(providerID: .yahooSports).articles(from: payload, league: league, limit: limit)
@@ -129,11 +129,11 @@ struct YahooSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider
         return articles
     }
 
-    private func games(for league: League, range: SportsDateRange) async throws -> [StadiaGame] {
+    private func games(for league: League, range: SportsDateRange) async throws -> [BannerGame] {
         try await firstMappedGames(urls: YahooSportsEndpoint.scoreboardURLs(league: league, range: range), league: league)
     }
 
-    private func firstMappedGames(urls: [URL], league: League) async throws -> [StadiaGame] {
+    private func firstMappedGames(urls: [URL], league: League) async throws -> [BannerGame] {
         var lastError: Error = SportsDataError.unavailable
         for url in urls {
             do {
@@ -175,19 +175,19 @@ struct FoxSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, 
         )
     }
 
-    func liveScores(for league: League) async throws -> [StadiaGame] {
+    func liveScores(for league: League) async throws -> [BannerGame] {
         try ensureSupported(league, capability: .liveScores)
         return try await games(for: league, range: .today())
             .filter { Calendar.current.isDate($0.scheduledStart, inSameDayAs: Date()) || $0.status == .live }
     }
 
-    func schedule(for league: League, range: SportsDateRange) async throws -> StadiaSchedule {
+    func schedule(for league: League, range: SportsDateRange) async throws -> BannerSchedule {
         try ensureSupported(league, capability: .schedule)
         let games = try await games(for: league, range: range)
             .filter { $0.scheduledStart >= range.start && $0.scheduledStart <= range.end }
             .sorted { $0.scheduledStart < $1.scheduledStart }
-        return StadiaSchedule(
-            id: StadiaEntityID(rawValue: "schedule:foxSports:\(league.stadiaKey):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
+        return BannerSchedule(
+            id: BannerEntityID(rawValue: "schedule:foxSports:\(league.bannerKey):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             range: range,
             games: games,
@@ -195,7 +195,7 @@ struct FoxSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, 
         )
     }
 
-    func gameDetails(for league: League, gameID: StadiaEntityID) async throws -> StadiaGame {
+    func gameDetails(for league: League, gameID: BannerEntityID) async throws -> BannerGame {
         try ensureSupported(league, capability: .gameDetails)
         let providerGameID = SportsIdentityResolver.providerID(from: gameID, provider: .foxSports) ?? gameID.rawValue
         let payload = try await client.firstSuccessfulJSON(urls: FoxSportsEndpoint.detailsURLs(league: league, gameID: providerGameID))
@@ -203,27 +203,27 @@ struct FoxSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, 
         return game
     }
 
-    func boxScore(for league: League, gameID: StadiaEntityID) async throws -> StadiaBoxScore {
+    func boxScore(for league: League, gameID: BannerEntityID) async throws -> BannerBoxScore {
         try ensureSupported(league, capability: .boxScore)
         guard FoxSportsEndpoint.hasEventDataBoxScore(for: league) else { throw SportsDataError.unsupportedCapability(.boxScore) }
         let providerGameID = SportsIdentityResolver.providerID(from: gameID, provider: .foxSports) ?? gameID.rawValue
         let payload = try await client.firstSuccessfulJSON(urls: FoxSportsEndpoint.detailsURLs(league: league, gameID: providerGameID))
         let stats = WebSportsStatsMapper(providerID: .foxSports, identityResolver: identityResolver).teamStats(from: payload, league: league, gameID: gameID)
         guard !stats.isEmpty else { throw SportsDataError.unsupportedCapability(.boxScore) }
-        return StadiaBoxScore(id: StadiaEntityID(rawValue: "boxScore:foxSports:\(providerGameID)"), gameID: gameID, teamStats: stats, playerStats: [], provenance: DataProvenance(provider: .foxSports, fetchedAt: Date(), providerEntityID: providerGameID, confidence: 0.55))
+        return BannerBoxScore(id: BannerEntityID(rawValue: "boxScore:foxSports:\(providerGameID)"), gameID: gameID, teamStats: stats, playerStats: [], provenance: DataProvenance(provider: .foxSports, fetchedAt: Date(), providerEntityID: providerGameID, confidence: 0.55))
     }
 
-    func playByPlay(for league: League, gameID: StadiaEntityID) async throws -> StadiaPlayByPlay {
+    func playByPlay(for league: League, gameID: BannerEntityID) async throws -> BannerPlayByPlay {
         try ensureSupported(league, capability: .playByPlay)
         guard FoxSportsEndpoint.hasEventDataPlayByPlay(for: league) else { throw SportsDataError.unsupportedCapability(.playByPlay) }
         let providerGameID = SportsIdentityResolver.providerID(from: gameID, provider: .foxSports) ?? gameID.rawValue
         let payload = try await client.firstSuccessfulJSON(urls: FoxSportsEndpoint.detailsURLs(league: league, gameID: providerGameID))
         let plays = WebSportsStatsMapper(providerID: .foxSports, identityResolver: identityResolver).plays(from: payload, gameID: gameID, providerGameID: providerGameID)
         guard !plays.isEmpty else { throw SportsDataError.unsupportedCapability(.playByPlay) }
-        return StadiaPlayByPlay(id: StadiaEntityID(rawValue: "pbp:foxSports:\(providerGameID)"), gameID: gameID, plays: plays, provenance: DataProvenance(provider: .foxSports, fetchedAt: Date(), providerEntityID: providerGameID, confidence: 0.58))
+        return BannerPlayByPlay(id: BannerEntityID(rawValue: "pbp:foxSports:\(providerGameID)"), gameID: gameID, plays: plays, provenance: DataProvenance(provider: .foxSports, fetchedAt: Date(), providerEntityID: providerGameID, confidence: 0.58))
     }
 
-    func teams(for league: League) async throws -> [StadiaTeam] {
+    func teams(for league: League) async throws -> [BannerTeam] {
         try ensureSupported(league, capability: .teams)
         let payload = try await client.firstSuccessfulJSON(urls: FoxSportsEndpoint.teamURLs(league: league))
         let teams = mapper.teams(from: payload, league: league)
@@ -231,7 +231,7 @@ struct FoxSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, 
         return teams
     }
 
-    func standings(for league: League) async throws -> [StadiaStandingGroup] {
+    func standings(for league: League) async throws -> [BannerStandingGroup] {
         try ensureSupported(league, capability: .standings)
         let payload = try await client.firstSuccessfulJSON(urls: FoxSportsEndpoint.standingsURLs(league: league))
         let standings = WebSportsStatsMapper(providerID: .foxSports, identityResolver: identityResolver).standings(from: payload, league: league)
@@ -239,25 +239,25 @@ struct FoxSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, 
         return standings
     }
 
-    func roster(for league: League, teamID: StadiaEntityID) async throws -> StadiaRoster {
+    func roster(for league: League, teamID: BannerEntityID) async throws -> BannerRoster {
         try ensureSupported(league, capability: .rosters)
         let providerTeamID = SportsIdentityResolver.providerID(from: teamID, provider: .foxSports) ?? teamID.rawValue
         let payload = try await client.firstSuccessfulJSON(urls: FoxSportsEndpoint.rosterURLs(league: league, teamID: providerTeamID))
         let players = WebSportsStatsMapper(providerID: .foxSports, identityResolver: identityResolver).players(from: payload, league: league, teamID: teamID)
         guard !players.isEmpty else { throw SportsDataError.unsupportedCapability(.rosters) }
-        return StadiaRoster(id: StadiaEntityID(rawValue: "roster:foxSports:\(providerTeamID)"), teamID: teamID, leagueID: SportsIdentityResolver.canonicalLeagueID(for: league), players: players, provenance: DataProvenance(provider: .foxSports, fetchedAt: Date(), providerEntityID: providerTeamID, confidence: 0.56))
+        return BannerRoster(id: BannerEntityID(rawValue: "roster:foxSports:\(providerTeamID)"), teamID: teamID, leagueID: SportsIdentityResolver.canonicalLeagueID(for: league), players: players, provenance: DataProvenance(provider: .foxSports, fetchedAt: Date(), providerEntityID: providerTeamID, confidence: 0.56))
     }
 
-    func teamStats(for league: League, teamIDs: Set<StadiaEntityID>, range: SportsDateRange?) async throws -> [StadiaTeamStat] {
+    func teamStats(for league: League, teamIDs: Set<BannerEntityID>, range: SportsDateRange?) async throws -> [BannerTeamStat] {
         try await standings(for: league).flatMap(\.standings).compactMap { row in
             guard teamIDs.isEmpty || teamIDs.contains(row.teamID) else { return nil }
             let stats = [stat("record", "Record", row.displayRecord), stat("wins", "W", row.wins), stat("losses", "L", row.losses), stat("points", "Pts", row.points)].compactMap { $0 }
             guard !stats.isEmpty else { return nil }
-            return StadiaTeamStat(id: StadiaEntityID(rawValue: "teamStat:foxSports:\(row.teamID.rawValue)"), teamID: row.teamID, seasonID: nil, stats: stats, provenance: row.provenance)
+            return BannerTeamStat(id: BannerEntityID(rawValue: "teamStat:foxSports:\(row.teamID.rawValue)"), teamID: row.teamID, seasonID: nil, stats: stats, provenance: row.provenance)
         }
     }
 
-    private func games(for league: League, range: SportsDateRange) async throws -> [StadiaGame] {
+    private func games(for league: League, range: SportsDateRange) async throws -> [BannerGame] {
         try await firstMappedGames(urls: try await FoxSportsEndpoint.scoreboardURLs(league: league, range: range, client: client), league: league)
     }
 
@@ -266,7 +266,7 @@ struct FoxSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, 
         guard FoxSportsEndpoint.slug(for: league) != nil else { throw SportsDataError.unsupportedCapability(capability) }
     }
 
-    private func firstMappedGames(urls: [URL], league: League) async throws -> [StadiaGame] {
+    private func firstMappedGames(urls: [URL], league: League) async throws -> [BannerGame] {
         var lastError: Error = SportsDataError.unavailable
         for url in urls {
             do {
@@ -279,9 +279,9 @@ struct FoxSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, 
         throw lastError
     }
 
-    private func stat(_ key: String, _ displayName: String, _ value: String?) -> StadiaStatValue? {
+    private func stat(_ key: String, _ displayName: String, _ value: String?) -> BannerStatValue? {
         guard let value, !value.isEmpty else { return nil }
-        return StadiaStatValue(key: key, displayName: displayName, value: value)
+        return BannerStatValue(key: key, displayName: displayName, value: value)
     }
 }
 
@@ -387,20 +387,20 @@ struct WebSportsEventMapper: Sendable {
     let providerID: SportsDataProviderID
     let identityResolver: SportsIdentityResolver
 
-    func games(from payload: WebSportsJSON, league: League) -> [StadiaGame] {
-        var seen = Set<StadiaEntityID>()
+    func games(from payload: WebSportsJSON, league: League) -> [BannerGame] {
+        var seen = Set<BannerEntityID>()
         let mapped = foxScoreboardGames(from: payload, league: league) + yahooScoreboardGames(from: payload, league: league) + candidateEventObjects(from: payload).compactMap { mapEvent($0, league: league) }
         return mapped.filter { seen.insert($0.id).inserted }
     }
 
-    func teams(from payload: WebSportsJSON, league: League) -> [StadiaTeam] {
-        var seen = Set<StadiaEntityID>()
+    func teams(from payload: WebSportsJSON, league: League) -> [BannerTeam] {
+        var seen = Set<BannerEntityID>()
         return candidateTeamObjects(from: payload).compactMap { object in
             mapTeam(object, league: league)
         }.filter { seen.insert($0.id).inserted }
     }
 
-    private func mapEvent(_ object: [String: WebSportsJSON], league: League) -> StadiaGame? {
+    private func mapEvent(_ object: [String: WebSportsJSON], league: League) -> BannerGame? {
         let competitors = object.array("competitors", "participants", "teams")?.compactMap(\.objectValue) ?? []
         let homeObject = competitors.first { $0.string("qualifier", "homeAway", "alignment", "side")?.lowercased() == "home" }
             ?? object.object("home", "homeTeam", "homeCompetitor")
@@ -413,8 +413,8 @@ struct WebSportsEventMapper: Sendable {
         let away = mapTeam(awayObject, league: league, fallback: "Away")
         let providerGameID = object.string("id", "eventId", "eventID", "gameId", "gameID", "uuid") ?? "\(away.abbreviation)-\(home.abbreviation)-\(object.string("startTime", "date", "gameDate") ?? UUID().uuidString)"
         let start = WebSportsDateParser.date(from: object.string("startTime", "startDate", "date", "gameDate", "scheduled", "scheduledStart")) ?? Date()
-        let status = StadiaGameStatus(webStatus: object.string("status", "statusText", "gameState", "state", "phase"), start: start)
-        return StadiaGame(
+        let status = BannerGameStatus(webStatus: object.string("status", "statusText", "gameState", "state", "phase"), start: start)
+        return BannerGame(
             id: identityResolver.canonicalGameID(league: league, provider: providerID, providerGameID: providerGameID, home: home, away: away, scheduledStart: start),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             scheduledStart: start,
@@ -424,9 +424,9 @@ struct WebSportsEventMapper: Sendable {
             statusDetail: object.string("statusDetail", "statusText", "detail", "phase") ?? WebSportsStatusFormatter.detail(status: status, start: start),
             homeTeam: home,
             awayTeam: away,
-            score: StadiaScore(home: score(from: homeObject), away: score(from: awayObject)),
-            clock: object.string("clock", "gameClock", "displayClock").map { StadiaGameClock(displayValue: $0, remainingSeconds: nil, isRunning: status == .live) },
-            period: object.int("period", "quarter").map { StadiaPeriod(number: $0, displayName: nil) },
+            score: BannerScore(home: score(from: homeObject), away: score(from: awayObject)),
+            clock: object.string("clock", "gameClock", "displayClock").map { BannerGameClock(displayValue: $0, remainingSeconds: nil, isRunning: status == .live) },
+            period: object.int("period", "quarter").map { BannerPeriod(number: $0, displayName: nil) },
             venue: mapVenue(object.object("venue", "location")),
             broadcasts: object.broadcasts(),
             aliases: [ProviderEntityAlias(provider: providerID, id: providerGameID)],
@@ -434,11 +434,11 @@ struct WebSportsEventMapper: Sendable {
         )
     }
 
-    private func mapTeam(_ object: [String: WebSportsJSON], league: League, fallback: String = "Team") -> StadiaTeam {
+    private func mapTeam(_ object: [String: WebSportsJSON], league: League, fallback: String = "Team") -> BannerTeam {
         let providerTeamID = object.string("id", "teamId", "teamID", "abbreviation", "abbr") ?? fallback
         let abbreviation = object.string("abbreviation", "abbr", "shortName") ?? providerTeamID
         let displayName = object.string("displayName", "fullName", "name", "teamName", "nickname") ?? fallback
-        return StadiaTeam(
+        return BannerTeam(
             id: identityResolver.canonicalTeamID(league: league, provider: providerID, providerTeamID: providerTeamID, abbreviation: abbreviation, displayName: displayName),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             displayName: displayName,
@@ -454,10 +454,10 @@ struct WebSportsEventMapper: Sendable {
         object.string("score", "points", "runs", "goals", "displayScore")
     }
 
-    private func mapVenue(_ object: [String: WebSportsJSON]?) -> StadiaVenue? {
+    private func mapVenue(_ object: [String: WebSportsJSON]?) -> BannerVenue? {
         guard let object, object.string("name", "venueName") != nil || object.string("city") != nil else { return nil }
         let providerVenueID = object.string("id", "venueId")
-        return StadiaVenue(id: providerVenueID.map { StadiaEntityID(rawValue: "venue:\(providerID.rawValue):\($0)") }, name: object.string("name", "venueName") ?? "Venue", city: object.string("city"), state: object.string("state"), country: object.string("country"), aliases: providerVenueID.map { [ProviderEntityAlias(provider: providerID, id: $0)] } ?? [])
+        return BannerVenue(id: providerVenueID.map { BannerEntityID(rawValue: "venue:\(providerID.rawValue):\($0)") }, name: object.string("name", "venueName") ?? "Venue", city: object.string("city"), state: object.string("state"), country: object.string("country"), aliases: providerVenueID.map { [ProviderEntityAlias(provider: providerID, id: $0)] } ?? [])
     }
 
     private func candidateEventObjects(from payload: WebSportsJSON) -> [[String: WebSportsJSON]] {
@@ -466,7 +466,7 @@ struct WebSportsEventMapper: Sendable {
         }
     }
 
-    private func foxScoreboardGames(from payload: WebSportsJSON, league: League) -> [StadiaGame] {
+    private func foxScoreboardGames(from payload: WebSportsJSON, league: League) -> [BannerGame] {
         guard providerID == .foxSports else { return [] }
         return payload.recursiveObjects().flatMap { object in
             object.array("events")?.compactMap(\.objectValue) ?? []
@@ -497,8 +497,8 @@ struct WebSportsEventMapper: Sendable {
                 ?? "\(away.abbreviation)-\(home.abbreviation)-\(event.string("eventTime") ?? UUID().uuidString)"
             let start = WebSportsDateParser.date(from: event.string("eventTime", "startTime", "date")) ?? Date()
             let statusText = event.string("statusLine", "status", "statusText")
-            let status = StadiaGameStatus(webStatus: statusText, start: start)
-            return StadiaGame(
+            let status = BannerGameStatus(webStatus: statusText, start: start)
+            return BannerGame(
                 id: identityResolver.canonicalGameID(league: league, provider: providerID, providerGameID: providerGameID, home: home, away: away, scheduledStart: start),
                 leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
                 scheduledStart: start,
@@ -508,7 +508,7 @@ struct WebSportsEventMapper: Sendable {
                 statusDetail: statusText ?? WebSportsStatusFormatter.detail(status: status, start: start),
                 homeTeam: home,
                 awayTeam: away,
-                score: StadiaScore(home: score(from: homeObject), away: score(from: awayObject)),
+                score: BannerScore(home: score(from: homeObject), away: score(from: awayObject)),
                 clock: nil,
                 period: nil,
                 venue: nil,
@@ -519,9 +519,9 @@ struct WebSportsEventMapper: Sendable {
         }
     }
 
-    private func yahooScoreboardGames(from payload: WebSportsJSON, league: League) -> [StadiaGame] {
+    private func yahooScoreboardGames(from payload: WebSportsJSON, league: League) -> [BannerGame] {
         guard providerID == .yahooSports else { return [] }
-        return payload.recursiveObjects().compactMap { object -> StadiaGame? in
+        return payload.recursiveObjects().compactMap { object -> BannerGame? in
             let competitors = object.array("competitors", "teams")?.compactMap(\.objectValue) ?? []
             let homeCandidate = object.object("home_team", "homeTeam")
                 ?? competitors.first { $0.string("type", "homeAway", "qualifier")?.lowercased() == "home" }
@@ -532,8 +532,8 @@ struct WebSportsEventMapper: Sendable {
             let away = mapTeam(awayObject, league: league, fallback: "Away")
             let providerGameID = object.string("game_id", "gameId", "id", "eventId") ?? "\(away.abbreviation)-\(home.abbreviation)-\(object.string("start_time", "startTime", "date") ?? UUID().uuidString)"
             let start = WebSportsDateParser.date(from: object.string("start_time", "startTime", "date", "game_time")) ?? Date()
-            let status = StadiaGameStatus(webStatus: object.string("status", "status_type", "statusDisplayName"), start: start)
-            return StadiaGame(
+            let status = BannerGameStatus(webStatus: object.string("status", "status_type", "statusDisplayName"), start: start)
+            return BannerGame(
                 id: identityResolver.canonicalGameID(league: league, provider: providerID, providerGameID: providerGameID, home: home, away: away, scheduledStart: start),
                 leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
                 scheduledStart: start,
@@ -543,9 +543,9 @@ struct WebSportsEventMapper: Sendable {
                 statusDetail: object.string("statusDisplayName", "status_detail", "status") ?? WebSportsStatusFormatter.detail(status: status, start: start),
                 homeTeam: home,
                 awayTeam: away,
-                score: StadiaScore(home: score(from: homeObject), away: score(from: awayObject)),
-                clock: object.string("clock").map { StadiaGameClock(displayValue: $0, remainingSeconds: nil, isRunning: status == .live) },
-                period: object.int("period", "quarter").map { StadiaPeriod(number: $0, displayName: nil) },
+                score: BannerScore(home: score(from: homeObject), away: score(from: awayObject)),
+                clock: object.string("clock").map { BannerGameClock(displayValue: $0, remainingSeconds: nil, isRunning: status == .live) },
+                period: object.int("period", "quarter").map { BannerPeriod(number: $0, displayName: nil) },
                 venue: mapVenue(object.object("venue")),
                 broadcasts: object.broadcasts(),
                 aliases: [ProviderEntityAlias(provider: providerID, id: providerGameID)],
@@ -554,7 +554,7 @@ struct WebSportsEventMapper: Sendable {
         }
     }
 
-    private func mapFoxTeam(_ object: [String: WebSportsJSON], league: League, fallback: String) -> StadiaTeam {
+    private func mapFoxTeam(_ object: [String: WebSportsJSON], league: League, fallback: String) -> BannerTeam {
         let providerTeamID = object.string("id", "teamId", "teamID")
             ?? providerIDFromURI(object.string("uri", "entityUri", "teamUri"))
             ?? object.string("abbreviation", "abbr")
@@ -566,7 +566,7 @@ struct WebSportsEventMapper: Sendable {
             ?? (stackedName.isEmpty ? nil : stackedName)
             ?? fallback
         let abbreviation = object.string("abbreviation", "abbr", "shortName") ?? providerTeamID
-        return StadiaTeam(
+        return BannerTeam(
             id: identityResolver.canonicalTeamID(league: league, provider: providerID, providerTeamID: providerTeamID, abbreviation: abbreviation, displayName: displayName),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             displayName: displayName,
@@ -593,52 +593,52 @@ struct WebSportsStatsMapper: Sendable {
     let providerID: SportsDataProviderID
     let identityResolver: SportsIdentityResolver
 
-    func teamStats(from payload: WebSportsJSON, league: League, gameID: StadiaEntityID) -> [StadiaTeamStat] {
+    func teamStats(from payload: WebSportsJSON, league: League, gameID: BannerEntityID) -> [BannerTeamStat] {
         WebSportsEventMapper(providerID: providerID, identityResolver: identityResolver).teams(from: payload, league: league).compactMap { team in
             let stats = payload.recursiveObjects()
                 .filter { $0.string("teamId", "teamID", "id") == SportsIdentityResolver.providerID(from: team.id, provider: providerID) || $0.string("abbreviation", "abbr") == team.abbreviation }
                 .flatMap(statValues)
                 .uniquedByKey()
             guard !stats.isEmpty else { return nil }
-            return StadiaTeamStat(id: StadiaEntityID(rawValue: "teamStat:\(providerID.rawValue):\(gameID.rawValue):\(team.id.rawValue)"), teamID: team.id, seasonID: nil, stats: stats, provenance: DataProvenance(provider: providerID, fetchedAt: Date(), providerEntityID: nil, confidence: 0.5))
+            return BannerTeamStat(id: BannerEntityID(rawValue: "teamStat:\(providerID.rawValue):\(gameID.rawValue):\(team.id.rawValue)"), teamID: team.id, seasonID: nil, stats: stats, provenance: DataProvenance(provider: providerID, fetchedAt: Date(), providerEntityID: nil, confidence: 0.5))
         }
     }
 
-    func standings(from payload: WebSportsJSON, league: League) -> [StadiaStandingGroup] {
-        let rows = payload.recursiveObjects().enumerated().compactMap { index, object -> StadiaStanding? in
+    func standings(from payload: WebSportsJSON, league: League) -> [BannerStandingGroup] {
+        let rows = payload.recursiveObjects().enumerated().compactMap { index, object -> BannerStanding? in
             guard let name = object.string("team", "teamName", "displayName", "name"), object.string("wins", "w", "losses", "l", "record") != nil else { return nil }
             let abbreviation = object.string("abbreviation", "abbr") ?? name
             let team = identityResolver.canonicalTeamID(league: league, provider: providerID, providerTeamID: object.string("teamId", "teamID", "id"), abbreviation: abbreviation, displayName: name)
             let wins = object.string("wins", "w")
             let losses = object.string("losses", "l")
-            return StadiaStanding(id: StadiaEntityID(rawValue: "standing:\(providerID.rawValue):\(team.rawValue)"), teamID: team, teamDisplayName: name, teamAbbreviation: abbreviation, teamLogoURL: TeamLogoAssetResolver.assetURL(leaguePath: league.path, abbreviation: abbreviation, displayName: name, providerTeamID: object.string("teamId", "teamID", "id")), groupName: object.string("conference", "division", "group") ?? league.shortName, rank: object.int("rank", "position") ?? index + 1, wins: wins, losses: losses, ties: object.string("ties", "t"), points: object.string("points", "pts"), gamesPlayed: object.string("gamesPlayed", "gp"), displayRecord: object.string("record") ?? [wins, losses].compactMap { $0 }.joined(separator: "-"), provenance: DataProvenance(provider: providerID, fetchedAt: Date(), providerEntityID: object.string("teamId", "teamID", "id"), confidence: 0.5))
+            return BannerStanding(id: BannerEntityID(rawValue: "standing:\(providerID.rawValue):\(team.rawValue)"), teamID: team, teamDisplayName: name, teamAbbreviation: abbreviation, teamLogoURL: TeamLogoAssetResolver.assetURL(leaguePath: league.path, abbreviation: abbreviation, displayName: name, providerTeamID: object.string("teamId", "teamID", "id")), groupName: object.string("conference", "division", "group") ?? league.shortName, rank: object.int("rank", "position") ?? index + 1, wins: wins, losses: losses, ties: object.string("ties", "t"), points: object.string("points", "pts"), gamesPlayed: object.string("gamesPlayed", "gp"), displayRecord: object.string("record") ?? [wins, losses].compactMap { $0 }.joined(separator: "-"), provenance: DataProvenance(provider: providerID, fetchedAt: Date(), providerEntityID: object.string("teamId", "teamID", "id"), confidence: 0.5))
         }
         guard !rows.isEmpty else { return [] }
         let grouped = Dictionary(grouping: rows) { $0.groupName ?? league.shortName }
         return grouped.keys.sorted().map { key in
-            StadiaStandingGroup(id: StadiaEntityID(rawValue: "standings:\(providerID.rawValue):\(league.stadiaKey):\(SportsIdentityResolver.slug(key))"), name: key, standings: (grouped[key] ?? []).sorted { ($0.rank ?? Int.max) < ($1.rank ?? Int.max) })
+            BannerStandingGroup(id: BannerEntityID(rawValue: "standings:\(providerID.rawValue):\(league.bannerKey):\(SportsIdentityResolver.slug(key))"), name: key, standings: (grouped[key] ?? []).sorted { ($0.rank ?? Int.max) < ($1.rank ?? Int.max) })
         }
     }
 
-    func players(from payload: WebSportsJSON, league: League, teamID: StadiaEntityID) -> [StadiaPlayer] {
-        payload.recursiveObjects().compactMap { object -> StadiaPlayer? in
+    func players(from payload: WebSportsJSON, league: League, teamID: BannerEntityID) -> [BannerPlayer] {
+        payload.recursiveObjects().compactMap { object -> BannerPlayer? in
             guard let name = object.string("displayName", "fullName", "name", "player"), object.string("playerId", "athleteId", "id") != nil || object.string("position", "pos") != nil else { return nil }
             let providerPlayerID = object.string("playerId", "athleteId", "id") ?? name
-            return StadiaPlayer(id: identityResolver.canonicalPlayerID(league: league, provider: providerID, providerPlayerID: providerPlayerID, fullName: name, teamAbbreviation: object.string("teamAbbreviation", "team")), leagueID: SportsIdentityResolver.canonicalLeagueID(for: league), fullName: name, displayName: name, teamID: teamID, teamAbbreviation: object.string("teamAbbreviation", "team"), position: object.string("position", "pos"), jerseyNumber: object.string("jersey", "jerseyNumber", "number"), birthDate: nil, headshotURL: object.url("headshot", "imageUrl", "imageURL"), aliases: [ProviderEntityAlias(provider: providerID, id: providerPlayerID)], provenance: DataProvenance(provider: providerID, fetchedAt: Date(), providerEntityID: providerPlayerID, confidence: 0.5))
+            return BannerPlayer(id: identityResolver.canonicalPlayerID(league: league, provider: providerID, providerPlayerID: providerPlayerID, fullName: name, teamAbbreviation: object.string("teamAbbreviation", "team")), leagueID: SportsIdentityResolver.canonicalLeagueID(for: league), fullName: name, displayName: name, teamID: teamID, teamAbbreviation: object.string("teamAbbreviation", "team"), position: object.string("position", "pos"), jerseyNumber: object.string("jersey", "jerseyNumber", "number"), birthDate: nil, headshotURL: object.url("headshot", "imageUrl", "imageURL"), aliases: [ProviderEntityAlias(provider: providerID, id: providerPlayerID)], provenance: DataProvenance(provider: providerID, fetchedAt: Date(), providerEntityID: providerPlayerID, confidence: 0.5))
         }
     }
 
-    func plays(from payload: WebSportsJSON, gameID: StadiaEntityID, providerGameID: String) -> [StadiaPlay] {
-        payload.recursiveObjects().enumerated().compactMap { index, object -> StadiaPlay? in
+    func plays(from payload: WebSportsJSON, gameID: BannerEntityID, providerGameID: String) -> [BannerPlay] {
+        payload.recursiveObjects().enumerated().compactMap { index, object -> BannerPlay? in
             guard let text = object.string("description", "text", "playDescription", "shortDescription"), !text.isEmpty else { return nil }
-            return StadiaPlay(id: StadiaEntityID(rawValue: "play:\(providerID.rawValue):\(providerGameID):\(object.string("id", "playId") ?? String(index))"), sequence: object.int("sequence", "sequenceNumber") ?? index, period: object.int("period", "quarter").map { StadiaPeriod(number: $0, displayName: nil) }, clock: object.string("clock", "gameClock").map { StadiaGameClock(displayValue: $0, remainingSeconds: nil, isRunning: nil) }, text: text, teamID: nil, awayScore: object.string("awayScore", "visitorScore"), homeScore: object.string("homeScore"), isScoringPlay: object.string("scoringPlay", "isScoringPlay") == "true", provenance: DataProvenance(provider: providerID, fetchedAt: Date(), providerEntityID: object.string("id", "playId"), confidence: 0.5))
+            return BannerPlay(id: BannerEntityID(rawValue: "play:\(providerID.rawValue):\(providerGameID):\(object.string("id", "playId") ?? String(index))"), sequence: object.int("sequence", "sequenceNumber") ?? index, period: object.int("period", "quarter").map { BannerPeriod(number: $0, displayName: nil) }, clock: object.string("clock", "gameClock").map { BannerGameClock(displayValue: $0, remainingSeconds: nil, isRunning: nil) }, text: text, teamID: nil, awayScore: object.string("awayScore", "visitorScore"), homeScore: object.string("homeScore"), isScoringPlay: object.string("scoringPlay", "isScoringPlay") == "true", provenance: DataProvenance(provider: providerID, fetchedAt: Date(), providerEntityID: object.string("id", "playId"), confidence: 0.5))
         }
     }
 
-    private func statValues(from object: [String: WebSportsJSON]) -> [StadiaStatValue] {
+    private func statValues(from object: [String: WebSportsJSON]) -> [BannerStatValue] {
         object.compactMap { key, value in
             guard !["id", "teamId", "teamID", "name", "displayName", "abbreviation", "abbr"].contains(key), let string = value.stringValue, !string.isEmpty else { return nil }
-            return StadiaStatValue(key: SportsIdentityResolver.slug(key), displayName: WebSportsText.titleized(key), value: string)
+            return BannerStatValue(key: SportsIdentityResolver.slug(key), displayName: WebSportsText.titleized(key), value: string)
         }
     }
 }
@@ -646,10 +646,10 @@ struct WebSportsStatsMapper: Sendable {
 struct WebSportsNewsMapper: Sendable {
     let providerID: SportsDataProviderID
 
-    func articles(from payload: WebSportsJSON, league: League, limit: Int) -> [StadiaNewsArticle] {
-        payload.recursiveObjects().compactMap { object -> StadiaNewsArticle? in
+    func articles(from payload: WebSportsJSON, league: League, limit: Int) -> [BannerNewsArticle] {
+        payload.recursiveObjects().compactMap { object -> BannerNewsArticle? in
             guard let title = object.string("title", "headline"), let url = object.url("url", "link") else { return nil }
-            return StadiaNewsArticle(id: StadiaEntityID(rawValue: "article:\(providerID.rawValue):\(SportsIdentityResolver.slug(url.absoluteString))"), headline: title, description: object.string("summary", "description", "shortDescription") ?? "", published: WebSportsDateParser.date(from: object.string("published", "publishedAt", "date")), url: url, imageURL: object.url("image", "imageUrl", "thumbnail"), leagueID: SportsIdentityResolver.canonicalLeagueID(for: league), teamIDs: [], playerIDs: [], sourceName: "Yahoo Sports", provenance: DataProvenance(provider: providerID, fetchedAt: Date(), providerEntityID: url.absoluteString, confidence: 0.52))
+            return BannerNewsArticle(id: BannerEntityID(rawValue: "article:\(providerID.rawValue):\(SportsIdentityResolver.slug(url.absoluteString))"), headline: title, description: object.string("summary", "description", "shortDescription") ?? "", published: WebSportsDateParser.date(from: object.string("published", "publishedAt", "date")), url: url, imageURL: object.url("image", "imageUrl", "thumbnail"), leagueID: SportsIdentityResolver.canonicalLeagueID(for: league), teamIDs: [], playerIDs: [], sourceName: "Yahoo Sports", provenance: DataProvenance(provider: providerID, fetchedAt: Date(), providerEntityID: url.absoluteString, confidence: 0.52))
         }.prefix(limit).map { $0 }
     }
 }
@@ -901,7 +901,7 @@ enum WebSportsDateParser {
 }
 
 enum WebSportsStatusFormatter {
-    nonisolated static func detail(status: StadiaGameStatus, start: Date) -> String {
+    nonisolated static func detail(status: BannerGameStatus, start: Date) -> String {
         switch status {
         case .live: return "Live"
         case .final: return "Final"
@@ -958,16 +958,16 @@ extension Dictionary where Key == String, Value == WebSportsJSON {
         string(keys).flatMap(URL.init(string:))
     }
 
-    func broadcasts() -> [StadiaBroadcast] {
+    func broadcasts() -> [BannerBroadcast] {
         if let broadcasts = array("broadcasts", "networks") {
             return broadcasts.compactMap { value in
                 if let object = value.objectValue, let network = object.string("name", "network", "channel") {
-                    return StadiaBroadcast(network: network, type: object.string("type") ?? "TV", countryCode: object.string("countryCode"))
+                    return BannerBroadcast(network: network, type: object.string("type") ?? "TV", countryCode: object.string("countryCode"))
                 }
-                return value.stringValue.map { StadiaBroadcast(network: $0, type: "TV", countryCode: nil) }
+                return value.stringValue.map { BannerBroadcast(network: $0, type: "TV", countryCode: nil) }
             }
         }
-        return string("network", "tvNetwork", "broadcast").map { [StadiaBroadcast(network: $0, type: "TV", countryCode: nil)] } ?? []
+        return string("network", "tvNetwork", "broadcast").map { [BannerBroadcast(network: $0, type: "TV", countryCode: nil)] } ?? []
     }
 
     private func string(_ keys: [String]) -> String? {
@@ -975,7 +975,7 @@ extension Dictionary where Key == String, Value == WebSportsJSON {
     }
 }
 
-extension StadiaGameStatus {
+extension BannerGameStatus {
     init(webStatus: String?, start: Date) {
         let value = webStatus?.lowercased() ?? ""
         if value.contains("final") || value.contains("complete") || value.contains("post") {

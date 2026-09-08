@@ -60,7 +60,7 @@ enum GameCentreArchetype: String, CaseIterable, Hashable {
 struct GameCentreContainerView: View {
     let match: Match
     let gameSummary: GameSummary?
-    let golfTournament: StadiaGolfTournament?
+    let golfTournament: BannerGolfTournament?
     let isLoadingGolfTournament: Bool
     let didAttemptGolfTournamentLoad: Bool
     let isLoadingGameSummary: Bool
@@ -138,7 +138,7 @@ struct GameCentreContainerView: View {
 struct GameCentreEventHeader: View {
     let match: Match
     let gameSummary: GameSummary?
-    let golfTournament: StadiaGolfTournament?
+    let golfTournament: BannerGolfTournament?
     let spoilerFreeMode: Bool
     let spoilerRevealed: Bool
     let revealScore: () -> Void
@@ -344,7 +344,7 @@ private struct TeamSportEventHero: View {
 
 private struct GolfTournamentHero: View {
     let match: Match
-    let tournament: StadiaGolfTournament?
+    let tournament: BannerGolfTournament?
 
     private var leaderboard: [GolfLeaderboardEntry] {
         GolfTournamentData(match: match, tournament: tournament).leaderboard
@@ -863,7 +863,7 @@ private enum GolfGameCentreTab: String, CaseIterable, Identifiable {
 
 private struct GolfGameCentre: View {
     let match: Match
-    let tournament: StadiaGolfTournament?
+    let tournament: BannerGolfTournament?
     let isLoadingTournament: Bool
     let didAttemptTournamentLoad: Bool
     @State private var selectedTab: GolfGameCentreTab = .leaderboard
@@ -901,7 +901,7 @@ private struct GolfGameCentre: View {
 
 private struct GolfTournamentData: Hashable {
     let match: Match
-    let tournament: StadiaGolfTournament?
+    let tournament: BannerGolfTournament?
 
     var leaderboard: [GolfLeaderboardEntry] {
         (tournament?.leaderboard ?? []).map { entry in

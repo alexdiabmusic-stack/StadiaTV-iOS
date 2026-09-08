@@ -185,7 +185,7 @@ struct SportsProviderDiagnosticsView: View {
     }
 
     private func overrideKey(_ providerID: SportsDataProviderID) -> String {
-        "\(selectedLeague.stadiaKey)|\(selectedCapability.rawValue)|\(providerID.rawValue)"
+        "\(selectedLeague.bannerKey)|\(selectedCapability.rawValue)|\(providerID.rawValue)"
     }
 
     @MainActor

@@ -259,9 +259,9 @@ struct MatchesView: View {
     }
 
     private var leagueChips: [League] {
-        let favLeagueIDs = Set(prefs.favoriteTeams.flatMap { [$0.leaguePath, $0.leagueStadiaKey] })
+        let favLeagueIDs = Set(prefs.favoriteTeams.flatMap { [$0.leaguePath, $0.leagueBannerKey] })
         return League.all.filter {
-            prefs.isLeagueSelected($0) && !favLeagueIDs.contains($0.id) && !favLeagueIDs.contains($0.stadiaKey)
+            prefs.isLeagueSelected($0) && !favLeagueIDs.contains($0.id) && !favLeagueIDs.contains($0.bannerKey)
         }.prefix(6).map { $0 }
     }
 
@@ -356,9 +356,9 @@ struct MatchesView: View {
     }
 
     private var newsLeagues: [League] {
-        let favLeagueIDs = Set(prefs.favoriteTeams.flatMap { [$0.leaguePath, $0.leagueStadiaKey] })
-        let explicitIDs = Set(prefs.explicitlyFollowedLeagues.flatMap { [$0.id, $0.stadiaKey] })
-        return League.all.filter { favLeagueIDs.contains($0.id) || favLeagueIDs.contains($0.stadiaKey) || explicitIDs.contains($0.id) || explicitIDs.contains($0.stadiaKey) }
+        let favLeagueIDs = Set(prefs.favoriteTeams.flatMap { [$0.leaguePath, $0.leagueBannerKey] })
+        let explicitIDs = Set(prefs.explicitlyFollowedLeagues.flatMap { [$0.id, $0.bannerKey] })
+        return League.all.filter { favLeagueIDs.contains($0.id) || favLeagueIDs.contains($0.bannerKey) || explicitIDs.contains($0.id) || explicitIDs.contains($0.bannerKey) }
     }
 
     private func isTBDMatch(_ match: Match) -> Bool {
@@ -1623,7 +1623,7 @@ struct TeamLogo: View {
 
     @ViewBuilder
     private var logo: some View {
-        if let assetName = url?.stadiaImageAssetName {
+        if let assetName = url?.bannerImageAssetName {
             Image(assetName)
                 .resizable()
                 .scaledToFit()

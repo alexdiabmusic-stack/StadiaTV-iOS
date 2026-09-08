@@ -12,9 +12,9 @@ final class EntitlementStore: ObservableObject {
 
     // MARK: Product IDs
 
-    static let monthlyID  = "stadiatv.premium.monthly"
-    static let annualID   = "stadiatv.premium.annual"
-    static let lifetimeID = "stadiatv.premium.lifetime"
+    static let monthlyID  = "bannertv.premium.monthly"
+    static let annualID   = "bannertv.premium.annual"
+    static let lifetimeID = "bannertv.premium.lifetime"
 
     // MARK: Published state
 
@@ -25,7 +25,7 @@ final class EntitlementStore: ObservableObject {
 
     // MARK: Private
 
-    private static let cacheKey = "stadiatv.entitlement.premium.v1"
+    private static let cacheKey = "bannertv.entitlement.premium.v1"
     private static let unlockAllFeaturesByDefault = true
     private var updateListenerTask: Task<Void, Never>?
 

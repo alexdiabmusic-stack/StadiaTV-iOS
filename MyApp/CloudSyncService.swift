@@ -4,8 +4,8 @@ import Foundation
 final class CloudSyncService {
     static let shared = CloudSyncService()
 
-    static let enabledDefaultsKey = "stadiatv.cloudsync.enabled"
-    private let lastSyncDateKey = "stadiatv.cloudsync.lastSyncDate"
+    static let enabledDefaultsKey = "bannertv.cloudsync.enabled"
+    private let lastSyncDateKey = "bannertv.cloudsync.lastSyncDate"
 
     private let store = NSUbiquitousKeyValueStore.default
     private var isStarted = false
@@ -40,7 +40,7 @@ final class CloudSyncService {
             store.synchronize()
             recordSync()
         }
-        NotificationCenter.default.post(name: .stadiatvCloudSyncDidChange, object: nil)
+        NotificationCenter.default.post(name: .bannertvCloudSyncDidChange, object: nil)
     }
 
     func save<T: Encodable>(_ value: T, for key: CloudSyncKey) {
@@ -61,16 +61,16 @@ final class CloudSyncService {
 
     @objc private func handleExternalChange() {
         recordSync()
-        NotificationCenter.default.post(name: .stadiatvCloudSyncDidChange, object: nil)
+        NotificationCenter.default.post(name: .bannertvCloudSyncDidChange, object: nil)
     }
 }
 
 enum CloudSyncKey: String {
-    case preferences = "stadiatv.preferences.v1"
-    case favoriteChannels = "stadiatv.favoritechannels.v1"
-    case watchHistory = "stadiatv.watchhistory.v1"
+    case preferences = "bannertv.preferences.v1"
+    case favoriteChannels = "bannertv.favoritechannels.v1"
+    case watchHistory = "bannertv.watchhistory.v1"
 }
 
 extension Notification.Name {
-    static let stadiatvCloudSyncDidChange = Notification.Name("stadiatv.cloudSyncDidChange")
+    static let bannertvCloudSyncDidChange = Notification.Name("bannertv.cloudSyncDidChange")
 }

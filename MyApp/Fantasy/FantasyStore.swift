@@ -519,7 +519,7 @@ final class FantasyStore: ObservableObject {
             return FantasyPlayerGame(
                 id: game.id,
                 fantasyPlayer: game.fantasyPlayer,
-                stadiaPlayer: game.stadiaPlayer,
+                bannerPlayer: game.bannerPlayer,
                 event: game.event,
                 opponent: game.opponent,
                 gameState: game.gameState,

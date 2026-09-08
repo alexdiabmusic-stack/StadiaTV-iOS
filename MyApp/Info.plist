@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>StadiaTV</string>
+	<string>BannerTV</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -28,9 +28,9 @@
 		<true/>
 	</dict>
 	<key>NSCalendarsUsageDescription</key>
-	<string>StadiaTV adds upcoming games you choose to your calendar.</string>
+	<string>BannerTV adds upcoming games you choose to your calendar.</string>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
-	<string>StadiaTV adds upcoming games you choose to your calendar without reading your existing calendar events.</string>
+	<string>BannerTV adds upcoming games you choose to your calendar without reading your existing calendar events.</string>
 	<key>OddsAPIBaseURL</key>
 	<string>https://mlapi.bet/v1</string>
 	<key>OddsAPIKey</key>

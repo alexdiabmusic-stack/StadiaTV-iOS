@@ -1,12 +1,12 @@
 import Foundation
 
 extension URL {
-    nonisolated static func stadiaImageAsset(named assetName: String) -> URL? {
-        URL(string: "stadia-asset:/\(assetName)")
+    nonisolated static func bannerImageAsset(named assetName: String) -> URL? {
+        URL(string: "banner-asset:/\(assetName)")
     }
 
-    nonisolated var stadiaImageAssetName: String? {
-        guard scheme == "stadia-asset" else { return nil }
+    nonisolated var bannerImageAssetName: String? {
+        guard scheme == "banner-asset" else { return nil }
         let trimmedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         return trimmedPath.isEmpty ? host : trimmedPath
     }
@@ -56,24 +56,24 @@ enum SportGroup: String, CaseIterable, Identifiable {
     }
 }
 
-/// A single Stadia league / competition.
-/// `path` remains the legacy ESPN URL segment during migration. Use `stadiaKey` for Stadia-owned identity and routing.
+/// A single Banner league / competition.
+/// `path` remains the legacy ESPN URL segment during migration. Use `bannerKey` for Banner-owned identity and routing.
 struct League: Identifiable, Hashable {
     let id: String        // migration-compatible identifier == path
     let name: String      // display name
     let shortName: String // compact label
     let path: String      // legacy ESPN api path segment
-    let stadiaKey: String // Stadia-owned league key, independent of provider URL paths
+    let bannerKey: String // Banner-owned league key, independent of provider URL paths
     let group: SportGroup
     /// Keywords used by the source-matching algorithm (broadcast/league aliases).
     let keywords: [String]
 
-    init(name: String, shortName: String, path: String, stadiaKey: String? = nil, group: SportGroup, keywords: [String] = []) {
+    init(name: String, shortName: String, path: String, bannerKey: String? = nil, group: SportGroup, keywords: [String] = []) {
         self.id = path
         self.name = name
         self.shortName = shortName
         self.path = path
-        self.stadiaKey = stadiaKey ?? "league.\(SportsIdentityResolver.slug(path))"
+        self.bannerKey = bannerKey ?? "league.\(SportsIdentityResolver.slug(path))"
         self.group = group
         self.keywords = keywords
     }
@@ -481,7 +481,7 @@ struct Match: Identifiable, Hashable {
     /// Provider-qualified canonical game ID (e.g. "game:espn:nba:401234"). Preserved for routing.
     var canonicalID: String? = nil
     /// Full broadcast records with country/type metadata. Use for stream matching; use `broadcasts` for display.
-    var broadcastDetails: [StadiaBroadcast] = []
+    var broadcastDetails: [BannerBroadcast] = []
 
     static func == (lhs: Match, rhs: Match) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }

@@ -553,7 +553,7 @@ struct PrivacySyncSettingsView: View {
                 }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .stadiatvCloudSyncDidChange)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .bannertvCloudSyncDidChange)) { _ in
             lastSyncDate = CloudSyncService.shared.lastSyncDate
         }
         .confirmationDialog("Delete Local Data", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
@@ -679,28 +679,28 @@ struct WatchHistorySettingsView: View {
 struct PrivacyPolicySettingsView: View {
     var body: some View {
         SettingsPage(title: "Privacy Policy") {
-            SettingsPanel(title: "STADIATV PRIVACY POLICY") {
+            SettingsPanel(title: "BANNERTV PRIVACY POLICY") {
                 LegalDocumentText(Self.policyText)
             }
         }
     }
 
     private static let policyText = """
-StadiaTV Privacy Policy
+BannerTV Privacy Policy
 
 Effective date: July 27, 2026
 
-StadiaTV is operated by Alexandre Diab ("StadiaTV," "we," "us," or "our").
+BannerTV is operated by Alexandre Diab ("BannerTV," "we," "us," or "our").
 
-This Privacy Policy explains how information is handled when you use the StadiaTV mobile application ("the App").
+This Privacy Policy explains how information is handled when you use the BannerTV mobile application ("the App").
 
 1. Overview
 
-StadiaTV is a media player and sports information application. It allows users to view sports information and connect playlists or provider credentials that they are authorized to use.
+BannerTV is a media player and sports information application. It allows users to view sports information and connect playlists or provider credentials that they are authorized to use.
 
-StadiaTV does not provide, host, sell, or distribute television channels, playlists, subscriptions, broadcasts, or other media content.
+BannerTV does not provide, host, sell, or distribute television channels, playlists, subscriptions, broadcasts, or other media content.
 
-We designed StadiaTV to minimize the collection of personal information. The App does not require users to create a StadiaTV account.
+We designed BannerTV to minimize the collection of personal information. The App does not require users to create a BannerTV account.
 
 2. Information handled by the App
 
@@ -716,7 +716,7 @@ When you connect an M3U playlist, stream login account, or another supported sou
 
 This information is used only to connect the App to the source you selected.
 
-Your playlist information and provider credentials are stored locally on your device. We do not receive or store this information on StadiaTV-operated servers.
+Your playlist information and provider credentials are stored locally on your device. We do not receive or store this information on BannerTV-operated servers.
 
 When the App connects to your selected provider, the information required to establish that connection is transmitted directly to that provider. Your provider may receive ordinary network information, including your IP address, device request information, and requested content.
 
@@ -735,11 +735,11 @@ These preferences are stored locally on your device and are used to personalize 
 
 Fantasy sports
 
-If you connect ESPN Fantasy, StadiaTV reads league, roster, matchup, scoring, standing, and player metadata directly from ESPN Fantasy and stores lightweight cache data locally so Fantasy can load efficiently and degrade gracefully offline. Private ESPN Fantasy leagues may require ESPN session cookies; `espn_s2` and `SWID` are stored only in Keychain and are sent only as ESPN Cookie headers.
+If you connect ESPN Fantasy, BannerTV reads league, roster, matchup, scoring, standing, and player metadata directly from ESPN Fantasy and stores lightweight cache data locally so Fantasy can load efficiently and degrade gracefully offline. Private ESPN Fantasy leagues may require ESPN session cookies; `espn_s2` and `SWID` are stored only in Keychain and are sent only as ESPN Cookie headers.
 
 Sleeper import support is currently disabled in the active product, but previously stored Sleeper data is preserved locally for compatibility if that provider is re-enabled later.
 
-StadiaTV does not require a Stadia account for imported Fantasy connections and does not send playlist credentials, stream URLs, IPTV provider details, or video traffic to StadiaTV-operated servers for Fantasy features.
+BannerTV does not require a Banner account for imported Fantasy connections and does not send playlist credentials, stream URLs, IPTV provider details, or video traffic to BannerTV-operated servers for Fantasy features.
 
 Sports and news information
 
@@ -769,7 +769,7 @@ Do not send playlist passwords, provider credentials, or other sensitive informa
 
 3. How information is used
 
-Information handled through StadiaTV may be used to:
+Information handled through BannerTV may be used to:
 
 - Connect to playlists and providers selected by the user
 - Display content from a connected source
@@ -785,7 +785,7 @@ We do not use personal information for targeted advertising.
 
 4. Advertising, tracking, and sale of information
 
-StadiaTV does not:
+BannerTV does not:
 
 - Display third-party advertisements
 - Track users across applications or websites
@@ -803,7 +803,7 @@ User-selected providers
 
 Information necessary to connect to an M3U, stream login, or other source is sent to the provider selected by the user.
 
-StadiaTV does not control these providers and is not responsible for their privacy or security practices.
+BannerTV does not control these providers and is not responsible for their privacy or security practices.
 
 Service providers
 
@@ -834,7 +834,7 @@ You may remove connected playlists and provider credentials through the App's pl
 
 Support emails and related communications may be retained only for as long as reasonably necessary to respond to the request, maintain business records, resolve disputes, prevent abuse, and comply with legal obligations.
 
-Because StadiaTV does not require a user account and does not store playlist credentials on its own servers, there is normally no StadiaTV account or associated server profile to delete.
+Because BannerTV does not require a user account and does not store playlist credentials on its own servers, there is normally no BannerTV account or associated server profile to delete.
 
 To request access to or deletion of information you previously submitted through customer support, contact us using the email address below.
 
@@ -854,7 +854,7 @@ Removing a connected source does not delete information separately held by that 
 
 9. Children's privacy
 
-StadiaTV does not require users to provide their age and is not designed to intentionally collect personal information from children.
+BannerTV does not require users to provide their age and is not designed to intentionally collect personal information from children.
 
 We do not knowingly collect personal information from children under 13. A parent or guardian who believes a child has submitted personal information through a support request may contact us to request its deletion.
 
@@ -866,7 +866,7 @@ Information processed in another country may be subject to that country's laws a
 
 11. Third-party content and links
 
-StadiaTV may display information or content obtained from third parties or allow users to connect to third-party services.
+BannerTV may display information or content obtained from third parties or allow users to connect to third-party services.
 
 We do not control the privacy, security, availability, legality, or content practices of user-selected providers or external services. Users should review the terms and privacy policies of each service they use.
 
@@ -880,26 +880,26 @@ The updated policy will display a revised effective date. Where required, we wil
 
 Questions, privacy requests, or concerns may be sent to:
 
-StadiaTV Privacy
+BannerTV Privacy
 Alexandre Diab
 Email: alexdiabmusic@gmail.com
 Country: Canada
 
-Please use the subject line "StadiaTV Privacy Request."
+Please use the subject line "BannerTV Privacy Request."
 """
 }
 
-struct AboutStadiaTVSettingsView: View {
+struct AboutBannerTVSettingsView: View {
     var body: some View {
-        SettingsPage(title: "About StadiaTV") {
-            SettingsPanel(title: "ABOUT STADIATV") {
+        SettingsPage(title: "About BannerTV") {
+            SettingsPanel(title: "ABOUT BANNERTV") {
                 LegalDocumentText(Self.aboutText)
             }
         }
     }
 
     private static let aboutText = """
-StadiaTV brings sports, scores, schedules, news, and your own authorized playlists together in one fast, modern experience.
+BannerTV brings sports, scores, schedules, news, and your own authorized playlists together in one fast, modern experience.
 
 Stay connected to the sports you love by following your favourite teams and leagues, tracking live scores, exploring player statistics, and quickly accessing your own linked sources - all from one app.
 
@@ -940,9 +940,9 @@ Racing
 Golf
 And more
 
-Whether you're checking scores throughout the day, keeping up with your favourite teams, or organizing your own authorized viewing sources, StadiaTV helps keep everything in one place.
+Whether you're checking scores throughout the day, keeping up with your favourite teams, or organizing your own authorized viewing sources, BannerTV helps keep everything in one place.
 
-Important: StadiaTV does not provide, host, or distribute television channels, sports broadcasts, or media content. Users are responsible for providing their own authorized playlists or provider credentials and must ensure they have the rights to access any content viewed through the app.
+Important: BannerTV does not provide, host, or distribute television channels, sports broadcasts, or media content. Users are responsible for providing their own authorized playlists or provider credentials and must ensure they have the rights to access any content viewed through the app.
 
 *Availability of features depends on connected sources and supported providers.
 """
@@ -959,7 +959,7 @@ For playlist or provider issues, include the provider type and the error you see
 
 Support email: alexdiabmusic@gmail.com
 
-Suggested subject: StadiaTV Support
+Suggested subject: BannerTV Support
 """)
             }
 
@@ -974,7 +974,7 @@ Feature ideas, sports coverage requests, bug reports, and design feedback are we
 
 struct FantasySettingsView: View {
     @EnvironmentObject private var fantasyStore: FantasyStore
-    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
+    @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
     @EnvironmentObject private var playlists: PlaylistStore
     @EnvironmentObject private var prefs: PreferencesStore
     @State private var showingConnect = false
@@ -985,7 +985,7 @@ struct FantasySettingsView: View {
 
     var body: some View {
         SettingsPage(title: "Fantasy") {
-            SettingsPanel(title: "STADIA FANTASY") {
+            SettingsPanel(title: "BANNER FANTASY") {
                 if let bundle = nativeFantasyStore.selectedBundle {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 12) {
@@ -1004,7 +1004,7 @@ struct FantasySettingsView: View {
                     }
                     .padding(14)
                 } else {
-                    InfoTextRow("Create or join a native Stadia Fantasy league from Following → Fantasy.")
+                    InfoTextRow("Create or join a native Banner Fantasy league from Following → Fantasy.")
                 }
             }
 
@@ -1144,7 +1144,7 @@ struct FantasySettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes the local Fantasy connection, provider credentials and Fantasy caches without changing playlists, favourites, recordings or other Stadia settings.")
+            Text("This removes the local Fantasy connection, provider credentials and Fantasy caches without changing playlists, favourites, recordings or other Banner settings.")
         }
         .confirmationDialog("Reset Local Fantasy Data?", isPresented: $showingNativeResetConfirmation, titleVisibility: .visible) {
             Button("Reset Local Fantasy Data", role: .destructive) {
@@ -1155,7 +1155,7 @@ struct FantasySettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes Stadia Fantasy teams, local leagues, rosters, lineups and transactions. It does not change IPTV playlists, recordings, favourites or imported ESPN Fantasy credentials.")
+            Text("This removes Banner Fantasy teams, local leagues, rosters, lineups and transactions. It does not change IPTV playlists, recordings, favourites or imported ESPN Fantasy credentials.")
         }
         .task {
             await nativeFantasyStore.load()
@@ -1226,7 +1226,7 @@ struct ESPNFantasyConnectSheet: View {
                             .keyboardType(.numberPad)
                         TextField("Your team ID", text: $teamID)
                             .keyboardType(.numberPad)
-                        Text("For public leagues, enter your ESPN Fantasy team ID so Stadia knows which roster is yours.")
+                        Text("For public leagues, enter your ESPN Fantasy team ID so Banner knows which roster is yours.")
                             .font(.footnote)
                             .foregroundStyle(Theme.textSecondary)
                     }

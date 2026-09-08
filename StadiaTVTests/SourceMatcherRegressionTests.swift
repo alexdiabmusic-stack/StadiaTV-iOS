@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import StadiaTV
+@testable import BannerTV
 
 // MARK: - Helpers
 
@@ -298,7 +298,7 @@ struct NewsPaginationTests {
                     requestTimeout: 10
                 )
             }
-            func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [StadiaNewsArticle] { [] }
+            func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [BannerNewsArticle] { [] }
         }
         #expect(MockPaginatingProvider().supportsPagination,
                 "The default protocol extension must return true for providers that don't override it")

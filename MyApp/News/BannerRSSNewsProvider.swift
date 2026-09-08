@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Generic RSS/Atom news provider
 
-struct StadiaRSSFeed {
+struct BannerRSSFeed {
     let url: URL
     /// Fixed league this feed covers, when known (e.g. CBS NFL feed → NFL).
     let knownLeague: League?
@@ -15,33 +15,33 @@ struct StadiaRSSFeed {
     }
 }
 
-struct StadiaRSSNewsProvider: SportsNewsProvider {
+struct BannerRSSNewsProvider: SportsNewsProvider {
     let metadata: SportsDataProviderMetadata
-    let feeds: [StadiaRSSFeed]
+    let feeds: [BannerRSSFeed]
     let publisher: String
 
     var supportsPagination: Bool { false }
 
-    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [StadiaNewsArticle] {
+    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [BannerNewsArticle] {
         guard page == 1 else { throw SportsDataError.unsupportedCapability(.newsMetadata) }
         guard metadata.isEnabled else { throw SportsDataError.providerDisabled(metadata.id) }
 
-        var allItems: [(StadiaRSSParser.ParsedItem, League)] = []
-        let http = StadiaNewsHTTPClient.shared
+        var allItems: [(BannerRSSParser.ParsedItem, League)] = []
+        let http = BannerNewsHTTPClient.shared
 
-        await withTaskGroup(of: [(StadiaRSSParser.ParsedItem, League)].self) { group in
+        await withTaskGroup(of: [(BannerRSSParser.ParsedItem, League)].self) { group in
             for feed in feeds {
                 group.addTask {
                     do {
                         let data = try await http.dataWithRetry(from: feed.url, accept: feed.accept)
-                        let items = StadiaRSSParser.parse(data)
-                        return items.compactMap { item -> (StadiaRSSParser.ParsedItem, League)? in
+                        let items = BannerRSSParser.parse(data)
+                        return items.compactMap { item -> (BannerRSSParser.ParsedItem, League)? in
                             // If feed has a fixed league, use it directly.
                             if let fixed = feed.knownLeague {
                                 return (item, fixed)
                             }
                             // Otherwise classify by headline keywords.
-                            let (_, leagueID) = StadiaNewsDeduplicator.classify(
+                            let (_, leagueID) = BannerNewsDeduplicator.classify(
                                 headline: item.title ?? "",
                                 description: item.description,
                                 tags: item.categories
@@ -70,12 +70,12 @@ struct StadiaRSSNewsProvider: SportsNewsProvider {
             let urlString = item.link ?? item.guid ?? ""
             let url = URL(string: urlString)
             let seed = item.guid ?? urlString
-            let idHash = StadiaNewsDeduplicator.articleHash(seed)
-            return StadiaNewsArticle(
-                id: StadiaEntityID(rawValue: "news:\(providerID.rawValue):\(idHash)"),
+            let idHash = BannerNewsDeduplicator.articleHash(seed)
+            return BannerNewsArticle(
+                id: BannerEntityID(rawValue: "news:\(providerID.rawValue):\(idHash)"),
                 headline: item.title ?? "Untitled",
                 description: item.description ?? item.content ?? "",
-                published: StadiaRSSParser.parseDate(item.publishedRaw),
+                published: BannerRSSParser.parseDate(item.publishedRaw),
                 url: url,
                 imageURL: item.imageURL.flatMap(URL.init(string:)),
                 leagueID: SportsIdentityResolver.canonicalLeagueID(for: matchedLeague),
@@ -94,30 +94,30 @@ struct StadiaRSSNewsProvider: SportsNewsProvider {
 
 // MARK: - General-purpose RSS provider that returns all articles regardless of league
 
-struct StadiaGeneralRSSNewsProvider: SportsNewsProvider {
+struct BannerGeneralRSSNewsProvider: SportsNewsProvider {
     let metadata: SportsDataProviderMetadata
-    let feeds: [StadiaRSSFeed]
+    let feeds: [BannerRSSFeed]
     let publisher: String
 
     var supportsPagination: Bool { false }
 
-    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [StadiaNewsArticle] {
+    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [BannerNewsArticle] {
         guard page == 1 else { throw SportsDataError.unsupportedCapability(.newsMetadata) }
         guard metadata.isEnabled else { throw SportsDataError.providerDisabled(metadata.id) }
 
-        var allItems: [(StadiaRSSParser.ParsedItem, League?)] = []
-        let http = StadiaNewsHTTPClient.shared
+        var allItems: [(BannerRSSParser.ParsedItem, League?)] = []
+        let http = BannerNewsHTTPClient.shared
 
-        await withTaskGroup(of: [(StadiaRSSParser.ParsedItem, League?)].self) { group in
+        await withTaskGroup(of: [(BannerRSSParser.ParsedItem, League?)].self) { group in
             for feed in feeds {
                 group.addTask {
                     do {
                         let data = try await http.dataWithRetry(from: feed.url, accept: feed.accept)
-                        let items = StadiaRSSParser.parse(data)
+                        let items = BannerRSSParser.parse(data)
                         return items.map { item in
                             let fixedLeague = feed.knownLeague
                             if fixedLeague != nil { return (item, fixedLeague) }
-                            let (_, leagueID) = StadiaNewsDeduplicator.classify(
+                            let (_, leagueID) = BannerNewsDeduplicator.classify(
                                 headline: item.title ?? "",
                                 description: item.description,
                                 tags: item.categories
@@ -151,12 +151,12 @@ struct StadiaGeneralRSSNewsProvider: SportsNewsProvider {
             let urlString = item.link ?? item.guid ?? ""
             let url = URL(string: urlString)
             let seed = item.guid ?? urlString
-            let idHash = StadiaNewsDeduplicator.articleHash(seed)
-            return StadiaNewsArticle(
-                id: StadiaEntityID(rawValue: "news:\(providerID.rawValue):\(idHash)"),
+            let idHash = BannerNewsDeduplicator.articleHash(seed)
+            return BannerNewsArticle(
+                id: BannerEntityID(rawValue: "news:\(providerID.rawValue):\(idHash)"),
                 headline: item.title ?? "Untitled",
                 description: item.description ?? item.content ?? "",
-                published: StadiaRSSParser.parseDate(item.publishedRaw),
+                published: BannerRSSParser.parseDate(item.publishedRaw),
                 url: url,
                 imageURL: item.imageURL.flatMap(URL.init(string:)),
                 leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),

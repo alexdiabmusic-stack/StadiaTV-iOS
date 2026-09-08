@@ -4,7 +4,7 @@ import UIKit
 // MARK: - LaunchAnimationView
 
 /// Full-screen brand overlay that plays on cold launch and transitions
-/// the STADIA TV wordmark into the Home navigation-bar header position.
+/// the BANNER TV wordmark into the Home navigation-bar header position.
 ///
 /// Layout strategy
 /// ───────────────
@@ -18,7 +18,7 @@ import UIKit
 /// Animation choreography
 /// ──────────────────────
 ///  0.00 s  White logo centred (matches native launch screen background).
-///  0.20 s  TV starts animating white → Stadia blue (easeInOut 0.45 s).
+///  0.20 s  TV starts animating white → Banner blue (easeInOut 0.45 s).
 ///  0.65 s  Fully branded wordmark at rest. Startup pipeline is running.
 ///  1.10 s  Minimum brand duration met.
 ///  ~1.25 s Logo flies from centre → nav-bar header (0.58 s, custom ease).
@@ -101,7 +101,7 @@ struct LaunchAnimationView: View {
 
     // MARK: - Animated properties
 
-    /// The "TV" colour.  Changes from white → Stadia blue when
+    /// The "TV" colour.  Changes from white → Banner blue when
     /// `coordinator.phase` becomes `.colorizingTV`.  Because the coordinator
     /// wraps the phase mutation in `withAnimation(.easeInOut(duration: 0.45))`,
     /// SwiftUI interpolates the Color in that same transaction — no extra

@@ -64,7 +64,7 @@ final class PredictionsStore: ObservableObject {
     @Published private(set) var currentStreak: Int = 0
     @Published private(set) var bestStreak: Int = 0
 
-    private let key = "stadiatv.predictions.v1"
+    private let key = "bannertv.predictions.v1"
 
     init() {
         guard let data = UserDefaults.standard.data(forKey: key),

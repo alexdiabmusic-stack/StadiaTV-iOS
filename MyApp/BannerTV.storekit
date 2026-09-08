@@ -1,6 +1,6 @@
 {
   "_developmentRegion" : "en_US",
-  "_storeName" : "StadiaTV",
+  "_storeName" : "BannerTV",
   "enableAllProductsDebug" : false,
   "identifier" : "62A00F33-C3E1-4CF7-BC39-FD1DE0EF0ACA",
   "nonConsumableProducts" : [
@@ -10,12 +10,12 @@
       "internalID" : "7B2A9F84-1C3D-4E5A-B6C7-D8E9F0A1B2C3",
       "localizations" : [
         {
-          "description" : "Unlock all StadiaTV Premium features forever. One payment, no subscription.",
+          "description" : "Unlock all BannerTV Premium features forever. One payment, no subscription.",
           "displayName" : "Premium — Lifetime",
           "locale" : "en_US"
         }
       ],
-      "productID" : "stadiatv.premium.lifetime",
+      "productID" : "bannertv.premium.lifetime",
       "referenceName" : "Premium Lifetime",
       "type" : "NonConsumable"
     }
@@ -32,7 +32,7 @@
     {
       "id" : "D8E9F0A1-B2C3-4D5E-F6A7-B8C9D0E1F2A3",
       "localizations" : [],
-      "name" : "StadiaTV Premium",
+      "name" : "BannerTV Premium",
       "subscriptions" : [
         {
           "adHocOffers" : [],
@@ -49,12 +49,12 @@
           },
           "localizations" : [
             {
-              "description" : "Full access to all StadiaTV Premium features with a 7-day free trial. Auto-renews monthly.",
+              "description" : "Full access to all BannerTV Premium features with a 7-day free trial. Auto-renews monthly.",
               "displayName" : "Premium — Monthly",
               "locale" : "en_US"
             }
           ],
-          "productID" : "stadiatv.premium.monthly",
+          "productID" : "bannertv.premium.monthly",
           "recurringSubscriptionPeriod" : "P1M",
           "referenceName" : "Premium Monthly",
           "subscriptionGroupID" : "D8E9F0A1-B2C3-4D5E-F6A7-B8C9D0E1F2A3",
@@ -69,12 +69,12 @@
           "introductoryOffer" : null,
           "localizations" : [
             {
-              "description" : "Full access to all StadiaTV Premium features, including Game Center, Play by Play, and Multiscreen. Renews annually.",
+              "description" : "Full access to all BannerTV Premium features, including Game Center, Play by Play, and Multiscreen. Renews annually.",
               "displayName" : "Premium — Annual",
               "locale" : "en_US"
             }
           ],
-          "productID" : "stadiatv.premium.annual",
+          "productID" : "bannertv.premium.annual",
           "recurringSubscriptionPeriod" : "P1Y",
           "referenceName" : "Premium Annual",
           "subscriptionGroupID" : "D8E9F0A1-B2C3-4D5E-F6A7-B8C9D0E1F2A3",

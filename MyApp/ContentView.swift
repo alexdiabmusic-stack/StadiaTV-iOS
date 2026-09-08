@@ -13,7 +13,7 @@ struct MyApp: App {
     @StateObject private var customGroupStore = CustomGroupStore()
     @StateObject private var groupPrefsStore = GroupPreferencesStore()
     @StateObject private var fantasyStore = FantasyStore.shared
-    @StateObject private var stadiaFantasyStore = StadiaFantasyStore.shared
+    @StateObject private var bannerFantasyStore = BannerFantasyStore.shared
     @StateObject private var launchCoordinator = StartupCoordinator()
 
     var body: some Scene {
@@ -44,7 +44,7 @@ struct MyApp: App {
             .environmentObject(customGroupStore)
             .environmentObject(groupPrefsStore)
             .environmentObject(fantasyStore)
-            .environmentObject(stadiaFantasyStore)
+            .environmentObject(bannerFantasyStore)
             .environmentObject(ProgrammeReminderStore.shared)
             .environmentObject(RecordingService.shared)
             .environmentObject(ParentalControlStore.shared)
@@ -58,12 +58,12 @@ struct MyApp: App {
             .task { await playlistStore.refreshAll() }
             // Fantasy — load local state first, then refresh ESPN and event contexts concurrently.
             .task {
-                await stadiaFantasyStore.load()
+                await bannerFantasyStore.load()
                 async let espnRefresh: Void = fantasyStore.refresh(
                     channels: playlistStore.allChannels,
                     preferredLanguages: preferences.preferredStreamLanguages
                 )
-                async let eventContextRefresh: Void = stadiaFantasyStore.refreshEventContexts(
+                async let eventContextRefresh: Void = bannerFantasyStore.refreshEventContexts(
                     channels: playlistStore.allChannels,
                     preferredLanguages: preferences.preferredStreamLanguages
                 )
@@ -96,7 +96,7 @@ struct RootView: View {
     @EnvironmentObject private var podcastStore: PodcastStore
     @EnvironmentObject private var playlistStore: PlaylistStore
     @EnvironmentObject private var fantasyStore: FantasyStore
-    @EnvironmentObject private var stadiaFantasyStore: StadiaFantasyStore
+    @EnvironmentObject private var bannerFantasyStore: BannerFantasyStore
     @StateObject private var liveViewModel = LiveViewModel()
     @StateObject private var epgRepository = EPGRepository()
     @StateObject private var guideStore = GuideChannelStore()
@@ -167,18 +167,18 @@ struct RootView: View {
                 Task { await enableFavoriteTeamNotifications() }
             }
         } message: {
-            Text("StadiaTV can remind you before games for teams you star. You can change this later in Settings.")
+            Text("BannerTV can remind you before games for teams you star. You can change this later in Settings.")
         }
     }
 
     private func refreshFantasyContexts(force: Bool = false) async {
-        await stadiaFantasyStore.load()
+        await bannerFantasyStore.load()
         async let espnRefresh: Void = fantasyStore.refresh(
             channels: playlistStore.allChannels,
             preferredLanguages: prefs.preferredStreamLanguages,
             force: force
         )
-        async let eventContextRefresh: Void = stadiaFantasyStore.refreshEventContexts(
+        async let eventContextRefresh: Void = bannerFantasyStore.refreshEventContexts(
             channels: playlistStore.allChannels,
             preferredLanguages: prefs.preferredStreamLanguages
         )
@@ -210,7 +210,7 @@ struct RootView: View {
         .environmentObject(ArticleLibraryStore())
         .environmentObject(PodcastStore())
         .environmentObject(FantasyStore.shared)
-        .environmentObject(StadiaFantasyStore.shared)
+        .environmentObject(BannerFantasyStore.shared)
         .environmentObject(StartupCoordinator())
         .preferredColorScheme(.dark)
 }

@@ -4,7 +4,7 @@ struct FantasyDashboardView: View {
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var playlists: PlaylistStore
     @EnvironmentObject private var prefs: PreferencesStore
-    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
+    @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
     @State private var showingConnect = false
     @State private var showingESPNConnect = false
     @State private var showingCreateLeague = false
@@ -30,11 +30,11 @@ struct FantasyDashboardView: View {
                 .environmentObject(fantasyStore)
         }
         .sheet(isPresented: $showingCreateLeague) {
-            StadiaFantasyCreateLeagueFlow()
+            BannerFantasyCreateLeagueFlow()
                 .environmentObject(nativeFantasyStore)
         }
         .sheet(isPresented: $showingJoinLeague) {
-            StadiaFantasyJoinLeagueSheet()
+            BannerFantasyJoinLeagueSheet()
                 .environmentObject(nativeFantasyStore)
         }
         .task {
@@ -49,10 +49,10 @@ struct FantasyDashboardView: View {
     @ViewBuilder
     private var content: some View {
         if nativeFantasyStore.nativeLeagueCount > 0 {
-            StadiaFantasyNativeDashboardView()
+            BannerFantasyNativeDashboardView()
                 .environmentObject(nativeFantasyStore)
         } else if fantasyStore.currentConnection != nil {
-            StadiaFantasyHubView(
+            BannerFantasyHubView(
                 importedContent: AnyView(connectedContent),
                 onCreateLeague: { showingCreateLeague = true },
                 onJoinLeague: { showingJoinLeague = true },
@@ -61,7 +61,7 @@ struct FantasyDashboardView: View {
             )
             .environmentObject(nativeFantasyStore)
         } else {
-            StadiaFantasyHubView(
+            BannerFantasyHubView(
                 importedContent: nil,
                 onCreateLeague: { showingCreateLeague = true },
                 onJoinLeague: { showingJoinLeague = true },
@@ -272,7 +272,7 @@ struct FantasyDashboardView: View {
     private var unresolvedSection: some View {
         let count = fantasyStore.liveContext.unresolvedPlayerIDs.count
         if count > 0 {
-            FantasyInlineStatus(systemImage: "person.crop.circle.badge.questionmark", title: "\(count) player\(count == 1 ? "" : "s") not fully linked", subtitle: "They remain in your roster, but Stadia will not guess their games or channels.", tint: Theme.starting)
+            FantasyInlineStatus(systemImage: "person.crop.circle.badge.questionmark", title: "\(count) player\(count == 1 ? "" : "s") not fully linked", subtitle: "They remain in your roster, but Banner will not guess their games or channels.", tint: Theme.starting)
         }
     }
 
@@ -314,7 +314,7 @@ struct SleeperConnectSheet: View {
                         Text("Connect Sleeper")
                             .font(.title.weight(.bold))
                             .foregroundStyle(Theme.textPrimary)
-                        Text("Enter your Sleeper username. Stadia stores the stable Sleeper user ID after lookup.")
+                        Text("Enter your Sleeper username. Banner stores the stable Sleeper user ID after lookup.")
                             .font(.callout)
                             .foregroundStyle(Theme.textSecondary)
                     }
@@ -371,7 +371,7 @@ private struct FantasyDisconnectedState: View {
                 Text("Connect your fantasy league")
                     .font(.title2.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
-                Text("Track your matchup, players and games directly from Stadia.")
+                Text("Track your matchup, players and games directly from Banner.")
                     .font(.callout)
                     .foregroundStyle(Theme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -922,7 +922,7 @@ struct FantasyDashboardStateHarness: View {
             FantasyInlineStatus(systemImage: "trophy.fill", title: sampleLeague.name, subtitle: "2026 · 12 teams · In season", tint: Theme.accent)
             FantasyMatchupHero(matchup: sampleMatchup, roster: sampleRoster, league: sampleLeague)
             if isPartial {
-                FantasyInlineStatus(systemImage: "person.crop.circle.badge.questionmark", title: "2 players not fully linked", subtitle: "They remain in your roster, but Stadia will not guess their games or channels.", tint: Theme.starting)
+                FantasyInlineStatus(systemImage: "person.crop.circle.badge.questionmark", title: "2 players not fully linked", subtitle: "They remain in your roster, but Banner will not guess their games or channels.", tint: Theme.starting)
             }
             VStack(alignment: .leading, spacing: 10) {
                 Text(isLive ? "PLAYERS LIVE" : "TODAY")
@@ -947,7 +947,7 @@ struct FantasyDashboardStateHarness: View {
     }
 
     private var sampleTeam: FantasyTeam {
-        FantasyTeam(id: "team-preview", leagueID: sampleLeague.id, providerUserID: "user-preview", rosterID: 1, displayName: "Stadia Starters", username: "stadia", avatarID: nil, isOwner: true)
+        FantasyTeam(id: "team-preview", leagueID: sampleLeague.id, providerUserID: "user-preview", rosterID: 1, displayName: "Banner Starters", username: "banner", avatarID: nil, isOwner: true)
     }
 
     private var sampleOpponent: FantasyTeam {
@@ -982,13 +982,13 @@ struct FantasyDashboardStateHarness: View {
 
     private var sampleLiveGames: [FantasyPlayerGame] {
         samplePlayers.prefix(2).map { player in
-            FantasyPlayerGame(id: "\(player.id)-live", fantasyPlayer: player, stadiaPlayer: nil, event: nil, opponent: nil, gameState: .live, fantasyPoints: player.id == "p-qb" ? 18.4 : nil, projectedPoints: nil, matchedChannel: nil)
+            FantasyPlayerGame(id: "\(player.id)-live", fantasyPlayer: player, bannerPlayer: nil, event: nil, opponent: nil, gameState: .live, fantasyPoints: player.id == "p-qb" ? 18.4 : nil, projectedPoints: nil, matchedChannel: nil)
         }
     }
 
     private var sampleTodayGames: [FantasyPlayerGame] {
         samplePlayers.map { player in
-            FantasyPlayerGame(id: "\(player.id)-today", fantasyPlayer: player, stadiaPlayer: nil, event: nil, opponent: nil, gameState: .upcoming, fantasyPoints: nil, projectedPoints: nil, matchedChannel: nil)
+            FantasyPlayerGame(id: "\(player.id)-today", fantasyPlayer: player, bannerPlayer: nil, event: nil, opponent: nil, gameState: .upcoming, fantasyPoints: nil, projectedPoints: nil, matchedChannel: nil)
         }
     }
 }

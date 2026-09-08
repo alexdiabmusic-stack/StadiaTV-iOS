@@ -92,7 +92,7 @@ final class EPGRepository: ObservableObject {
 
     private let epgpwMappings = EPGPWMappingRepository()
     private lazy var epgpwProvider = EPGPWProvider(cacheDir: cacheDir)
-    private let logger = Logger(subsystem: "StadiaTV", category: "LiveTVImport")
+    private let logger = Logger(subsystem: "BannerTV", category: "LiveTVImport")
 
     // Cache keys
     private let channelCacheKey = "epg.canonical.channels.v1"
@@ -101,7 +101,7 @@ final class EPGRepository: ObservableObject {
 
     private let cacheDir: URL = {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("StadiaTV_EPG", isDirectory: true)
+            .appendingPathComponent("BannerTV_EPG", isDirectory: true)
     }()
 
     private let session: URLSession = {

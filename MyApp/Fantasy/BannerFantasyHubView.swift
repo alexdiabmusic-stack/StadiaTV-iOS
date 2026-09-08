@@ -1,7 +1,7 @@
 import SwiftUI
 
-struct StadiaFantasyHubView: View {
-    @EnvironmentObject private var nativeStore: StadiaFantasyStore
+struct BannerFantasyHubView: View {
+    @EnvironmentObject private var nativeStore: BannerFantasyStore
     let importedContent: AnyView?
     let onCreateLeague: () -> Void
     let onJoinLeague: () -> Void
@@ -33,7 +33,7 @@ struct StadiaFantasyHubView: View {
             Label("Fantasy", systemImage: "trophy.fill")
                 .font(.caption.weight(.heavy))
                 .foregroundStyle(Theme.accent)
-            Text("Build your team. Compete with friends. Watch your players live in Stadia.")
+            Text("Build your team. Compete with friends. Watch your players live in Banner.")
                 .font(.title2.weight(.black))
                 .foregroundStyle(Theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -77,7 +77,7 @@ struct StadiaFantasyHubView: View {
                     .frame(maxWidth: .infinity)
                     .padding(18)
             } else if nativeStore.leagues.isEmpty {
-                StadiaFantasyInfoCard(systemImage: "person.3", title: "No Stadia leagues yet", subtitle: "Create a native Fantasy league or join one with an invite code.")
+                BannerFantasyInfoCard(systemImage: "person.3", title: "No Banner leagues yet", subtitle: "Create a native Fantasy league or join one with an invite code.")
             } else {
                 VStack(spacing: 0) {
                     ForEach(nativeStore.leagues, id: \.league.id) { bundle in
@@ -128,11 +128,11 @@ struct StadiaFantasyHubView: View {
                 .font(.caption.weight(.heavy))
                 .foregroundStyle(Theme.textSecondary)
             VStack(spacing: 0) {
-                Button(action: onConnectESPN) { StadiaFantasyDisclosureRow(title: "ESPN Fantasy", subtitle: "Import Football, Hockey, Basketball or Baseball") }
+                Button(action: onConnectESPN) { BannerFantasyDisclosureRow(title: "ESPN Fantasy", subtitle: "Import Football, Hockey, Basketball or Baseball") }
                     .buttonStyle(.plain)
                 if AppConfiguration.isSleeperFantasyProviderEnabled {
                     Divider().overlay(Theme.hairline)
-                    Button(action: onConnectSleeper) { StadiaFantasyDisclosureRow(title: "Sleeper", subtitle: "Import Football league") }
+                    Button(action: onConnectSleeper) { BannerFantasyDisclosureRow(title: "Sleeper", subtitle: "Import Football league") }
                         .buttonStyle(.plain)
                 }
             }
@@ -142,8 +142,8 @@ struct StadiaFantasyHubView: View {
     }
 }
 
-struct StadiaFantasyNativeDashboardView: View {
-    @EnvironmentObject private var nativeStore: StadiaFantasyStore
+struct BannerFantasyNativeDashboardView: View {
+    @EnvironmentObject private var nativeStore: BannerFantasyStore
     @State private var showingDraft = false
 
     var body: some View {
@@ -160,7 +160,7 @@ struct StadiaFantasyNativeDashboardView: View {
                     if bundle.league.effectiveMode == .simulatedLeague { standings(bundle) }
                     activity(bundle)
                 } else {
-                    StadiaFantasyInfoCard(systemImage: "trophy", title: "No active league", subtitle: "Create or join a Stadia Fantasy league to get started.")
+                    BannerFantasyInfoCard(systemImage: "trophy", title: "No active league", subtitle: "Create or join a Banner Fantasy league to get started.")
                 }
                 Spacer(minLength: 80)
             }
@@ -169,7 +169,7 @@ struct StadiaFantasyNativeDashboardView: View {
             .frame(maxWidth: .infinity)
         }
         .task { await nativeStore.load() }
-        .sheet(isPresented: $showingDraft) { StadiaFantasyDraftRoomView().environmentObject(nativeStore) }
+        .sheet(isPresented: $showingDraft) { BannerFantasyDraftRoomView().environmentObject(nativeStore) }
     }
 
     @ViewBuilder
@@ -180,13 +180,13 @@ struct StadiaFantasyNativeDashboardView: View {
                     Button(bundle.league.name) { nativeStore.selectLeague(id: bundle.league.id) }
                 }
             } label: {
-                StadiaFantasyDisclosureRow(title: nativeStore.selectedBundle?.league.name ?? "Select League", subtitle: nativeStore.selectedBundle.map { "Stadia Fantasy · \($0.league.sport.displayName)" } ?? "Stadia Fantasy")
+                BannerFantasyDisclosureRow(title: nativeStore.selectedBundle?.league.name ?? "Select League", subtitle: nativeStore.selectedBundle.map { "Banner Fantasy · \($0.league.sport.displayName)" } ?? "Banner Fantasy")
             }
             .buttonStyle(.plain)
         }
     }
 
-    private func leagueSummary(_ bundle: StadiaFantasyLeagueBundle) -> some View {
+    private func leagueSummary(_ bundle: BannerFantasyLeagueBundle) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
@@ -216,7 +216,7 @@ struct StadiaFantasyNativeDashboardView: View {
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
     }
 
-    private func lobby(_ bundle: StadiaFantasyLeagueBundle) -> some View {
+    private func lobby(_ bundle: BannerFantasyLeagueBundle) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("LEAGUE LOBBY")
                 .font(.caption.weight(.heavy))
@@ -313,18 +313,18 @@ struct StadiaFantasyNativeDashboardView: View {
         }
     }
 
-    private func matchupPlaceholder(_ bundle: StadiaFantasyLeagueBundle) -> some View {
-        StadiaFantasyInfoCard(systemImage: "chart.xyaxis.line", title: "Matchups ready after draft", subtitle: "Native scoring uses Stadia sports stats through the FantasyScoringEngine. Projections are not fabricated.")
+    private func matchupPlaceholder(_ bundle: BannerFantasyLeagueBundle) -> some View {
+        BannerFantasyInfoCard(systemImage: "chart.xyaxis.line", title: "Matchups ready after draft", subtitle: "Native scoring uses Banner sports stats through the FantasyScoringEngine. Projections are not fabricated.")
     }
 
-    private func roster(_ bundle: StadiaFantasyLeagueBundle) -> some View {
+    private func roster(_ bundle: BannerFantasyLeagueBundle) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("MY TEAM")
                 .font(.caption.weight(.heavy))
                 .foregroundStyle(Theme.textSecondary)
             let entries = nativeStore.selectedRoster?.entries ?? []
             if entries.isEmpty {
-                StadiaFantasyInfoCard(systemImage: "person.crop.rectangle.stack", title: "Roster empty", subtitle: "Draft NHL players to build your team.")
+                BannerFantasyInfoCard(systemImage: "person.crop.rectangle.stack", title: "Roster empty", subtitle: "Draft NHL players to build your team.")
             } else {
                 VStack(spacing: 0) {
                     ForEach(entries) { entry in
@@ -373,7 +373,7 @@ struct StadiaFantasyNativeDashboardView: View {
         }
     }
 
-    private func standings(_ bundle: StadiaFantasyLeagueBundle) -> some View {
+    private func standings(_ bundle: BannerFantasyLeagueBundle) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("STANDINGS")
                 .font(.caption.weight(.heavy))
@@ -402,13 +402,13 @@ struct StadiaFantasyNativeDashboardView: View {
         }
     }
 
-    private func activity(_ bundle: StadiaFantasyLeagueBundle) -> some View {
+    private func activity(_ bundle: BannerFantasyLeagueBundle) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("ACTIVITY")
                 .font(.caption.weight(.heavy))
                 .foregroundStyle(Theme.textSecondary)
             if bundle.transactions.isEmpty {
-                StadiaFantasyInfoCard(systemImage: "list.bullet.rectangle", title: "No activity yet", subtitle: "Draft picks, adds, drops, waivers and trades will appear here.")
+                BannerFantasyInfoCard(systemImage: "list.bullet.rectangle", title: "No activity yet", subtitle: "Draft picks, adds, drops, waivers and trades will appear here.")
             } else {
                 VStack(spacing: 0) {
                     ForEach(bundle.transactions.prefix(8)) { transaction in
@@ -426,20 +426,20 @@ struct StadiaFantasyNativeDashboardView: View {
     }
 }
 
-struct StadiaFantasyCreateLeagueFlow: View {
+struct BannerFantasyCreateLeagueFlow: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var nativeStore: StadiaFantasyStore
+    @EnvironmentObject private var nativeStore: BannerFantasyStore
     @State private var selectedSport: FantasySport = .nhl
-    @State private var selectedMode: StadiaFantasyMode = .personalTeam
+    @State private var selectedMode: BannerFantasyMode = .personalTeam
     @State private var leagueName = ""
     @State private var teamName = ""
     @State private var maxTeams = 10
-    @State private var visibility: StadiaFantasyVisibility = .private
-    @State private var scoringType: StadiaFantasyScoringType = .headToHeadPoints
-    @State private var rosterConfiguration = StadiaFantasyRosterConfiguration.standard
+    @State private var visibility: BannerFantasyVisibility = .private
+    @State private var scoringType: BannerFantasyScoringType = .headToHeadPoints
+    @State private var rosterConfiguration = BannerFantasyRosterConfiguration.standard
     @State private var draftDate = Date().addingTimeInterval(7 * 24 * 3600)
     @State private var pickTimer = 90
-    @State private var waiverType: StadiaFantasyWaiverSettings.WaiverType = .rollingPriority
+    @State private var waiverType: BannerFantasyWaiverSettings.WaiverType = .rollingPriority
     @State private var playoffTeams = 4
 
     var body: some View {
@@ -449,14 +449,14 @@ struct StadiaFantasyCreateLeagueFlow: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 16) {
                         VStack(alignment: .leading, spacing: 8) {
-                            Label("STADIA FANTASY", systemImage: selectedSport.symbolName)
+                            Label("BANNER FANTASY", systemImage: selectedSport.symbolName)
                                 .font(.caption.weight(.heavy))
                                 .foregroundStyle(Theme.accent)
                             Text(selectedMode == .personalTeam ? "Create your fantasy team" : "Create a simulated league")
                                 .font(.title2.weight(.black))
                                 .foregroundStyle(Theme.textPrimary)
                                 .fixedSize(horizontal: false, vertical: true)
-                            Text("Choose a sport, draft real ESPN-backed players, then track points and games inside Stadia.")
+                            Text("Choose a sport, draft real ESPN-backed players, then track points and games inside Banner.")
                                 .font(.subheadline)
                                 .foregroundStyle(Theme.textSecondary)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -467,7 +467,7 @@ struct StadiaFantasyCreateLeagueFlow: View {
 
                         setupCard(title: "Fantasy Type", systemImage: "switch.2") {
                             Picker("Mode", selection: $selectedMode) {
-                                ForEach(StadiaFantasyMode.allCases) { mode in
+                                ForEach(BannerFantasyMode.allCases) { mode in
                                     Text(mode.displayName).tag(mode)
                                 }
                             }
@@ -491,17 +491,17 @@ struct StadiaFantasyCreateLeagueFlow: View {
                             if selectedMode == .simulatedLeague {
                                 Stepper("\(maxTeams) teams", value: $maxTeams, in: 4...20, step: 2)
                                 Picker("Visibility", selection: $visibility) {
-                                    ForEach(StadiaFantasyVisibility.allCases) { Text($0.displayName).tag($0) }
+                                    ForEach(BannerFantasyVisibility.allCases) { Text($0.displayName).tag($0) }
                                 }
                             }
                         }
 
                         setupCard(title: "Scoring", systemImage: "chart.bar.fill") {
                             Picker("Scoring", selection: $scoringType) {
-                                ForEach(StadiaFantasyScoringType.allCases) { Text($0.displayName).tag($0) }
+                                ForEach(BannerFantasyScoringType.allCases) { Text($0.displayName).tag($0) }
                             }
                             LazyVGrid(columns: [GridItem(.adaptive(minimum: 86), spacing: 8)], spacing: 8) {
-                                ForEach(StadiaFantasyScoringRules.stadiaDefault(sport: selectedSport, type: scoringType).rules.prefix(12)) { rule in
+                                ForEach(BannerFantasyScoringRules.bannerDefault(sport: selectedSport, type: scoringType).rules.prefix(12)) { rule in
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(rule.stat.abbreviation)
                                             .font(.caption2.weight(.heavy))
@@ -534,7 +534,7 @@ struct StadiaFantasyCreateLeagueFlow: View {
                         if selectedMode == .simulatedLeague {
                             setupCard(title: "League Rules", systemImage: "slider.horizontal.3") {
                                 Picker("Waivers", selection: $waiverType) {
-                                    ForEach(StadiaFantasyWaiverSettings.WaiverType.allCases) { Text($0.rawValue.capitalized).tag($0) }
+                                    ForEach(BannerFantasyWaiverSettings.WaiverType.allCases) { Text($0.rawValue.capitalized).tag($0) }
                                 }
                                 Stepper("\(playoffTeams) playoff teams", value: $playoffTeams, in: 2...12, step: 2)
                             }
@@ -556,7 +556,7 @@ struct StadiaFantasyCreateLeagueFlow: View {
                         .disabled(leagueName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || teamName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                         if let error = nativeStore.lastError {
-                            StadiaFantasyInfoCard(systemImage: "exclamationmark.triangle", title: "Could not create Fantasy", subtitle: error)
+                            BannerFantasyInfoCard(systemImage: "exclamationmark.triangle", title: "Could not create Fantasy", subtitle: error)
                         }
                     }
                     .padding(20)
@@ -579,8 +579,8 @@ struct StadiaFantasyCreateLeagueFlow: View {
         .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
     }
 
-    private var createRequest: StadiaFantasyCreateLeagueRequest {
-        StadiaFantasyCreateLeagueRequest(
+    private var createRequest: BannerFantasyCreateLeagueRequest {
+        BannerFantasyCreateLeagueRequest(
             sport: selectedSport,
             mode: selectedMode,
             leagueName: leagueName.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -589,18 +589,18 @@ struct StadiaFantasyCreateLeagueFlow: View {
             visibility: visibility,
             scoringType: scoringType,
             rosterConfiguration: rosterConfiguration,
-            scoringRules: .stadiaDefault(sport: selectedSport, type: scoringType),
-            draftSettings: StadiaFantasyDraftSettings(type: .snake, scheduledAt: draftDate, pickTimerSeconds: pickTimer, draftOrderTeamIDs: []),
-            waiverSettings: StadiaFantasyWaiverSettings(type: waiverType, waiverPeriodHours: 24, usesFAAB: waiverType == .faab, faabBudget: waiverType == .faab ? 100 : nil),
-            tradeSettings: StadiaFantasyTradeSettings(deadline: nil, reviewType: .commissioner),
-            playoffSettings: StadiaFantasyPlayoffSettings(regularSeasonPeriods: 20, playoffTeams: playoffTeams, playoffRounds: max(1, Int(log2(Double(playoffTeams)))), championshipPeriod: nil)
+            scoringRules: .bannerDefault(sport: selectedSport, type: scoringType),
+            draftSettings: BannerFantasyDraftSettings(type: .snake, scheduledAt: draftDate, pickTimerSeconds: pickTimer, draftOrderTeamIDs: []),
+            waiverSettings: BannerFantasyWaiverSettings(type: waiverType, waiverPeriodHours: 24, usesFAAB: waiverType == .faab, faabBudget: waiverType == .faab ? 100 : nil),
+            tradeSettings: BannerFantasyTradeSettings(deadline: nil, reviewType: .commissioner),
+            playoffSettings: BannerFantasyPlayoffSettings(regularSeasonPeriods: 20, playoffTeams: playoffTeams, playoffRounds: max(1, Int(log2(Double(playoffTeams)))), championshipPeriod: nil)
         )
     }
 }
 
-struct StadiaFantasyJoinLeagueSheet: View {
+struct BannerFantasyJoinLeagueSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var nativeStore: StadiaFantasyStore
+    @EnvironmentObject private var nativeStore: BannerFantasyStore
     @State private var inviteCode = ""
     @State private var teamName = ""
 
@@ -615,7 +615,7 @@ struct StadiaFantasyJoinLeagueSheet: View {
                 Section {
                     Button {
                         Task {
-                            await nativeStore.joinLeague(StadiaFantasyJoinLeagueRequest(inviteCode: inviteCode.trimmingCharacters(in: .whitespacesAndNewlines), teamName: teamName.trimmingCharacters(in: .whitespacesAndNewlines)))
+                            await nativeStore.joinLeague(BannerFantasyJoinLeagueRequest(inviteCode: inviteCode.trimmingCharacters(in: .whitespacesAndNewlines), teamName: teamName.trimmingCharacters(in: .whitespacesAndNewlines)))
                             if nativeStore.lastError == nil { dismiss() }
                         }
                     } label: {
@@ -634,14 +634,14 @@ struct StadiaFantasyJoinLeagueSheet: View {
     }
 }
 
-struct StadiaFantasyDraftRoomView: View {
+struct BannerFantasyDraftRoomView: View {
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var nativeStore: StadiaFantasyStore
+    @EnvironmentObject private var nativeStore: BannerFantasyStore
     @State private var query = ""
     @State private var positionFilter: String = "All"
     @State private var teamFilter: String = "All"
     @State private var minimumPoints = 0.0
-    @State private var selectedPlayer: StadiaFantasyAvailablePlayer?
+    @State private var selectedPlayer: BannerFantasyAvailablePlayer?
 
     private var positions: [String] {
         ["All"] + Array(Set(nativeStore.availablePlayers.compactMap(\.position))).sorted()
@@ -651,7 +651,7 @@ struct StadiaFantasyDraftRoomView: View {
         ["All"] + Array(Set(nativeStore.availablePlayers.compactMap(\.teamAbbreviation))).sorted()
     }
 
-    private var filteredPlayers: [StadiaFantasyAvailablePlayer] {
+    private var filteredPlayers: [BannerFantasyAvailablePlayer] {
         let rostered = Set(nativeStore.selectedBundle?.rosters.flatMap(\.entries).map(\.canonicalPlayerID) ?? [])
         let available = nativeStore.availablePlayers.filter { !rostered.contains($0.id) }
         let searched = query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? available : available.filter { $0.fullName.localizedCaseInsensitiveContains(query) || ($0.teamAbbreviation?.localizedCaseInsensitiveContains(query) == true) || ($0.position?.localizedCaseInsensitiveContains(query) == true) }
@@ -703,7 +703,7 @@ struct StadiaFantasyDraftRoomView: View {
                     .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
                     .padding(.horizontal, 16)
                     List(filteredPlayers) { player in
-                        StadiaFantasyDraftPlayerRow(
+                        BannerFantasyDraftPlayerRow(
                             player: player,
                             onOpen: { selectedPlayer = player },
                             onDraft: { Task { await nativeStore.draft(player: player) } }
@@ -718,14 +718,14 @@ struct StadiaFantasyDraftRoomView: View {
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } } }
             .task { await nativeStore.loadAvailablePlayers() }
             .sheet(item: $selectedPlayer) { player in
-                StadiaFantasyPlayerStatsSheet(player: player)
+                BannerFantasyPlayerStatsSheet(player: player)
             }
         }
     }
 }
 
-private struct StadiaFantasyDraftPlayerRow: View {
-    let player: StadiaFantasyAvailablePlayer
+private struct BannerFantasyDraftPlayerRow: View {
+    let player: BannerFantasyAvailablePlayer
     let onOpen: () -> Void
     let onDraft: () -> Void
 
@@ -733,7 +733,7 @@ private struct StadiaFantasyDraftPlayerRow: View {
         HStack(spacing: 12) {
             Button(action: onOpen) {
                 HStack(spacing: 12) {
-                    StadiaFantasyPlayerHeadshot(url: player.headshotURL, name: player.fullName, size: 46)
+                    BannerFantasyPlayerHeadshot(url: player.headshotURL, name: player.fullName, size: 46)
                     VStack(alignment: .leading, spacing: 5) {
                         Text(player.fullName)
                             .font(.subheadline.weight(.bold))
@@ -770,9 +770,9 @@ private struct StadiaFantasyDraftPlayerRow: View {
     }
 }
 
-private struct StadiaFantasyPlayerStatsSheet: View {
+private struct BannerFantasyPlayerStatsSheet: View {
     @Environment(\.dismiss) private var dismiss
-    let player: StadiaFantasyAvailablePlayer
+    let player: BannerFantasyAvailablePlayer
 
     var body: some View {
         NavigationStack {
@@ -781,7 +781,7 @@ private struct StadiaFantasyPlayerStatsSheet: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         HStack(spacing: 14) {
-                            StadiaFantasyPlayerHeadshot(url: player.headshotURL, name: player.fullName, size: 72)
+                            BannerFantasyPlayerHeadshot(url: player.headshotURL, name: player.fullName, size: 72)
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(player.fullName)
                                     .font(.title2.weight(.black))
@@ -825,7 +825,7 @@ private struct StadiaFantasyPlayerStatsSheet: View {
                                     }
                                 }
                             } else {
-                                StadiaFantasyInfoCard(systemImage: "chart.bar.doc.horizontal", title: "Stats unavailable", subtitle: "ESPN did not return season statistics for this player in the roster feed.")
+                                BannerFantasyInfoCard(systemImage: "chart.bar.doc.horizontal", title: "Stats unavailable", subtitle: "ESPN did not return season statistics for this player in the roster feed.")
                             }
                         }
                         .padding(16)
@@ -840,7 +840,7 @@ private struct StadiaFantasyPlayerStatsSheet: View {
     }
 }
 
-private struct StadiaFantasyPlayerHeadshot: View {
+private struct BannerFantasyPlayerHeadshot: View {
     let url: URL?
     let name: String
     let size: CGFloat
@@ -872,7 +872,7 @@ private struct StadiaFantasyPlayerHeadshot: View {
     }
 }
 
-private struct StadiaFantasyInfoCard: View {
+private struct BannerFantasyInfoCard: View {
     let systemImage: String
     let title: String
     let subtitle: String
@@ -899,7 +899,7 @@ private struct StadiaFantasyInfoCard: View {
     }
 }
 
-private struct StadiaFantasyDisclosureRow: View {
+private struct BannerFantasyDisclosureRow: View {
     let title: String
     let subtitle: String
 

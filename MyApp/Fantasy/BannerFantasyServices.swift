@@ -1,31 +1,31 @@
 import Foundation
 
-protocol StadiaSportsDataProvider: Sendable {
-    func currentPlayers(for sport: FantasySport) async throws -> [StadiaFantasyAvailablePlayer]
+protocol BannerSportsDataProvider: Sendable {
+    func currentPlayers(for sport: FantasySport) async throws -> [BannerFantasyAvailablePlayer]
     func currentSchedule(for sport: FantasySport, starting date: Date, days: Int) async throws -> [Match]
-    func statLines(for sport: FantasySport, playerIDs: Set<String>, from start: Date, to end: Date) async throws -> [String: StadiaFantasyStatLine]
+    func statLines(for sport: FantasySport, playerIDs: Set<String>, from start: Date, to end: Date) async throws -> [String: BannerFantasyStatLine]
 }
 
-struct StadiaFantasyAvailablePlayer: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyAvailablePlayer: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let fullName: String
     let teamAbbreviation: String?
     let position: String?
-    let eligibleSlots: [StadiaFantasyRosterSlot]
+    let eligibleSlots: [BannerFantasyRosterSlot]
     let injuryStatus: String?
     var headshotURL: URL? = nil
     var lastSeasonFantasyPoints: Double? = nil
-    var lastSeasonStatLine: StadiaFantasyStatLine? = nil
+    var lastSeasonStatLine: BannerFantasyStatLine? = nil
     var keyInfo: [String] = []
 }
 
 actor ESPNSportsPlayerPoolCache {
     static let shared = ESPNSportsPlayerPoolCache()
-    private var cached: [FantasySport: (date: Date, players: [StadiaFantasyAvailablePlayer])] = [:]
-    private var inFlight: [FantasySport: Task<[StadiaFantasyAvailablePlayer], Error>] = [:]
+    private var cached: [FantasySport: (date: Date, players: [BannerFantasyAvailablePlayer])] = [:]
+    private var inFlight: [FantasySport: Task<[BannerFantasyAvailablePlayer], Error>] = [:]
     private let ttl: TimeInterval = 6 * 3600
 
-    func players(for sport: FantasySport, load: @escaping @Sendable () async throws -> [StadiaFantasyAvailablePlayer]) async throws -> [StadiaFantasyAvailablePlayer] {
+    func players(for sport: FantasySport, load: @escaping @Sendable () async throws -> [BannerFantasyAvailablePlayer]) async throws -> [BannerFantasyAvailablePlayer] {
         if let value = cached[sport], Date().timeIntervalSince(value.date) < ttl { return value.players }
         if let task = inFlight[sport] { return try await task.value }
         let task = Task { try await load() }
@@ -42,7 +42,7 @@ actor ESPNSportsPlayerPoolCache {
     }
 }
 
-struct ESPNSportsDataProvider: StadiaSportsDataProvider {
+struct ESPNSportsDataProvider: BannerSportsDataProvider {
     private let service: ESPNService
     private let cache: ESPNSportsPlayerPoolCache
     private let session: URLSession
@@ -56,28 +56,28 @@ struct ESPNSportsDataProvider: StadiaSportsDataProvider {
         self.session = URLSession(configuration: config)
     }
 
-    func currentPlayers(for sport: FantasySport) async throws -> [StadiaFantasyAvailablePlayer] {
+    func currentPlayers(for sport: FantasySport) async throws -> [BannerFantasyAvailablePlayer] {
         try await cache.players(for: sport) {
             try await loadESPNPlayers(for: sport)
         }
     }
 
     func currentSchedule(for sport: FantasySport, starting date: Date, days: Int) async throws -> [Match] {
-        guard let league = sport.stadiaLeague else { return [] }
+        guard let league = sport.bannerLeague else { return [] }
         return try await SportsRepository.shared.legacyScoreboards(for: league, starting: date, days: days)
     }
 
-    func statLines(for sport: FantasySport, playerIDs: Set<String>, from start: Date, to end: Date) async throws -> [String: StadiaFantasyStatLine] {
+    func statLines(for sport: FantasySport, playerIDs: Set<String>, from start: Date, to end: Date) async throws -> [String: BannerFantasyStatLine] {
         // Live box-score ingestion remains isolated here; draft/player-pool stats are loaded through
         // the ESPN roster player model so SwiftUI never calculates fantasy scores directly.
         [:]
     }
 
-    private func loadESPNPlayers(for sport: FantasySport) async throws -> [StadiaFantasyAvailablePlayer] {
-        guard let league = sport.stadiaLeague else { return [] }
+    private func loadESPNPlayers(for sport: FantasySport) async throws -> [BannerFantasyAvailablePlayer] {
+        guard let league = sport.bannerLeague else { return [] }
         let teams = try await SportsRepository.shared.legacyTeams(for: league)
-        var players: [StadiaFantasyAvailablePlayer] = []
-        try await withThrowingTaskGroup(of: [StadiaFantasyAvailablePlayer].self) { group in
+        var players: [BannerFantasyAvailablePlayer] = []
+        try await withThrowingTaskGroup(of: [BannerFantasyAvailablePlayer].self) { group in
             for team in teams {
                 group.addTask { [session] in
                     try await Self.rosterPlayers(team: team, league: league, sport: sport, session: session)
@@ -93,7 +93,7 @@ struct ESPNSportsDataProvider: StadiaSportsDataProvider {
             }
     }
 
-    private static func rosterPlayers(team: Team, league: League, sport: FantasySport, session: URLSession) async throws -> [StadiaFantasyAvailablePlayer] {
+    private static func rosterPlayers(team: Team, league: League, sport: FantasySport, session: URLSession) async throws -> [BannerFantasyAvailablePlayer] {
         var components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/teams/\(team.id)/roster")!
         components.queryItems = [URLQueryItem(name: "enable", value: "stats")]
         let (data, response) = try await session.data(from: components.url!)
@@ -126,14 +126,14 @@ private struct ESPNSportsAthleteDTO: Decodable {
     let injuries: [ESPNSportsInjuryDTO]?
     let statistics: [ESPNSportsStatisticGroupDTO]?
 
-    func toFantasyPlayer(sport: FantasySport, team: Team) -> StadiaFantasyAvailablePlayer? {
+    func toFantasyPlayer(sport: FantasySport, team: Team) -> BannerFantasyAvailablePlayer? {
         guard let id, let name = displayName ?? fullName else { return nil }
         let positionAbbreviation = position?.abbreviation ?? position?.name
         let statLine = fantasyStatLine(for: sport)
-        let scoringRules = StadiaFantasyScoringRules.stadiaDefault(sport: sport, type: .headToHeadPoints)
+        let scoringRules = BannerFantasyScoringRules.bannerDefault(sport: sport, type: .headToHeadPoints)
         let points = statLine.map { FantasyScoringEngine().score(statLine: $0, rules: scoringRules, sport: sport).points }
         let keyInfo = Self.keyInfo(from: statLine, sport: sport)
-        return StadiaFantasyAvailablePlayer(
+        return BannerFantasyAvailablePlayer(
             id: "espn-\(sport.rawValue)-\(id)",
             fullName: name,
             teamAbbreviation: team.abbreviation,
@@ -147,18 +147,18 @@ private struct ESPNSportsAthleteDTO: Decodable {
         )
     }
 
-    private func fantasyStatLine(for sport: FantasySport) -> StadiaFantasyStatLine? {
-        var values: [StadiaFantasyStat: Double] = [:]
+    private func fantasyStatLine(for sport: FantasySport) -> BannerFantasyStatLine? {
+        var values: [BannerFantasyStat: Double] = [:]
         for group in statistics ?? [] {
             for stat in group.splits?.flatMap({ $0.stats ?? [] }) ?? [] {
                 guard let mapped = Self.mapStat(stat.name ?? stat.abbreviation, sport: sport), let value = stat.value ?? Double(stat.displayValue ?? "") else { continue }
                 values[mapped] = value
             }
         }
-        return values.isEmpty ? nil : StadiaFantasyStatLine(values: values, appearances: 1)
+        return values.isEmpty ? nil : BannerFantasyStatLine(values: values, appearances: 1)
     }
 
-    private static func mapStat(_ raw: String?, sport: FantasySport) -> StadiaFantasyStat? {
+    private static func mapStat(_ raw: String?, sport: FantasySport) -> BannerFantasyStat? {
         let key = (raw ?? "").lowercased().replacingOccurrences(of: "_", with: "")
         switch sport {
         case .nfl:
@@ -199,7 +199,7 @@ private struct ESPNSportsAthleteDTO: Decodable {
         return nil
     }
 
-    private static func eligibleSlots(position: String?, sport: FantasySport) -> [StadiaFantasyRosterSlot] {
+    private static func eligibleSlots(position: String?, sport: FantasySport) -> [BannerFantasyRosterSlot] {
         let raw = (position ?? "").uppercased()
         switch sport {
         case .nfl:
@@ -246,7 +246,7 @@ private struct ESPNSportsAthleteDTO: Decodable {
         }
     }
 
-    private static func keyInfo(from statLine: StadiaFantasyStatLine?, sport: FantasySport) -> [String] {
+    private static func keyInfo(from statLine: BannerFantasyStatLine?, sport: FantasySport) -> [String] {
         guard let statLine else { return [] }
         return FantasySportConfiguration.configuration(for: sport).relevantLiveStatistics.prefix(4).compactMap { stat in
             let value = statLine[stat]
@@ -264,20 +264,20 @@ private struct ESPNSportsStatisticDTO: Decodable { let name: String?; let abbrev
 
 typealias ESPNHockeySportsDataProvider = ESPNSportsDataProvider
 
-protocol StadiaFantasyBackendService: Sendable {
-    func loadMyLeagues(userID: String) async throws -> [StadiaFantasyLeagueBundle]
-    func createLeague(_ request: StadiaFantasyCreateLeagueRequest, commissionerUserID: String) async throws -> StadiaFantasyLeagueBundle
-    func joinLeague(_ request: StadiaFantasyJoinLeagueRequest, userID: String) async throws -> StadiaFantasyLeagueBundle
-    func draftPlayer(leagueID: String, teamID: String, player: StadiaFantasyAvailablePlayer, availablePlayers: [StadiaFantasyAvailablePlayer]) async throws -> StadiaFantasyLeagueBundle
-    func moveLineupSlot(leagueID: String, teamID: String, scoringDate: Date, playerEntryID: String, to slot: StadiaFantasyRosterSlot) async throws -> StadiaFantasyLineup
-    func addFreeAgent(leagueID: String, teamID: String, player: StadiaFantasyAvailablePlayer, dropPlayerEntryID: String?) async throws -> StadiaFantasyLeagueBundle
-    func dropPlayer(leagueID: String, teamID: String, playerEntryID: String) async throws -> StadiaFantasyLeagueBundle
-    func exportData() async throws -> StadiaFantasyPersistenceEnvelope
+protocol BannerFantasyBackendService: Sendable {
+    func loadMyLeagues(userID: String) async throws -> [BannerFantasyLeagueBundle]
+    func createLeague(_ request: BannerFantasyCreateLeagueRequest, commissionerUserID: String) async throws -> BannerFantasyLeagueBundle
+    func joinLeague(_ request: BannerFantasyJoinLeagueRequest, userID: String) async throws -> BannerFantasyLeagueBundle
+    func draftPlayer(leagueID: String, teamID: String, player: BannerFantasyAvailablePlayer, availablePlayers: [BannerFantasyAvailablePlayer]) async throws -> BannerFantasyLeagueBundle
+    func moveLineupSlot(leagueID: String, teamID: String, scoringDate: Date, playerEntryID: String, to slot: BannerFantasyRosterSlot) async throws -> BannerFantasyLineup
+    func addFreeAgent(leagueID: String, teamID: String, player: BannerFantasyAvailablePlayer, dropPlayerEntryID: String?) async throws -> BannerFantasyLeagueBundle
+    func dropPlayer(leagueID: String, teamID: String, playerEntryID: String) async throws -> BannerFantasyLeagueBundle
+    func exportData() async throws -> BannerFantasyPersistenceEnvelope
     func resetLocalData() async throws
     func disconnect() async
 }
 
-enum StadiaFantasyBackendError: LocalizedError, Sendable {
+enum BannerFantasyBackendError: LocalizedError, Sendable {
     case leagueNotFound
     case leagueFull
     case teamNotFound
@@ -301,13 +301,13 @@ enum StadiaFantasyBackendError: LocalizedError, Sendable {
     }
 }
 
-actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
-    static let shared = LocalStadiaFantasyBackendService()
+actor LocalBannerFantasyBackendService: BannerFantasyBackendService {
+    static let shared = LocalBannerFantasyBackendService()
 
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let fileURL: URL
-    private var bundles: [StadiaFantasyLeagueBundle] = []
+    private var bundles: [BannerFantasyLeagueBundle] = []
     private var didLoad = false
 
     init(fileManager: FileManager = .default) {
@@ -316,25 +316,25 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
         decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? fileManager.temporaryDirectory
-        let dir = base.appendingPathComponent("StadiaFantasy", isDirectory: true)
+        let dir = base.appendingPathComponent("BannerFantasy", isDirectory: true)
         try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
         fileURL = dir.appendingPathComponent("native-leagues.json")
     }
 
-    func loadMyLeagues(userID: String) async throws -> [StadiaFantasyLeagueBundle] {
+    func loadMyLeagues(userID: String) async throws -> [BannerFantasyLeagueBundle] {
         try loadIfNeeded()
         return bundles.filter { bundle in
             bundle.memberships.contains { $0.userID == userID }
         }
     }
 
-    func createLeague(_ request: StadiaFantasyCreateLeagueRequest, commissionerUserID: String) async throws -> StadiaFantasyLeagueBundle {
+    func createLeague(_ request: BannerFantasyCreateLeagueRequest, commissionerUserID: String) async throws -> BannerFantasyLeagueBundle {
         try loadIfNeeded()
         let now = Date()
         let leagueID = UUID().uuidString
         let userTeamID = UUID().uuidString
         let teamCount = request.mode == .personalTeam ? 1 : request.maxTeams
-        let membership = StadiaFantasyMembership(
+        let membership = BannerFantasyMembership(
             id: UUID().uuidString,
             leagueID: leagueID,
             userID: commissionerUserID,
@@ -342,7 +342,7 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
             role: .commissioner,
             joinedAt: now
         )
-        let userTeam = StadiaFantasyTeam(
+        let userTeam = BannerFantasyTeam(
             id: userTeamID,
             leagueID: leagueID,
             ownerUserID: commissionerUserID,
@@ -355,13 +355,13 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
         let cpuTeams = request.mode == .simulatedLeague ? Self.cpuTeams(leagueID: leagueID, count: max(0, teamCount - 1)) : []
         let teams = [userTeam] + cpuTeams
         draftSettings.draftOrderTeamIDs = teams.map(\.id)
-        let league = StadiaFantasyLeague(
+        let league = BannerFantasyLeague(
             id: leagueID,
             name: request.leagueName,
             source: .native,
             mode: request.mode,
             sport: request.sport,
-            season: StadiaFantasySeason(id: "\(request.sport.rawValue)-\(seasonYear)", year: seasonYear, startsAt: nil, endsAt: nil, scoringPeriodDays: FantasySportConfiguration.configuration(for: request.sport).lineupFrequency == .daily ? 1 : 7),
+            season: BannerFantasySeason(id: "\(request.sport.rawValue)-\(seasonYear)", year: seasonYear, startsAt: nil, endsAt: nil, scoringPeriodDays: FantasySportConfiguration.configuration(for: request.sport).lineupFrequency == .daily ? 1 : 7),
             phase: .lobby,
             visibility: request.mode == .personalTeam ? .private : request.visibility,
             inviteCode: Self.inviteCode(),
@@ -370,23 +370,23 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
             rosterConfiguration: request.rosterConfiguration,
             scoringRules: request.scoringRules,
             draftSettings: draftSettings,
-            waiverSettings: request.mode == .personalTeam ? StadiaFantasyWaiverSettings(type: .freeAgency, waiverPeriodHours: 0, usesFAAB: false, faabBudget: nil) : request.waiverSettings,
+            waiverSettings: request.mode == .personalTeam ? BannerFantasyWaiverSettings(type: .freeAgency, waiverPeriodHours: 0, usesFAAB: false, faabBudget: nil) : request.waiverSettings,
             tradeSettings: request.tradeSettings,
             playoffSettings: request.playoffSettings,
             createdAt: now
         )
-        let rosters = teams.map { StadiaFantasyRoster(leagueID: leagueID, teamID: $0.id, entries: []) }
+        let rosters = teams.map { BannerFantasyRoster(leagueID: leagueID, teamID: $0.id, entries: []) }
         let standings = request.mode == .personalTeam ? [] : teams.enumerated().map { index, team in
-            StadiaFantasyStanding(leagueID: leagueID, teamID: team.id, rank: index + 1, wins: 0, losses: 0, ties: 0, pointsFor: nil, pointsAgainst: nil)
+            BannerFantasyStanding(leagueID: leagueID, teamID: team.id, rank: index + 1, wins: 0, losses: 0, ties: 0, pointsFor: nil, pointsAgainst: nil)
         }
-        let draft = StadiaFantasyDraft(
+        let draft = BannerFantasyDraft(
             id: UUID().uuidString,
             leagueID: leagueID,
             status: .lobby,
             currentPickOverall: 1,
             picks: Self.snakeDraftPicks(leagueID: leagueID, teamIDs: draftSettings.draftOrderTeamIDs, rounds: Self.draftRounds(for: request.rosterConfiguration))
         )
-        let bundle = StadiaFantasyLeagueBundle(
+        let bundle = BannerFantasyLeagueBundle(
             league: league,
             memberships: [membership],
             teams: teams,
@@ -402,30 +402,30 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
         return bundle
     }
 
-    func joinLeague(_ request: StadiaFantasyJoinLeagueRequest, userID: String) async throws -> StadiaFantasyLeagueBundle {
+    func joinLeague(_ request: BannerFantasyJoinLeagueRequest, userID: String) async throws -> BannerFantasyLeagueBundle {
         try loadIfNeeded()
         guard let index = bundles.firstIndex(where: { $0.league.inviteCode.caseInsensitiveCompare(request.inviteCode) == .orderedSame }) else {
-            throw StadiaFantasyBackendError.leagueNotFound
+            throw BannerFantasyBackendError.leagueNotFound
         }
-        guard bundles[index].teams.count < bundles[index].league.maxTeams else { throw StadiaFantasyBackendError.leagueFull }
+        guard bundles[index].teams.count < bundles[index].league.maxTeams else { throw BannerFantasyBackendError.leagueFull }
         if let existing = bundles[index].team(for: userID) { return bundles[index].copySelecting(teamID: existing.id) }
         let now = Date()
         let teamID = UUID().uuidString
-        bundles[index].memberships.append(StadiaFantasyMembership(id: UUID().uuidString, leagueID: bundles[index].league.id, userID: userID, displayName: request.teamName, role: .manager, joinedAt: now))
-        bundles[index].teams.append(StadiaFantasyTeam(id: teamID, leagueID: bundles[index].league.id, ownerUserID: userID, displayName: request.teamName, abbreviation: String(request.teamName.prefix(3)).uppercased(), avatarID: nil))
-        bundles[index].rosters.append(StadiaFantasyRoster(leagueID: bundles[index].league.id, teamID: teamID, entries: []))
-        bundles[index].standings.append(StadiaFantasyStanding(leagueID: bundles[index].league.id, teamID: teamID, rank: bundles[index].standings.count + 1, wins: 0, losses: 0, ties: 0, pointsFor: nil, pointsAgainst: nil))
+        bundles[index].memberships.append(BannerFantasyMembership(id: UUID().uuidString, leagueID: bundles[index].league.id, userID: userID, displayName: request.teamName, role: .manager, joinedAt: now))
+        bundles[index].teams.append(BannerFantasyTeam(id: teamID, leagueID: bundles[index].league.id, ownerUserID: userID, displayName: request.teamName, abbreviation: String(request.teamName.prefix(3)).uppercased(), avatarID: nil))
+        bundles[index].rosters.append(BannerFantasyRoster(leagueID: bundles[index].league.id, teamID: teamID, entries: []))
+        bundles[index].standings.append(BannerFantasyStanding(leagueID: bundles[index].league.id, teamID: teamID, rank: bundles[index].standings.count + 1, wins: 0, losses: 0, ties: 0, pointsFor: nil, pointsAgainst: nil))
         try save()
         return bundles[index]
     }
 
-    func draftPlayer(leagueID: String, teamID: String, player: StadiaFantasyAvailablePlayer, availablePlayers: [StadiaFantasyAvailablePlayer]) async throws -> StadiaFantasyLeagueBundle {
+    func draftPlayer(leagueID: String, teamID: String, player: BannerFantasyAvailablePlayer, availablePlayers: [BannerFantasyAvailablePlayer]) async throws -> BannerFantasyLeagueBundle {
         try loadIfNeeded()
-        guard let leagueIndex = bundles.firstIndex(where: { $0.league.id == leagueID }) else { throw StadiaFantasyBackendError.leagueNotFound }
-        guard let rosterIndex = bundles[leagueIndex].rosters.firstIndex(where: { $0.teamID == teamID }) else { throw StadiaFantasyBackendError.teamNotFound }
-        guard !isPlayerRostered(player.id, in: bundles[leagueIndex]) else { throw StadiaFantasyBackendError.playerAlreadyRostered }
+        guard let leagueIndex = bundles.firstIndex(where: { $0.league.id == leagueID }) else { throw BannerFantasyBackendError.leagueNotFound }
+        guard let rosterIndex = bundles[leagueIndex].rosters.firstIndex(where: { $0.teamID == teamID }) else { throw BannerFantasyBackendError.teamNotFound }
+        guard !isPlayerRostered(player.id, in: bundles[leagueIndex]) else { throw BannerFantasyBackendError.playerAlreadyRostered }
         if var draft = bundles[leagueIndex].draft, draft.picks.contains(where: { $0.canonicalPlayerID == nil }) {
-            guard draft.picks.first(where: { $0.overallPick == draft.currentPickOverall })?.teamID == teamID else { throw StadiaFantasyBackendError.notCurrentPick }
+            guard draft.picks.first(where: { $0.overallPick == draft.currentPickOverall })?.teamID == teamID else { throw BannerFantasyBackendError.notCurrentPick }
             draftPick(player, teamID: teamID, leagueIndex: leagueIndex, draft: &draft)
             autoDraftCPUSelections(leagueIndex: leagueIndex, draft: &draft, availablePlayers: availablePlayers)
             bundles[leagueIndex].draft = advanceDraft(draft, in: bundles[leagueIndex])
@@ -438,11 +438,11 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
         return bundles[leagueIndex]
     }
 
-    func moveLineupSlot(leagueID: String, teamID: String, scoringDate: Date, playerEntryID: String, to slot: StadiaFantasyRosterSlot) async throws -> StadiaFantasyLineup {
+    func moveLineupSlot(leagueID: String, teamID: String, scoringDate: Date, playerEntryID: String, to slot: BannerFantasyRosterSlot) async throws -> BannerFantasyLineup {
         try loadIfNeeded()
-        guard let leagueIndex = bundles.firstIndex(where: { $0.league.id == leagueID }) else { throw StadiaFantasyBackendError.leagueNotFound }
-        guard let roster = bundles[leagueIndex].rosters.first(where: { $0.teamID == teamID }) else { throw StadiaFantasyBackendError.teamNotFound }
-        guard roster.entries.contains(where: { $0.id == playerEntryID }) else { throw StadiaFantasyBackendError.playerNotRostered }
+        guard let leagueIndex = bundles.firstIndex(where: { $0.league.id == leagueID }) else { throw BannerFantasyBackendError.leagueNotFound }
+        guard let roster = bundles[leagueIndex].rosters.first(where: { $0.teamID == teamID }) else { throw BannerFantasyBackendError.teamNotFound }
+        guard roster.entries.contains(where: { $0.id == playerEntryID }) else { throw BannerFantasyBackendError.playerNotRostered }
         let day = Calendar.current.startOfDay(for: scoringDate)
         let lineupID = "\(leagueID)-\(teamID)-\(Int(day.timeIntervalSince1970))"
         let slotID = "\(lineupID)-\(playerEntryID)"
@@ -451,13 +451,13 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
             if let playerSlotIndex = bundles[leagueIndex].lineups[existingIndex].slots.firstIndex(where: { $0.playerEntryID == playerEntryID }) {
                 bundles[leagueIndex].lineups[existingIndex].slots[playerSlotIndex].slot = slot
             } else {
-                bundles[leagueIndex].lineups[existingIndex].slots.append(StadiaFantasyLineupSlot(id: slotID, playerEntryID: playerEntryID, slot: slot, lockedAt: nil))
+                bundles[leagueIndex].lineups[existingIndex].slots.append(BannerFantasyLineupSlot(id: slotID, playerEntryID: playerEntryID, slot: slot, lockedAt: nil))
             }
             try validate(lineup: bundles[leagueIndex].lineups[existingIndex], league: bundles[leagueIndex].league, roster: roster)
             try save()
             return bundles[leagueIndex].lineups[existingIndex]
         } else {
-            let lineup = StadiaFantasyLineup(id: lineupID, leagueID: leagueID, teamID: teamID, scoringDate: day, slots: [StadiaFantasyLineupSlot(id: slotID, playerEntryID: playerEntryID, slot: slot, lockedAt: nil)])
+            let lineup = BannerFantasyLineup(id: lineupID, leagueID: leagueID, teamID: teamID, scoringDate: day, slots: [BannerFantasyLineupSlot(id: slotID, playerEntryID: playerEntryID, slot: slot, lockedAt: nil)])
             try validate(lineup: lineup, league: bundles[leagueIndex].league, roster: roster)
             bundles[leagueIndex].lineups.append(lineup)
             try save()
@@ -465,31 +465,31 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
         }
     }
 
-    func addFreeAgent(leagueID: String, teamID: String, player: StadiaFantasyAvailablePlayer, dropPlayerEntryID: String?) async throws -> StadiaFantasyLeagueBundle {
+    func addFreeAgent(leagueID: String, teamID: String, player: BannerFantasyAvailablePlayer, dropPlayerEntryID: String?) async throws -> BannerFantasyLeagueBundle {
         try loadIfNeeded()
-        guard let leagueIndex = bundles.firstIndex(where: { $0.league.id == leagueID }) else { throw StadiaFantasyBackendError.leagueNotFound }
-        guard let rosterIndex = bundles[leagueIndex].rosters.firstIndex(where: { $0.teamID == teamID }) else { throw StadiaFantasyBackendError.teamNotFound }
+        guard let leagueIndex = bundles.firstIndex(where: { $0.league.id == leagueID }) else { throw BannerFantasyBackendError.leagueNotFound }
+        guard let rosterIndex = bundles[leagueIndex].rosters.firstIndex(where: { $0.teamID == teamID }) else { throw BannerFantasyBackendError.teamNotFound }
         var droppedIDs: [String] = []
         if let dropPlayerEntryID {
-            guard bundles[leagueIndex].rosters[rosterIndex].entries.contains(where: { $0.id == dropPlayerEntryID }) else { throw StadiaFantasyBackendError.playerNotRostered }
+            guard bundles[leagueIndex].rosters[rosterIndex].entries.contains(where: { $0.id == dropPlayerEntryID }) else { throw BannerFantasyBackendError.playerNotRostered }
             bundles[leagueIndex].rosters[rosterIndex].entries.removeAll { $0.id == dropPlayerEntryID }
             bundles[leagueIndex].lineups.removeAll { lineup in lineup.slots.contains { $0.playerEntryID == dropPlayerEntryID } }
             droppedIDs.append(dropPlayerEntryID)
         }
-        guard !isPlayerRostered(player.id, in: bundles[leagueIndex]) else { throw StadiaFantasyBackendError.playerAlreadyRostered }
+        guard !isPlayerRostered(player.id, in: bundles[leagueIndex]) else { throw BannerFantasyBackendError.playerAlreadyRostered }
         let entry = rosterEntry(for: player, leagueID: leagueID, teamID: teamID)
         bundles[leagueIndex].rosters[rosterIndex].entries.append(entry)
-        let type: StadiaFantasyTransactionType = dropPlayerEntryID == nil ? .add : .addDrop
+        let type: BannerFantasyTransactionType = dropPlayerEntryID == nil ? .add : .addDrop
         bundles[leagueIndex].transactions.insert(Self.transaction(leagueID: leagueID, teamID: teamID, type: type, playerEntryIDs: [entry.id] + droppedIDs, description: dropPlayerEntryID == nil ? "Added \(player.fullName)" : "Added \(player.fullName) and dropped a player"), at: 0)
         try save()
         return bundles[leagueIndex]
     }
 
-    func dropPlayer(leagueID: String, teamID: String, playerEntryID: String) async throws -> StadiaFantasyLeagueBundle {
+    func dropPlayer(leagueID: String, teamID: String, playerEntryID: String) async throws -> BannerFantasyLeagueBundle {
         try loadIfNeeded()
-        guard let leagueIndex = bundles.firstIndex(where: { $0.league.id == leagueID }) else { throw StadiaFantasyBackendError.leagueNotFound }
-        guard let rosterIndex = bundles[leagueIndex].rosters.firstIndex(where: { $0.teamID == teamID }) else { throw StadiaFantasyBackendError.teamNotFound }
-        guard let entry = bundles[leagueIndex].rosters[rosterIndex].entries.first(where: { $0.id == playerEntryID }) else { throw StadiaFantasyBackendError.playerNotRostered }
+        guard let leagueIndex = bundles.firstIndex(where: { $0.league.id == leagueID }) else { throw BannerFantasyBackendError.leagueNotFound }
+        guard let rosterIndex = bundles[leagueIndex].rosters.firstIndex(where: { $0.teamID == teamID }) else { throw BannerFantasyBackendError.teamNotFound }
+        guard let entry = bundles[leagueIndex].rosters[rosterIndex].entries.first(where: { $0.id == playerEntryID }) else { throw BannerFantasyBackendError.playerNotRostered }
         bundles[leagueIndex].rosters[rosterIndex].entries.removeAll { $0.id == playerEntryID }
         bundles[leagueIndex].lineups.removeAll { lineup in lineup.slots.contains { $0.playerEntryID == playerEntryID } }
         bundles[leagueIndex].transactions.insert(Self.transaction(leagueID: leagueID, teamID: teamID, type: .drop, playerEntryIDs: [playerEntryID], description: "Dropped \(entry.playerName)"), at: 0)
@@ -497,9 +497,9 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
         return bundles[leagueIndex]
     }
 
-    func exportData() async throws -> StadiaFantasyPersistenceEnvelope {
+    func exportData() async throws -> BannerFantasyPersistenceEnvelope {
         try loadIfNeeded()
-        return StadiaFantasyPersistenceEnvelope(schemaVersion: StadiaFantasyPersistenceEnvelope.currentSchemaVersion, bundles: bundles)
+        return BannerFantasyPersistenceEnvelope(schemaVersion: BannerFantasyPersistenceEnvelope.currentSchemaVersion, bundles: bundles)
     }
 
     func resetLocalData() async throws {
@@ -510,29 +510,29 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
 
     func disconnect() async {}
 
-    private func validate(lineup: StadiaFantasyLineup, league: StadiaFantasyLeague, roster: StadiaFantasyRoster) throws {
+    private func validate(lineup: BannerFantasyLineup, league: BannerFantasyLeague, roster: BannerFantasyRoster) throws {
         let rosterEntryIDs = Set(roster.entries.map(\.id))
         let lineupEntryIDs = lineup.slots.map(\.playerEntryID)
         guard Set(lineupEntryIDs).count == lineupEntryIDs.count else {
-            throw StadiaFantasyBackendError.invalidLineup("A player can only occupy one lineup slot.")
+            throw BannerFantasyBackendError.invalidLineup("A player can only occupy one lineup slot.")
         }
         for playerEntryID in lineupEntryIDs where !rosterEntryIDs.contains(playerEntryID) {
-            throw StadiaFantasyBackendError.invalidLineup("Lineup contains a player that is not on this roster.")
+            throw BannerFantasyBackendError.invalidLineup("Lineup contains a player that is not on this roster.")
         }
         let entriesByID = Dictionary(uniqueKeysWithValues: roster.entries.map { ($0.id, $0) })
         for slot in lineup.slots {
             guard league.rosterConfiguration.slotCounts[slot.slot, default: 0] > 0 else {
-                throw StadiaFantasyBackendError.invalidLineup("\(slot.slot.displayAbbreviation) is not part of this roster configuration.")
+                throw BannerFantasyBackendError.invalidLineup("\(slot.slot.displayAbbreviation) is not part of this roster configuration.")
             }
             if let entry = entriesByID[slot.playerEntryID], !Self.isEligible(entry: entry, for: slot.slot) {
-                throw StadiaFantasyBackendError.invalidLineup("\(entry.playerName) is not eligible for \(slot.slot.displayAbbreviation).")
+                throw BannerFantasyBackendError.invalidLineup("\(entry.playerName) is not eligible for \(slot.slot.displayAbbreviation).")
             }
         }
         let counts = Dictionary(grouping: lineup.slots, by: \.slot).mapValues(\.count)
         for (slot, count) in counts {
             let allowed = league.rosterConfiguration.slotCounts[slot] ?? 0
             guard count <= allowed else {
-                throw StadiaFantasyBackendError.invalidLineup("Too many players in \(slot.displayAbbreviation).")
+                throw BannerFantasyBackendError.invalidLineup("Too many players in \(slot.displayAbbreviation).")
             }
         }
     }
@@ -541,25 +541,25 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
         guard !didLoad else { return }
         didLoad = true
         guard let data = try? Data(contentsOf: fileURL), !data.isEmpty else { return }
-        if let envelope = try? decoder.decode(StadiaFantasyPersistenceEnvelope.self, from: data), envelope.schemaVersion <= StadiaFantasyPersistenceEnvelope.currentSchemaVersion {
+        if let envelope = try? decoder.decode(BannerFantasyPersistenceEnvelope.self, from: data), envelope.schemaVersion <= BannerFantasyPersistenceEnvelope.currentSchemaVersion {
             bundles = envelope.bundles
         } else {
-            bundles = (try? decoder.decode([StadiaFantasyLeagueBundle].self, from: data)) ?? []
+            bundles = (try? decoder.decode([BannerFantasyLeagueBundle].self, from: data)) ?? []
         }
     }
 
     private func save() throws {
-        let envelope = StadiaFantasyPersistenceEnvelope(schemaVersion: StadiaFantasyPersistenceEnvelope.currentSchemaVersion, bundles: bundles)
+        let envelope = BannerFantasyPersistenceEnvelope(schemaVersion: BannerFantasyPersistenceEnvelope.currentSchemaVersion, bundles: bundles)
         let data = try encoder.encode(envelope)
         try data.write(to: fileURL, options: [.atomic])
     }
 
-    private func isPlayerRostered(_ canonicalPlayerID: String, in bundle: StadiaFantasyLeagueBundle) -> Bool {
+    private func isPlayerRostered(_ canonicalPlayerID: String, in bundle: BannerFantasyLeagueBundle) -> Bool {
         bundle.rosters.flatMap(\.entries).contains { $0.canonicalPlayerID == canonicalPlayerID }
     }
 
-    private func rosterEntry(for player: StadiaFantasyAvailablePlayer, leagueID: String, teamID: String) -> StadiaFantasyPlayerEntry {
-        StadiaFantasyPlayerEntry(
+    private func rosterEntry(for player: BannerFantasyAvailablePlayer, leagueID: String, teamID: String) -> BannerFantasyPlayerEntry {
+        BannerFantasyPlayerEntry(
             id: UUID().uuidString,
             leagueID: leagueID,
             teamID: teamID,
@@ -573,7 +573,7 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
         )
     }
 
-    private func draftPick(_ player: StadiaFantasyAvailablePlayer, teamID: String, leagueIndex: Int, draft: inout StadiaFantasyDraft) {
+    private func draftPick(_ player: BannerFantasyAvailablePlayer, teamID: String, leagueIndex: Int, draft: inout BannerFantasyDraft) {
         let leagueID = bundles[leagueIndex].league.id
         let entry = rosterEntry(for: player, leagueID: leagueID, teamID: teamID)
         if let rosterIndex = bundles[leagueIndex].rosters.firstIndex(where: { $0.teamID == teamID }) {
@@ -587,7 +587,7 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
         bundles[leagueIndex].transactions.insert(Self.transaction(leagueID: leagueID, teamID: teamID, type: .draftPick, playerEntryIDs: [entry.id], description: "Drafted \(player.fullName)"), at: 0)
     }
 
-    private func autoDraftCPUSelections(leagueIndex: Int, draft: inout StadiaFantasyDraft, availablePlayers: [StadiaFantasyAvailablePlayer]) {
+    private func autoDraftCPUSelections(leagueIndex: Int, draft: inout BannerFantasyDraft, availablePlayers: [BannerFantasyAvailablePlayer]) {
         let userTeamIDs = Set(bundles[leagueIndex].memberships.map(\.userID)).compactMap { userID in
             bundles[leagueIndex].teams.first { $0.ownerUserID == userID }?.id
         }
@@ -601,7 +601,7 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
         }
     }
 
-    private func advanceDraft(_ draft: StadiaFantasyDraft, in bundle: StadiaFantasyLeagueBundle) -> StadiaFantasyDraft {
+    private func advanceDraft(_ draft: BannerFantasyDraft, in bundle: BannerFantasyLeagueBundle) -> BannerFantasyDraft {
         var updated = draft
         if let next = updated.picks.filter({ $0.canonicalPlayerID == nil }).map(\.overallPick).min() {
             updated.currentPickOverall = next
@@ -621,35 +621,35 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
         return abbreviation.uppercased()
     }
 
-    private static func cpuTeams(leagueID: String, count: Int) -> [StadiaFantasyTeam] {
+    private static func cpuTeams(leagueID: String, count: Int) -> [BannerFantasyTeam] {
         let names = ["Ice Breakers", "Goal Line", "Fast Break", "Diamond Club", "Power Play", "Red Zone", "Baseline", "Bullpen", "North Stars", "City Skaters", "Sunday Squad", "Late Shift"]
         return (0..<count).map { index in
             let name = names[index % names.count]
-            return StadiaFantasyTeam(id: UUID().uuidString, leagueID: leagueID, ownerUserID: "cpu-\(leagueID)-\(index + 1)", displayName: name, abbreviation: abbreviation(for: name), avatarID: nil)
+            return BannerFantasyTeam(id: UUID().uuidString, leagueID: leagueID, ownerUserID: "cpu-\(leagueID)-\(index + 1)", displayName: name, abbreviation: abbreviation(for: name), avatarID: nil)
         }
     }
 
-    private static func draftRounds(for rosterConfiguration: StadiaFantasyRosterConfiguration) -> Int {
+    private static func draftRounds(for rosterConfiguration: BannerFantasyRosterConfiguration) -> Int {
         rosterConfiguration.slotCounts
             .filter { slot, _ in slot != .injuredReserve && slot != .injuredList }
             .map(\.value)
             .reduce(0, +)
     }
 
-    private static func snakeDraftPicks(leagueID: String, teamIDs: [String], rounds: Int) -> [StadiaFantasyDraftPick] {
+    private static func snakeDraftPicks(leagueID: String, teamIDs: [String], rounds: Int) -> [BannerFantasyDraftPick] {
         guard !teamIDs.isEmpty, rounds > 0 else { return [] }
-        var picks: [StadiaFantasyDraftPick] = []
+        var picks: [BannerFantasyDraftPick] = []
         for round in 1...rounds {
             let order = round.isMultiple(of: 2) ? Array(teamIDs.reversed()) : teamIDs
             for (index, teamID) in order.enumerated() {
                 let overall = picks.count + 1
-                picks.append(StadiaFantasyDraftPick(id: UUID().uuidString, leagueID: leagueID, teamID: teamID, round: round, pickInRound: index + 1, overallPick: overall, canonicalPlayerID: nil, playerName: nil, madeAt: nil))
+                picks.append(BannerFantasyDraftPick(id: UUID().uuidString, leagueID: leagueID, teamID: teamID, round: round, pickInRound: index + 1, overallPick: overall, canonicalPlayerID: nil, playerName: nil, madeAt: nil))
             }
         }
         return picks
     }
 
-    private static func bestCPUPlayer(from players: [StadiaFantasyAvailablePlayer], roster: StadiaFantasyRoster?, configuration: StadiaFantasyRosterConfiguration) -> StadiaFantasyAvailablePlayer? {
+    private static func bestCPUPlayer(from players: [BannerFantasyAvailablePlayer], roster: BannerFantasyRoster?, configuration: BannerFantasyRosterConfiguration) -> BannerFantasyAvailablePlayer? {
         guard !players.isEmpty else { return nil }
         let currentSlots = roster?.entries.flatMap(\.eligibleSlots) ?? []
         let filledCounts = Dictionary(grouping: currentSlots, by: { $0 }).mapValues(\.count)
@@ -658,7 +658,7 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
         }
     }
 
-    private static func scoreCPUPlayer(_ player: StadiaFantasyAvailablePlayer, filledCounts: [StadiaFantasyRosterSlot: Int], configuration: StadiaFantasyRosterConfiguration) -> Double {
+    private static func scoreCPUPlayer(_ player: BannerFantasyAvailablePlayer, filledCounts: [BannerFantasyRosterSlot: Int], configuration: BannerFantasyRosterConfiguration) -> Double {
         let needScore = player.eligibleSlots.map { slot -> Double in
             let target = configuration.slotCounts[slot] ?? 0
             guard target > 0 else { return 0 }
@@ -674,11 +674,11 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
         id.unicodeScalars.reduce(0) { ($0 &+ Int($1.value)) % 10_000 }
     }
 
-    private static func matchups(leagueID: String, teams: [StadiaFantasyTeam], start: Date, periods: Int) -> [StadiaFantasyMatchup] {
+    private static func matchups(leagueID: String, teams: [BannerFantasyTeam], start: Date, periods: Int) -> [BannerFantasyMatchup] {
         guard teams.count > 1 else { return [] }
         let calendar = Calendar.current
         let startDay = calendar.startOfDay(for: start)
-        var generated: [StadiaFantasyMatchup] = []
+        var generated: [BannerFantasyMatchup] = []
         for period in 1...max(1, periods) {
             let periodStart = calendar.date(byAdding: .day, value: (period - 1) * 7, to: startDay) ?? startDay
             let periodEnd = calendar.date(byAdding: .day, value: 7, to: periodStart) ?? periodStart.addingTimeInterval(7 * 24 * 3600)
@@ -686,14 +686,14 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
                 let home = teams[pairIndex]
                 let away = teams[(pairIndex + period) % teams.count]
                 guard home.id != away.id else { continue }
-                generated.append(StadiaFantasyMatchup(
+                generated.append(BannerFantasyMatchup(
                     id: "\(leagueID)-period-\(period)-\(home.id)-\(away.id)",
                     leagueID: leagueID,
                     matchupPeriod: period,
                     startsAt: periodStart,
                     endsAt: periodEnd,
-                    home: StadiaFantasyMatchupSide(teamID: home.id, points: nil, categoryValues: [:], categoryWins: nil),
-                    away: StadiaFantasyMatchupSide(teamID: away.id, points: nil, categoryValues: [:], categoryWins: nil),
+                    home: BannerFantasyMatchupSide(teamID: home.id, points: nil, categoryValues: [:], categoryWins: nil),
+                    away: BannerFantasyMatchupSide(teamID: away.id, points: nil, categoryValues: [:], categoryWins: nil),
                     winnerTeamID: nil
                 ))
             }
@@ -701,14 +701,14 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
         return generated
     }
 
-    private static func isEligible(entry: StadiaFantasyPlayerEntry, for slot: StadiaFantasyRosterSlot) -> Bool {
+    private static func isEligible(entry: BannerFantasyPlayerEntry, for slot: BannerFantasyRosterSlot) -> Bool {
         if slot == .bench { return true }
         if slot == .injuredReserve || slot == .injuredList { return entry.injuryStatus != nil }
         return entry.eligibleSlots.contains(slot) || entry.eligibleSlots.contains(.utility) && slot == .utility || entry.eligibleSlots.contains(.flex) && slot == .flex
     }
 
-    private static func transaction(leagueID: String, teamID: String?, type: StadiaFantasyTransactionType, playerEntryIDs: [String], description: String) -> StadiaFantasyTransaction {
-        StadiaFantasyTransaction(id: UUID().uuidString, leagueID: leagueID, teamID: teamID, type: type, playerEntryIDs: playerEntryIDs, description: description, createdAt: Date())
+    private static func transaction(leagueID: String, teamID: String?, type: BannerFantasyTransactionType, playerEntryIDs: [String], description: String) -> BannerFantasyTransaction {
+        BannerFantasyTransaction(id: UUID().uuidString, leagueID: leagueID, teamID: teamID, type: type, playerEntryIDs: playerEntryIDs, description: description, createdAt: Date())
     }
 
     private static func inviteCode() -> String {
@@ -716,51 +716,51 @@ actor LocalStadiaFantasyBackendService: StadiaFantasyBackendService {
     }
 }
 
-private extension StadiaFantasyLeagueBundle {
-    func copySelecting(teamID: String) -> StadiaFantasyLeagueBundle { self }
+private extension BannerFantasyLeagueBundle {
+    func copySelecting(teamID: String) -> BannerFantasyLeagueBundle { self }
 }
 
 protocol FantasySportScoringStrategy: Sendable {
-    func score(statLine: StadiaFantasyStatLine, rules: StadiaFantasyScoringRules) -> StadiaFantasyPlayerScore
+    func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore
 }
 
 struct DefaultFantasySportScoringStrategy: FantasySportScoringStrategy {
-    func score(statLine: StadiaFantasyStatLine, rules: StadiaFantasyScoringRules) -> StadiaFantasyPlayerScore {
+    func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore {
         switch rules.type {
         case .headToHeadPoints:
             let points = rules.rules.reduce(0) { partial, rule in
                 partial + statLine[rule.stat] * rule.points
             }
-            return StadiaFantasyPlayerScore(playerEntryID: "", points: points, categoryValues: [:])
+            return BannerFantasyPlayerScore(playerEntryID: "", points: points, categoryValues: [:])
         case .headToHeadCategories, .rotisserie:
-            var values: [StadiaFantasyStat: Double] = [:]
+            var values: [BannerFantasyStat: Double] = [:]
             for rule in rules.rules where rule.enabledForCategories {
                 values[rule.stat] = statLine[rule.stat]
             }
-            return StadiaFantasyPlayerScore(playerEntryID: "", points: nil, categoryValues: values)
+            return BannerFantasyPlayerScore(playerEntryID: "", points: nil, categoryValues: values)
         }
     }
 }
 
-struct NFLFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: StadiaFantasyStatLine, rules: StadiaFantasyScoringRules) -> StadiaFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
-struct NHLFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: StadiaFantasyStatLine, rules: StadiaFantasyScoringRules) -> StadiaFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
-struct NBAFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: StadiaFantasyStatLine, rules: StadiaFantasyScoringRules) -> StadiaFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
-struct MLBFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: StadiaFantasyStatLine, rules: StadiaFantasyScoringRules) -> StadiaFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
+struct NFLFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
+struct NHLFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
+struct NBAFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
+struct MLBFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
 
 struct FantasyScoringEngine: Sendable {
-    func score(statLine: StadiaFantasyStatLine, rules: StadiaFantasyScoringRules, sport: FantasySport = .nhl) -> StadiaFantasyPlayerScore {
+    func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules, sport: FantasySport = .nhl) -> BannerFantasyPlayerScore {
         strategy(for: sport).score(statLine: statLine, rules: rules)
     }
 
-    func points(for entries: [StadiaFantasyPlayerEntry], statLines: [String: StadiaFantasyStatLine], rules: StadiaFantasyScoringRules, sport: FantasySport = .nhl) -> [String: StadiaFantasyPlayerScore] {
+    func points(for entries: [BannerFantasyPlayerEntry], statLines: [String: BannerFantasyStatLine], rules: BannerFantasyScoringRules, sport: FantasySport = .nhl) -> [String: BannerFantasyPlayerScore] {
         Dictionary(uniqueKeysWithValues: entries.map { entry in
-            var score = score(statLine: statLines[entry.canonicalPlayerID] ?? StadiaFantasyStatLine(values: [:], appearances: 0), rules: rules, sport: sport)
-            score = StadiaFantasyPlayerScore(playerEntryID: entry.id, points: score.points, categoryValues: score.categoryValues)
+            var score = score(statLine: statLines[entry.canonicalPlayerID] ?? BannerFantasyStatLine(values: [:], appearances: 0), rules: rules, sport: sport)
+            score = BannerFantasyPlayerScore(playerEntryID: entry.id, points: score.points, categoryValues: score.categoryValues)
             return (entry.id, score)
         })
     }
 
-    func categoryWinner(home: Double, away: Double, stat: StadiaFantasyStat) -> Int {
+    func categoryWinner(home: Double, away: Double, stat: BannerFantasyStat) -> Int {
         if home == away { return 0 }
         if stat.lowerIsBetter { return home < away ? 1 : -1 }
         return home > away ? 1 : -1

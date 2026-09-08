@@ -8,7 +8,7 @@ final class GroupPreferencesStore: ObservableObject {
 
     @Published private(set) var preferences: [String: GroupPreferences] = [:]
 
-    private let defaultsKey = "stadiatv.groupprefs.v1"
+    private let defaultsKey = "bannertv.groupprefs.v1"
 
     init() { load() }
 

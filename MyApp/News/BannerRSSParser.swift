@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Production RSS 2.0 + Atom parser
 
-final class StadiaRSSParser: NSObject, XMLParserDelegate {
+final class BannerRSSParser: NSObject, XMLParserDelegate {
     struct ParsedItem {
         var title: String?
         var link: String?
@@ -30,12 +30,12 @@ final class StadiaRSSParser: NSObject, XMLParserDelegate {
     // MARK: - Entry point
 
     nonisolated static func parse(_ data: Data) -> [ParsedItem] {
-        let delegate = StadiaRSSParser()
+        let delegate = BannerRSSParser()
         let parser = XMLParser(data: data)
         // Prevent XXE: disable external entity resolution
         parser.shouldResolveExternalEntities = false
         // XMLParser.parse() is synchronous; all XMLParserDelegate callbacks fire on the calling thread.
-        // nonisolated(unsafe) properties on StadiaRSSParser make this safe despite the @MainActor
+        // nonisolated(unsafe) properties on BannerRSSParser make this safe despite the @MainActor
         // inference that NSObject subclasses receive in Swift 6. No concurrent access occurs here.
         parser.delegate = delegate
         parser.parse()

@@ -10,7 +10,7 @@ final class ChannelPreferencesStore: ObservableObject {
 
     @Published private(set) var preferences: [String: ChannelPreferences] = [:]
 
-    private let defaultsKey = "stadiatv.channelprefs.v1"
+    private let defaultsKey = "bannertv.channelprefs.v1"
 
     init() { load() }
 

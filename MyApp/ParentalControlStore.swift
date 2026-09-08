@@ -21,11 +21,11 @@ final class ParentalControlStore: ObservableObject {
     @Published private(set) var temporaryUnlockExpiry: Date?
 
     private enum Keys {
-        static let pinHash          = "stadiatv.pc.pinHash.v1"
-        static let enabled          = "stadiatv.pc.enabled.v1"
-        static let blockedChannels  = "stadiatv.pc.blockedChannels.v1"
-        static let blockedGroups    = "stadiatv.pc.blockedGroups.v1"
-        static let pinForSettings   = "stadiatv.pc.pinForSettings.v1"
+        static let pinHash          = "bannertv.pc.pinHash.v1"
+        static let enabled          = "bannertv.pc.enabled.v1"
+        static let blockedChannels  = "bannertv.pc.blockedChannels.v1"
+        static let blockedGroups    = "bannertv.pc.blockedGroups.v1"
+        static let pinForSettings   = "bannertv.pc.pinForSettings.v1"
     }
 
     private init() {

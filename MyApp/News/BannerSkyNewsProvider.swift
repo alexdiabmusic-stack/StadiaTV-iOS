@@ -40,17 +40,17 @@ struct SkySportsNewsProvider: SportsNewsProvider {
         )
     }
 
-    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [StadiaNewsArticle] {
+    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [BannerNewsArticle] {
         guard page == 1 else { throw SportsDataError.unsupportedCapability(.newsMetadata) }
         guard metadata.isEnabled else { throw SportsDataError.providerDisabled(.skySports) }
 
         let feedIDs = Self.feedByLeagueGroup[league.group] ?? [12040]
-        let http = StadiaNewsHTTPClient.shared
+        let http = BannerNewsHTTPClient.shared
         let now = Date()
         let targetLeagueID = SportsIdentityResolver.canonicalLeagueID(for: league)
-        var collected: [StadiaNewsArticle] = []
+        var collected: [BannerNewsArticle] = []
 
-        await withTaskGroup(of: [StadiaNewsArticle].self) { group in
+        await withTaskGroup(of: [BannerNewsArticle].self) { group in
             for feedID in feedIDs {
                 group.addTask {
                     guard let url = URL(string: "\(Self.rssBase)/\(feedID)") else { return [] }
@@ -59,15 +59,15 @@ struct SkySportsNewsProvider: SportsNewsProvider {
                             from: url,
                             accept: "application/rss+xml, application/xml, text/xml"
                         )
-                        return StadiaRSSParser.parse(data).compactMap { item -> StadiaNewsArticle? in
+                        return BannerRSSParser.parse(data).compactMap { item -> BannerNewsArticle? in
                             guard let title = item.title, !title.isEmpty else { return nil }
                             let urlStr = item.link ?? item.guid ?? ""
                             let seed = item.guid ?? urlStr
-                            return StadiaNewsArticle(
-                                id: StadiaEntityID(rawValue: "news:skySports:\(StadiaNewsDeduplicator.articleHash(seed))"),
+                            return BannerNewsArticle(
+                                id: BannerEntityID(rawValue: "news:skySports:\(BannerNewsDeduplicator.articleHash(seed))"),
                                 headline: title,
                                 description: item.description ?? item.content ?? "",
-                                published: StadiaRSSParser.parseDate(item.publishedRaw),
+                                published: BannerRSSParser.parseDate(item.publishedRaw),
                                 url: URL(string: urlStr),
                                 imageURL: item.imageURL.flatMap(URL.init(string:)),
                                 leagueID: targetLeagueID,
@@ -94,10 +94,10 @@ struct SkySportsNewsProvider: SportsNewsProvider {
         guard !collected.isEmpty else { throw SportsDataError.unsupportedCapability(.newsMetadata) }
 
         // For mixed feeds (feedID 12040), classify and filter to requested league
-        let filtered: [StadiaNewsArticle]
+        let filtered: [BannerNewsArticle]
         if feedIDs.contains(12040) && feedIDs.count == 1 {
             filtered = collected.filter { article in
-                let (_, cid) = StadiaNewsDeduplicator.classify(
+                let (_, cid) = BannerNewsDeduplicator.classify(
                     headline: article.headline,
                     description: article.description,
                     tags: []
@@ -108,7 +108,7 @@ struct SkySportsNewsProvider: SportsNewsProvider {
             filtered = collected
         }
 
-        return StadiaNewsDeduplicator.deduplicate(
+        return BannerNewsDeduplicator.deduplicate(
             filtered.sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
         ).prefix(limit).map { $0 }
     }

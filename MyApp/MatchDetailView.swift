@@ -11,7 +11,7 @@ struct MatchDetailView: View {
     @EnvironmentObject private var entitlements: EntitlementStore
     @EnvironmentObject private var predictions: PredictionsStore
     @EnvironmentObject private var fantasyStore: FantasyStore
-    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
+    @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
     @EnvironmentObject private var epgRepository: EPGRepository
     @State private var showingAllChannels = false
     @State private var spoilerRevealed = false
@@ -26,7 +26,7 @@ struct MatchDetailView: View {
     @State private var gameSummary: GameSummary?
     @State private var isLoadingGameSummary = false
     @State private var didAttemptGameSummaryLoad = false
-    @State private var golfTournament: StadiaGolfTournament?
+    @State private var golfTournament: BannerGolfTournament?
     @State private var isLoadingGolfTournament = false
     @State private var didAttemptGolfTournamentLoad = false
     @State private var showPaywall = false
@@ -273,7 +273,7 @@ struct MatchDetailView: View {
             isLoadingGolfTournament = golfTournament == nil
             let tournament = try? await SportsRepository.shared.golfTournament(
                 for: match.league,
-                gameID: StadiaEntityID(rawValue: match.id)
+                gameID: BannerEntityID(rawValue: match.id)
             )
             didAttemptGolfTournamentLoad = true
             isLoadingGolfTournament = false

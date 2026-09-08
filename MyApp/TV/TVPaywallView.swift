@@ -16,7 +16,7 @@ struct TVPaywallView: View {
                     Image(systemName: "sparkles")
                         .font(.system(size: 60, weight: .bold))
                         .foregroundStyle(Theme.accent)
-                    Text("StadiaTV Premium")
+                    Text("BannerTV Premium")
                         .font(.largeTitle.weight(.black))
                         .foregroundStyle(Theme.textPrimary)
                     Text("Unlock standings, leaders, injury reports, and multiscreen.")

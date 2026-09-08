@@ -17,8 +17,8 @@ final class PlaylistStore: ObservableObject {
     @Published private(set) var defaultPlaylistID: UUID?
     @Published var lastError: String?
 
-    private let defaultsKey      = "stadiatv.playlists.v1"
-    private let defaultPlaylistKey = "stadiatv.defaultplaylist.v1"
+    private let defaultsKey      = "bannertv.playlists.v1"
+    private let defaultPlaylistKey = "bannertv.defaultplaylist.v1"
 
     private let repository = LiveChannelRepository()
 

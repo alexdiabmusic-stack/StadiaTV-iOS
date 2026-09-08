@@ -268,7 +268,7 @@ struct TVTeamLogo: View {
 
     @ViewBuilder
     private var logo: some View {
-        if let assetName = url?.stadiaImageAssetName {
+        if let assetName = url?.bannerImageAssetName {
             Image(assetName)
                 .resizable()
                 .scaledToFit()

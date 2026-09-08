@@ -28,7 +28,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         )
     }
 
-    func liveScores(for league: League) async throws -> [StadiaGame] {
+    func liveScores(for league: League) async throws -> [BannerGame] {
         try ensureEnabled()
         let document = try await document(for: league)
         let today = SportsDateRange.today()
@@ -39,14 +39,14 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
             .sorted { $0.scheduledStart < $1.scheduledStart }
     }
 
-    func schedule(for league: League, range: SportsDateRange) async throws -> StadiaSchedule {
+    func schedule(for league: League, range: SportsDateRange) async throws -> BannerSchedule {
         try ensureEnabled()
         let document = try await document(for: league)
         let games = document.content.events.compactMap { mapEvent($0, league: league, manifest: document.manifest) }
             .filter { $0.scheduledStart >= range.start && $0.scheduledStart <= range.end }
             .sorted { $0.scheduledStart < $1.scheduledStart }
-        return StadiaSchedule(
-            id: StadiaEntityID(rawValue: "schedule:appleSports:\(league.stadiaKey):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
+        return BannerSchedule(
+            id: BannerEntityID(rawValue: "schedule:appleSports:\(league.bannerKey):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             range: range,
             games: games,
@@ -54,7 +54,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         )
     }
 
-    func standings(for league: League) async throws -> [StadiaStandingGroup] {
+    func standings(for league: League) async throws -> [BannerStandingGroup] {
         try ensureEnabled()
         let document = try await document(for: league)
         if let group = mapLeagueMembersStandings(document: document, league: league) {
@@ -66,7 +66,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         throw SportsDataError.unsupportedCapability(.standings)
     }
 
-    func teams(for league: League) async throws -> [StadiaTeam] {
+    func teams(for league: League) async throws -> [BannerTeam] {
         try ensureEnabled()
         let manifest = try await manifestService.manifest(locale: AppleSportsLocale.defaultIdentifier)
         guard let group = manifest.group(for: league), let groupID = group.canonicalID else { throw SportsDataError.noProviderAvailable(.teams, league.path) }
@@ -76,7 +76,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
             .sorted { $0.displayName < $1.displayName }
     }
 
-    func gameDetails(for league: League, gameID: StadiaEntityID) async throws -> StadiaGame {
+    func gameDetails(for league: League, gameID: BannerEntityID) async throws -> BannerGame {
         try ensureEnabled()
         let document = try await document(for: league)
         let appleEventID = SportsIdentityResolver.providerID(from: gameID, provider: .appleSports) ?? gameID.rawValue
@@ -86,7 +86,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         return game
     }
 
-    func boxScore(for league: League, gameID: StadiaEntityID) async throws -> StadiaBoxScore {
+    func boxScore(for league: League, gameID: BannerEntityID) async throws -> BannerBoxScore {
         try ensureEnabled()
         let document = try await document(for: league)
         let appleEventID = SportsIdentityResolver.providerID(from: gameID, provider: .appleSports) ?? gameID.rawValue
@@ -96,8 +96,8 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         let teamStats = event.competitors.compactMap { mapTeamStat(entry: $0, event: event, league: league, manifest: document.manifest) }
         let playerStats = event.competitors.compactMap { mapPlayerStat(entry: $0, event: event, league: league, manifest: document.manifest) }
         guard !teamStats.isEmpty || !playerStats.isEmpty else { throw SportsDataError.unsupportedCapability(.boxScore) }
-        return StadiaBoxScore(
-            id: StadiaEntityID(rawValue: "boxScore:appleSports:\(appleEventID)"),
+        return BannerBoxScore(
+            id: BannerEntityID(rawValue: "boxScore:appleSports:\(appleEventID)"),
             gameID: gameID,
             teamStats: teamStats,
             playerStats: playerStats,
@@ -105,7 +105,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         )
     }
 
-    func teamStats(for league: League, teamIDs: Set<StadiaEntityID>, range: SportsDateRange?) async throws -> [StadiaTeamStat] {
+    func teamStats(for league: League, teamIDs: Set<BannerEntityID>, range: SportsDateRange?) async throws -> [BannerTeamStat] {
         try ensureEnabled()
         let document = try await document(for: league)
         let stats = document.content.events.flatMap { event in
@@ -116,7 +116,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         return filtered
     }
 
-    func playerStats(for league: League, playerIDs: Set<StadiaEntityID>, range: SportsDateRange?) async throws -> [StadiaPlayerStat] {
+    func playerStats(for league: League, playerIDs: Set<BannerEntityID>, range: SportsDateRange?) async throws -> [BannerPlayerStat] {
         try ensureEnabled()
         let document = try await document(for: league)
         let stats = document.content.events.flatMap { event in
@@ -127,19 +127,19 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         return filtered
     }
 
-    func leaders(for league: League) async throws -> [StadiaLeader] {
+    func leaders(for league: League) async throws -> [BannerLeader] {
         try ensureEnabled()
         let document = try await document(for: league)
         let leaderStats = document.content.events.flatMap { event in
             event.competitors.compactMap { mapPlayerStat(entry: $0, event: event, league: league, manifest: document.manifest) }
         }
         let grouped = Dictionary(grouping: leaderStats.flatMap(\.stats)) { $0.key }
-        let leaders = grouped.compactMap { key, values -> StadiaLeader? in
+        let leaders = grouped.compactMap { key, values -> BannerLeader? in
             guard let first = values.first else { return nil }
             let players = leaderStats.filter { playerStat in playerStat.stats.contains { $0.key == key } }
             guard !players.isEmpty else { return nil }
-            return StadiaLeader(
-                id: StadiaEntityID(rawValue: "leader:appleSports:\(league.stadiaKey):\(key)"),
+            return BannerLeader(
+                id: BannerEntityID(rawValue: "leader:appleSports:\(league.bannerKey):\(key)"),
                 statKey: key,
                 displayName: first.displayName,
                 players: players,
@@ -150,13 +150,13 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         return leaders
     }
 
-    func golfTournament(for league: League, gameID: StadiaEntityID) async throws -> StadiaGolfTournament {
+    func golfTournament(for league: League, gameID: BannerEntityID) async throws -> BannerGolfTournament {
         try ensureEnabled()
         guard league.group == .golf else { throw SportsDataError.unsupportedCapability(.golfTournament) }
         let document = try await document(for: league)
         let appleEventID = SportsIdentityResolver.providerID(from: gameID, provider: .appleSports) ?? gameID.rawValue
         let event = document.content.events.first { $0.canonicalID == appleEventID }
-            ?? document.content.events.first { $0.progressStatus.map { StadiaGameStatus(appleProgressStatus: $0) } == .live && !$0.competitors.isEmpty }
+            ?? document.content.events.first { $0.progressStatus.map { BannerGameStatus(appleProgressStatus: $0) } == .live && !$0.competitors.isEmpty }
             ?? document.content.events.first { !$0.competitors.isEmpty }
         guard let event else { throw SportsDataError.unsupportedCapability(.golfTournament) }
         return try mapGolfTournament(event: event, league: league, manifest: document.manifest, requestedGameID: gameID)
@@ -175,7 +175,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         return AppleSportsLeagueDocumentContext(manifest: manifest, group: group, content: document.content)
     }
 
-    private func mapEvent(_ event: AppleSportsEventDTO, league: League, manifest: AppleSportsManifest) -> StadiaGame? {
+    private func mapEvent(_ event: AppleSportsEventDTO, league: League, manifest: AppleSportsManifest) -> BannerGame? {
         guard let eventID = event.canonicalID else { return nil }
         let competitors = event.competitors
         let homeEntry = competitors.first { $0.competitor?.qualifier?.lowercased() == "home" } ?? competitors.first
@@ -183,15 +183,15 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         let home = mapCompetitor(homeEntry, fallbackName: "Home", league: league, manifest: manifest)
         let away = mapCompetitor(awayEntry, fallbackName: "Away", league: league, manifest: manifest)
         let start = AppleSportsDateParser.date(fromEpochSeconds: event.schedule?.duration?.start) ?? Date()
-        let status = StadiaGameStatus(appleProgressStatus: event.progressStatus)
-        let period = event.clock?.current?.period.map { StadiaPeriod(number: $0.index, displayName: $0.displayName) }
-        let clock = event.clock.flatMap { clock -> StadiaGameClock? in
+        let status = BannerGameStatus(appleProgressStatus: event.progressStatus)
+        let period = event.clock?.current?.period.map { BannerPeriod(number: $0.index, displayName: $0.displayName) }
+        let clock = event.clock.flatMap { clock -> BannerGameClock? in
             guard clock.displayValue != nil || clock.current?.period?.index != nil else { return nil }
-            return StadiaGameClock(displayValue: clock.displayValue, remainingSeconds: nil, isRunning: status == .live)
+            return BannerGameClock(displayValue: clock.displayValue, remainingSeconds: nil, isRunning: status == .live)
         }
         let shortName = event.shortName ?? "\(away.abbreviation) @ \(home.abbreviation)"
         let venue = event.venues.first.map(mapVenue)
-        return StadiaGame(
+        return BannerGame(
             id: identityResolver.canonicalGameID(league: league, provider: .appleSports, providerGameID: eventID, home: home, away: away, scheduledStart: start),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             scheduledStart: start,
@@ -201,7 +201,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
             statusDetail: AppleSportsStatusFormatter.detail(status: status, clock: clock, period: period, start: start),
             homeTeam: home,
             awayTeam: away,
-            score: StadiaScore(home: homeEntry?.score?.displayScore, away: awayEntry?.score?.displayScore),
+            score: BannerScore(home: homeEntry?.score?.displayScore, away: awayEntry?.score?.displayScore),
             clock: clock,
             period: period,
             venue: venue,
@@ -211,17 +211,17 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         )
     }
 
-    private func mapCompetitor(_ entry: AppleSportsCompetitorEntryDTO?, fallbackName: String, league: League, manifest: AppleSportsManifest) -> StadiaTeam {
+    private func mapCompetitor(_ entry: AppleSportsCompetitorEntryDTO?, fallbackName: String, league: League, manifest: AppleSportsManifest) -> BannerTeam {
         let appleID = entry?.competitor?.canonicalID ?? fallbackName
         let manifestTeam = manifest.teams[appleID]
         return mapTeam(canonicalID: appleID, manifestTeam: manifestTeam, league: league, fallbackName: fallbackName)
     }
 
-    private func mapTeam(canonicalID: String, manifestTeam: AppleSportsManifestTeamDTO?, league: League, fallbackName: String? = nil) -> StadiaTeam {
+    private func mapTeam(canonicalID: String, manifestTeam: AppleSportsManifestTeamDTO?, league: League, fallbackName: String? = nil) -> BannerTeam {
         let displayName = manifestTeam?.fullName ?? manifestTeam?.name ?? fallbackName ?? canonicalID
         let shortName = manifestTeam?.name ?? displayName
         let abbreviation = manifestTeam?.abbr ?? String(shortName.prefix(4)).uppercased()
-        return StadiaTeam(
+        return BannerTeam(
             id: identityResolver.canonicalTeamID(league: league, provider: .appleSports, providerTeamID: canonicalID, abbreviation: abbreviation, displayName: displayName),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             displayName: displayName,
@@ -233,9 +233,9 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         )
     }
 
-    private func mapVenue(_ venue: AppleSportsVenueDTO) -> StadiaVenue {
-        StadiaVenue(
-            id: venue.canonicalID.map { StadiaEntityID(rawValue: "venue:appleSports:\($0)") },
+    private func mapVenue(_ venue: AppleSportsVenueDTO) -> BannerVenue {
+        BannerVenue(
+            id: venue.canonicalID.map { BannerEntityID(rawValue: "venue:appleSports:\($0)") },
             name: venue.name ?? venue.location?.name ?? "Venue",
             city: venue.location?.city,
             state: venue.location?.state,
@@ -244,13 +244,13 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         )
     }
 
-    private func mapTeamStat(entry: AppleSportsCompetitorEntryDTO, event: AppleSportsEventDTO, league: League, manifest: AppleSportsManifest) -> StadiaTeamStat? {
+    private func mapTeamStat(entry: AppleSportsCompetitorEntryDTO, event: AppleSportsEventDTO, league: League, manifest: AppleSportsManifest) -> BannerTeamStat? {
         guard entry.competitor?.isTeam == true else { return nil }
         let team = mapCompetitor(entry, fallbackName: "Team", league: league, manifest: manifest)
         let stats = entry.allStats(prefix: "event")
         guard !stats.isEmpty else { return nil }
-        return StadiaTeamStat(
-            id: StadiaEntityID(rawValue: "teamStat:appleSports:\(event.canonicalID ?? league.stadiaKey):\(team.id.rawValue)"),
+        return BannerTeamStat(
+            id: BannerEntityID(rawValue: "teamStat:appleSports:\(event.canonicalID ?? league.bannerKey):\(team.id.rawValue)"),
             teamID: team.id,
             seasonID: nil,
             stats: stats,
@@ -258,14 +258,14 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         )
     }
 
-    private func mapPlayerStat(entry: AppleSportsCompetitorEntryDTO, event: AppleSportsEventDTO, league: League, manifest: AppleSportsManifest) -> StadiaPlayerStat? {
+    private func mapPlayerStat(entry: AppleSportsCompetitorEntryDTO, event: AppleSportsEventDTO, league: League, manifest: AppleSportsManifest) -> BannerPlayerStat? {
         guard entry.competitor?.isTeam != true, let playerID = entry.competitor?.canonicalID else { return nil }
         let stats = entry.allStats(prefix: "event")
         guard !stats.isEmpty else { return nil }
         let displayName = entry.competitor?.displayName ?? playerID
         let canonicalPlayerID = identityResolver.canonicalPlayerID(league: league, provider: .appleSports, providerPlayerID: playerID, fullName: displayName)
-        return StadiaPlayerStat(
-            id: StadiaEntityID(rawValue: "playerStat:appleSports:\(event.canonicalID ?? league.stadiaKey):\(canonicalPlayerID.rawValue)"),
+        return BannerPlayerStat(
+            id: BannerEntityID(rawValue: "playerStat:appleSports:\(event.canonicalID ?? league.bannerKey):\(canonicalPlayerID.rawValue)"),
             playerID: canonicalPlayerID,
             playerDisplayName: displayName,
             teamAbbreviation: nil,
@@ -277,9 +277,9 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         )
     }
 
-    private func mapLeagueMembersStandings(document: AppleSportsLeagueDocumentContext, league: League) -> StadiaStandingGroup? {
+    private func mapLeagueMembersStandings(document: AppleSportsLeagueDocumentContext, league: League) -> BannerStandingGroup? {
         guard let leagueDTO = document.content.leagues.first, !leagueDTO.members.isEmpty else { return nil }
-        let standings = leagueDTO.members.enumerated().map { index, member -> StadiaStanding in
+        let standings = leagueDTO.members.enumerated().map { index, member -> BannerStanding in
             let team = mapTeam(canonicalID: member.canonicalID ?? "member-\(index)", manifestTeam: member.canonicalID.flatMap { document.manifest.teams[$0] }, league: league)
             let wins = member.stat(named: "Wins")
             let losses = member.stat(named: "Losses")
@@ -287,8 +287,8 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
             let overtimeLosses = member.stat(named: "OvertimeLosses")
             let points = member.stat(named: "Points")
             let record = [wins, losses, ties ?? overtimeLosses].compactMap { $0 }.joined(separator: "-")
-            return StadiaStanding(
-                id: StadiaEntityID(rawValue: "standing:appleSports:\(team.id.rawValue)"),
+            return BannerStanding(
+                id: BannerEntityID(rawValue: "standing:appleSports:\(team.id.rawValue)"),
                 teamID: team.id,
                 teamDisplayName: team.displayName,
                 teamAbbreviation: team.abbreviation,
@@ -304,16 +304,16 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
                 provenance: DataProvenance(provider: .appleSports, fetchedAt: Date(), providerEntityID: member.canonicalID, confidence: 0.65)
             )
         }
-        return StadiaStandingGroup(id: StadiaEntityID(rawValue: "standings:appleSports:\(league.stadiaKey)"), name: league.name, standings: standings)
+        return BannerStandingGroup(id: BannerEntityID(rawValue: "standings:appleSports:\(league.bannerKey)"), name: league.name, standings: standings)
     }
 
-    private func mapEventLeaderboard(document: AppleSportsLeagueDocumentContext, league: League) -> StadiaStandingGroup? {
+    private func mapEventLeaderboard(document: AppleSportsLeagueDocumentContext, league: League) -> BannerStandingGroup? {
         guard let event = document.content.events.first(where: { !$0.competitors.isEmpty }) else { return nil }
-        let standings = event.competitors.enumerated().map { index, entry -> StadiaStanding in
+        let standings = event.competitors.enumerated().map { index, entry -> BannerStanding in
             let team = mapCompetitor(entry, fallbackName: "Competitor \(index + 1)", league: league, manifest: document.manifest)
             let score = entry.score?.displayScore
-            return StadiaStanding(
-                id: StadiaEntityID(rawValue: "standing:appleSports:\(event.canonicalID ?? league.stadiaKey):\(index)"),
+            return BannerStanding(
+                id: BannerEntityID(rawValue: "standing:appleSports:\(event.canonicalID ?? league.bannerKey):\(index)"),
                 teamID: team.id,
                 teamDisplayName: team.displayName,
                 teamAbbreviation: team.abbreviation,
@@ -329,14 +329,14 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
                 provenance: DataProvenance(provider: .appleSports, fetchedAt: Date(), providerEntityID: event.canonicalID, confidence: 0.58)
             )
         }
-        return StadiaStandingGroup(id: StadiaEntityID(rawValue: "leaderboard:appleSports:\(league.stadiaKey)"), name: event.shortName ?? league.name, standings: standings)
+        return BannerStandingGroup(id: BannerEntityID(rawValue: "leaderboard:appleSports:\(league.bannerKey)"), name: event.shortName ?? league.name, standings: standings)
     }
 
-    private func mapGolfTournament(event: AppleSportsEventDTO, league: League, manifest: AppleSportsManifest, requestedGameID: StadiaEntityID) throws -> StadiaGolfTournament {
+    private func mapGolfTournament(event: AppleSportsEventDTO, league: League, manifest: AppleSportsManifest, requestedGameID: BannerEntityID) throws -> BannerGolfTournament {
         guard let eventID = event.canonicalID else { throw SportsDataError.invalidResponse }
-        let status = StadiaGameStatus(appleProgressStatus: event.progressStatus)
+        let status = BannerGameStatus(appleProgressStatus: event.progressStatus)
         let provenance = DataProvenance(provider: .appleSports, fetchedAt: Date(), providerEntityID: eventID, confidence: 0.68)
-        let leaderboard = StadiaGolfLeaderboardNormalizer.normalized(
+        let leaderboard = BannerGolfLeaderboardNormalizer.normalized(
             event.competitors.enumerated().compactMap { index, entry in
                 mapGolfLeaderboardEntry(entry: entry, index: index, eventID: eventID, league: league, manifest: manifest, provenance: provenance)
             }
@@ -345,8 +345,8 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
 
         let venue = event.venues.first
         let course = venue.map { venue in
-            StadiaGolfCourse(
-                id: venue.canonicalID.map { StadiaEntityID(rawValue: "course:appleSports:\($0)") },
+            BannerGolfCourse(
+                id: venue.canonicalID.map { BannerEntityID(rawValue: "course:appleSports:\($0)") },
                 name: venue.name ?? venue.location?.name ?? "Course",
                 location: [venue.location?.city, venue.location?.state, venue.location?.country].compactMap { $0 }.joined(separator: ", ").nilIfEmpty(),
                 par: firstIntStat(named: ["Par", "CoursePar"], in: event.competitors.flatMap { $0.score?.scoreEntries ?? [] }),
@@ -355,20 +355,20 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
             )
         }
 
-        return StadiaGolfTournament(
-            id: StadiaEntityID(rawValue: "golfTournament:appleSports:\(eventID)"),
+        return BannerGolfTournament(
+            id: BannerEntityID(rawValue: "golfTournament:appleSports:\(eventID)"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             gameID: requestedGameID,
             tournamentName: event.shortName ?? league.name,
             tourName: league.name,
-            status: StadiaTournamentStatus(gameStatus: status),
+            status: BannerTournamentStatus(gameStatus: status),
             statusDetail: AppleSportsStatusFormatter.detail(status: status, clock: event.clock.flatMap { clock in
-                StadiaGameClock(displayValue: clock.displayValue, remainingSeconds: nil, isRunning: status == .live)
-            }, period: event.clock?.current?.period.map { StadiaPeriod(number: $0.index, displayName: $0.displayName) }, start: AppleSportsDateParser.date(fromEpochSeconds: event.schedule?.duration?.start) ?? Date()),
+                BannerGameClock(displayValue: clock.displayValue, remainingSeconds: nil, isRunning: status == .live)
+            }, period: event.clock?.current?.period.map { BannerPeriod(number: $0.index, displayName: $0.displayName) }, start: AppleSportsDateParser.date(fromEpochSeconds: event.schedule?.duration?.start) ?? Date()),
             currentRound: event.clock?.current?.period?.index,
             totalRounds: event.clock?.total?.period?.index,
             course: course,
-            cutLine: firstDisplayStat(named: ["Cut", "CutLine", "ProjectedCut"], in: event.competitors.flatMap { $0.score?.scoreEntries ?? [] }).flatMap(StadiaGolfScoreFormatter.format(raw:)),
+            cutLine: firstDisplayStat(named: ["Cut", "CutLine", "ProjectedCut"], in: event.competitors.flatMap { $0.score?.scoreEntries ?? [] }).flatMap(BannerGolfScoreFormatter.format(raw:)),
             leaderboard: leaderboard,
             broadcasts: [],
             stats: [],
@@ -376,7 +376,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         )
     }
 
-    private func mapGolfLeaderboardEntry(entry: AppleSportsCompetitorEntryDTO, index: Int, eventID: String, league: League, manifest: AppleSportsManifest, provenance: DataProvenance) -> StadiaGolfLeaderboardEntry? {
+    private func mapGolfLeaderboardEntry(entry: AppleSportsCompetitorEntryDTO, index: Int, eventID: String, league: League, manifest: AppleSportsManifest, provenance: DataProvenance) -> BannerGolfLeaderboardEntry? {
         guard let providerID = entry.competitor?.canonicalID else { return nil }
         let manifestTeam = manifest.teams[providerID]
         let displayName = manifestTeam?.fullName ?? manifestTeam?.name ?? entry.competitor?.displayName ?? providerID
@@ -391,25 +391,25 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
 
         let rounds = lineScore.enumerated().map { offset, line in
             let roundScore = firstDisplayStat(named: ["Score", "Total", "ToPar"], in: line.score) ?? line.score.first?.displayValue
-            return StadiaGolfRound(
+            return BannerGolfRound(
                 number: line.period?.index ?? offset + 1,
                 displayName: line.period?.displayName,
-                score: StadiaGolfScoreFormatter.format(raw: roundScore) ?? roundScore,
+                score: BannerGolfScoreFormatter.format(raw: roundScore) ?? roundScore,
                 strokes: firstIntStat(named: ["Strokes"], in: line.score),
-                scoreToPar: StadiaGolfScoreFormatter.format(raw: roundScore),
+                scoreToPar: BannerGolfScoreFormatter.format(raw: roundScore),
                 holes: []
             )
         }
         let normalizedStats = stats.compactMap { $0.statValue(prefix: "golf") }.uniquedByKey()
 
-        return StadiaGolfLeaderboardEntry(
-            id: StadiaEntityID(rawValue: "golfEntry:appleSports:\(eventID):\(providerID)"),
+        return BannerGolfLeaderboardEntry(
+            id: BannerEntityID(rawValue: "golfEntry:appleSports:\(eventID):\(providerID)"),
             playerID: playerID,
             playerName: displayName,
             position: position,
             isTied: position?.uppercased().hasPrefix("T") == true,
-            totalScore: StadiaGolfScoreFormatter.format(raw: total),
-            todayScore: StadiaGolfScoreFormatter.format(raw: today),
+            totalScore: BannerGolfScoreFormatter.format(raw: total),
+            todayScore: BannerGolfScoreFormatter.format(raw: today),
             thru: thru,
             status: status,
             rounds: rounds,
@@ -481,7 +481,7 @@ struct AppleSportsClient: Sendable {
         var request = URLRequest(url: url)
         request.timeoutInterval = 6
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("StadiaTV/1.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("BannerTV/1.0", forHTTPHeaderField: "User-Agent")
 
         do {
             let (data, response) = try await session.data(for: request)
@@ -786,7 +786,7 @@ struct AppleSportsCompetitorEntryDTO: Decodable, Sendable {
     let competitor: AppleSportsCompetitorDTO?
     let score: AppleSportsScoreDTO?
 
-    func allStats(prefix: String) -> [StadiaStatValue] {
+    func allStats(prefix: String) -> [BannerStatValue] {
         score?.allStats(prefix: prefix) ?? []
     }
 }
@@ -832,7 +832,7 @@ struct AppleSportsScoreDTO: Decodable, Sendable {
         scoreEntries.first { $0.statisticType?.name == "Score" }?.displayValue ?? scoreEntries.first?.displayValue
     }
 
-    func allStats(prefix: String) -> [StadiaStatValue] {
+    func allStats(prefix: String) -> [BannerStatValue] {
         var values = scoreEntries.compactMap { $0.statValue(prefix: prefix) }
         values += lineScore.flatMap(\.statValues)
         return values.uniquedByKey()
@@ -854,12 +854,12 @@ struct AppleSportsLineScoreDTO: Decodable, Sendable {
         score = try container.decodeIfPresent([AppleSportsStatisticDTO].self, forKey: .score) ?? []
     }
 
-    var statValues: [StadiaStatValue] {
+    var statValues: [BannerStatValue] {
         let periodKey = period?.statKey ?? "period"
         return score.compactMap { statistic in
             guard let value = statistic.displayValue else { return nil }
             let label = [period?.displayName, statistic.statisticType?.name].compactMap { $0 }.joined(separator: " ")
-            return StadiaStatValue(key: "line_\(periodKey)_\(SportsIdentityResolver.slug(statistic.statisticType?.name ?? "score"))", displayName: label.isEmpty ? "Line Score" : label, value: value)
+            return BannerStatValue(key: "line_\(periodKey)_\(SportsIdentityResolver.slug(statistic.statisticType?.name ?? "score"))", displayName: label.isEmpty ? "Line Score" : label, value: value)
         }
     }
 }
@@ -885,9 +885,9 @@ struct AppleSportsStatisticDTO: Decodable, Sendable {
             }
     }
 
-    func statValue(prefix: String) -> StadiaStatValue? {
+    func statValue(prefix: String) -> BannerStatValue? {
         guard let name = statisticType?.name, let displayValue else { return nil }
-        return StadiaStatValue(key: "\(prefix)_\(SportsIdentityResolver.slug(name))", displayName: name, value: displayValue)
+        return BannerStatValue(key: "\(prefix)_\(SportsIdentityResolver.slug(name))", displayName: name, value: displayValue)
     }
 }
 
@@ -969,7 +969,7 @@ enum AppleSportsDateParser {
 }
 
 enum AppleSportsStatusFormatter {
-    nonisolated static func detail(status: StadiaGameStatus, clock: StadiaGameClock?, period: StadiaPeriod?, start: Date) -> String {
+    nonisolated static func detail(status: BannerGameStatus, clock: BannerGameClock?, period: BannerPeriod?, start: Date) -> String {
         switch status {
         case .live:
             let text = [period?.displayName, clock?.displayValue].compactMap { $0 }.joined(separator: " ")
@@ -997,10 +997,10 @@ enum AppleSportsJSONDecoder {
     }
 }
 
-extension Array where Element == StadiaStatValue {
-    func uniquedByKey() -> [StadiaStatValue] {
+extension Array where Element == BannerStatValue {
+    func uniquedByKey() -> [BannerStatValue] {
         var seen = Set<String>()
-        var output: [StadiaStatValue] = []
+        var output: [BannerStatValue] = []
         for value in self where seen.insert(value.key).inserted {
             output.append(value)
         }
@@ -1008,7 +1008,7 @@ extension Array where Element == StadiaStatValue {
     }
 }
 
-extension StadiaGameStatus {
+extension BannerGameStatus {
     init(appleProgressStatus: String?) {
         switch appleProgressStatus?.lowercased() {
         case "pregame", "pre_game", "scheduled":

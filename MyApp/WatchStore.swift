@@ -67,9 +67,9 @@ final class WatchStore: ObservableObject {
     /// Dwell-confirmed recent channels for fast channel navigation (device-local, not cloud-synced).
     @Published private(set) var recents: [RecentEntry] = []
 
-    private let favoritesKey = "stadiatv.favoritechannels.v1"
-    private let historyKey = "stadiatv.watchhistory.v1"
-    private let recentsKey = "stadiatv.recents.v1"
+    private let favoritesKey = "bannertv.favoritechannels.v1"
+    private let historyKey = "bannertv.watchhistory.v1"
+    private let recentsKey = "bannertv.recents.v1"
     private let historyLimit = 20
     private let recentsLimit = 20
 
@@ -92,7 +92,7 @@ final class WatchStore: ObservableObject {
             recents = decoded
         }
         NotificationCenter.default.addObserver(
-            forName: .stadiatvCloudSyncDidChange,
+            forName: .bannertvCloudSyncDidChange,
             object: nil,
             queue: .main
         ) { [weak self] _ in

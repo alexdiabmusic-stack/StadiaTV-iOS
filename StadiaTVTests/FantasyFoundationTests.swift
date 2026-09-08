@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import StadiaTV
+@testable import BannerTV
 
 @Suite("Fantasy foundation")
 struct FantasyFoundationTests {
@@ -84,17 +84,17 @@ struct FantasyFoundationTests {
         let persistence = FantasyPersistenceStore(defaults: suite)
         let resolver = FantasyPlayerResolver(persistence: persistence)
         let known = [
-            StadiaPlayerIdentity(id: "espn:1", leaguePath: "football/nfl", displayName: "Exact One", teamAbbreviation: "KC", position: "QB", espnAthleteID: "1", source: "test"),
-            StadiaPlayerIdentity(id: "name:2", leaguePath: "football/nfl", displayName: "Jane Runner", teamAbbreviation: "KC", position: "RB", espnAthleteID: nil, source: "test"),
-            StadiaPlayerIdentity(id: "amb:a", leaguePath: "football/nfl", displayName: "Chris Smith", teamAbbreviation: "KC", position: "WR", espnAthleteID: nil, source: "test"),
-            StadiaPlayerIdentity(id: "amb:b", leaguePath: "football/nfl", displayName: "Kris Smith", teamAbbreviation: "KC", position: "WR", espnAthleteID: nil, source: "test")
+            BannerPlayerIdentity(id: "espn:1", leaguePath: "football/nfl", displayName: "Exact One", teamAbbreviation: "KC", position: "QB", espnAthleteID: "1", source: "test"),
+            BannerPlayerIdentity(id: "name:2", leaguePath: "football/nfl", displayName: "Jane Runner", teamAbbreviation: "KC", position: "RB", espnAthleteID: nil, source: "test"),
+            BannerPlayerIdentity(id: "amb:a", leaguePath: "football/nfl", displayName: "Chris Smith", teamAbbreviation: "KC", position: "WR", espnAthleteID: nil, source: "test"),
+            BannerPlayerIdentity(id: "amb:b", leaguePath: "football/nfl", displayName: "Kris Smith", teamAbbreviation: "KC", position: "WR", espnAthleteID: nil, source: "test")
         ]
         let players = [
             fantasyPlayer(id: "p1", name: "Exact One", team: "KC", position: "QB", espnID: "1"),
             fantasyPlayer(id: "p2", name: "Jane Runner", team: "KC", position: "RB"),
             fantasyPlayer(id: "p3", name: "Will Missing", team: "KC", position: "TE")
         ]
-        let result = await resolver.resolve(players: players, knownStadiaPlayers: known)
+        let result = await resolver.resolve(players: players, knownBannerPlayers: known)
         #expect(result["p1"]?.identity?.espnAthleteID == "1")
         #expect(result["p2"]?.identity?.displayName == "Jane Runner")
         if case .unresolved = result["p3"] {} else { Issue.record("Expected unresolved player") }
@@ -103,7 +103,7 @@ struct FantasyFoundationTests {
         #expect(persisted["p1"]?.espnAthleteID == "1")
     }
 
-    @Test func eventAndIPTVLinkingUsesStadiaMatchAndSourceMatcher() async throws {
+    @Test func eventAndIPTVLinkingUsesBannerMatchAndSourceMatcher() async throws {
         let league = try #require(League.all.first { $0.path == "football/nfl" })
         let match = Match(
             id: "game1",
@@ -120,7 +120,7 @@ struct FantasyFoundationTests {
         )
         let channel = Channel(id: "cbs", name: "US CBS Sports", streamURL: URL(string: "https://example.com/live.m3u8")!, logoURL: nil, group: "Sports", playlistID: UUID(), playlistName: "Local")
         let player = fantasyPlayer(id: "p1", name: "Patrick Mahomes", team: "KC", position: "QB", espnID: "3139477")
-        let identity = StadiaPlayerIdentity(id: "espn:3139477", leaguePath: "football/nfl", displayName: "Patrick Mahomes", teamAbbreviation: "KC", position: "QB", espnAthleteID: "3139477", source: "test")
+        let identity = BannerPlayerIdentity(id: "espn:3139477", leaguePath: "football/nfl", displayName: "Patrick Mahomes", teamAbbreviation: "KC", position: "QB", espnAthleteID: "3139477", source: "test")
         let linker = FantasyEventLinker(nowProvider: { Date() })
         let games = await linker.linkPlayerGames(players: [player], resolutions: ["p1": .resolved(identity)], matchup: nil, channels: [channel], preferredLanguages: ["en"], knownMatches: [match])
         #expect(games.first?.gameState == .upcoming)
@@ -168,7 +168,7 @@ struct FantasyFoundationTests {
         )
         let channel = Channel(id: "cbs-guide", name: "CBS", streamURL: URL(string: "https://example.com/live.m3u8")!, logoURL: nil, group: "Sports", playlistID: UUID(), playlistName: "Local")
         let player = fantasyPlayer(id: "p1", name: "Patrick Mahomes", team: "KC", position: "QB", espnID: "3139477")
-        let identity = StadiaPlayerIdentity(id: "espn:3139477", leaguePath: "football/nfl", displayName: "Patrick Mahomes", teamAbbreviation: "KC", position: "QB", espnAthleteID: "3139477", source: "test")
+        let identity = BannerPlayerIdentity(id: "espn:3139477", leaguePath: "football/nfl", displayName: "Patrick Mahomes", teamAbbreviation: "KC", position: "QB", espnAthleteID: "3139477", source: "test")
         let linker = FantasyEventLinker(nowProvider: { eventDate })
         let games = await linker.linkPlayerGames(players: [player], resolutions: ["p1": .resolved(identity)], matchup: nil, channels: [channel], preferredLanguages: ["en"], knownMatches: [match])
         #expect(games.first?.matchedChannel?.channel.id == "cbs-guide")
@@ -183,7 +183,7 @@ struct FantasyFoundationTests {
         let roster = fantasyRoster(leagueID: "L1", rosterID: 1, ownerID: "U1", playerIDs: ["p1"])
         let player = fantasyPlayer(id: "p1", name: "Patrick Mahomes", team: "KC", position: "QB", espnID: "3139477")
         let provider = MockFantasyProviderService(leagues: [leagueOne, leagueTwo], rostersByLeagueID: ["L1": [roster], "L2": [fantasyRoster(leagueID: "L2", rosterID: 2, ownerID: "U1", playerIDs: ["p1"])]], playersByID: ["p1": player])
-        let linker = MockFantasyEventLinker(games: [FantasyPlayerGame(id: "p1-none", fantasyPlayer: player, stadiaPlayer: nil, event: nil, opponent: nil, gameState: .noGame, fantasyPoints: nil, projectedPoints: nil, matchedChannel: nil)])
+        let linker = MockFantasyEventLinker(games: [FantasyPlayerGame(id: "p1-none", fantasyPlayer: player, bannerPlayer: nil, event: nil, opponent: nil, gameState: .noGame, fantasyPoints: nil, projectedPoints: nil, matchedChannel: nil)])
         let store = FantasyStore(providerRegistry: FantasyProviderRegistry(services: [provider]), persistence: persistence, resolver: FantasyPlayerResolver(persistence: persistence), eventLinker: linker)
 
         await store.connect(provider: .sleeper, usernameOrUserID: "alex")
@@ -276,7 +276,7 @@ struct FantasyFoundationTests {
           },
           "members": [{"id": "{OWNER}", "displayName": "Alex"}],
           "teams": [
-            {"id": 1, "name": "Stadia Skaters", "abbrev": "STAD", "owners": ["{OWNER}"], "record": {"overall": {"wins": 3, "losses": 1, "ties": 0, "pointsFor": 240.5, "pointsAgainst": 220.0, "rankCalculatedFinal": 1}}, "roster": {"entries": [
+            {"id": 1, "name": "Banner Skaters", "abbrev": "STAD", "owners": ["{OWNER}"], "record": {"overall": {"wins": 3, "losses": 1, "ties": 0, "pointsFor": 240.5, "pointsAgainst": 220.0, "rankCalculatedFinal": 1}}, "roster": {"entries": [
               {"lineupSlotId": 0, "playerPoolEntry": {"appliedStatTotal": 12.5, "player": {"id": 3114, "fullName": "Auston Matthews", "firstName": "Auston", "lastName": "Matthews", "active": true, "proTeamId": 22, "defaultPositionId": 0, "eligibleSlots": [0, 3, 6], "injuryStatus": "ACTIVE"}}},
               {"lineupSlotId": 7, "playerPoolEntry": {"player": {"id": 3897, "fullName": "Connor McDavid", "active": true, "proTeamId": 6, "defaultPositionId": 0, "eligibleSlots": [0, 3, 6]}}}
             ]}},
@@ -414,16 +414,16 @@ struct FantasyFoundationTests {
         )
     }
     @Test func nativeScoringEngineUsesConfiguredPointRules() throws {
-        let rules = StadiaFantasyScoringRules.stadiaDefault(type: .headToHeadPoints)
-        let statLine = StadiaFantasyStatLine(values: [.goals: 2, .assists: 1, .shotsOnGoal: 5], appearances: 1)
+        let rules = BannerFantasyScoringRules.bannerDefault(type: .headToHeadPoints)
+        let statLine = BannerFantasyStatLine(values: [.goals: 2, .assists: 1, .shotsOnGoal: 5], appearances: 1)
         let score = FantasyScoringEngine().score(statLine: statLine, rules: rules)
         #expect(score.points == 10.0)
         #expect(score.categoryValues.isEmpty)
     }
 
     @Test func nativeCategoryEnginePreservesCategoriesAndLowerIsBetter() throws {
-        let rules = StadiaFantasyScoringRules.stadiaDefault(type: .headToHeadCategories)
-        let statLine = StadiaFantasyStatLine(values: [.goals: 1, .goalsAgainstAverage: 2.1], appearances: 1)
+        let rules = BannerFantasyScoringRules.bannerDefault(type: .headToHeadCategories)
+        let statLine = BannerFantasyStatLine(values: [.goals: 1, .goalsAgainstAverage: 2.1], appearances: 1)
         let score = FantasyScoringEngine().score(statLine: statLine, rules: rules)
         #expect(score.points == nil)
         #expect(score.categoryValues[.goals] == 1)
@@ -431,7 +431,7 @@ struct FantasyFoundationTests {
     }
 
     @Test func nativeBackendCreatesPersonalAndSimulatedLeague() async throws {
-        let backend = LocalStadiaFantasyBackendService()
+        let backend = LocalBannerFantasyBackendService()
         let commissionerID = UUID().uuidString
         let personal = try await backend.createLeague(nativeCreateRequest(name: "My Local Team", teamName: "My Team", mode: .personalTeam), commissionerUserID: commissionerID)
         #expect(personal.league.source == .native)
@@ -448,25 +448,25 @@ struct FantasyFoundationTests {
     }
 
     @Test func nativeBackendPreventsDuplicateDraftedPlayer() async throws {
-        let backend = LocalStadiaFantasyBackendService()
+        let backend = LocalBannerFantasyBackendService()
         let userID = UUID().uuidString
         let created = try await backend.createLeague(nativeCreateRequest(name: "Draft Test League", teamName: "Draft Team", mode: .personalTeam), commissionerUserID: userID)
         let team = try #require(created.team(for: userID))
-        let player = StadiaFantasyAvailablePlayer(id: "p-native-test", fullName: "Native Player", teamAbbreviation: "TOR", position: "C", eligibleSlots: [.center], injuryStatus: nil)
+        let player = BannerFantasyAvailablePlayer(id: "p-native-test", fullName: "Native Player", teamAbbreviation: "TOR", position: "C", eligibleSlots: [.center], injuryStatus: nil)
         _ = try await backend.draftPlayer(leagueID: created.league.id, teamID: team.id, player: player, availablePlayers: [player])
-        await #expect(throws: StadiaFantasyBackendError.playerAlreadyRostered) {
+        await #expect(throws: BannerFantasyBackendError.playerAlreadyRostered) {
             _ = try await backend.draftPlayer(leagueID: created.league.id, teamID: team.id, player: player, availablePlayers: [player])
         }
     }
 
     @Test func nativeBackendAutoDraftsCPUSelectionsUntilNextUserPick() async throws {
-        let backend = LocalStadiaFantasyBackendService()
+        let backend = LocalBannerFantasyBackendService()
         let userID = UUID().uuidString
         let request = nativeCreateRequest(name: "CPU Draft League", teamName: "User Team", mode: .simulatedLeague)
         let created = try await backend.createLeague(request, commissionerUserID: userID)
         let team = try #require(created.team(for: userID))
         let players = (0..<40).map { index in
-            StadiaFantasyAvailablePlayer(id: "cpu-player-\(index)", fullName: "CPU Player \(index)", teamAbbreviation: "TOR", position: "C", eligibleSlots: [.center, .forward, .utility], injuryStatus: nil)
+            BannerFantasyAvailablePlayer(id: "cpu-player-\(index)", fullName: "CPU Player \(index)", teamAbbreviation: "TOR", position: "C", eligibleSlots: [.center, .forward, .utility], injuryStatus: nil)
         }
         let updated = try await backend.draftPlayer(leagueID: created.league.id, teamID: team.id, player: players[0], availablePlayers: players)
         #expect((updated.rosters.first { $0.teamID == team.id }?.entries.count ?? 0) == 1)
@@ -475,23 +475,23 @@ struct FantasyFoundationTests {
     }
 
     @Test func nativeBackendAddDropAndExportEnvelope() async throws {
-        let backend = LocalStadiaFantasyBackendService()
+        let backend = LocalBannerFantasyBackendService()
         let userID = UUID().uuidString
         let created = try await backend.createLeague(nativeCreateRequest(name: "Transactions", teamName: "User Team", mode: .personalTeam), commissionerUserID: userID)
         let team = try #require(created.team(for: userID))
-        let added = StadiaFantasyAvailablePlayer(id: "add-player", fullName: "Add Player", teamAbbreviation: "TOR", position: "C", eligibleSlots: [.center], injuryStatus: nil)
-        let dropped = StadiaFantasyAvailablePlayer(id: "drop-player", fullName: "Drop Player", teamAbbreviation: "EDM", position: "C", eligibleSlots: [.center], injuryStatus: nil)
+        let added = BannerFantasyAvailablePlayer(id: "add-player", fullName: "Add Player", teamAbbreviation: "TOR", position: "C", eligibleSlots: [.center], injuryStatus: nil)
+        let dropped = BannerFantasyAvailablePlayer(id: "drop-player", fullName: "Drop Player", teamAbbreviation: "EDM", position: "C", eligibleSlots: [.center], injuryStatus: nil)
         let withDropped = try await backend.addFreeAgent(leagueID: created.league.id, teamID: team.id, player: dropped, dropPlayerEntryID: nil)
         let dropEntry = try #require(withDropped.rosters.first?.entries.first)
         let withAddDrop = try await backend.addFreeAgent(leagueID: created.league.id, teamID: team.id, player: added, dropPlayerEntryID: dropEntry.id)
         #expect(withAddDrop.rosters.first?.entries.map(\.canonicalPlayerID) == ["add-player"])
         let envelope = try await backend.exportData()
-        #expect(envelope.schemaVersion == StadiaFantasyPersistenceEnvelope.currentSchemaVersion)
+        #expect(envelope.schemaVersion == BannerFantasyPersistenceEnvelope.currentSchemaVersion)
         #expect(envelope.bundles.contains { $0.league.id == created.league.id })
     }
 
-    private func nativeCreateRequest(name: String, teamName: String, mode: StadiaFantasyMode = .simulatedLeague) -> StadiaFantasyCreateLeagueRequest {
-        StadiaFantasyCreateLeagueRequest(
+    private func nativeCreateRequest(name: String, teamName: String, mode: BannerFantasyMode = .simulatedLeague) -> BannerFantasyCreateLeagueRequest {
+        BannerFantasyCreateLeagueRequest(
             sport: .nhl,
             mode: mode,
             leagueName: name,
@@ -500,11 +500,11 @@ struct FantasyFoundationTests {
             visibility: .private,
             scoringType: .headToHeadPoints,
             rosterConfiguration: .standard,
-            scoringRules: .stadiaDefault(),
+            scoringRules: .bannerDefault(),
             draftSettings: .standard,
             waiverSettings: .standard,
-            tradeSettings: StadiaFantasyTradeSettings(deadline: nil, reviewType: .commissioner),
-            playoffSettings: StadiaFantasyPlayoffSettings(regularSeasonPeriods: 20, playoffTeams: 4, playoffRounds: 2, championshipPeriod: nil)
+            tradeSettings: BannerFantasyTradeSettings(deadline: nil, reviewType: .commissioner),
+            playoffSettings: BannerFantasyPlayoffSettings(regularSeasonPeriods: 20, playoffTeams: 4, playoffRounds: 2, championshipPeriod: nil)
         )
     }
 }

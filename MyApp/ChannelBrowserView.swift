@@ -21,10 +21,10 @@ enum ChannelBrowserScope {
     /// Key used to persist per-scope sort choice in UserDefaults.
     var sortStorageKey: String {
         switch self {
-        case .favorites:                               return "stadiatv.sort.favorites"
-        case .allChannels:                             return "stadiatv.sort.all"
-        case .customGroup(let id, _):                  return "stadiatv.sort.cg.\(id)"
-        case .providerGroup(let pid, let g, _):        return "stadiatv.sort.pg.\(pid).\(g)"
+        case .favorites:                               return "bannertv.sort.favorites"
+        case .allChannels:                             return "bannertv.sort.all"
+        case .customGroup(let id, _):                  return "bannertv.sort.cg.\(id)"
+        case .providerGroup(let pid, let g, _):        return "bannertv.sort.pg.\(pid).\(g)"
         }
     }
 

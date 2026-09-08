@@ -18,31 +18,31 @@ enum TeamLogoAssetResolver {
 
     nonisolated static func nbaAssetURL(abbreviation: String?, displayName: String? = nil) -> URL? {
         let abbreviation = normalizedAbbreviation(abbreviation) ?? displayName.flatMap { nbaNameAbbreviations[normalizedName($0)] }
-        return abbreviation.flatMap { URL.stadiaImageAsset(named: "NBALogo_\($0)") }
+        return abbreviation.flatMap { URL.bannerImageAsset(named: "NBALogo_\($0)") }
     }
 
     nonisolated static func nflAssetURL(abbreviation: String?, displayName: String? = nil) -> URL? {
         guard let abbreviation = normalizedAbbreviation(abbreviation) ?? displayName.flatMap({ nflNameAbbreviations[normalizedName($0)] }) else { return nil }
         let normalized = nflAbbreviationAliases[abbreviation] ?? abbreviation
-        return URL.stadiaImageAsset(named: "NFLLogo_\(normalized)")
+        return URL.bannerImageAsset(named: "NFLLogo_\(normalized)")
     }
 
     nonisolated static func nhlAssetURL(abbreviation: String?, displayName: String? = nil) -> URL? {
         guard let abbreviation = normalizedAbbreviation(abbreviation) ?? displayName.flatMap({ nhlNameAbbreviations[normalizedName($0)] }) else { return nil }
         let normalized = nhlAbbreviationAliases[abbreviation] ?? abbreviation
-        return URL.stadiaImageAsset(named: "NHLLogo_\(normalized)")
+        return URL.bannerImageAsset(named: "NHLLogo_\(normalized)")
     }
 
     nonisolated static func mlbAssetURL(abbreviation: String?, displayName: String?, providerTeamID: String?) -> URL? {
         if let providerTeamID, let asset = mlbProviderIDAssets[providerTeamID] {
-            return URL.stadiaImageAsset(named: asset)
+            return URL.bannerImageAsset(named: asset)
         }
         if let abbreviation = normalizedAbbreviation(abbreviation), let asset = mlbAbbreviationAssets[abbreviation] {
-            return URL.stadiaImageAsset(named: asset)
+            return URL.bannerImageAsset(named: asset)
         }
         if let displayName {
             let asset = "MLBLogo_\(assetSuffix(displayName))"
-            return URL.stadiaImageAsset(named: asset)
+            return URL.bannerImageAsset(named: asset)
         }
         return nil
     }
@@ -50,7 +50,7 @@ enum TeamLogoAssetResolver {
     nonisolated static func soccerAssetURL(leaguePath: String, displayName: String?) -> URL? {
         guard let displayName, let leagueName = msiLeagueName(for: leaguePath) else { return nil }
         let asset = "MSILogo_\(assetSuffix("\(leagueName)_\(displayName)").lowercased())"
-        return URL.stadiaImageAsset(named: asset)
+        return URL.bannerImageAsset(named: asset)
     }
 
     nonisolated static func normalizedAbbreviation(_ value: String?) -> String? {

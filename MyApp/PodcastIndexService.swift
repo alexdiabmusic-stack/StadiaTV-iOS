@@ -28,7 +28,7 @@ actor PodcastIndexService {
             "X-Auth-Key":  apiKey,
             "X-Auth-Date": ts,
             "Authorization": hash,
-            "User-Agent":  "StadiaTV/1.0"
+            "User-Agent":  "BannerTV/1.0"
         ]
     }
 

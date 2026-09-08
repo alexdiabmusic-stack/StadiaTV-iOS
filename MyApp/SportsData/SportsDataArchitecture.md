@@ -1,4 +1,4 @@
-# Stadia Sports Data Platform
+# Banner Sports Data Platform
 
 ## Current Dependency Map
 
@@ -21,7 +21,7 @@ ESPN Site/Web/Core premium endpoints
 ```text
 ESPN Fantasy API and ESPN public roster endpoints
 -> ESPNFantasyService / ESPNSportsDataProvider / FantasyEventLinker / FantasyPlayerResolver
--> FantasyStore / StadiaFantasyStore
+-> FantasyStore / BannerFantasyStore
 -> FantasyDashboardView, MatchDetailView fantasy context
 ```
 
@@ -41,7 +41,7 @@ Direct ESPN concepts currently leaked outside adapters:
 
 ## Provider Capability Matrix
 
-This matrix reflects the attached `sportsdataverse-0.1.2` package plus the current Stadia codebase. Apple Sports, CBS, and broad Yahoo references were not present as attached source trees; only Yahoo CFB and FOX Bifrost references were discoverable in SportsDataverse.
+This matrix reflects the attached `sportsdataverse-0.1.2` package plus the current Banner codebase. Apple Sports, CBS, and broad Yahoo references were not present as attached source trees; only Yahoo CFB and FOX Bifrost references were discoverable in SportsDataverse.
 
 | Provider | League | Scores | Schedule | PBP | Box Score | Standings | Rosters | Player Stats | Team Stats | Injuries | Leaders | News |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -51,13 +51,13 @@ This matrix reflects the attached `sportsdataverse-0.1.2` package plus the curre
 | NFL Shield | NFL | Partial | Weeks/details | Unknown | Summaries/details | Yes | Yes | Unknown | Unknown | Yes | Unknown | No |
 | FOX Bifrost | NBA/NHL/MLB/CFB/MBB/WBB/WNBA | Partial | Partial | Yes | Yes | Yes | Yes | Yes | Yes | Unknown | Yes | No |
 | Yahoo Sports | CFB in attached package | Yes | Yes | Unknown | Unknown | Unknown | Unknown | Season stats | Season stats | Unknown | Unknown | Editorial CFB |
-| ESPN | Many Stadia leagues | Yes | Yes | Yes via summary | Yes via summary | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| ESPN | Many Banner leagues | Yes | Yes | Yes via summary | Yes via summary | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 | Apple Sports | Not attached | Unknown | Unknown | Unknown | Unknown | Unknown | Unknown | Unknown | Unknown | Unknown | Unknown | Unknown |
 | CBS Sports NAPI | Not attached | Unknown | Unknown | Unknown | Unknown | Unknown | Unknown | Unknown | Unknown | Unknown | Unknown | Unknown |
 
 ## Attached Reference Findings
 
-SportsDataverse is useful as endpoint discovery and parser guidance, not as a runtime dependency. It is Python, DataFrame-heavy, and includes thousands of wrappers Stadia does not need on-device.
+SportsDataverse is useful as endpoint discovery and parser guidance, not as a runtime dependency. It is Python, DataFrame-heavy, and includes thousands of wrappers Banner does not need on-device.
 
 Useful endpoint families:
 
@@ -70,14 +70,14 @@ Useful endpoint families:
 
 ## Normalized Domain
 
-The first-pass code introduces Stadia-owned models in `SportsDataPlatform.swift`:
+The first-pass code introduces Banner-owned models in `SportsDataPlatform.swift`:
 
-- League/team/player/game identity: `StadiaLeague`, `StadiaTeam`, `StadiaPlayer`, `StadiaGame`, `StadiaEntityID`, `ProviderEntityAlias`.
-- Live game state: `StadiaGameStatus`, `StadiaScore`, `StadiaGameClock`, `StadiaPeriod`, `StadiaVenue`, `StadiaBroadcast`.
-- Capability results: `StadiaSchedule`, `StadiaStandingGroup`, `StadiaStanding`, `StadiaBoxScore`, `StadiaPlayByPlay`, `StadiaRoster`, `StadiaInjury`, `StadiaLeader`, `StadiaNewsArticle`, `StadiaOdds`.
+- League/team/player/game identity: `BannerLeague`, `BannerTeam`, `BannerPlayer`, `BannerGame`, `BannerEntityID`, `ProviderEntityAlias`.
+- Live game state: `BannerGameStatus`, `BannerScore`, `BannerGameClock`, `BannerPeriod`, `BannerVenue`, `BannerBroadcast`.
+- Capability results: `BannerSchedule`, `BannerStandingGroup`, `BannerStanding`, `BannerBoxScore`, `BannerPlayByPlay`, `BannerRoster`, `BannerInjury`, `BannerLeader`, `BannerNewsArticle`, `BannerOdds`.
 - Debugging: `DataProvenance`, `SportsProviderDiagnostics`.
 
-Provider DTOs must remain inside provider adapters. The compatibility bridge converts `StadiaGame` back to current `Match` values until feature screens are migrated.
+Provider DTOs must remain inside provider adapters. The compatibility bridge converts `BannerGame` back to current `Match` values until feature screens are migrated.
 
 ## Capability Protocols
 
@@ -125,7 +125,7 @@ Current ESPN bridge behavior preserves compatibility by creating canonical IDs t
 Planned identity records:
 
 ```text
-Stadia Team ID
+Banner Team ID
 - ESPN ID
 - NHL/MLB/NBA/NFL first-party ID
 - FOX ID
@@ -160,7 +160,7 @@ The first bridge changes `MatchesViewModel` to call `SportsRepository.shared.leg
 - Game details: `/gamecenter/{gameID}/landing`.
 - Play-by-play: `/gamecenter/{gameID}/play-by-play`.
 
-The adapter keeps NHL DTOs local to the provider file and maps immediately into Stadia-normalized models with `.nhl` provenance. `NHLProviderEnabled` is the bundle kill switch; absent means enabled.
+The adapter keeps NHL DTOs local to the provider file and maps immediately into Banner-normalized models with `.nhl` provenance. `NHLProviderEnabled` is the bundle kill switch; absent means enabled.
 
 ## Apple Sports Assessment
 
@@ -195,7 +195,7 @@ Safety constraints retained:
 - Defensive/tolerant decoding and short timeout.
 - Isolated DTOs and networking.
 - Provider health integration so failures route to the next provider.
-- No Apple IDs in Stadia canonical IDs except as aliases.
+- No Apple IDs in Banner canonical IDs except as aliases.
 
 ## Remaining ESPN Dependencies
 

@@ -39,36 +39,36 @@ struct CBSRSSNewsProvider: SportsNewsProvider {
         )
     }
 
-    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [StadiaNewsArticle] {
+    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [BannerNewsArticle] {
         guard page == 1 else { throw SportsDataError.unsupportedCapability(.newsMetadata) }
         guard metadata.isEnabled else { throw SportsDataError.providerDisabled(.cbsRSS) }
 
         let base = "https://www.cbssports.com/rss/headlines"
-        let http = StadiaNewsHTTPClient.shared
+        let http = BannerNewsHTTPClient.shared
         let now = Date()
 
         // Determine which CBS feeds could contain this league's news
         let relevantSlugs = cbsSlugs(for: league)
 
-        var collected: [StadiaNewsArticle] = []
+        var collected: [BannerNewsArticle] = []
 
-        await withTaskGroup(of: [StadiaNewsArticle].self) { group in
+        await withTaskGroup(of: [BannerNewsArticle].self) { group in
             for (slug, fixedLeague) in relevantSlugs {
                 group.addTask {
                     let urlString = slug.isEmpty ? base + "/" : "\(base)/\(slug)"
                     guard let url = URL(string: urlString) else { return [] }
                     do {
                         let data = try await http.dataWithRetry(from: url)
-                        return StadiaRSSParser.parse(data).compactMap { item -> StadiaNewsArticle? in
+                        return BannerRSSParser.parse(data).compactMap { item -> BannerNewsArticle? in
                             guard let title = item.title, !title.isEmpty else { return nil }
                             let urlStr = item.link ?? item.guid ?? ""
                             let seed = item.guid ?? urlStr
-                            let idHash = StadiaNewsDeduplicator.articleHash(seed)
+                            let idHash = BannerNewsDeduplicator.articleHash(seed)
                             let articleLeague: League
                             if let fixed = fixedLeague {
                                 articleLeague = fixed
                             } else {
-                                let (_, lid) = StadiaNewsDeduplicator.classify(
+                                let (_, lid) = BannerNewsDeduplicator.classify(
                                     headline: title,
                                     description: item.description,
                                     tags: item.categories
@@ -80,11 +80,11 @@ struct CBSRSSNewsProvider: SportsNewsProvider {
                             // Only keep articles for the requested league
                             guard SportsIdentityResolver.canonicalLeagueID(for: articleLeague) ==
                                     SportsIdentityResolver.canonicalLeagueID(for: league) else { return nil }
-                            return StadiaNewsArticle(
-                                id: StadiaEntityID(rawValue: "news:cbsRSS:\(idHash)"),
+                            return BannerNewsArticle(
+                                id: BannerEntityID(rawValue: "news:cbsRSS:\(idHash)"),
                                 headline: title,
                                 description: item.description ?? item.content ?? "",
-                                published: StadiaRSSParser.parseDate(item.publishedRaw),
+                                published: BannerRSSParser.parseDate(item.publishedRaw),
                                 url: URL(string: urlStr),
                                 imageURL: item.imageURL.flatMap(URL.init(string:)),
                                 leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
@@ -106,7 +106,7 @@ struct CBSRSSNewsProvider: SportsNewsProvider {
         }
 
         guard !collected.isEmpty else { throw SportsDataError.unsupportedCapability(.newsMetadata) }
-        return StadiaNewsDeduplicator.deduplicate(collected.sorted {
+        return BannerNewsDeduplicator.deduplicate(collected.sorted {
             ($0.published ?? .distantPast) > ($1.published ?? .distantPast)
         }).prefix(limit).map { $0 }
     }
@@ -145,13 +145,13 @@ struct CBSRSSNewsProvider: SportsNewsProvider {
 
 struct CBSJSONEditorialProvider {
     private let base = URL(string: "https://api.cbssports.com")!
-    private let http = StadiaNewsHTTPClient.shared
+    private let http = BannerNewsHTTPClient.shared
 
     enum Kind: String {
         case preview, recap, story
     }
 
-    func editorial(cbsGameID: String, kind: Kind) async throws -> StadiaNewsArticle? {
+    func editorial(cbsGameID: String, kind: Kind) async throws -> BannerNewsArticle? {
         let path = "/resource/game/content/\(kind.rawValue)/\(cbsGameID)"
         guard let url = URL(string: path, relativeTo: base)?.absoluteURL else { return nil }
         let data = try await http.dataWithRetry(from: url, accept: "application/json")
@@ -159,7 +159,7 @@ struct CBSJSONEditorialProvider {
         return parse(json: json, kind: kind, gameID: cbsGameID)
     }
 
-    private func parse(json: [String: Any], kind: Kind, gameID: String) -> StadiaNewsArticle? {
+    private func parse(json: [String: Any], kind: Kind, gameID: String) -> BannerNewsArticle? {
         // CBS wraps in {body: {result: {...}}} or {data: {...}}
         let body: [String: Any]? =
             (json["body"] as? [String: Any])?["result"] as? [String: Any]
@@ -178,8 +178,8 @@ struct CBSJSONEditorialProvider {
         let imageStr = (body?["thumbnail"] as? String)
             ?? ((body?["image"] as? [String: Any])?["url"] as? String)
 
-        return StadiaNewsArticle(
-            id: StadiaEntityID(rawValue: "news:cbsSports:editorial:\(gameID):\(kind.rawValue)"),
+        return BannerNewsArticle(
+            id: BannerEntityID(rawValue: "news:cbsSports:editorial:\(gameID):\(kind.rawValue)"),
             headline: headline,
             description: desc,
             published: nil,

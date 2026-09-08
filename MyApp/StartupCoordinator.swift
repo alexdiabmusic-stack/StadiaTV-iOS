@@ -6,7 +6,7 @@ import Combine
 enum LaunchPhase: Equatable {
     /// All-white logo centered. iOS launch screen hands off here seamlessly.
     case brandWhite
-    /// "TV" animating from white → Stadia blue (0.20–0.65 s).
+    /// "TV" animating from white → Banner blue (0.20–0.65 s).
     case colorizingTV
     /// Fully branded wordmark resting while the startup pipeline runs.
     case brandComplete
@@ -53,7 +53,7 @@ final class StartupCoordinator: ObservableObject {
     }
 
     private func printReport() {
-        print("\n━━━ STADIA STARTUP ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("\n━━━ BANNER STARTUP ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         for (label, ms) in marks {
             let padding = String(repeating: " ", count: max(1, 34 - label.count))
             print("  \(label)\(padding)\(ms) ms")
@@ -73,7 +73,7 @@ final class StartupCoordinator: ObservableObject {
 
         Task { @MainActor in
             // ── t = 0.20 s ────────────────────────────────────────────────
-            // Begin animating "TV" from white to Stadia blue.
+            // Begin animating "TV" from white to Banner blue.
             // The withAnimation here propagates into BrandMark(tvColor:) via
             // SwiftUI's animation transaction so Color interpolates smoothly.
             try? await Task.sleep(for: .milliseconds(200))

@@ -235,7 +235,7 @@ actor EPGPWProvider {
     private let configuration: EPGPWConfiguration
     private let session: URLSession
     private let cacheDir: URL
-    private let logger = Logger(subsystem: "StadiaTV", category: "EPGPW")
+    private let logger = Logger(subsystem: "BannerTV", category: "EPGPW")
     private var inFlight: [Int: Task<EPGPWFetchResult, Error>] = [:]
     private var activeRequests = 0
     private var lastRequestStart = Date.distantPast

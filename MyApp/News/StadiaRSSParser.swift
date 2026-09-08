@@ -35,11 +35,9 @@ final class StadiaRSSParser: NSObject, XMLParserDelegate {
         // Prevent XXE: disable external entity resolution
         parser.shouldResolveExternalEntities = false
         // XMLParser.parse() is synchronous; all XMLParserDelegate callbacks fire on the calling thread.
-        // @MainActor inference on NSObject subclasses in Xcode 26 causes a Swift 6 warning here —
-        // safe to suppress with assumeIsolated because there is no concurrent access.
-        MainActor.assumeIsolated {
-            parser.delegate = delegate
-        }
+        // nonisolated(unsafe) properties on StadiaRSSParser make this safe despite the @MainActor
+        // inference that NSObject subclasses receive in Swift 6. No concurrent access occurs here.
+        parser.delegate = delegate
         parser.parse()
         return delegate.items
     }

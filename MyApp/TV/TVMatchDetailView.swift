@@ -39,7 +39,7 @@ struct TVMatchDetailView: View {
             }
         }
         .navigationTitle(match.shortName)
-        .task(id: "\(playlistStore.allChannels.count)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))") {
+        .task(id: "\(match.id)-\(playlistStore.allChannels.count)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
             await rankSources()
         }
         .fullScreenCover(item: $playingChannel) { channel in
@@ -93,6 +93,28 @@ struct TVMatchDetailView: View {
             enriched.canonicalChannelId = canonicalId
             enriched.evidenceCategories.insert(.guideListsMatch)
             return enriched
+        }
+
+        // EPG injection: add channels the guide confirms for this event that SourceMatcher
+        // didn't surface — e.g. a regional feed below the score threshold, or a rights holder
+        // not yet in the policy store.
+        let rankedChannelIds = Set(ranked.map { $0.channel.id })
+        var canonicalToChannels: [String: [Channel]] = [:]
+        for channel in channels {
+            if let cid = channelToCanonical[channel.id] {
+                canonicalToChannels[cid, default: []].append(channel)
+            }
+        }
+        for (canonicalId, join) in bestJoinByCanonical {
+            guard join.titleSimilarity >= 0.6 || (join.networkMatches && join.titleSimilarity >= 0.4) else { continue }
+            for channel in (canonicalToChannels[canonicalId] ?? []) {
+                guard !rankedChannelIds.contains(channel.id) else { continue }
+                var injected = RankedSource(channel: channel, score: 55 + Int(join.titleSimilarity * 40))
+                injected.evidenceCategories = [.guideListsMatch]
+                injected.epgProgramme = join.programme
+                injected.canonicalChannelId = canonicalId
+                ranked.append(injected)
+            }
         }
 
         ranked.sort {

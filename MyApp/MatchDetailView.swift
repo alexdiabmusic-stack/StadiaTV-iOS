@@ -159,7 +159,7 @@ struct MatchDetailView: View {
         .task(id: match.id) {
             await loadOdds()
         }
-        .task(id: "\(match.id)-\(playlists.allChannels.count)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))") {
+        .task(id: "\(match.id)-\(playlists.allChannels.count)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
             await rankSources()
         }
     }
@@ -225,6 +225,28 @@ struct MatchDetailView: View {
             enriched.canonicalChannelId = canonicalId
             enriched.evidenceCategories.insert(.guideListsMatch)
             return enriched
+        }
+
+        // EPG injection: add channels the guide confirms for this event that SourceMatcher
+        // didn't surface — e.g. a regional feed below the score threshold, or a rights holder
+        // not yet in the policy store (TSN1 for an F1 race whose TSN entry was missing).
+        let rankedChannelIds = Set(ranked.map { $0.channel.id })
+        var canonicalToChannels: [String: [Channel]] = [:]
+        for channel in channels {
+            if let cid = channelToCanonical[channel.id] {
+                canonicalToChannels[cid, default: []].append(channel)
+            }
+        }
+        for (canonicalId, join) in bestJoinByCanonical {
+            guard join.titleSimilarity >= 0.6 || (join.networkMatches && join.titleSimilarity >= 0.4) else { continue }
+            for channel in (canonicalToChannels[canonicalId] ?? []) {
+                guard !rankedChannelIds.contains(channel.id) else { continue }
+                var injected = RankedSource(channel: channel, score: 55 + Int(join.titleSimilarity * 40))
+                injected.evidenceCategories = [.guideListsMatch]
+                injected.epgProgramme = join.programme
+                injected.canonicalChannelId = canonicalId
+                ranked.append(injected)
+            }
         }
 
         // Sort by strongest evidence tier, then score within tier.

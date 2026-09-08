@@ -185,6 +185,10 @@ struct UserPreferences: Codable, Equatable {
     var guideTimeScaleMinutes: Int = 60
     var playerBarActions: [String] = PlayerBarAction.defaultOrder.map(\.rawValue)
 
+    // Catalog-aware onboarding preferences (v2+)
+    var selectedCatalogLeagueIDs: Set<String> = []
+    var selectedCatalogSportIDs: Set<String> = []
+
     init() {}
 
     private enum CodingKeys: String, CodingKey {
@@ -193,6 +197,7 @@ struct UserPreferences: Codable, Equatable {
         case appearance, preferredStreamLanguages, spoilerFreeMode, showLiveScoreBadge, showLiveScoreBar
         case showChannelNumbers, guideProgrammeTitleLines, epgHighlightCurrentProgramme
         case playerPanelTimeoutSeconds, guideTimeScaleMinutes, playerBarActions
+        case selectedCatalogLeagueIDs, selectedCatalogSportIDs
     }
 
     /// Decodes leniently so preferences saved by older app versions
@@ -218,6 +223,8 @@ struct UserPreferences: Codable, Equatable {
         guideTimeScaleMinutes = try container.decodeIfPresent(Int.self, forKey: .guideTimeScaleMinutes) ?? 60
         playerBarActions = try container.decodeIfPresent([String].self, forKey: .playerBarActions)
             ?? PlayerBarAction.defaultOrder.map(\.rawValue)
+        selectedCatalogLeagueIDs = try container.decodeIfPresent(Set<String>.self, forKey: .selectedCatalogLeagueIDs) ?? []
+        selectedCatalogSportIDs  = try container.decodeIfPresent(Set<String>.self, forKey: .selectedCatalogSportIDs) ?? []
     }
 }
 
@@ -444,6 +451,21 @@ final class PreferencesStore: ObservableObject {
 
     func setLeagues(_ leagues: Set<League>) {
         prefs.selectedLeagueIDs = Set(leagues.map(\.path))
+        persist()
+    }
+
+    // MARK: Catalog preferences
+
+    var selectedCatalogLeagueIDs: Set<String> { prefs.selectedCatalogLeagueIDs }
+    var selectedCatalogSportIDs: Set<String>  { prefs.selectedCatalogSportIDs  }
+
+    func setSelectedCatalogLeagueIDs(_ ids: Set<String>) {
+        prefs.selectedCatalogLeagueIDs = ids
+        persist()
+    }
+
+    func setSelectedCatalogSportIDs(_ ids: Set<String>) {
+        prefs.selectedCatalogSportIDs = ids
         persist()
     }
 

@@ -10,6 +10,7 @@
 		000000000000000000000120 /* StadiaTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StadiaTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2268B0E303FB4B90014AE4B /* FantasyFoundationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasyFoundationTests.swift; sourceTree = "<group>"; };
 		D27D9E98304F61D30062353E /* NewsProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsProviderTests.swift; sourceTree = "<group>"; };
+		D27D9EB73050BAD90062353E /* SportsCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SportsCatalogTests.swift; sourceTree = "<group>"; };
 		D28647D33041356500260FB3 /* SportsDataFoundationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SportsDataFoundationTests.swift; sourceTree = "<group>"; };
 		D2B8CEEC304D50140034778D /* SourceMatcherRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceMatcherRegressionTests.swift; sourceTree = "<group>"; };
 		D2B8CEEF304E7AB20034778D /* PrecisionStreamMatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrecisionStreamMatcherTests.swift; sourceTree = "<group>"; };
@@ -70,6 +71,7 @@
 				D2B8CEEC304D50140034778D /* SourceMatcherRegressionTests.swift */,
 				D2B8CEEF304E7AB20034778D /* PrecisionStreamMatcherTests.swift */,
 				D27D9E98304F61D30062353E /* NewsProviderTests.swift */,
+				D27D9EB73050BAD90062353E /* SportsCatalogTests.swift */,
 			);
 			path = StadiaTVTests;
 			sourceTree = "<group>";

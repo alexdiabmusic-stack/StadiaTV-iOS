@@ -366,6 +366,21 @@ struct PrecisionStreamMatcherTests {
         #expect(SportsOntology.isIncompatible(candidate: .ahl, with: .nhl))
     }
 
+    @Test("SportsOntology: WNBA incompatible with NBA (within-group sub-league)")
+    func wnbaIncompatibleWithNBA() {
+        #expect(SportsOntology.isIncompatible(candidate: .wnba, with: .nba))
+    }
+
+    @Test("SportsOntology: NCAAF incompatible with NFL (within-group sub-league)")
+    func ncaafIncompatibleWithNFL() {
+        #expect(SportsOntology.isIncompatible(candidate: .ncaaf, with: .nfl))
+    }
+
+    @Test("SportsOntology: CFL incompatible with NFL (within-group sub-league)")
+    func cflIncompatibleWithNFL() {
+        #expect(SportsOntology.isIncompatible(candidate: .cfl, with: .nfl))
+    }
+
     @Test("SportsOntology: same family not incompatible")
     func sameFamilyNotIncompatible() {
         #expect(!SportsOntology.isIncompatible(candidate: .nhl, with: .nhl))
@@ -389,5 +404,85 @@ struct PrecisionStreamMatcherTests {
     @Test("SportsOntology: named channel not flagged as numbered slot")
     func namedChannelNotNumberedSlot() {
         #expect(!SportsOntology.isNumberedEventSlot("Sky Sports Premier League"))
+    }
+
+    // MARK: HC-002: Sub-league hard reject — within-group competition conflicts
+
+    @Test("HC-002: WNBA channel hard-rejected for NBA event")
+    func wnbaChannelRejectedForNBAEvent() {
+        let nba = League.all.first { $0.path == "basketball/nba" }!
+        let m = pMatch(league: nba,
+                       home: "Boston Celtics", homeAbbr: "BOS",
+                       away: "Miami Heat", awayAbbr: "MIA")
+        let ranked = SourceMatcher.rank(match: m, channels: [
+            pChannel(name: "WNBA TV Live")
+        ])
+        #expect(ranked.isEmpty,
+                "WNBA-branded channel must be hard-rejected for an NBA event (within-group sub-league conflict)")
+    }
+
+    @Test("HC-002: NCAAF channel hard-rejected for NFL event")
+    func ncaafChannelRejectedForNFLEvent() {
+        let nfl = League.all.first { $0.path == "football/nfl" }!
+        let m = pMatch(league: nfl,
+                       home: "Kansas City Chiefs", homeAbbr: "KC",
+                       away: "Philadelphia Eagles", awayAbbr: "PHI")
+        let ranked = SourceMatcher.rank(match: m, channels: [
+            pChannel(name: "NCAAF 37")
+        ])
+        #expect(ranked.isEmpty,
+                "NCAAF-branded channel must be hard-rejected for an NFL event (within-group sub-league conflict)")
+    }
+
+    @Test("HC-002: CFL channel hard-rejected for NFL event")
+    func cflChannelRejectedForNFLEvent() {
+        let nfl = League.all.first { $0.path == "football/nfl" }!
+        let m = pMatch(league: nfl,
+                       home: "Kansas City Chiefs", homeAbbr: "KC",
+                       away: "Philadelphia Eagles", awayAbbr: "PHI")
+        let ranked = SourceMatcher.rank(match: m, channels: [
+            pChannel(name: "CFL Network")
+        ])
+        #expect(ranked.isEmpty,
+                "CFL-branded channel must be hard-rejected for an NFL event")
+    }
+
+    // MARK: Shared city tokens — must not fire eventTitleMatch (REG-013)
+
+    @Test("REG-013: Shared city tokens must not confirm a same-city matchup")
+    func sharedCityTokensNotEventTitleMatch() {
+        let nba = League.all.first { $0.path == "basketball/nba" }!
+        let m = pMatch(league: nba,
+                       home: "Los Angeles Lakers", homeAbbr: "LAL",
+                       away: "Los Angeles Clippers", awayAbbr: "LAC",
+                       broadcasts: ["ABC"])
+        let ranked = SourceMatcher.rank(match: m, channels: [
+            pChannel(name: "ABC Los Angeles")
+        ])
+        if let source = ranked.first {
+            #expect(!source.isConfirmed,
+                    "ABC Los Angeles must not be confirmed: city tokens shared by both teams cannot fire eventTitleMatch")
+            #expect(!source.evidenceCategories.contains(.eventTitleMatch),
+                    "Shared city tokens (los/angeles) must not generate eventTitleMatch evidence")
+        }
+    }
+
+    // MARK: Broadcaster dedup — same network scores once (REG-014)
+
+    @Test("REG-014: Broadcaster in both event metadata and rights store scores once")
+    func broadcasterDedup() {
+        let nba = League.all.first { $0.path == "basketball/nba" }!
+        let m = pMatch(league: nba,
+                       home: "Boston Celtics", homeAbbr: "BOS",
+                       away: "Miami Heat", awayAbbr: "MIA",
+                       broadcasts: ["NBC"])
+        let ranked = SourceMatcher.rank(match: m, channels: [
+            pChannel(name: "NBC Sports")
+        ])
+        // "nbc" appears in match.broadcasts (+35) AND in the NBA rights store (+70).
+        // After dedup: rights store takes precedence and broadcast loop skips it → max ~75.
+        let score = ranked.first?.score ?? 0
+        #expect(score <= 80,
+                "Broadcaster scored from both event metadata and rights store must not double-count (+35+70=105 → should be ≤75)")
     }
 }

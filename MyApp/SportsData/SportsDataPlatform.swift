@@ -14,6 +14,14 @@ enum SportsDataProviderID: String, Codable, CaseIterable, Hashable, Sendable {
     case foxSports
     case appleSports
     case espn
+    // News-only providers (RSS + structured feeds)
+    case foxBifrostNews
+    case cbsRSS
+    case bbcSport
+    case skySports
+    case nbcSports
+    case foxRSS
+    case bleacherReport
 }
 
 enum SportsDataProviderSupportLevel: String, Codable, Hashable, Sendable {
@@ -555,6 +563,12 @@ struct StadiaNewsArticle: Identifiable, Codable, Hashable, Sendable {
     let playerIDs: [StadiaEntityID]
     let sourceName: String?
     let provenance: DataProvenance?
+    /// Display name of the publishing outlet (e.g. "CBS Sports", "BBC Sport").
+    var publisher: String? = nil
+    /// Content type such as "preview", "recap", "story", "breaking".
+    var articleType: String? = nil
+    /// Author byline when available; used in place of publisher in reader view.
+    var authorByline: String? = nil
 }
 
 struct StadiaOdds: Identifiable, Codable, Hashable, Sendable {
@@ -744,7 +758,7 @@ struct SportsIdentityResolver: Sendable {
         return StadiaEntityID(rawValue: "game:\(slug)")
     }
 
-    static func canonicalLeagueID(for league: League) -> StadiaEntityID {
+    nonisolated static func canonicalLeagueID(for league: League) -> StadiaEntityID {
         StadiaEntityID(rawValue: "league:\(league.stadiaKey)")
     }
 
@@ -1068,7 +1082,11 @@ struct SportsProviderRouteConfiguration: Sendable {
         routes.append(ProviderRoute(leagueID: "*", capability: .liveScores, providers: [.appleSports, .espn]))
         routes.append(ProviderRoute(leagueID: "*", capability: .schedule, providers: [.appleSports, .espn]))
         routes.append(ProviderRoute(leagueID: "*", capability: .golfTournament, providers: [.appleSports, .espn]))
-        routes.append(ProviderRoute(leagueID: "*", capability: .newsMetadata, providers: [.espn]))
+        // News: ESPN primary + all multi-source providers for parallel aggregation.
+        routes.append(ProviderRoute(leagueID: "*", capability: .newsMetadata, providers: [
+            .espn, .yahooSports, .foxBifrostNews,
+            .cbsRSS, .bbcSport, .skySports, .nbcSports, .foxRSS
+        ]))
         routes.append(ProviderRoute(leagueID: "*", capability: .odds, providers: [.espn]))
         return routes
     }
@@ -1192,6 +1210,14 @@ struct SportsProviderRegistry: Sendable {
         if AppConfiguration.isNHLProviderEnabled {
             providers.insert(NHLProvider(), at: 0)
         }
+        // Multi-source news providers — always registered; health monitor gates individual usage.
+        providers.append(FOXBifrostNewsProvider())
+        providers.append(CBSRSSNewsProvider())
+        providers.append(BBCSportNewsProvider())
+        providers.append(SkySportsNewsProvider())
+        providers.append(NBCSportsNewsProvider())
+        providers.append(FOXRSSNewsProvider())
+        providers.append(BleacherReportNewsProvider())
         return SportsProviderRegistry(providers: providers)
     }
 }
@@ -1581,27 +1607,43 @@ struct SportsRepository: Sendable {
             return cached
         }
         let allProviders = await router.providers(for: league, capability: .newsMetadata, as: (any SportsNewsProvider).self)
-        // When fetching beyond page 1, skip providers that don't support pagination — they'd just repeat page 1.
         let providers = page > 1 ? allProviders.filter(\.supportsPagination) : allProviders
         guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.newsMetadata, league.path) }
-        var fallbacks: [SportsDataProviderID] = []
+
+        // Run all providers concurrently; aggregate, deduplicate, and rank results.
+        let start = Date()
+        var collected: [(SportsDataProviderID, [StadiaNewsArticle])] = []
         var failures: [String] = []
-        for provider in providers {
-            let start = Date()
-            do {
-                let articles = try await provider.newsMetadata(for: league, limit: limit, page: page)
-                let latency = Date().timeIntervalSince(start)
-                await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
-                await cache.store(articles, for: key, ttl: SportsDataCache.defaultTTL(for: .newsMetadata))
-                await recordDiagnostics(league: league, capability: .newsMetadata, currentProvider: provider.metadata.id, latency: latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
-                return articles
-            } catch {
-                failures.append("\(provider.metadata.name): \(error.localizedDescription)")
-                await router.healthMonitor.recordFailure(providerID: provider.metadata.id, error: error)
-                fallbacks.append(provider.metadata.id)
+        await withTaskGroup(of: (SportsDataProviderID, [StadiaNewsArticle], Error?).self) { group in
+            for provider in providers {
+                group.addTask {
+                    let t = Date()
+                    do {
+                        let articles = try await provider.newsMetadata(for: league, limit: limit, page: page)
+                        await self.router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: Date().timeIntervalSince(t))
+                        return (provider.metadata.id, articles, nil)
+                    } catch {
+                        await self.router.healthMonitor.recordFailure(providerID: provider.metadata.id, error: error)
+                        return (provider.metadata.id, [], error)
+                    }
+                }
+            }
+            for await (providerID, articles, error) in group {
+                if let error {
+                    failures.append("\(providerID.rawValue): \(error.localizedDescription)")
+                } else if !articles.isEmpty {
+                    collected.append((providerID, articles))
+                }
             }
         }
-        throw SportsDataError.unavailable
+
+        guard !collected.isEmpty else { throw SportsDataError.unavailable }
+
+        let merged = StadiaNewsDeduplicator.mergeAndRank(collected, league: league, limit: limit * 3)
+        let latency = Date().timeIntervalSince(start)
+        await cache.store(merged, for: key, ttl: SportsDataCache.defaultTTL(for: .newsMetadata))
+        await recordDiagnostics(league: league, capability: .newsMetadata, currentProvider: collected.first?.0, latency: latency, cacheHit: false, fallbacks: [], failures: failures)
+        return merged
     }
 
     func roster(for league: League, teamID: StadiaEntityID) async throws -> StadiaRoster {
@@ -2575,7 +2617,9 @@ extension StadiaInjury {
 
 extension StadiaNewsArticle {
     func toLegacyArticle(league: League) -> ESPNArticle {
-        ESPNArticle(
+        // Prefer author byline; fall back to publisher name for attribution.
+        let displayByline = authorByline ?? publisher ?? sourceName
+        return ESPNArticle(
             id: id.rawValue,
             headline: headline,
             description: description,
@@ -2583,8 +2627,8 @@ extension StadiaNewsArticle {
             url: url,
             imageURL: imageURL,
             league: league,
-            byline: sourceName,
-            type: nil,
+            byline: displayByline,
+            type: articleType,
             isPremium: false,
             categories: []
         )

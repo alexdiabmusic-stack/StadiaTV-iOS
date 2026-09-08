@@ -1,0 +1,3603 @@
+{
+  "schemaVersion": 1,
+  "catalogId": "banner-tv-league-logos-v1",
+  "generatedAt": "2026-09-08",
+  "purpose": "Compact league marks for Banner TV onboarding horizontal competition pills.",
+  "globalPillStyle": {
+    "height": 36,
+    "horizontalPadding": 12,
+    "selectedHorizontalPadding": 10,
+    "cornerRadius": 18,
+    "logoFrameWidth": 20,
+    "logoFrameHeight": 20,
+    "logoMaxWidth": 24,
+    "logoMaxHeight": 20,
+    "contentMode": "fit",
+    "selectedCheckmarkSize": 14,
+    "selectedCheckmarkGap": 5,
+    "logoTextGap": 6,
+    "singleLine": true,
+    "truncateLabel": false,
+    "minimumTouchHeight": 44,
+    "notes": [
+      "Render the logo inside a fixed 20x20 frame so wide wordmarks never widen the pill.",
+      "Use aspectFit and never crop or circle-mask league marks.",
+      "Keep the abbreviation/text outside the logo frame.",
+      "Cache resolved remote logos; do not re-fetch when pills scroll on/off screen.",
+      "If a remote logo fails, fall back to the sport SF Symbol rather than showing a broken image."
+    ]
+  },
+  "resolverRules": {
+    "priority": [
+      "logo.directURL",
+      "logo.primaryResolver",
+      "logo.fallbackResolver",
+      "logo.fallbackSFSymbol"
+    ],
+    "espnLeagueMetadata": {
+      "description": "Read the league logo from the ESPN scoreboard metadata response and cache the resolved href by catalogLeagueId.",
+      "logoArrayJSONPath": "leagues[0].logos"
+    },
+    "wikipediaPageImage": {
+      "description": "Fallback only. Resolve the page-image thumbnail source and cache it. Do not perform this request repeatedly while scrolling."
+    }
+  },
+  "leagueCount": 89,
+  "leagues": [
+    {
+      "catalogLeagueId": "baseball:caribbean-series",
+      "sport": "Baseball",
+      "name": "Caribbean Series",
+      "pillLabel": "Caribbean Series",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "baseball",
+          "league": "caribbean-series",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/baseball/caribbean-series/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Caribbean%20Series",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Caribbean Series"
+        },
+        "fallbackSFSymbol": "baseball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "baseball:dominican-professional-baseball-league",
+      "sport": "Baseball",
+      "name": "Dominican Professional Baseball League",
+      "pillLabel": "LIDOM",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Dominican%20Professional%20Baseball%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Dominican Professional Baseball League"
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Dominican%20Professional%20Baseball%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Dominican Professional Baseball League"
+        },
+        "fallbackSFSymbol": "baseball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "baseball:kbo-league",
+      "sport": "Baseball",
+      "name": "KBO League",
+      "pillLabel": "KBO",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "baseball",
+          "league": "kbo",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/baseball/kbo/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=KBO%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "KBO League"
+        },
+        "fallbackSFSymbol": "baseball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "baseball:liga-mexicana-de-beisbol",
+      "sport": "Baseball",
+      "name": "Liga Mexicana de Béisbol",
+      "pillLabel": "LMB",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Liga%20Mexicana%20de%20B%C3%A9isbol",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Liga Mexicana de Béisbol"
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Liga%20Mexicana%20de%20B%C3%A9isbol",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Liga Mexicana de Béisbol"
+        },
+        "fallbackSFSymbol": "baseball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "baseball:major-league-baseball",
+      "sport": "Baseball",
+      "name": "Major League Baseball",
+      "pillLabel": "MLB",
+      "logo": {
+        "directURL": "https://a.espncdn.com/i/teamlogos/leagues/500/mlb.png",
+        "primaryResolver": {
+          "type": "directImage",
+          "url": "https://a.espncdn.com/i/teamlogos/leagues/500/mlb.png"
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Major%20League%20Baseball",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Major League Baseball"
+        },
+        "fallbackSFSymbol": "baseball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "baseball:ncaa-division-i-baseball",
+      "sport": "Baseball",
+      "name": "NCAA Division I Baseball",
+      "pillLabel": "NCAA",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "baseball",
+          "league": "college-baseball",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/baseball/college-baseball/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=NCAA%20Division%20I%20Baseball",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "NCAA Division I Baseball"
+        },
+        "fallbackSFSymbol": "baseball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "baseball:nippon-professional-baseball",
+      "sport": "Baseball",
+      "name": "Nippon Professional Baseball",
+      "pillLabel": "NPB",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "baseball",
+          "league": "npb",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/baseball/npb/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Nippon%20Professional%20Baseball",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Nippon Professional Baseball"
+        },
+        "fallbackSFSymbol": "baseball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "baseball:olympic-baseball",
+      "sport": "Baseball",
+      "name": "Olympic Baseball",
+      "pillLabel": "OLY",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Olympic%20Baseball",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Olympic Baseball"
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Olympic%20Baseball",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Olympic Baseball"
+        },
+        "fallbackSFSymbol": "baseball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "baseball:puerto-rico-professional-baseball-league",
+      "sport": "Baseball",
+      "name": "Puerto Rico Professional Baseball League",
+      "pillLabel": "LBPRC",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Puerto%20Rico%20Professional%20Baseball%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Puerto Rico Professional Baseball League"
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Puerto%20Rico%20Professional%20Baseball%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Puerto Rico Professional Baseball League"
+        },
+        "fallbackSFSymbol": "baseball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "baseball:venezuelan-professional-baseball-league",
+      "sport": "Baseball",
+      "name": "Venezuelan Professional Baseball League",
+      "pillLabel": "LVBP",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Venezuelan%20Professional%20Baseball%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Venezuelan Professional Baseball League"
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Venezuelan%20Professional%20Baseball%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Venezuelan Professional Baseball League"
+        },
+        "fallbackSFSymbol": "baseball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "baseball:world-baseball-classic",
+      "sport": "Baseball",
+      "name": "World Baseball Classic",
+      "pillLabel": "WBC",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "baseball",
+          "league": "world-baseball-classic",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/baseball/world-baseball-classic/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=World%20Baseball%20Classic",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "World Baseball Classic"
+        },
+        "fallbackSFSymbol": "baseball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "basketball:australian-national-basketball-league",
+      "sport": "Basketball",
+      "name": "Australian National Basketball League",
+      "pillLabel": "NBL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "basketball",
+          "league": "nbl",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/basketball/nbl/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Australian%20National%20Basketball%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Australian National Basketball League"
+        },
+        "fallbackSFSymbol": "basketball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "basketball:euroleague",
+      "sport": "Basketball",
+      "name": "EuroLeague",
+      "pillLabel": "EUROLEAGUE",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "basketball",
+          "league": "euroleague",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/basketball/euroleague/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=EuroLeague",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "EuroLeague"
+        },
+        "fallbackSFSymbol": "basketball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "basketball:fiba-basketball-world-cup",
+      "sport": "Basketball",
+      "name": "FIBA Basketball World Cup",
+      "pillLabel": "FIBA",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "basketball",
+          "league": "fiba",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/basketball/fiba/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=FIBA%20Basketball%20World%20Cup",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "FIBA Basketball World Cup"
+        },
+        "fallbackSFSymbol": "basketball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "basketball:nba",
+      "sport": "Basketball",
+      "name": "NBA",
+      "pillLabel": "NBA",
+      "logo": {
+        "directURL": "https://a.espncdn.com/i/teamlogos/leagues/500/nba.png",
+        "primaryResolver": {
+          "type": "directImage",
+          "url": "https://a.espncdn.com/i/teamlogos/leagues/500/nba.png"
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=National%20Basketball%20Association",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "National Basketball Association"
+        },
+        "fallbackSFSymbol": "basketball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "basketball:nba-g-league",
+      "sport": "Basketball",
+      "name": "NBA G League",
+      "pillLabel": "G League",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "basketball",
+          "league": "nba-development",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba-development/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=NBA%20G%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "NBA G League"
+        },
+        "fallbackSFSymbol": "basketball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "basketball:ncaa-men-s-basketball",
+      "sport": "Basketball",
+      "name": "NCAA Men's Basketball",
+      "pillLabel": "NCAAM",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "basketball",
+          "league": "mens-college-basketball",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=NCAA%20Men%27s%20Basketball",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "NCAA Men's Basketball"
+        },
+        "fallbackSFSymbol": "basketball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "basketball:ncaa-women-s-basketball",
+      "sport": "Basketball",
+      "name": "NCAA Women's Basketball",
+      "pillLabel": "NCAAW",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "basketball",
+          "league": "womens-college-basketball",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/basketball/womens-college-basketball/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=NCAA%20Women%27s%20Basketball",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "NCAA Women's Basketball"
+        },
+        "fallbackSFSymbol": "basketball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "basketball:olympic-men-s-basketball",
+      "sport": "Basketball",
+      "name": "Olympic Men's Basketball",
+      "pillLabel": "OLY-M",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "basketball",
+          "league": "mens-olympics-basketball",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/basketball/mens-olympics-basketball/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Olympic%20Men%27s%20Basketball",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Olympic Men's Basketball"
+        },
+        "fallbackSFSymbol": "basketball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "basketball:olympic-women-s-basketball",
+      "sport": "Basketball",
+      "name": "Olympic Women's Basketball",
+      "pillLabel": "OLY-W",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "basketball",
+          "league": "womens-olympics-basketball",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/basketball/womens-olympics-basketball/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Olympic%20Women%27s%20Basketball",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Olympic Women's Basketball"
+        },
+        "fallbackSFSymbol": "basketball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "basketball:wnba",
+      "sport": "Basketball",
+      "name": "WNBA",
+      "pillLabel": "WNBA",
+      "logo": {
+        "directURL": "https://a.espncdn.com/i/teamlogos/leagues/500/wnba.png",
+        "primaryResolver": {
+          "type": "directImage",
+          "url": "https://a.espncdn.com/i/teamlogos/leagues/500/wnba.png"
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Women%27s%20National%20Basketball%20Association",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Women's National Basketball Association"
+        },
+        "fallbackSFSymbol": "basketball.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "football:canadian-football-league",
+      "sport": "Football",
+      "name": "Canadian Football League",
+      "pillLabel": "CFL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "football",
+          "league": "cfl",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/football/cfl/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Canadian%20Football%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Canadian Football League"
+        },
+        "fallbackSFSymbol": "football.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "football:national-football-league",
+      "sport": "Football",
+      "name": "National Football League",
+      "pillLabel": "NFL",
+      "logo": {
+        "directURL": "https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png",
+        "primaryResolver": {
+          "type": "directImage",
+          "url": "https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png"
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=National%20Football%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "National Football League"
+        },
+        "fallbackSFSymbol": "football.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "football:ncaa-football",
+      "sport": "Football",
+      "name": "NCAA Football",
+      "pillLabel": "NCAA",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "football",
+          "league": "college-football",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=NCAA%20Football",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "NCAA Football"
+        },
+        "fallbackSFSymbol": "football.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "football:united-football-league",
+      "sport": "Football",
+      "name": "United Football League",
+      "pillLabel": "UFL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "football",
+          "league": "ufl",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/football/ufl/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=United%20Football%20League%20%282024%29",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "United Football League (2024)"
+        },
+        "fallbackSFSymbol": "football.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "golf:dp-world-tour",
+      "sport": "Golf",
+      "name": "DP World Tour",
+      "pillLabel": "DPWT",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "golf",
+          "league": "euro",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/golf/euro/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=PGA%20European%20Tour",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "PGA European Tour"
+        },
+        "fallbackSFSymbol": "figure.golf"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "golf:korn-ferry-tour",
+      "sport": "Golf",
+      "name": "Korn Ferry Tour",
+      "pillLabel": "KFT",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "golf",
+          "league": "korn-ferry",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/golf/korn-ferry/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Korn%20Ferry%20Tour",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Korn Ferry Tour"
+        },
+        "fallbackSFSymbol": "figure.golf"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "golf:liv-golf",
+      "sport": "Golf",
+      "name": "LIV Golf",
+      "pillLabel": "LIV",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "golf",
+          "league": "liv",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/golf/liv/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=LIV%20Golf",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "LIV Golf"
+        },
+        "fallbackSFSymbol": "figure.golf"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "golf:lpga-tour",
+      "sport": "Golf",
+      "name": "LPGA Tour",
+      "pillLabel": "LPGA",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "golf",
+          "league": "lpga",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/golf/lpga/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=LPGA%20Tour",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "LPGA Tour"
+        },
+        "fallbackSFSymbol": "figure.golf"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "golf:olympic-men-s-golf",
+      "sport": "Golf",
+      "name": "Olympic Men's Golf",
+      "pillLabel": "OLY-M",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "golf",
+          "league": "mens-olympics-golf",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/golf/mens-olympics-golf/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Olympic%20Men%27s%20Golf",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Olympic Men's Golf"
+        },
+        "fallbackSFSymbol": "figure.golf"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "golf:olympic-women-s-golf",
+      "sport": "Golf",
+      "name": "Olympic Women's Golf",
+      "pillLabel": "OLY-W",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "golf",
+          "league": "womens-olympics-golf",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/golf/womens-olympics-golf/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Olympic%20Women%27s%20Golf",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Olympic Women's Golf"
+        },
+        "fallbackSFSymbol": "figure.golf"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "golf:pga-tour",
+      "sport": "Golf",
+      "name": "PGA Tour",
+      "pillLabel": "PGA",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "golf",
+          "league": "pga",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=PGA%20Tour",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "PGA Tour"
+        },
+        "fallbackSFSymbol": "figure.golf"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "golf:pga-tour-champions",
+      "sport": "Golf",
+      "name": "PGA Tour Champions",
+      "pillLabel": "PGATC",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "golf",
+          "league": "champions-tour",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/golf/champions-tour/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=PGA%20Tour%20Champions",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "PGA Tour Champions"
+        },
+        "fallbackSFSymbol": "figure.golf"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "golf:tgl",
+      "sport": "Golf",
+      "name": "TGL",
+      "pillLabel": "TGL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "golf",
+          "league": "tgl",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/golf/tgl/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=TGL",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "TGL"
+        },
+        "fallbackSFSymbol": "figure.golf"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "hockey:american-hockey-league",
+      "sport": "Hockey",
+      "name": "American Hockey League",
+      "pillLabel": "AHL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "hockey",
+          "league": "ahl",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/hockey/ahl/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=American%20Hockey%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "American Hockey League"
+        },
+        "fallbackSFSymbol": "hockey.puck.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "hockey:kontinental-hockey-league",
+      "sport": "Hockey",
+      "name": "Kontinental Hockey League",
+      "pillLabel": "KHL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "hockey",
+          "league": "khl",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/hockey/khl/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Kontinental%20Hockey%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Kontinental Hockey League"
+        },
+        "fallbackSFSymbol": "hockey.puck.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "hockey:national-hockey-league",
+      "sport": "Hockey",
+      "name": "National Hockey League",
+      "pillLabel": "NHL",
+      "logo": {
+        "directURL": "https://a.espncdn.com/i/teamlogos/leagues/500/nhl.png",
+        "primaryResolver": {
+          "type": "directImage",
+          "url": "https://a.espncdn.com/i/teamlogos/leagues/500/nhl.png"
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=National%20Hockey%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "National Hockey League"
+        },
+        "fallbackSFSymbol": "hockey.puck.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "hockey:ncaa-men-s-ice-hockey",
+      "sport": "Hockey",
+      "name": "NCAA Men's Ice Hockey",
+      "pillLabel": "NCAAM",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "hockey",
+          "league": "mens-college-hockey",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/hockey/mens-college-hockey/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=NCAA%20Men%27s%20Ice%20Hockey",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "NCAA Men's Ice Hockey"
+        },
+        "fallbackSFSymbol": "hockey.puck.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "hockey:ncaa-women-s-ice-hockey",
+      "sport": "Hockey",
+      "name": "NCAA Women's Ice Hockey",
+      "pillLabel": "NCAAW",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "hockey",
+          "league": "womens-college-hockey",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/hockey/womens-college-hockey/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=NCAA%20Women%27s%20Ice%20Hockey",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "NCAA Women's Ice Hockey"
+        },
+        "fallbackSFSymbol": "hockey.puck.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "hockey:olympic-men-s-ice-hockey",
+      "sport": "Hockey",
+      "name": "Olympic Men's Ice Hockey",
+      "pillLabel": "OLY-M",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "hockey",
+          "league": "mens-olympics-ice-hockey",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/hockey/mens-olympics-ice-hockey/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Olympic%20Men%27s%20Ice%20Hockey",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Olympic Men's Ice Hockey"
+        },
+        "fallbackSFSymbol": "hockey.puck.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "hockey:olympic-women-s-ice-hockey",
+      "sport": "Hockey",
+      "name": "Olympic Women's Ice Hockey",
+      "pillLabel": "OLY-W",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "hockey",
+          "league": "womens-olympics-ice-hockey",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/hockey/womens-olympics-ice-hockey/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Olympic%20Women%27s%20Ice%20Hockey",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Olympic Women's Ice Hockey"
+        },
+        "fallbackSFSymbol": "hockey.puck.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "hockey:professional-women-s-hockey-league",
+      "sport": "Hockey",
+      "name": "Professional Women's Hockey League",
+      "pillLabel": "PWHL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "hockey",
+          "league": "pwhl",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/hockey/pwhl/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Professional%20Women%27s%20Hockey%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Professional Women's Hockey League"
+        },
+        "fallbackSFSymbol": "hockey.puck.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "hockey:swedish-hockey-league",
+      "sport": "Hockey",
+      "name": "Swedish Hockey League",
+      "pillLabel": "SHL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "hockey",
+          "league": "swedish-hockey-league",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/hockey/swedish-hockey-league/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Swedish%20Hockey%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Swedish Hockey League"
+        },
+        "fallbackSFSymbol": "hockey.puck.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "hockey:world-cup-of-hockey",
+      "sport": "Hockey",
+      "name": "World Cup of Hockey",
+      "pillLabel": "WCH",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "hockey",
+          "league": "world-cup-of-hockey",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/hockey/world-cup-of-hockey/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=World%20Cup%20of%20Hockey",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "World Cup of Hockey"
+        },
+        "fallbackSFSymbol": "hockey.puck.fill"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "racing:fia-formula-2-championship",
+      "sport": "Racing",
+      "name": "FIA Formula 2 Championship",
+      "pillLabel": "F2",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "racing",
+          "league": "f2",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/racing/f2/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=FIA%20Formula%202%20Championship",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "FIA Formula 2 Championship"
+        },
+        "fallbackSFSymbol": "flag.checkered"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "racing:fia-formula-e-world-championship",
+      "sport": "Racing",
+      "name": "FIA Formula E World Championship",
+      "pillLabel": "Formula E",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "racing",
+          "league": "formula-e",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/racing/formula-e/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Formula%20E",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Formula E"
+        },
+        "fallbackSFSymbol": "flag.checkered"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "racing:fia-world-endurance-championship",
+      "sport": "Racing",
+      "name": "FIA World Endurance Championship",
+      "pillLabel": "WEC",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "racing",
+          "league": "wec",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/racing/wec/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=FIA%20World%20Endurance%20Championship",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "FIA World Endurance Championship"
+        },
+        "fallbackSFSymbol": "flag.checkered"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "racing:formula-1",
+      "sport": "Racing",
+      "name": "Formula 1",
+      "pillLabel": "F1",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "racing",
+          "league": "f1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/racing/f1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Formula%20One",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Formula One"
+        },
+        "fallbackSFSymbol": "flag.checkered"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "racing:indycar-series",
+      "sport": "Racing",
+      "name": "IndyCar Series",
+      "pillLabel": "INDYCAR",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "racing",
+          "league": "indycar",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/racing/indycar/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=IndyCar%20Series",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "IndyCar Series"
+        },
+        "fallbackSFSymbol": "flag.checkered"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "racing:motogp",
+      "sport": "Racing",
+      "name": "MotoGP",
+      "pillLabel": "MotoGP",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "racing",
+          "league": "motogp",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/racing/motogp/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=MotoGP",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "MotoGP"
+        },
+        "fallbackSFSymbol": "flag.checkered"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "racing:nascar-craftsman-truck-series",
+      "sport": "Racing",
+      "name": "NASCAR Craftsman Truck Series",
+      "pillLabel": "NASCAR Truck",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "racing",
+          "league": "nascar-truck",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/racing/nascar-truck/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=NASCAR%20Craftsman%20Truck%20Series",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "NASCAR Craftsman Truck Series"
+        },
+        "fallbackSFSymbol": "flag.checkered"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "racing:nascar-cup-series",
+      "sport": "Racing",
+      "name": "NASCAR Cup Series",
+      "pillLabel": "NASCAR Cup",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "racing",
+          "league": "nascar-cup",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/racing/nascar-cup/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=NASCAR%20Cup%20Series",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "NASCAR Cup Series"
+        },
+        "fallbackSFSymbol": "flag.checkered"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "racing:nascar-o-reilly-auto-parts-series",
+      "sport": "Racing",
+      "name": "NASCAR O'Reilly Auto Parts Series",
+      "pillLabel": "NASCAR O'Reilly",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "racing",
+          "league": "nascar-xfinity",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/racing/nascar-xfinity/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=NASCAR%20O%27Reilly%20Auto%20Parts%20Series",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "NASCAR O'Reilly Auto Parts Series"
+        },
+        "fallbackSFSymbol": "flag.checkered"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:a-league-men",
+      "sport": "Soccer",
+      "name": "A-League Men",
+      "pillLabel": "A-League",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "aus.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/aus.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=A-League%20Men",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "A-League Men"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:afc-champions-league-elite",
+      "sport": "Soccer",
+      "name": "AFC Champions League Elite",
+      "pillLabel": "ACLE",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "afc.champions",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/afc.champions/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=AFC%20Champions%20League%20Elite",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "AFC Champions League Elite"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:argentine-primera-division",
+      "sport": "Soccer",
+      "name": "Argentine Primera División",
+      "pillLabel": "LPF",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "arg.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/arg.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Argentine%20Primera%20Divisi%C3%B3n",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Argentine Primera División"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:belgian-pro-league",
+      "sport": "Soccer",
+      "name": "Belgian Pro League",
+      "pillLabel": "JPL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "bel.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/bel.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Belgian%20Pro%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Belgian Pro League"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:brasileirao-serie-a",
+      "sport": "Soccer",
+      "name": "Brasileirão Série A",
+      "pillLabel": "BRA1",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "bra.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/bra.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Brasileir%C3%A3o%20S%C3%A9rie%20A",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Brasileirão Série A"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:bundesliga",
+      "sport": "Soccer",
+      "name": "Bundesliga",
+      "pillLabel": "BUN",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "ger.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/ger.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Bundesliga",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Bundesliga"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:canadian-premier-league",
+      "sport": "Soccer",
+      "name": "Canadian Premier League",
+      "pillLabel": "CPL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "can.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/can.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Canadian%20Premier%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Canadian Premier League"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:chinese-super-league",
+      "sport": "Soccer",
+      "name": "Chinese Super League",
+      "pillLabel": "CSL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "chn.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/chn.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Chinese%20Super%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Chinese Super League"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:copa-libertadores",
+      "sport": "Soccer",
+      "name": "Copa Libertadores",
+      "pillLabel": "LIB",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "conmebol.libertadores",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/conmebol.libertadores/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Copa%20Libertadores",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Copa Libertadores"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:danish-superliga",
+      "sport": "Soccer",
+      "name": "Danish Superliga",
+      "pillLabel": "SUPERLIGA",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "den.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/den.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Danish%20Superliga",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Danish Superliga"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:efl-championship",
+      "sport": "Soccer",
+      "name": "EFL Championship",
+      "pillLabel": "EFL Championship",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "eng.2",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.2/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=EFL%20Championship",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "EFL Championship"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:eredivisie",
+      "sport": "Soccer",
+      "name": "Eredivisie",
+      "pillLabel": "ERE",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "ned.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/ned.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Eredivisie",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Eredivisie"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:fifa-club-world-cup",
+      "sport": "Soccer",
+      "name": "FIFA Club World Cup",
+      "pillLabel": "CWC",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "fifa.cwc",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.cwc/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=FIFA%20Club%20World%20Cup",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "FIFA Club World Cup"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:fifa-world-cup",
+      "sport": "Soccer",
+      "name": "FIFA World Cup",
+      "pillLabel": "WC",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "fifa.world",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=FIFA%20World%20Cup",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "FIFA World Cup"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:j1-league",
+      "sport": "Soccer",
+      "name": "J1 League",
+      "pillLabel": "J1",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "jpn.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/jpn.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=J1%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "J1 League"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:k-league-1",
+      "sport": "Soccer",
+      "name": "K League 1",
+      "pillLabel": "K1",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "kor.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/kor.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=K%20League%201",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "K League 1"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:la-liga",
+      "sport": "Soccer",
+      "name": "La Liga",
+      "pillLabel": "LALIGA",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "esp.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=La%20Liga",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "La Liga"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:liga-mx",
+      "sport": "Soccer",
+      "name": "Liga MX",
+      "pillLabel": "LIGAMX",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "mex.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/mex.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Liga%20MX",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Liga MX"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:ligue-1",
+      "sport": "Soccer",
+      "name": "Ligue 1",
+      "pillLabel": "L1",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "fra.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Ligue%201",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Ligue 1"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:major-league-soccer",
+      "sport": "Soccer",
+      "name": "Major League Soccer",
+      "pillLabel": "MLS",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "usa.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Major%20League%20Soccer",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Major League Soccer"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:national-women-s-soccer-league",
+      "sport": "Soccer",
+      "name": "National Women's Soccer League",
+      "pillLabel": "NWSL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "usa.nwsl",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/usa.nwsl/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=National%20Women%27s%20Soccer%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "National Women's Soccer League"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:premier-league",
+      "sport": "Soccer",
+      "name": "Premier League",
+      "pillLabel": "EPL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "eng.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Premier%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Premier League"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:primeira-liga",
+      "sport": "Soccer",
+      "name": "Primeira Liga",
+      "pillLabel": "Liga Portugal",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "por.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/por.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Primeira%20Liga",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Primeira Liga"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:saudi-pro-league",
+      "sport": "Soccer",
+      "name": "Saudi Pro League",
+      "pillLabel": "SPL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "ksa.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/ksa.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Saudi%20Pro%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Saudi Pro League"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:scottish-premiership",
+      "sport": "Soccer",
+      "name": "Scottish Premiership",
+      "pillLabel": "SPFL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "sco.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/sco.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Scottish%20Premiership",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Scottish Premiership"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:serie-a",
+      "sport": "Soccer",
+      "name": "Serie A",
+      "pillLabel": "Serie A",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "ita.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=Serie%20A",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Serie A"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:super-lig",
+      "sport": "Soccer",
+      "name": "Süper Lig",
+      "pillLabel": "Süper Lig",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "tur.1",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/tur.1/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=S%C3%BCper%20Lig",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "Süper Lig"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:uefa-champions-league",
+      "sport": "Soccer",
+      "name": "UEFA Champions League",
+      "pillLabel": "UCL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "uefa.champions",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=UEFA%20Champions%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "UEFA Champions League"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:uefa-conference-league",
+      "sport": "Soccer",
+      "name": "UEFA Conference League",
+      "pillLabel": "UECL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "uefa.europa.conf",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa.conf/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=UEFA%20Conference%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "UEFA Conference League"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "soccer:uefa-europa-league",
+      "sport": "Soccer",
+      "name": "UEFA Europa League",
+      "pillLabel": "UEL",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "soccer",
+          "league": "uefa.europa",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=UEFA%20Europa%20League",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "UEFA Europa League"
+        },
+        "fallbackSFSymbol": "soccerball"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "tennis:atp-challenger-tour",
+      "sport": "Tennis",
+      "name": "ATP Challenger Tour",
+      "pillLabel": "ATP Challenger",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "tennis",
+          "league": "atp-challenger",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/tennis/atp-challenger/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=ATP%20Challenger%20Tour",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "ATP Challenger Tour"
+        },
+        "fallbackSFSymbol": "figure.tennis"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "tennis:atp-tour",
+      "sport": "Tennis",
+      "name": "ATP Tour",
+      "pillLabel": "ATP",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "tennis",
+          "league": "atp",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/tennis/atp/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=ATP%20Tour",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "ATP Tour"
+        },
+        "fallbackSFSymbol": "figure.tennis"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "tennis:itf-men-s-world-tennis-tour",
+      "sport": "Tennis",
+      "name": "ITF Men's World Tennis Tour",
+      "pillLabel": "ITF Men",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=ITF%20Men%27s%20World%20Tennis%20Tour",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "ITF Men's World Tennis Tour"
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=ITF%20Men%27s%20World%20Tennis%20Tour",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "ITF Men's World Tennis Tour"
+        },
+        "fallbackSFSymbol": "figure.tennis"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "tennis:itf-women-s-world-tennis-tour",
+      "sport": "Tennis",
+      "name": "ITF Women's World Tennis Tour",
+      "pillLabel": "ITF Women",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=ITF%20Women%27s%20World%20Tennis%20Tour",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "ITF Women's World Tennis Tour"
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=ITF%20Women%27s%20World%20Tennis%20Tour",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "ITF Women's World Tennis Tour"
+        },
+        "fallbackSFSymbol": "figure.tennis"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "tennis:wta-125",
+      "sport": "Tennis",
+      "name": "WTA 125",
+      "pillLabel": "WTA 125",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "tennis",
+          "league": "wta-125",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/tennis/wta-125/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=WTA%20125",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "WTA 125"
+        },
+        "fallbackSFSymbol": "figure.tennis"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    },
+    {
+      "catalogLeagueId": "tennis:wta-tour",
+      "sport": "Tennis",
+      "name": "WTA Tour",
+      "pillLabel": "WTA",
+      "logo": {
+        "directURL": null,
+        "primaryResolver": {
+          "type": "espnLeagueMetadata",
+          "sport": "tennis",
+          "league": "wta",
+          "requestURL": "https://site.api.espn.com/apis/site/v2/sports/tennis/wta/scoreboard",
+          "logoArrayJSONPath": "leagues[0].logos",
+          "hrefJSONKey": "href",
+          "preference": [
+            "dark-background-compatible",
+            "default",
+            "first-valid"
+          ]
+        },
+        "fallbackResolver": {
+          "type": "wikipediaPageImage",
+          "requestURL": "https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&pithumbsize=128&origin=*&titles=WTA%20Tour",
+          "jsonPath": "query.pages.*.thumbnail.source",
+          "pageTitle": "WTA Tour"
+        },
+        "fallbackSFSymbol": "figure.tennis"
+      },
+      "pillRendering": {
+        "logoFrameWidth": 20,
+        "logoFrameHeight": 20,
+        "logoMaxWidth": 24,
+        "logoMaxHeight": 20,
+        "contentMode": "fit",
+        "preserveAspectRatio": true,
+        "clipToCircle": false,
+        "tintLogo": false,
+        "transparentBackgroundPreferred": true,
+        "gapAfterLogo": 6
+      }
+    }
+  ]
+}

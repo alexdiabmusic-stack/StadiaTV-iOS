@@ -1,16 +1,18 @@
 import SwiftUI
 
 /// Screen 1 of 3 — Sports + inline league expansion on one screen.
+/// Sports are laid out in N-column rows; selecting a sport appends its full-width
+/// league drawer directly below the row it belongs to.
 struct SportsSelectionView: View {
     @Bindable var store: OnboardingStore
     let onSportDeselect: (CatalogSport) -> Void
 
     @State private var expandedSportIDs: Set<String> = []
     @State private var showingAllLeagues: Set<String> = []
-    @State private var leagueSearch: [String: String] = [:]  // sportID → search text
+    @State private var leagueSearch: [String: String] = [:]
 
     @Environment(\.horizontalSizeClass) private var sizeClass
-    private var isIPad: Bool { sizeClass == .regular }
+    private var colCount: Int { sizeClass == .regular ? 4 : 2 }
 
     private let catalog = SportsCatalogRepository.shared
 
@@ -25,42 +27,57 @@ struct SportsSelectionView: View {
             )
 
             ScrollView {
-                VStack(spacing: 12) {
-                    sportGrid
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 32)
+                sportGrid
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 32)
             }
         }
     }
 
-    // MARK: - Sport grid
+    // MARK: - Sport grid (row-based)
 
     private var sportGrid: some View {
-        let columns: [GridItem] = isIPad
-            ? Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
-            : [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+        let sports = catalog.sports
+        let cols = colCount
+        let rowStarts = Array(stride(from: 0, to: sports.count, by: cols))
 
-        return LazyVGrid(columns: columns, spacing: 12) {
-            ForEach(catalog.sports) { sport in
-                VStack(spacing: 0) {
-                    SportCard(
-                        sport: sport,
-                        isSelected: store.isSportSelected(sport),
-                        onTap: { handleSportTap(sport) }
-                    )
+        return VStack(spacing: 12) {
+            ForEach(rowStarts, id: \.self) { rowStart in
+                let rowEnd = min(rowStart + cols, sports.count)
+                let rowSports = Array(sports[rowStart..<rowEnd])
+                let padding = cols - rowSports.count
 
-                    if store.isSportSelected(sport) && expandedSportIDs.contains(sport.id) {
-                        LeagueExpansion(
+                // Sport card row
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(rowSports) { sport in
+                        SportCard(
                             sport: sport,
-                            store: store,
-                            showingAll: showingAllLeagues.contains(sport.id),
-                            searchText: leagueSearch[sport.id] ?? "",
-                            onToggleAll: { toggleShowAll(sport) },
-                            onSearchChange: { text in leagueSearch[sport.id] = text }
+                            isSelected: store.isSportSelected(sport),
+                            onTap: { handleSportTap(sport) }
                         )
-                        .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
                     }
+                    // Pad incomplete last row so cards stay equal width
+                    if padding > 0 {
+                        ForEach(0..<padding, id: \.self) { _ in
+                            Color.clear.frame(maxWidth: .infinity)
+                        }
+                    }
+                }
+
+                // Full-width expansion drawers below this row
+                let expanded = rowSports.filter {
+                    store.isSportSelected($0) && expandedSportIDs.contains($0.id)
+                }
+                ForEach(expanded) { sport in
+                    LeagueExpansionDrawer(
+                        sport: sport,
+                        store: store,
+                        showingAll: showingAllLeagues.contains(sport.id),
+                        searchText: leagueSearch[sport.id] ?? "",
+                        onToggleAll: { toggleShowAll(sport) },
+                        onSearchChange: { leagueSearch[sport.id] = $0 }
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
         }
@@ -81,8 +98,7 @@ struct SportsSelectionView: View {
                 _ = expandedSportIDs.insert(sport.id)
             }
         }
-        let impactGenerator = UIImpactFeedbackGenerator(style: .light)
-        impactGenerator.impactOccurred()
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     private func toggleShowAll(_ sport: CatalogSport) {
@@ -143,9 +159,9 @@ private struct SportCard: View {
     }
 }
 
-// MARK: - League expansion panel
+// MARK: - League expansion drawer (full-width)
 
-private struct LeagueExpansion: View {
+private struct LeagueExpansionDrawer: View {
     let sport: CatalogSport
     @Bindable var store: OnboardingStore
     let showingAll: Bool
@@ -153,7 +169,7 @@ private struct LeagueExpansion: View {
     let onToggleAll: () -> Void
     let onSearchChange: (String) -> Void
 
-    private let maxInitial = 7
+    private let maxInitial = 8
     private let catalog = SportsCatalogRepository.shared
 
     private var allLeagues: [CatalogLeague] { catalog.leagues(for: sport) }
@@ -172,79 +188,114 @@ private struct LeagueExpansion: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Search field for large league lists
-            if allLeagues.count > maxInitial {
+            if allLeagues.count >= maxInitial {
                 LeagueSearchField(text: Binding(
                     get: { searchText },
                     set: { onSearchChange($0) }
                 ))
-                .padding(.top, 8)
+                .padding(.top, 4)
             }
 
-            // League chips
             FlowLayout(spacing: 8) {
                 ForEach(displayedLeagues) { league in
-                    LeagueChip(league: league,
-                               isSelected: store.isLeagueSelected(league)) {
+                    LeaguePill(
+                        league: league,
+                        isSelected: store.isLeagueSelected(league)
+                    ) {
                         withAnimation(.easeInOut(duration: 0.18)) {
                             store.toggleLeague(league, inSport: sport)
                         }
-                        let generator = UIImpactFeedbackGenerator(style: .light)
-                        generator.impactOccurred()
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     }
                 }
             }
 
-            // Show more / show less
             if allLeagues.count > maxInitial && searchText.isEmpty {
-                Button {
-                    onToggleAll()
-                } label: {
-                    Text(showingAll ? "Show fewer" : "Show all \(allLeagues.count) competitions")
+                let remaining = allLeagues.count - maxInitial
+                Button(action: onToggleAll) {
+                    Text(showingAll ? "Show fewer" : "Show \(remaining) more")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Theme.accent)
+                        .lineLimit(1)
+                        .fixedSize()
                 }
                 .buttonStyle(.plain)
                 .padding(.top, 2)
             }
         }
         .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .padding(.top, 6)
     }
 }
 
-// MARK: - League chip
+// MARK: - League pill (with logo)
 
-private struct LeagueChip: View {
+private struct LeaguePill: View {
     let league: CatalogLeague
     let isSelected: Bool
     let onTap: () -> Void
 
+    @State private var logoURL: URL?
+    private let logoRepo = LeagueLogoRepository.shared
+
+    private var displayLabel: String {
+        logoRepo.displayLabel(for: league.id) ?? league.abbreviation ?? league.name
+    }
+
+    private var fallbackSFSymbol: String? {
+        logoRepo.config(for: league.id)?.logo.fallbackSFSymbol
+    }
+
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 5) {
+            HStack(spacing: 6) {
                 if isSelected {
                     Image(systemName: "checkmark")
-                        .font(.caption2.weight(.bold))
+                        .font(.system(size: 11, weight: .bold))
+                        .transition(.scale.combined(with: .opacity))
                 }
-                Text(league.abbreviation ?? league.name)
+
+                // Logo area: remote image or SF Symbol fallback
+                ZStack {
+                    if let url = logoURL {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                            default:
+                                Color.clear
+                            }
+                        }
+                    } else if let symbol = fallbackSFSymbol {
+                        Image(systemName: symbol)
+                            .font(.system(size: 12))
+                            .foregroundStyle(isSelected ? .white.opacity(0.85) : Theme.textSecondary)
+                    }
+                }
+                .frame(width: 20, height: 20)
+
+                Text(displayLabel)
                     .font(.system(size: 13, weight: .medium))
                     .lineLimit(1)
             }
             .foregroundStyle(isSelected ? .white : Theme.textPrimary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                isSelected ? Theme.accent : Theme.surface,
-                in: Capsule()
-            )
+            .padding(.horizontal, isSelected ? 10 : 12)
+            .padding(.vertical, 0)
+            .frame(height: 36)
+            .background(isSelected ? Theme.accent : Theme.surface, in: Capsule())
             .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Theme.hairline, lineWidth: 1))
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(league.name)
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
         .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .task(id: league.id) {
+            logoURL = await logoRepo.logoURL(for: league.id)
+        }
     }
 }
 

@@ -75,45 +75,54 @@ struct LaunchAnimationView: View {
 
     @ViewBuilder
     private func animatedBrandMark(in geo: GeometryProxy) -> some View {
-        BrandMark(tvColor: tvColor)
-            .scaleEffect(logoScale * bounceScale)
-            .offset(y: logoOffset(in: geo))
-            .animation(
-                // No position/scale animation when Reduce Motion is enabled —
-                // the colour change still plays; the overlay simply fades out.
-                reduceMotion ? nil : .timingCurve(0.4, 0.0, 0.2, 1.0, duration: 0.58),
-                value: coordinator.isTransitioningToHome
-            )
-            .onChange(of: coordinator.phase) { _, newPhase in
-                guard newPhase == .brandComplete && !reduceMotion else { return }
-                // Spring pulse: logo scales up ~6 % then bounces back to rest.
-                // Completes ~500 ms before the travel animation fires.
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(80))
-                    withAnimation(.spring(response: 0.2, dampingFraction: 0.65)) {
-                        bounceScale = 1.06
-                    }
-                    try? await Task.sleep(for: .milliseconds(220))
-                    withAnimation(.spring(response: 0.38, dampingFraction: 0.42)) {
-                        bounceScale = 1.0
-                    }
+        // Render at the full splash height so the SVG is never upscaled.
+        // scaleEffect goes 1.0 → (1/splashScale) during the fly-to-navbar transition,
+        // scaling down cleanly instead of blurrily scaling up a small rasterised bitmap.
+        let splashHeight = Theme.scaled(22) * Self.splashScale
+        let isAllWhite = coordinator.phase == .brandWhite
+
+        ZStack {
+            Image("BannerTVBlue")
+                .resizable()
+                .scaledToFit()
+                .opacity(isAllWhite ? 0.0 : 1.0)
+            Image("BannerTVWhite")
+                .resizable()
+                .scaledToFit()
+                .opacity(isAllWhite ? 1.0 : 0.0)
+        }
+        .frame(height: splashHeight)
+        .scaleEffect(logoScale * bounceScale)
+        .offset(y: logoOffset(in: geo))
+        .animation(
+            // No position/scale animation when Reduce Motion is enabled —
+            // the colour change still plays; the overlay simply fades out.
+            reduceMotion ? nil : .timingCurve(0.4, 0.0, 0.2, 1.0, duration: 0.58),
+            value: coordinator.isTransitioningToHome
+        )
+        .onChange(of: coordinator.phase) { _, newPhase in
+            guard newPhase == .brandComplete && !reduceMotion else { return }
+            // Spring pulse: logo scales up ~6 % then bounces back to rest.
+            // Completes ~500 ms before the travel animation fires.
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(80))
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.65)) {
+                    bounceScale = 1.06
+                }
+                try? await Task.sleep(for: .milliseconds(220))
+                withAnimation(.spring(response: 0.38, dampingFraction: 0.42)) {
+                    bounceScale = 1.0
                 }
             }
+        }
     }
 
     // MARK: - Animated properties
 
-    /// The "TV" colour.  Changes from white → Banner blue when
-    /// `coordinator.phase` becomes `.colorizingTV`.  Because the coordinator
-    /// wraps the phase mutation in `withAnimation(.easeInOut(duration: 0.45))`,
-    /// SwiftUI interpolates the Color in that same transaction — no extra
-    /// state needed here.
-    private var tvColor: Color {
-        coordinator.phase == .brandWhite ? .white : Theme.accent
-    }
-
+    // logoScale is 1.0 while logo is on display at full splash size, then shrinks
+    // to 1/splashScale to match the toolbar BrandMark at the end of the fly animation.
     private var logoScale: CGFloat {
-        coordinator.isTransitioningToHome ? 1.0 : Self.splashScale
+        coordinator.isTransitioningToHome ? 1.0 / Self.splashScale : 1.0
     }
 
     /// Vertical offset that places the BrandMark at the nav-bar principal-item Y.

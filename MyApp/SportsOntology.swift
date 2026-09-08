@@ -174,7 +174,9 @@ nonisolated enum SportsOntology {
     ///
     /// Two `.unknown` values are never considered incompatible. Incompatibilities:
     /// - Different sport groups (basketball channel for hockey event)
-    /// - AHL vs NHL: same sport group but different competition level
+    /// - Within basketball: NBA / WNBA / NCAAM / NCAAW are separate competitions
+    /// - Within gridiron: NFL / CFL / NCAAF / UFL are separate competitions
+    /// - Within hockey: AHL ≠ NHL (affiliate vs top flight)
     static func isIncompatible(candidate: FeedFamily, with eventFamily: FeedFamily) -> Bool {
         guard candidate != .unknown, eventFamily != .unknown else { return false }
         guard candidate != eventFamily else { return false }
@@ -182,11 +184,17 @@ nonisolated enum SportsOntology {
         // Different sport groups → hard incompatibility
         if group(for: candidate) != group(for: eventFamily) { return true }
 
-        // Same group (hockey) but different competition level — AHL ≠ NHL.
-        // This is the primary defence against affiliate-team false positives
-        // (e.g. Toronto Marlies vs Toronto Maple Leafs).
-        if candidate == .ahl && eventFamily == .nhl { return true }
-        if candidate == .nhl && eventFamily == .ahl { return true }
+        // Same sport group but dedicated sub-league channel — each sub-league has its own
+        // branded channels that should never cross-match another competition in the group.
+        let basketballSubLeagues: Set<FeedFamily> = [.nba, .wnba, .ncaam, .ncaaw]
+        if basketballSubLeagues.contains(candidate) && basketballSubLeagues.contains(eventFamily) { return true }
+
+        let gridironSubLeagues: Set<FeedFamily> = [.nfl, .cfl, .ncaaf, .ufl]
+        if gridironSubLeagues.contains(candidate) && gridironSubLeagues.contains(eventFamily) { return true }
+
+        // AHL ≠ NHL — affiliate league vs top flight (same hockey group).
+        let hockeySubLeagues: Set<FeedFamily> = [.nhl, .ahl]
+        if hockeySubLeagues.contains(candidate) && hockeySubLeagues.contains(eventFamily) { return true }
 
         return false
     }

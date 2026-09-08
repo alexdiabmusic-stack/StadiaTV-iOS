@@ -26,13 +26,19 @@ nonisolated enum SourceMatcher {
         let awayTokens = teamTokens(for: match.away, league: match.league)
         let homeAliases = teamAliases(for: match.home, league: match.league).map { normalize($0) }
         let awayAliases = teamAliases(for: match.away, league: match.league).map { normalize($0) }
-        let eventTokens = eventTokens(from: match)
         let homeAbbr = match.home.abbreviation.lowercased()
         let awayAbbr = match.away.abbreviation.lowercased()
         let broadcasts = match.broadcasts.map { normalize($0) }
         let eventSpecificBroadcasters = eventBroadcasterAliases(for: match).map { normalize($0) }
         let leagueKeywords = (match.league.keywords + eventAliases(for: match)).map { normalize($0) }
         let leagueShort = normalize(match.league.shortName)
+
+        // Shared team tokens (e.g. "Los Angeles" for Lakers vs Clippers) must not confirm either
+        // team — filter them from both team matching and event-title generation before the loop.
+        let sharedTeamTokens = Set(homeTokens).intersection(Set(awayTokens))
+        let distinctHome = sharedTeamTokens.isEmpty ? homeTokens : homeTokens.filter { !sharedTeamTokens.contains($0) }
+        let distinctAway = sharedTeamTokens.isEmpty ? awayTokens : awayTokens.filter { !sharedTeamTokens.contains($0) }
+        let eventTokens = eventTokens(from: match, excluding: sharedTeamTokens)
 
         // Pre-compute event identity for hard conflict checks inside the channel loop.
         let eventFeedFamily = SportsOntology.feedFamily(for: match.league.path)
@@ -49,7 +55,8 @@ nonisolated enum SourceMatcher {
             // Channels whose name marks them as news or finance content never carry live sports.
             guard haystackTokens.isDisjoint(with: Self.nonSportsNameTokens) else { continue }
 
-            // HC-001: Feed family hard reject — wrong sport (e.g. NBA-branded channel for MLB event).
+            // HC-001: Feed family hard reject — wrong sport or wrong sub-league
+            // (e.g. NBA-branded channel for MLB event, WNBA-branded channel for NBA event).
             let channelFeedFamily = SportsOntology.classifyFeedFamily(from: channel.name)
             if SportsOntology.isIncompatible(candidate: channelFeedFamily, with: eventFeedFamily) { continue }
 
@@ -63,12 +70,6 @@ nonisolated enum SourceMatcher {
             let paddedHaystack = " \(haystack) "
             var score = 0
             var evidence: Set<StreamEvidenceCategory> = []
-
-            // Eliminate tokens shared by both teams before matching — "Los Angeles" appearing in both
-            // Lakers and Clippers cannot confirm either team from a channel named "ABC Los Angeles".
-            let sharedTeamTokens = Set(homeTokens).intersection(Set(awayTokens))
-            let distinctHome = sharedTeamTokens.isEmpty ? homeTokens : homeTokens.filter { !sharedTeamTokens.contains($0) }
-            let distinctAway = sharedTeamTokens.isEmpty ? awayTokens : awayTokens.filter { !sharedTeamTokens.contains($0) }
 
             let homeHit = matches(distinctHome.isEmpty ? homeTokens : distinctHome, tokens: haystackTokens) || aliasMatches(homeAliases, padded: paddedHaystack, tokens: haystackTokens)
             let awayHit = matches(distinctAway.isEmpty ? awayTokens : distinctAway, tokens: haystackTokens) || aliasMatches(awayAliases, padded: paddedHaystack, tokens: haystackTokens)
@@ -95,9 +96,24 @@ nonisolated enum SourceMatcher {
             if homeAbbr.count >= 3, haystackTokens.contains(homeAbbr) { score += 15 }
             if awayAbbr.count >= 3, haystackTokens.contains(awayAbbr) { score += 15 }
 
-            // Broadcast network on the channel name — require whole-word (single-word networks)
-            // or phrase-boundary (multi-word networks) to avoid "fox" matching "fox news".
-            for network in broadcasts where !network.isEmpty {
+            // Rights store broadcasters checked first so matched aliases can be deduplicated
+            // against the event metadata list below — a single broadcaster must not contribute
+            // both +70 (rights store) and +35 (event metadata) for a combined +105.
+            var rightStoreMatchedAliases: Set<String> = []
+            for alias in eventSpecificBroadcasters {
+                let hit = alias.contains(" ")
+                    ? paddedHaystack.contains(" \(alias) ")
+                    : haystackTokens.contains(alias)
+                if hit { rightStoreMatchedAliases.insert(alias) }
+            }
+            if !rightStoreMatchedAliases.isEmpty {
+                score += 70
+                evidence.insert(.broadcastRightsMatch)
+            }
+
+            // Broadcast network from event metadata — +35 per unique match not already
+            // scored via the rights store above.
+            for network in broadcasts where !network.isEmpty && !rightStoreMatchedAliases.contains(network) {
                 let hit = network.contains(" ")
                     ? paddedHaystack.contains(" \(network) ")
                     : haystackTokens.contains(network)
@@ -105,13 +121,6 @@ nonisolated enum SourceMatcher {
                     score += 35
                     evidence.insert(.broadcastRightsMatch)
                 }
-            }
-
-            // Known event-specific rights holders, used when ESPN's broadcast
-            // payload is sparse for events such as Tour de France stages.
-            if eventBroadcasterMatches(eventSpecificBroadcasters, padded: paddedHaystack, tokens: haystackTokens) {
-                score += 70
-                evidence.insert(.broadcastRightsMatch)
             }
 
             // League keywords — word-boundary only to prevent "nba" matching inside "wnba".
@@ -220,10 +229,6 @@ nonisolated enum SourceMatcher {
         }
     }
 
-    private static func eventBroadcasterMatches(_ aliases: [String], padded paddedHaystack: String, tokens haystackTokens: Set<String>) -> Bool {
-        aliasMatches(aliases, padded: paddedHaystack, tokens: haystackTokens)
-    }
-
     /// Matches any alias against a channel haystack using whole-word boundaries.
     /// Single-word aliases require a whole token; multi-word phrases require space-padded
     /// containment so "nba tv" does not match inside "wnba tv".
@@ -269,10 +274,10 @@ nonisolated enum SourceMatcher {
             .filter { $0.count >= 2 && !stopWords.contains($0) }
     }
 
-    private static func eventTokens(from match: Match) -> [String] {
+    private static func eventTokens(from match: Match, excluding sharedTokens: Set<String> = []) -> [String] {
         var seen: Set<String> = []
         return tokens(from: "\(match.name) \(match.shortName)")
-            .filter { $0.count >= 3 }
+            .filter { $0.count >= 3 && !sharedTokens.contains($0) }
             .filter { seen.insert($0).inserted }
     }
 

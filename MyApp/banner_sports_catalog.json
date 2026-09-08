@@ -1,0 +1,4117 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-08",
+  "catalogId": "banner-tv-onboarding-sports-v1",
+  "description": "Data-driven Banner TV onboarding catalog for the eight sports shown in the onboarding UI.",
+  "ordering": {
+    "sportsInFile": "alphabetical",
+    "leagues": "alphabetical within sport",
+    "teams": "alphabetical within league",
+    "uiSortOrder": "matches the sport order shown in the current Banner TV onboarding screen"
+  },
+  "coverage": {
+    "approach": "Bundle stable/current franchise memberships; flag promotion/relegation, qualification, college, and individual-sport memberships as dynamic so the app can resolve them from a live provider.",
+    "dynamicMembershipRule": "When membershipType is dynamic, qualification, or individual, an empty teams array is intentional and must not be displayed as a broken/empty team picker.",
+    "recommendedBehavior": "If selectionEntityType is player or constructor, route to the matching favorite-entity picker when implemented; otherwise skip team selection when there are no bundled teams."
+  },
+  "sports": [
+    {
+      "id": "baseball",
+      "name": "Baseball",
+      "uiSortOrder": 3,
+      "leagues": [
+        {
+          "id": "baseball:caribbean-series",
+          "name": "Caribbean Series",
+          "abbreviation": null,
+          "country": null,
+          "region": "Caribbean",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": "annual",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": "Representatives change each edition; resolve participants live.",
+          "sortOrder": 1
+        },
+        {
+          "id": "baseball:dominican-professional-baseball-league",
+          "name": "Dominican Professional Baseball League",
+          "abbreviation": "LIDOM",
+          "country": "Dominican Republic",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "baseball:dominican-professional-baseball-league:estrellas-orientales",
+              "name": "Estrellas Orientales",
+              "abbreviation": null,
+              "country": "Dominican Republic",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "baseball:dominican-professional-baseball-league:gigantes-del-cibao",
+              "name": "Gigantes del Cibao",
+              "abbreviation": null,
+              "country": "Dominican Republic",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "baseball:dominican-professional-baseball-league:leones-del-escogido",
+              "name": "Leones del Escogido",
+              "abbreviation": null,
+              "country": "Dominican Republic",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "baseball:dominican-professional-baseball-league:tigres-del-licey",
+              "name": "Tigres del Licey",
+              "abbreviation": null,
+              "country": "Dominican Republic",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "baseball:dominican-professional-baseball-league:toros-del-este",
+              "name": "Toros del Este",
+              "abbreviation": null,
+              "country": "Dominican Republic",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "baseball:dominican-professional-baseball-league:aguilas-cibaenas",
+              "name": "Águilas Cibaeñas",
+              "abbreviation": null,
+              "country": "Dominican Republic",
+              "aliases": [],
+              "sortOrder": 6
+            }
+          ],
+          "notes": null,
+          "sortOrder": 2
+        },
+        {
+          "id": "baseball:kbo-league",
+          "name": "KBO League",
+          "abbreviation": "KBO",
+          "country": "South Korea",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "baseball:kbo-league:doosan-bears",
+              "name": "Doosan Bears",
+              "abbreviation": null,
+              "country": "South Korea",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "baseball:kbo-league:hanwha-eagles",
+              "name": "Hanwha Eagles",
+              "abbreviation": null,
+              "country": "South Korea",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "baseball:kbo-league:kia-tigers",
+              "name": "Kia Tigers",
+              "abbreviation": null,
+              "country": "South Korea",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "baseball:kbo-league:kiwoom-heroes",
+              "name": "Kiwoom Heroes",
+              "abbreviation": null,
+              "country": "South Korea",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "baseball:kbo-league:kt-wiz",
+              "name": "KT Wiz",
+              "abbreviation": null,
+              "country": "South Korea",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "baseball:kbo-league:lg-twins",
+              "name": "LG Twins",
+              "abbreviation": null,
+              "country": "South Korea",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "baseball:kbo-league:lotte-giants",
+              "name": "Lotte Giants",
+              "abbreviation": null,
+              "country": "South Korea",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "baseball:kbo-league:nc-dinos",
+              "name": "NC Dinos",
+              "abbreviation": null,
+              "country": "South Korea",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "baseball:kbo-league:samsung-lions",
+              "name": "Samsung Lions",
+              "abbreviation": null,
+              "country": "South Korea",
+              "aliases": [],
+              "sortOrder": 9
+            },
+            {
+              "id": "baseball:kbo-league:ssg-landers",
+              "name": "SSG Landers",
+              "abbreviation": null,
+              "country": "South Korea",
+              "aliases": [],
+              "sortOrder": 10
+            }
+          ],
+          "notes": null,
+          "sortOrder": 3
+        },
+        {
+          "id": "baseball:liga-mexicana-de-beisbol",
+          "name": "Liga Mexicana de Béisbol",
+          "abbreviation": "LMB",
+          "country": "Mexico",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": "Use live catalog because club membership can change.",
+          "sortOrder": 4
+        },
+        {
+          "id": "baseball:major-league-baseball",
+          "name": "Major League Baseball",
+          "abbreviation": "MLB",
+          "country": null,
+          "region": "North America",
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "baseball:major-league-baseball:arizona-diamondbacks",
+              "name": "Arizona Diamondbacks",
+              "abbreviation": "ARI",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "baseball:major-league-baseball:athletics",
+              "name": "Athletics",
+              "abbreviation": "ATH",
+              "country": "United States",
+              "aliases": [
+                "A's",
+                "Oakland Athletics"
+              ],
+              "sortOrder": 2
+            },
+            {
+              "id": "baseball:major-league-baseball:atlanta-braves",
+              "name": "Atlanta Braves",
+              "abbreviation": "ATL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "baseball:major-league-baseball:baltimore-orioles",
+              "name": "Baltimore Orioles",
+              "abbreviation": "BAL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "baseball:major-league-baseball:boston-red-sox",
+              "name": "Boston Red Sox",
+              "abbreviation": "BOS",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "baseball:major-league-baseball:chicago-cubs",
+              "name": "Chicago Cubs",
+              "abbreviation": "CHC",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "baseball:major-league-baseball:chicago-white-sox",
+              "name": "Chicago White Sox",
+              "abbreviation": "CWS",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "baseball:major-league-baseball:cincinnati-reds",
+              "name": "Cincinnati Reds",
+              "abbreviation": "CIN",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "baseball:major-league-baseball:cleveland-guardians",
+              "name": "Cleveland Guardians",
+              "abbreviation": "CLE",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 9
+            },
+            {
+              "id": "baseball:major-league-baseball:colorado-rockies",
+              "name": "Colorado Rockies",
+              "abbreviation": "COL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 10
+            },
+            {
+              "id": "baseball:major-league-baseball:detroit-tigers",
+              "name": "Detroit Tigers",
+              "abbreviation": "DET",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 11
+            },
+            {
+              "id": "baseball:major-league-baseball:houston-astros",
+              "name": "Houston Astros",
+              "abbreviation": "HOU",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 12
+            },
+            {
+              "id": "baseball:major-league-baseball:kansas-city-royals",
+              "name": "Kansas City Royals",
+              "abbreviation": "KC",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 13
+            },
+            {
+              "id": "baseball:major-league-baseball:los-angeles-angels",
+              "name": "Los Angeles Angels",
+              "abbreviation": "LAA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 14
+            },
+            {
+              "id": "baseball:major-league-baseball:los-angeles-dodgers",
+              "name": "Los Angeles Dodgers",
+              "abbreviation": "LAD",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 15
+            },
+            {
+              "id": "baseball:major-league-baseball:miami-marlins",
+              "name": "Miami Marlins",
+              "abbreviation": "MIA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 16
+            },
+            {
+              "id": "baseball:major-league-baseball:milwaukee-brewers",
+              "name": "Milwaukee Brewers",
+              "abbreviation": "MIL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 17
+            },
+            {
+              "id": "baseball:major-league-baseball:minnesota-twins",
+              "name": "Minnesota Twins",
+              "abbreviation": "MIN",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 18
+            },
+            {
+              "id": "baseball:major-league-baseball:new-york-mets",
+              "name": "New York Mets",
+              "abbreviation": "NYM",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 19
+            },
+            {
+              "id": "baseball:major-league-baseball:new-york-yankees",
+              "name": "New York Yankees",
+              "abbreviation": "NYY",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 20
+            },
+            {
+              "id": "baseball:major-league-baseball:philadelphia-phillies",
+              "name": "Philadelphia Phillies",
+              "abbreviation": "PHI",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 21
+            },
+            {
+              "id": "baseball:major-league-baseball:pittsburgh-pirates",
+              "name": "Pittsburgh Pirates",
+              "abbreviation": "PIT",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 22
+            },
+            {
+              "id": "baseball:major-league-baseball:san-diego-padres",
+              "name": "San Diego Padres",
+              "abbreviation": "SD",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 23
+            },
+            {
+              "id": "baseball:major-league-baseball:san-francisco-giants",
+              "name": "San Francisco Giants",
+              "abbreviation": "SF",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 24
+            },
+            {
+              "id": "baseball:major-league-baseball:seattle-mariners",
+              "name": "Seattle Mariners",
+              "abbreviation": "SEA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 25
+            },
+            {
+              "id": "baseball:major-league-baseball:st-louis-cardinals",
+              "name": "St. Louis Cardinals",
+              "abbreviation": "STL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 26
+            },
+            {
+              "id": "baseball:major-league-baseball:tampa-bay-rays",
+              "name": "Tampa Bay Rays",
+              "abbreviation": "TB",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 27
+            },
+            {
+              "id": "baseball:major-league-baseball:texas-rangers",
+              "name": "Texas Rangers",
+              "abbreviation": "TEX",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 28
+            },
+            {
+              "id": "baseball:major-league-baseball:toronto-blue-jays",
+              "name": "Toronto Blue Jays",
+              "abbreviation": "TOR",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 29
+            },
+            {
+              "id": "baseball:major-league-baseball:washington-nationals",
+              "name": "Washington Nationals",
+              "abbreviation": "WSH",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 30
+            }
+          ],
+          "notes": null,
+          "sortOrder": 5
+        },
+        {
+          "id": "baseball:ncaa-division-i-baseball",
+          "name": "NCAA Division I Baseball",
+          "abbreviation": "NCAA",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": "Hundreds of programs; fetch from live provider rather than bundling a stale list.",
+          "sortOrder": 6
+        },
+        {
+          "id": "baseball:nippon-professional-baseball",
+          "name": "Nippon Professional Baseball",
+          "abbreviation": "NPB",
+          "country": "Japan",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "baseball:nippon-professional-baseball:chiba-lotte-marines",
+              "name": "Chiba Lotte Marines",
+              "abbreviation": null,
+              "country": "Japan",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "baseball:nippon-professional-baseball:chunichi-dragons",
+              "name": "Chunichi Dragons",
+              "abbreviation": null,
+              "country": "Japan",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "baseball:nippon-professional-baseball:fukuoka-softbank-hawks",
+              "name": "Fukuoka SoftBank Hawks",
+              "abbreviation": null,
+              "country": "Japan",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "baseball:nippon-professional-baseball:hanshin-tigers",
+              "name": "Hanshin Tigers",
+              "abbreviation": null,
+              "country": "Japan",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "baseball:nippon-professional-baseball:hiroshima-toyo-carp",
+              "name": "Hiroshima Toyo Carp",
+              "abbreviation": null,
+              "country": "Japan",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "baseball:nippon-professional-baseball:hokkaido-nippon-ham-fighters",
+              "name": "Hokkaido Nippon-Ham Fighters",
+              "abbreviation": null,
+              "country": "Japan",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "baseball:nippon-professional-baseball:orix-buffaloes",
+              "name": "Orix Buffaloes",
+              "abbreviation": null,
+              "country": "Japan",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "baseball:nippon-professional-baseball:saitama-seibu-lions",
+              "name": "Saitama Seibu Lions",
+              "abbreviation": null,
+              "country": "Japan",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "baseball:nippon-professional-baseball:tohoku-rakuten-golden-eagles",
+              "name": "Tohoku Rakuten Golden Eagles",
+              "abbreviation": null,
+              "country": "Japan",
+              "aliases": [],
+              "sortOrder": 9
+            },
+            {
+              "id": "baseball:nippon-professional-baseball:tokyo-yakult-swallows",
+              "name": "Tokyo Yakult Swallows",
+              "abbreviation": null,
+              "country": "Japan",
+              "aliases": [],
+              "sortOrder": 10
+            },
+            {
+              "id": "baseball:nippon-professional-baseball:yokohama-dena-baystars",
+              "name": "Yokohama DeNA BayStars",
+              "abbreviation": null,
+              "country": "Japan",
+              "aliases": [],
+              "sortOrder": 11
+            },
+            {
+              "id": "baseball:nippon-professional-baseball:yomiuri-giants",
+              "name": "Yomiuri Giants",
+              "abbreviation": null,
+              "country": "Japan",
+              "aliases": [],
+              "sortOrder": 12
+            }
+          ],
+          "notes": null,
+          "sortOrder": 7
+        },
+        {
+          "id": "baseball:olympic-baseball",
+          "name": "Olympic Baseball",
+          "abbreviation": "OLY",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 8
+        },
+        {
+          "id": "baseball:puerto-rico-professional-baseball-league",
+          "name": "Puerto Rico Professional Baseball League",
+          "abbreviation": "LBPRC",
+          "country": "Puerto Rico",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 9
+        },
+        {
+          "id": "baseball:venezuelan-professional-baseball-league",
+          "name": "Venezuelan Professional Baseball League",
+          "abbreviation": "LVBP",
+          "country": "Venezuela",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "baseball:venezuelan-professional-baseball-league:bravos-de-margarita",
+              "name": "Bravos de Margarita",
+              "abbreviation": null,
+              "country": "Venezuela",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "baseball:venezuelan-professional-baseball-league:cardenales-de-lara",
+              "name": "Cardenales de Lara",
+              "abbreviation": null,
+              "country": "Venezuela",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "baseball:venezuelan-professional-baseball-league:caribes-de-anzoategui",
+              "name": "Caribes de Anzoátegui",
+              "abbreviation": null,
+              "country": "Venezuela",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "baseball:venezuelan-professional-baseball-league:leones-del-caracas",
+              "name": "Leones del Caracas",
+              "abbreviation": null,
+              "country": "Venezuela",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "baseball:venezuelan-professional-baseball-league:navegantes-del-magallanes",
+              "name": "Navegantes del Magallanes",
+              "abbreviation": null,
+              "country": "Venezuela",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "baseball:venezuelan-professional-baseball-league:tiburones-de-la-guaira",
+              "name": "Tiburones de La Guaira",
+              "abbreviation": null,
+              "country": "Venezuela",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "baseball:venezuelan-professional-baseball-league:tigres-de-aragua",
+              "name": "Tigres de Aragua",
+              "abbreviation": null,
+              "country": "Venezuela",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "baseball:venezuelan-professional-baseball-league:aguilas-del-zulia",
+              "name": "Águilas del Zulia",
+              "abbreviation": null,
+              "country": "Venezuela",
+              "aliases": [],
+              "sortOrder": 8
+            }
+          ],
+          "notes": null,
+          "sortOrder": 10
+        },
+        {
+          "id": "baseball:world-baseball-classic",
+          "name": "World Baseball Classic",
+          "abbreviation": "WBC",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 11
+        }
+      ]
+    },
+    {
+      "id": "basketball",
+      "name": "Basketball",
+      "uiSortOrder": 2,
+      "leagues": [
+        {
+          "id": "basketball:australian-national-basketball-league",
+          "name": "Australian National Basketball League",
+          "abbreviation": "NBL",
+          "country": null,
+          "region": "Australia / New Zealand",
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "basketball:australian-national-basketball-league:adelaide-36ers",
+              "name": "Adelaide 36ers",
+              "abbreviation": null,
+              "country": "Australia",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "basketball:australian-national-basketball-league:brisbane-bullets",
+              "name": "Brisbane Bullets",
+              "abbreviation": null,
+              "country": "Australia",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "basketball:australian-national-basketball-league:cairns-taipans",
+              "name": "Cairns Taipans",
+              "abbreviation": null,
+              "country": "Australia",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "basketball:australian-national-basketball-league:illawarra-hawks",
+              "name": "Illawarra Hawks",
+              "abbreviation": null,
+              "country": "Australia",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "basketball:australian-national-basketball-league:melbourne-united",
+              "name": "Melbourne United",
+              "abbreviation": null,
+              "country": "Australia",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "basketball:australian-national-basketball-league:new-zealand-breakers",
+              "name": "New Zealand Breakers",
+              "abbreviation": null,
+              "country": "New Zealand",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "basketball:australian-national-basketball-league:perth-wildcats",
+              "name": "Perth Wildcats",
+              "abbreviation": null,
+              "country": "Australia",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "basketball:australian-national-basketball-league:south-east-melbourne-phoenix",
+              "name": "South East Melbourne Phoenix",
+              "abbreviation": null,
+              "country": "Australia",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "basketball:australian-national-basketball-league:sydney-kings",
+              "name": "Sydney Kings",
+              "abbreviation": null,
+              "country": "Australia",
+              "aliases": [],
+              "sortOrder": 9
+            },
+            {
+              "id": "basketball:australian-national-basketball-league:tasmania-jackjumpers",
+              "name": "Tasmania JackJumpers",
+              "abbreviation": null,
+              "country": "Australia",
+              "aliases": [],
+              "sortOrder": 10
+            }
+          ],
+          "notes": null,
+          "sortOrder": 1
+        },
+        {
+          "id": "basketball:euroleague",
+          "name": "EuroLeague",
+          "abbreviation": "EUROLEAGUE",
+          "country": null,
+          "region": "Europe",
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 2
+        },
+        {
+          "id": "basketball:fiba-basketball-world-cup",
+          "name": "FIBA Basketball World Cup",
+          "abbreviation": "FIBA",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 3
+        },
+        {
+          "id": "basketball:nba",
+          "name": "NBA",
+          "abbreviation": "NBA",
+          "country": null,
+          "region": "North America",
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "basketball:nba:atlanta-hawks",
+              "name": "Atlanta Hawks",
+              "abbreviation": "ATL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "basketball:nba:boston-celtics",
+              "name": "Boston Celtics",
+              "abbreviation": "BOS",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "basketball:nba:brooklyn-nets",
+              "name": "Brooklyn Nets",
+              "abbreviation": "BKN",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "basketball:nba:charlotte-hornets",
+              "name": "Charlotte Hornets",
+              "abbreviation": "CHA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "basketball:nba:chicago-bulls",
+              "name": "Chicago Bulls",
+              "abbreviation": "CHI",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "basketball:nba:cleveland-cavaliers",
+              "name": "Cleveland Cavaliers",
+              "abbreviation": "CLE",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "basketball:nba:dallas-mavericks",
+              "name": "Dallas Mavericks",
+              "abbreviation": "DAL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "basketball:nba:denver-nuggets",
+              "name": "Denver Nuggets",
+              "abbreviation": "DEN",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "basketball:nba:detroit-pistons",
+              "name": "Detroit Pistons",
+              "abbreviation": "DET",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 9
+            },
+            {
+              "id": "basketball:nba:golden-state-warriors",
+              "name": "Golden State Warriors",
+              "abbreviation": "GSW",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 10
+            },
+            {
+              "id": "basketball:nba:houston-rockets",
+              "name": "Houston Rockets",
+              "abbreviation": "HOU",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 11
+            },
+            {
+              "id": "basketball:nba:indiana-pacers",
+              "name": "Indiana Pacers",
+              "abbreviation": "IND",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 12
+            },
+            {
+              "id": "basketball:nba:la-clippers",
+              "name": "LA Clippers",
+              "abbreviation": "LAC",
+              "country": "United States",
+              "aliases": [
+                "Los Angeles Clippers"
+              ],
+              "sortOrder": 13
+            },
+            {
+              "id": "basketball:nba:los-angeles-lakers",
+              "name": "Los Angeles Lakers",
+              "abbreviation": "LAL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 14
+            },
+            {
+              "id": "basketball:nba:memphis-grizzlies",
+              "name": "Memphis Grizzlies",
+              "abbreviation": "MEM",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 15
+            },
+            {
+              "id": "basketball:nba:miami-heat",
+              "name": "Miami Heat",
+              "abbreviation": "MIA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 16
+            },
+            {
+              "id": "basketball:nba:milwaukee-bucks",
+              "name": "Milwaukee Bucks",
+              "abbreviation": "MIL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 17
+            },
+            {
+              "id": "basketball:nba:minnesota-timberwolves",
+              "name": "Minnesota Timberwolves",
+              "abbreviation": "MIN",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 18
+            },
+            {
+              "id": "basketball:nba:new-orleans-pelicans",
+              "name": "New Orleans Pelicans",
+              "abbreviation": "NOP",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 19
+            },
+            {
+              "id": "basketball:nba:new-york-knicks",
+              "name": "New York Knicks",
+              "abbreviation": "NYK",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 20
+            },
+            {
+              "id": "basketball:nba:oklahoma-city-thunder",
+              "name": "Oklahoma City Thunder",
+              "abbreviation": "OKC",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 21
+            },
+            {
+              "id": "basketball:nba:orlando-magic",
+              "name": "Orlando Magic",
+              "abbreviation": "ORL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 22
+            },
+            {
+              "id": "basketball:nba:philadelphia-76ers",
+              "name": "Philadelphia 76ers",
+              "abbreviation": "PHI",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 23
+            },
+            {
+              "id": "basketball:nba:phoenix-suns",
+              "name": "Phoenix Suns",
+              "abbreviation": "PHX",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 24
+            },
+            {
+              "id": "basketball:nba:portland-trail-blazers",
+              "name": "Portland Trail Blazers",
+              "abbreviation": "POR",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 25
+            },
+            {
+              "id": "basketball:nba:sacramento-kings",
+              "name": "Sacramento Kings",
+              "abbreviation": "SAC",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 26
+            },
+            {
+              "id": "basketball:nba:san-antonio-spurs",
+              "name": "San Antonio Spurs",
+              "abbreviation": "SAS",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 27
+            },
+            {
+              "id": "basketball:nba:toronto-raptors",
+              "name": "Toronto Raptors",
+              "abbreviation": "TOR",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 28
+            },
+            {
+              "id": "basketball:nba:utah-jazz",
+              "name": "Utah Jazz",
+              "abbreviation": "UTA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 29
+            },
+            {
+              "id": "basketball:nba:washington-wizards",
+              "name": "Washington Wizards",
+              "abbreviation": "WAS",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 30
+            }
+          ],
+          "notes": null,
+          "sortOrder": 4
+        },
+        {
+          "id": "basketball:nba-g-league",
+          "name": "NBA G League",
+          "abbreviation": "G League",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 5
+        },
+        {
+          "id": "basketball:ncaa-men-s-basketball",
+          "name": "NCAA Men's Basketball",
+          "abbreviation": "NCAAM",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 6
+        },
+        {
+          "id": "basketball:ncaa-women-s-basketball",
+          "name": "NCAA Women's Basketball",
+          "abbreviation": "NCAAW",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 7
+        },
+        {
+          "id": "basketball:olympic-men-s-basketball",
+          "name": "Olympic Men's Basketball",
+          "abbreviation": "OLY-M",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 8
+        },
+        {
+          "id": "basketball:olympic-women-s-basketball",
+          "name": "Olympic Women's Basketball",
+          "abbreviation": "OLY-W",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 9
+        },
+        {
+          "id": "basketball:wnba",
+          "name": "WNBA",
+          "abbreviation": "WNBA",
+          "country": null,
+          "region": "North America",
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "basketball:wnba:atlanta-dream",
+              "name": "Atlanta Dream",
+              "abbreviation": "ATL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "basketball:wnba:chicago-sky",
+              "name": "Chicago Sky",
+              "abbreviation": "CHI",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "basketball:wnba:connecticut-sun",
+              "name": "Connecticut Sun",
+              "abbreviation": "CON",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "basketball:wnba:dallas-wings",
+              "name": "Dallas Wings",
+              "abbreviation": "DAL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "basketball:wnba:golden-state-valkyries",
+              "name": "Golden State Valkyries",
+              "abbreviation": "GSV",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "basketball:wnba:indiana-fever",
+              "name": "Indiana Fever",
+              "abbreviation": "IND",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "basketball:wnba:las-vegas-aces",
+              "name": "Las Vegas Aces",
+              "abbreviation": "LVA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "basketball:wnba:los-angeles-sparks",
+              "name": "Los Angeles Sparks",
+              "abbreviation": "LAS",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "basketball:wnba:minnesota-lynx",
+              "name": "Minnesota Lynx",
+              "abbreviation": "MIN",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 9
+            },
+            {
+              "id": "basketball:wnba:new-york-liberty",
+              "name": "New York Liberty",
+              "abbreviation": "NYL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 10
+            },
+            {
+              "id": "basketball:wnba:phoenix-mercury",
+              "name": "Phoenix Mercury",
+              "abbreviation": "PHX",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 11
+            },
+            {
+              "id": "basketball:wnba:portland-fire",
+              "name": "Portland Fire",
+              "abbreviation": "POR",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 12
+            },
+            {
+              "id": "basketball:wnba:seattle-storm",
+              "name": "Seattle Storm",
+              "abbreviation": "SEA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 13
+            },
+            {
+              "id": "basketball:wnba:toronto-tempo",
+              "name": "Toronto Tempo",
+              "abbreviation": "TOR",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 14
+            },
+            {
+              "id": "basketball:wnba:washington-mystics",
+              "name": "Washington Mystics",
+              "abbreviation": "WAS",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 15
+            }
+          ],
+          "notes": null,
+          "sortOrder": 10
+        }
+      ]
+    },
+    {
+      "id": "football",
+      "name": "Football",
+      "uiSortOrder": 1,
+      "leagues": [
+        {
+          "id": "football:canadian-football-league",
+          "name": "Canadian Football League",
+          "abbreviation": "CFL",
+          "country": "Canada",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "football:canadian-football-league:bc-lions",
+              "name": "BC Lions",
+              "abbreviation": "BC",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "football:canadian-football-league:calgary-stampeders",
+              "name": "Calgary Stampeders",
+              "abbreviation": "CGY",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "football:canadian-football-league:edmonton-elks",
+              "name": "Edmonton Elks",
+              "abbreviation": "EDM",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "football:canadian-football-league:hamilton-tiger-cats",
+              "name": "Hamilton Tiger-Cats",
+              "abbreviation": "HAM",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "football:canadian-football-league:montreal-alouettes",
+              "name": "Montreal Alouettes",
+              "abbreviation": "MTL",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "football:canadian-football-league:ottawa-redblacks",
+              "name": "Ottawa Redblacks",
+              "abbreviation": "OTT",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "football:canadian-football-league:saskatchewan-roughriders",
+              "name": "Saskatchewan Roughriders",
+              "abbreviation": "SSK",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "football:canadian-football-league:toronto-argonauts",
+              "name": "Toronto Argonauts",
+              "abbreviation": "TOR",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "football:canadian-football-league:winnipeg-blue-bombers",
+              "name": "Winnipeg Blue Bombers",
+              "abbreviation": "WPG",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 9
+            }
+          ],
+          "notes": null,
+          "sortOrder": 1
+        },
+        {
+          "id": "football:national-football-league",
+          "name": "National Football League",
+          "abbreviation": "NFL",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "football:national-football-league:arizona-cardinals",
+              "name": "Arizona Cardinals",
+              "abbreviation": "ARI",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "football:national-football-league:atlanta-falcons",
+              "name": "Atlanta Falcons",
+              "abbreviation": "ATL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "football:national-football-league:baltimore-ravens",
+              "name": "Baltimore Ravens",
+              "abbreviation": "BAL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "football:national-football-league:buffalo-bills",
+              "name": "Buffalo Bills",
+              "abbreviation": "BUF",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "football:national-football-league:carolina-panthers",
+              "name": "Carolina Panthers",
+              "abbreviation": "CAR",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "football:national-football-league:chicago-bears",
+              "name": "Chicago Bears",
+              "abbreviation": "CHI",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "football:national-football-league:cincinnati-bengals",
+              "name": "Cincinnati Bengals",
+              "abbreviation": "CIN",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "football:national-football-league:cleveland-browns",
+              "name": "Cleveland Browns",
+              "abbreviation": "CLE",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "football:national-football-league:dallas-cowboys",
+              "name": "Dallas Cowboys",
+              "abbreviation": "DAL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 9
+            },
+            {
+              "id": "football:national-football-league:denver-broncos",
+              "name": "Denver Broncos",
+              "abbreviation": "DEN",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 10
+            },
+            {
+              "id": "football:national-football-league:detroit-lions",
+              "name": "Detroit Lions",
+              "abbreviation": "DET",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 11
+            },
+            {
+              "id": "football:national-football-league:green-bay-packers",
+              "name": "Green Bay Packers",
+              "abbreviation": "GB",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 12
+            },
+            {
+              "id": "football:national-football-league:houston-texans",
+              "name": "Houston Texans",
+              "abbreviation": "HOU",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 13
+            },
+            {
+              "id": "football:national-football-league:indianapolis-colts",
+              "name": "Indianapolis Colts",
+              "abbreviation": "IND",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 14
+            },
+            {
+              "id": "football:national-football-league:jacksonville-jaguars",
+              "name": "Jacksonville Jaguars",
+              "abbreviation": "JAX",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 15
+            },
+            {
+              "id": "football:national-football-league:kansas-city-chiefs",
+              "name": "Kansas City Chiefs",
+              "abbreviation": "KC",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 16
+            },
+            {
+              "id": "football:national-football-league:las-vegas-raiders",
+              "name": "Las Vegas Raiders",
+              "abbreviation": "LV",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 17
+            },
+            {
+              "id": "football:national-football-league:los-angeles-chargers",
+              "name": "Los Angeles Chargers",
+              "abbreviation": "LAC",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 18
+            },
+            {
+              "id": "football:national-football-league:los-angeles-rams",
+              "name": "Los Angeles Rams",
+              "abbreviation": "LAR",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 19
+            },
+            {
+              "id": "football:national-football-league:miami-dolphins",
+              "name": "Miami Dolphins",
+              "abbreviation": "MIA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 20
+            },
+            {
+              "id": "football:national-football-league:minnesota-vikings",
+              "name": "Minnesota Vikings",
+              "abbreviation": "MIN",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 21
+            },
+            {
+              "id": "football:national-football-league:new-england-patriots",
+              "name": "New England Patriots",
+              "abbreviation": "NE",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 22
+            },
+            {
+              "id": "football:national-football-league:new-orleans-saints",
+              "name": "New Orleans Saints",
+              "abbreviation": "NO",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 23
+            },
+            {
+              "id": "football:national-football-league:new-york-giants",
+              "name": "New York Giants",
+              "abbreviation": "NYG",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 24
+            },
+            {
+              "id": "football:national-football-league:new-york-jets",
+              "name": "New York Jets",
+              "abbreviation": "NYJ",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 25
+            },
+            {
+              "id": "football:national-football-league:philadelphia-eagles",
+              "name": "Philadelphia Eagles",
+              "abbreviation": "PHI",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 26
+            },
+            {
+              "id": "football:national-football-league:pittsburgh-steelers",
+              "name": "Pittsburgh Steelers",
+              "abbreviation": "PIT",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 27
+            },
+            {
+              "id": "football:national-football-league:san-francisco-49ers",
+              "name": "San Francisco 49ers",
+              "abbreviation": "SF",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 28
+            },
+            {
+              "id": "football:national-football-league:seattle-seahawks",
+              "name": "Seattle Seahawks",
+              "abbreviation": "SEA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 29
+            },
+            {
+              "id": "football:national-football-league:tampa-bay-buccaneers",
+              "name": "Tampa Bay Buccaneers",
+              "abbreviation": "TB",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 30
+            },
+            {
+              "id": "football:national-football-league:tennessee-titans",
+              "name": "Tennessee Titans",
+              "abbreviation": "TEN",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 31
+            },
+            {
+              "id": "football:national-football-league:washington-commanders",
+              "name": "Washington Commanders",
+              "abbreviation": "WAS",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 32
+            }
+          ],
+          "notes": null,
+          "sortOrder": 2
+        },
+        {
+          "id": "football:ncaa-football",
+          "name": "NCAA Football",
+          "abbreviation": "NCAA",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": "Large college catalog; resolve teams live.",
+          "sortOrder": 3
+        },
+        {
+          "id": "football:united-football-league",
+          "name": "United Football League",
+          "abbreviation": "UFL",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "football:united-football-league:birmingham-stallions",
+              "name": "Birmingham Stallions",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "football:united-football-league:columbus-aviators",
+              "name": "Columbus Aviators",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "football:united-football-league:d-c-defenders",
+              "name": "D.C. Defenders",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "football:united-football-league:dallas-renegades",
+              "name": "Dallas Renegades",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "football:united-football-league:houston-gamblers",
+              "name": "Houston Gamblers",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "football:united-football-league:louisville-kings",
+              "name": "Louisville Kings",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "football:united-football-league:orlando-storm",
+              "name": "Orlando Storm",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "football:united-football-league:st-louis-battlehawks",
+              "name": "St. Louis Battlehawks",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 8
+            }
+          ],
+          "notes": "2026 membership snapshot; league realignment is expected for 2027.",
+          "sortOrder": 4
+        }
+      ]
+    },
+    {
+      "id": "golf",
+      "name": "Golf",
+      "uiSortOrder": 7,
+      "leagues": [
+        {
+          "id": "golf:dp-world-tour",
+          "name": "DP World Tour",
+          "abbreviation": "DPWT",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "player",
+          "membershipType": "individual",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 1
+        },
+        {
+          "id": "golf:korn-ferry-tour",
+          "name": "Korn Ferry Tour",
+          "abbreviation": "KFT",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "player",
+          "membershipType": "individual",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 2
+        },
+        {
+          "id": "golf:liv-golf",
+          "name": "LIV Golf",
+          "abbreviation": "LIV",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": "Team identities/rosters can change; resolve live.",
+          "sortOrder": 3
+        },
+        {
+          "id": "golf:lpga-tour",
+          "name": "LPGA Tour",
+          "abbreviation": "LPGA",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "player",
+          "membershipType": "individual",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 4
+        },
+        {
+          "id": "golf:olympic-men-s-golf",
+          "name": "Olympic Men's Golf",
+          "abbreviation": "OLY-M",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "player",
+          "membershipType": "qualification",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 5
+        },
+        {
+          "id": "golf:olympic-women-s-golf",
+          "name": "Olympic Women's Golf",
+          "abbreviation": "OLY-W",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "player",
+          "membershipType": "qualification",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 6
+        },
+        {
+          "id": "golf:pga-tour",
+          "name": "PGA Tour",
+          "abbreviation": "PGA",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "player",
+          "membershipType": "individual",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 7
+        },
+        {
+          "id": "golf:pga-tour-champions",
+          "name": "PGA Tour Champions",
+          "abbreviation": "PGATC",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "player",
+          "membershipType": "individual",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 8
+        },
+        {
+          "id": "golf:tgl",
+          "name": "TGL",
+          "abbreviation": "TGL",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "golf:tgl:atlanta-drive-gc",
+              "name": "Atlanta Drive GC",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "golf:tgl:boston-common-golf",
+              "name": "Boston Common Golf",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "golf:tgl:jupiter-links-gc",
+              "name": "Jupiter Links GC",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "golf:tgl:los-angeles-golf-club",
+              "name": "Los Angeles Golf Club",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "golf:tgl:new-york-golf-club",
+              "name": "New York Golf Club",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "golf:tgl:the-bay-golf-club",
+              "name": "The Bay Golf Club",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 6
+            }
+          ],
+          "notes": "Motor City Golf Club is announced for 2027 and intentionally not included in the 2026 team list.",
+          "sortOrder": 9
+        }
+      ]
+    },
+    {
+      "id": "hockey",
+      "name": "Hockey",
+      "uiSortOrder": 4,
+      "leagues": [
+        {
+          "id": "hockey:american-hockey-league",
+          "name": "American Hockey League",
+          "abbreviation": "AHL",
+          "country": null,
+          "region": "North America",
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 1
+        },
+        {
+          "id": "hockey:kontinental-hockey-league",
+          "name": "Kontinental Hockey League",
+          "abbreviation": "KHL",
+          "country": null,
+          "region": "Eurasia",
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 2
+        },
+        {
+          "id": "hockey:national-hockey-league",
+          "name": "National Hockey League",
+          "abbreviation": "NHL",
+          "country": null,
+          "region": "North America",
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "hockey:national-hockey-league:anaheim-ducks",
+              "name": "Anaheim Ducks",
+              "abbreviation": "ANA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "hockey:national-hockey-league:boston-bruins",
+              "name": "Boston Bruins",
+              "abbreviation": "BOS",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "hockey:national-hockey-league:buffalo-sabres",
+              "name": "Buffalo Sabres",
+              "abbreviation": "BUF",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "hockey:national-hockey-league:calgary-flames",
+              "name": "Calgary Flames",
+              "abbreviation": "CGY",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "hockey:national-hockey-league:carolina-hurricanes",
+              "name": "Carolina Hurricanes",
+              "abbreviation": "CAR",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "hockey:national-hockey-league:chicago-blackhawks",
+              "name": "Chicago Blackhawks",
+              "abbreviation": "CHI",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "hockey:national-hockey-league:colorado-avalanche",
+              "name": "Colorado Avalanche",
+              "abbreviation": "COL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "hockey:national-hockey-league:columbus-blue-jackets",
+              "name": "Columbus Blue Jackets",
+              "abbreviation": "CBJ",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "hockey:national-hockey-league:dallas-stars",
+              "name": "Dallas Stars",
+              "abbreviation": "DAL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 9
+            },
+            {
+              "id": "hockey:national-hockey-league:detroit-red-wings",
+              "name": "Detroit Red Wings",
+              "abbreviation": "DET",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 10
+            },
+            {
+              "id": "hockey:national-hockey-league:edmonton-oilers",
+              "name": "Edmonton Oilers",
+              "abbreviation": "EDM",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 11
+            },
+            {
+              "id": "hockey:national-hockey-league:florida-panthers",
+              "name": "Florida Panthers",
+              "abbreviation": "FLA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 12
+            },
+            {
+              "id": "hockey:national-hockey-league:los-angeles-kings",
+              "name": "Los Angeles Kings",
+              "abbreviation": "LAK",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 13
+            },
+            {
+              "id": "hockey:national-hockey-league:minnesota-wild",
+              "name": "Minnesota Wild",
+              "abbreviation": "MIN",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 14
+            },
+            {
+              "id": "hockey:national-hockey-league:montreal-canadiens",
+              "name": "Montreal Canadiens",
+              "abbreviation": "MTL",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 15
+            },
+            {
+              "id": "hockey:national-hockey-league:nashville-predators",
+              "name": "Nashville Predators",
+              "abbreviation": "NSH",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 16
+            },
+            {
+              "id": "hockey:national-hockey-league:new-jersey-devils",
+              "name": "New Jersey Devils",
+              "abbreviation": "NJD",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 17
+            },
+            {
+              "id": "hockey:national-hockey-league:new-york-islanders",
+              "name": "New York Islanders",
+              "abbreviation": "NYI",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 18
+            },
+            {
+              "id": "hockey:national-hockey-league:new-york-rangers",
+              "name": "New York Rangers",
+              "abbreviation": "NYR",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 19
+            },
+            {
+              "id": "hockey:national-hockey-league:ottawa-senators",
+              "name": "Ottawa Senators",
+              "abbreviation": "OTT",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 20
+            },
+            {
+              "id": "hockey:national-hockey-league:philadelphia-flyers",
+              "name": "Philadelphia Flyers",
+              "abbreviation": "PHI",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 21
+            },
+            {
+              "id": "hockey:national-hockey-league:pittsburgh-penguins",
+              "name": "Pittsburgh Penguins",
+              "abbreviation": "PIT",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 22
+            },
+            {
+              "id": "hockey:national-hockey-league:san-jose-sharks",
+              "name": "San Jose Sharks",
+              "abbreviation": "SJS",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 23
+            },
+            {
+              "id": "hockey:national-hockey-league:seattle-kraken",
+              "name": "Seattle Kraken",
+              "abbreviation": "SEA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 24
+            },
+            {
+              "id": "hockey:national-hockey-league:st-louis-blues",
+              "name": "St. Louis Blues",
+              "abbreviation": "STL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 25
+            },
+            {
+              "id": "hockey:national-hockey-league:tampa-bay-lightning",
+              "name": "Tampa Bay Lightning",
+              "abbreviation": "TBL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 26
+            },
+            {
+              "id": "hockey:national-hockey-league:toronto-maple-leafs",
+              "name": "Toronto Maple Leafs",
+              "abbreviation": "TOR",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 27
+            },
+            {
+              "id": "hockey:national-hockey-league:utah-mammoth",
+              "name": "Utah Mammoth",
+              "abbreviation": "UTA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 28
+            },
+            {
+              "id": "hockey:national-hockey-league:vancouver-canucks",
+              "name": "Vancouver Canucks",
+              "abbreviation": "VAN",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 29
+            },
+            {
+              "id": "hockey:national-hockey-league:vegas-golden-knights",
+              "name": "Vegas Golden Knights",
+              "abbreviation": "VGK",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 30
+            },
+            {
+              "id": "hockey:national-hockey-league:washington-capitals",
+              "name": "Washington Capitals",
+              "abbreviation": "WSH",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 31
+            },
+            {
+              "id": "hockey:national-hockey-league:winnipeg-jets",
+              "name": "Winnipeg Jets",
+              "abbreviation": "WPG",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 32
+            }
+          ],
+          "notes": null,
+          "sortOrder": 3
+        },
+        {
+          "id": "hockey:ncaa-men-s-ice-hockey",
+          "name": "NCAA Men's Ice Hockey",
+          "abbreviation": "NCAAM",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 4
+        },
+        {
+          "id": "hockey:ncaa-women-s-ice-hockey",
+          "name": "NCAA Women's Ice Hockey",
+          "abbreviation": "NCAAW",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 5
+        },
+        {
+          "id": "hockey:olympic-men-s-ice-hockey",
+          "name": "Olympic Men's Ice Hockey",
+          "abbreviation": "OLY-M",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 6
+        },
+        {
+          "id": "hockey:olympic-women-s-ice-hockey",
+          "name": "Olympic Women's Ice Hockey",
+          "abbreviation": "OLY-W",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 7
+        },
+        {
+          "id": "hockey:professional-women-s-hockey-league",
+          "name": "Professional Women's Hockey League",
+          "abbreviation": "PWHL",
+          "country": null,
+          "region": "North America",
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "hockey:professional-women-s-hockey-league:boston-fleet",
+              "name": "Boston Fleet",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "hockey:professional-women-s-hockey-league:minnesota-frost",
+              "name": "Minnesota Frost",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "hockey:professional-women-s-hockey-league:montreal-victoire",
+              "name": "Montréal Victoire",
+              "abbreviation": null,
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "hockey:professional-women-s-hockey-league:new-york-sirens",
+              "name": "New York Sirens",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "hockey:professional-women-s-hockey-league:ottawa-charge",
+              "name": "Ottawa Charge",
+              "abbreviation": null,
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "hockey:professional-women-s-hockey-league:pwhl-detroit",
+              "name": "PWHL Detroit",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "hockey:professional-women-s-hockey-league:pwhl-hamilton",
+              "name": "PWHL Hamilton",
+              "abbreviation": null,
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "hockey:professional-women-s-hockey-league:pwhl-las-vegas",
+              "name": "PWHL Las Vegas",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "hockey:professional-women-s-hockey-league:pwhl-san-jose",
+              "name": "PWHL San Jose",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 9
+            },
+            {
+              "id": "hockey:professional-women-s-hockey-league:seattle-torrent",
+              "name": "Seattle Torrent",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 10
+            },
+            {
+              "id": "hockey:professional-women-s-hockey-league:toronto-sceptres",
+              "name": "Toronto Sceptres",
+              "abbreviation": null,
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 11
+            },
+            {
+              "id": "hockey:professional-women-s-hockey-league:vancouver-goldeneyes",
+              "name": "Vancouver Goldeneyes",
+              "abbreviation": null,
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 12
+            }
+          ],
+          "notes": null,
+          "sortOrder": 8
+        },
+        {
+          "id": "hockey:swedish-hockey-league",
+          "name": "Swedish Hockey League",
+          "abbreviation": "SHL",
+          "country": "Sweden",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 9
+        },
+        {
+          "id": "hockey:world-cup-of-hockey",
+          "name": "World Cup of Hockey",
+          "abbreviation": "WCH",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 10
+        }
+      ]
+    },
+    {
+      "id": "racing",
+      "name": "Racing",
+      "uiSortOrder": 8,
+      "leagues": [
+        {
+          "id": "racing:fia-formula-2-championship",
+          "name": "FIA Formula 2 Championship",
+          "abbreviation": "F2",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "constructor",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 1
+        },
+        {
+          "id": "racing:fia-formula-e-world-championship",
+          "name": "FIA Formula E World Championship",
+          "abbreviation": "Formula E",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "constructor",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 2
+        },
+        {
+          "id": "racing:fia-world-endurance-championship",
+          "name": "FIA World Endurance Championship",
+          "abbreviation": "WEC",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "constructor",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 3
+        },
+        {
+          "id": "racing:formula-1",
+          "name": "Formula 1",
+          "abbreviation": "F1",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "constructor",
+          "membershipType": "fixed",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "racing:formula-1:alpine",
+              "name": "Alpine",
+              "abbreviation": null,
+              "country": "France",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "racing:formula-1:aston-martin",
+              "name": "Aston Martin",
+              "abbreviation": null,
+              "country": "United Kingdom",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "racing:formula-1:audi",
+              "name": "Audi",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "racing:formula-1:cadillac",
+              "name": "Cadillac",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "racing:formula-1:ferrari",
+              "name": "Ferrari",
+              "abbreviation": null,
+              "country": "Italy",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "racing:formula-1:haas-f1-team",
+              "name": "Haas F1 Team",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "racing:formula-1:mclaren",
+              "name": "McLaren",
+              "abbreviation": null,
+              "country": "United Kingdom",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "racing:formula-1:mercedes",
+              "name": "Mercedes",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "racing:formula-1:racing-bulls",
+              "name": "Racing Bulls",
+              "abbreviation": null,
+              "country": "Italy",
+              "aliases": [],
+              "sortOrder": 9
+            },
+            {
+              "id": "racing:formula-1:red-bull-racing",
+              "name": "Red Bull Racing",
+              "abbreviation": null,
+              "country": "Austria",
+              "aliases": [],
+              "sortOrder": 10
+            },
+            {
+              "id": "racing:formula-1:williams",
+              "name": "Williams",
+              "abbreviation": null,
+              "country": "United Kingdom",
+              "aliases": [],
+              "sortOrder": 11
+            }
+          ],
+          "notes": null,
+          "sortOrder": 4
+        },
+        {
+          "id": "racing:indycar-series",
+          "name": "IndyCar Series",
+          "abbreviation": "INDYCAR",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "constructor",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 5
+        },
+        {
+          "id": "racing:motogp",
+          "name": "MotoGP",
+          "abbreviation": "MotoGP",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "constructor",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 6
+        },
+        {
+          "id": "racing:nascar-craftsman-truck-series",
+          "name": "NASCAR Craftsman Truck Series",
+          "abbreviation": "NASCAR Truck",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 7
+        },
+        {
+          "id": "racing:nascar-cup-series",
+          "name": "NASCAR Cup Series",
+          "abbreviation": "NASCAR Cup",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 8
+        },
+        {
+          "id": "racing:nascar-o-reilly-auto-parts-series",
+          "name": "NASCAR O'Reilly Auto Parts Series",
+          "abbreviation": "NASCAR O'Reilly",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 9
+        }
+      ]
+    },
+    {
+      "id": "soccer",
+      "name": "Soccer",
+      "uiSortOrder": 5,
+      "leagues": [
+        {
+          "id": "soccer:a-league-men",
+          "name": "A-League Men",
+          "abbreviation": "A-League",
+          "country": "Australia",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 1
+        },
+        {
+          "id": "soccer:afc-champions-league-elite",
+          "name": "AFC Champions League Elite",
+          "abbreviation": "ACLE",
+          "country": null,
+          "region": "Asia",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 2
+        },
+        {
+          "id": "soccer:argentine-primera-division",
+          "name": "Argentine Primera División",
+          "abbreviation": "LPF",
+          "country": "Argentina",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 3
+        },
+        {
+          "id": "soccer:belgian-pro-league",
+          "name": "Belgian Pro League",
+          "abbreviation": "JPL",
+          "country": "Belgium",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 4
+        },
+        {
+          "id": "soccer:brasileirao-serie-a",
+          "name": "Brasileirão Série A",
+          "abbreviation": "BRA1",
+          "country": "Brazil",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 5
+        },
+        {
+          "id": "soccer:bundesliga",
+          "name": "Bundesliga",
+          "abbreviation": "BUN",
+          "country": "Germany",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "soccer:bundesliga:1-fc-koln",
+              "name": "1. FC Köln",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "soccer:bundesliga:1-fc-union-berlin",
+              "name": "1. FC Union Berlin",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "soccer:bundesliga:1-fsv-mainz-05",
+              "name": "1. FSV Mainz 05",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "soccer:bundesliga:bayer-04-leverkusen",
+              "name": "Bayer 04 Leverkusen",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "soccer:bundesliga:borussia-dortmund",
+              "name": "Borussia Dortmund",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "soccer:bundesliga:borussia-monchengladbach",
+              "name": "Borussia Mönchengladbach",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "soccer:bundesliga:eintracht-frankfurt",
+              "name": "Eintracht Frankfurt",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "soccer:bundesliga:fc-augsburg",
+              "name": "FC Augsburg",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "soccer:bundesliga:fc-bayern-munchen",
+              "name": "FC Bayern München",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 9
+            },
+            {
+              "id": "soccer:bundesliga:fc-schalke-04",
+              "name": "FC Schalke 04",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 10
+            },
+            {
+              "id": "soccer:bundesliga:hamburger-sv",
+              "name": "Hamburger SV",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 11
+            },
+            {
+              "id": "soccer:bundesliga:rb-leipzig",
+              "name": "RB Leipzig",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 12
+            },
+            {
+              "id": "soccer:bundesliga:sc-paderborn-07",
+              "name": "SC Paderborn 07",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 13
+            },
+            {
+              "id": "soccer:bundesliga:sport-club-freiburg",
+              "name": "Sport-Club Freiburg",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 14
+            },
+            {
+              "id": "soccer:bundesliga:sv-elversberg",
+              "name": "SV Elversberg",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 15
+            },
+            {
+              "id": "soccer:bundesliga:sv-werder-bremen",
+              "name": "SV Werder Bremen",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 16
+            },
+            {
+              "id": "soccer:bundesliga:tsg-hoffenheim",
+              "name": "TSG Hoffenheim",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 17
+            },
+            {
+              "id": "soccer:bundesliga:vfb-stuttgart",
+              "name": "VfB Stuttgart",
+              "abbreviation": null,
+              "country": "Germany",
+              "aliases": [],
+              "sortOrder": 18
+            }
+          ],
+          "notes": null,
+          "sortOrder": 6
+        },
+        {
+          "id": "soccer:canadian-premier-league",
+          "name": "Canadian Premier League",
+          "abbreviation": "CPL",
+          "country": "Canada",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 7
+        },
+        {
+          "id": "soccer:chinese-super-league",
+          "name": "Chinese Super League",
+          "abbreviation": "CSL",
+          "country": "China",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 8
+        },
+        {
+          "id": "soccer:copa-libertadores",
+          "name": "Copa Libertadores",
+          "abbreviation": "LIB",
+          "country": null,
+          "region": "South America",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 9
+        },
+        {
+          "id": "soccer:danish-superliga",
+          "name": "Danish Superliga",
+          "abbreviation": "SUPERLIGA",
+          "country": "Denmark",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 10
+        },
+        {
+          "id": "soccer:efl-championship",
+          "name": "EFL Championship",
+          "abbreviation": "EFL Championship",
+          "country": "England",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 11
+        },
+        {
+          "id": "soccer:eredivisie",
+          "name": "Eredivisie",
+          "abbreviation": "ERE",
+          "country": "Netherlands",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 12
+        },
+        {
+          "id": "soccer:fifa-club-world-cup",
+          "name": "FIFA Club World Cup",
+          "abbreviation": "CWC",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 13
+        },
+        {
+          "id": "soccer:fifa-world-cup",
+          "name": "FIFA World Cup",
+          "abbreviation": "WC",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 14
+        },
+        {
+          "id": "soccer:j1-league",
+          "name": "J1 League",
+          "abbreviation": "J1",
+          "country": "Japan",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 15
+        },
+        {
+          "id": "soccer:k-league-1",
+          "name": "K League 1",
+          "abbreviation": "K1",
+          "country": "South Korea",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 16
+        },
+        {
+          "id": "soccer:la-liga",
+          "name": "La Liga",
+          "abbreviation": "LALIGA",
+          "country": "Spain",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "soccer:la-liga:athletic-club",
+              "name": "Athletic Club",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "soccer:la-liga:atletico-de-madrid",
+              "name": "Atlético de Madrid",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "soccer:la-liga:ca-osasuna",
+              "name": "CA Osasuna",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "soccer:la-liga:celta",
+              "name": "Celta",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "soccer:la-liga:deportivo-alaves",
+              "name": "Deportivo Alavés",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "soccer:la-liga:elche-cf",
+              "name": "Elche CF",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "soccer:la-liga:fc-barcelona",
+              "name": "FC Barcelona",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "soccer:la-liga:getafe-cf",
+              "name": "Getafe CF",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "soccer:la-liga:levante-ud",
+              "name": "Levante UD",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 9
+            },
+            {
+              "id": "soccer:la-liga:malaga-cf",
+              "name": "Málaga CF",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 10
+            },
+            {
+              "id": "soccer:la-liga:r-racing-club",
+              "name": "R. Racing Club",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 11
+            },
+            {
+              "id": "soccer:la-liga:rayo-vallecano",
+              "name": "Rayo Vallecano",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 12
+            },
+            {
+              "id": "soccer:la-liga:rc-deportivo",
+              "name": "RC Deportivo",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 13
+            },
+            {
+              "id": "soccer:la-liga:rcd-espanyol-de-barcelona",
+              "name": "RCD Espanyol de Barcelona",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 14
+            },
+            {
+              "id": "soccer:la-liga:real-betis",
+              "name": "Real Betis",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 15
+            },
+            {
+              "id": "soccer:la-liga:real-madrid",
+              "name": "Real Madrid",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 16
+            },
+            {
+              "id": "soccer:la-liga:real-sociedad",
+              "name": "Real Sociedad",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 17
+            },
+            {
+              "id": "soccer:la-liga:sevilla-fc",
+              "name": "Sevilla FC",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 18
+            },
+            {
+              "id": "soccer:la-liga:valencia-cf",
+              "name": "Valencia CF",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 19
+            },
+            {
+              "id": "soccer:la-liga:villarreal-cf",
+              "name": "Villarreal CF",
+              "abbreviation": null,
+              "country": "Spain",
+              "aliases": [],
+              "sortOrder": 20
+            }
+          ],
+          "notes": null,
+          "sortOrder": 17
+        },
+        {
+          "id": "soccer:liga-mx",
+          "name": "Liga MX",
+          "abbreviation": "LIGAMX",
+          "country": "Mexico",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 18
+        },
+        {
+          "id": "soccer:ligue-1",
+          "name": "Ligue 1",
+          "abbreviation": "L1",
+          "country": "France",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 19
+        },
+        {
+          "id": "soccer:major-league-soccer",
+          "name": "Major League Soccer",
+          "abbreviation": "MLS",
+          "country": null,
+          "region": "United States / Canada",
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "soccer:major-league-soccer:atlanta-united-fc",
+              "name": "Atlanta United FC",
+              "abbreviation": "ATL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "soccer:major-league-soccer:austin-fc",
+              "name": "Austin FC",
+              "abbreviation": "ATX",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "soccer:major-league-soccer:cf-montreal",
+              "name": "CF Montréal",
+              "abbreviation": "MTL",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "soccer:major-league-soccer:charlotte-fc",
+              "name": "Charlotte FC",
+              "abbreviation": "CLT",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "soccer:major-league-soccer:chicago-fire-fc",
+              "name": "Chicago Fire FC",
+              "abbreviation": "CHI",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "soccer:major-league-soccer:colorado-rapids",
+              "name": "Colorado Rapids",
+              "abbreviation": "COL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "soccer:major-league-soccer:columbus-crew",
+              "name": "Columbus Crew",
+              "abbreviation": "CLB",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "soccer:major-league-soccer:d-c-united",
+              "name": "D.C. United",
+              "abbreviation": "DC",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "soccer:major-league-soccer:fc-cincinnati",
+              "name": "FC Cincinnati",
+              "abbreviation": "CIN",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 9
+            },
+            {
+              "id": "soccer:major-league-soccer:fc-dallas",
+              "name": "FC Dallas",
+              "abbreviation": "DAL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 10
+            },
+            {
+              "id": "soccer:major-league-soccer:houston-dynamo-fc",
+              "name": "Houston Dynamo FC",
+              "abbreviation": "HOU",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 11
+            },
+            {
+              "id": "soccer:major-league-soccer:inter-miami-cf",
+              "name": "Inter Miami CF",
+              "abbreviation": "MIA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 12
+            },
+            {
+              "id": "soccer:major-league-soccer:la-galaxy",
+              "name": "LA Galaxy",
+              "abbreviation": "LA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 13
+            },
+            {
+              "id": "soccer:major-league-soccer:los-angeles-fc",
+              "name": "Los Angeles FC",
+              "abbreviation": "LAFC",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 14
+            },
+            {
+              "id": "soccer:major-league-soccer:minnesota-united-fc",
+              "name": "Minnesota United FC",
+              "abbreviation": "MIN",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 15
+            },
+            {
+              "id": "soccer:major-league-soccer:nashville-sc",
+              "name": "Nashville SC",
+              "abbreviation": "NSH",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 16
+            },
+            {
+              "id": "soccer:major-league-soccer:new-england-revolution",
+              "name": "New England Revolution",
+              "abbreviation": "NE",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 17
+            },
+            {
+              "id": "soccer:major-league-soccer:new-york-city-fc",
+              "name": "New York City FC",
+              "abbreviation": "NYCFC",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 18
+            },
+            {
+              "id": "soccer:major-league-soccer:new-york-red-bulls",
+              "name": "New York Red Bulls",
+              "abbreviation": "RBNY",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 19
+            },
+            {
+              "id": "soccer:major-league-soccer:orlando-city-sc",
+              "name": "Orlando City SC",
+              "abbreviation": "ORL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 20
+            },
+            {
+              "id": "soccer:major-league-soccer:philadelphia-union",
+              "name": "Philadelphia Union",
+              "abbreviation": "PHI",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 21
+            },
+            {
+              "id": "soccer:major-league-soccer:portland-timbers",
+              "name": "Portland Timbers",
+              "abbreviation": "POR",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 22
+            },
+            {
+              "id": "soccer:major-league-soccer:real-salt-lake",
+              "name": "Real Salt Lake",
+              "abbreviation": "RSL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 23
+            },
+            {
+              "id": "soccer:major-league-soccer:san-diego-fc",
+              "name": "San Diego FC",
+              "abbreviation": "SD",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 24
+            },
+            {
+              "id": "soccer:major-league-soccer:san-jose-earthquakes",
+              "name": "San Jose Earthquakes",
+              "abbreviation": "SJ",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 25
+            },
+            {
+              "id": "soccer:major-league-soccer:seattle-sounders-fc",
+              "name": "Seattle Sounders FC",
+              "abbreviation": "SEA",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 26
+            },
+            {
+              "id": "soccer:major-league-soccer:sporting-kansas-city",
+              "name": "Sporting Kansas City",
+              "abbreviation": "SKC",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 27
+            },
+            {
+              "id": "soccer:major-league-soccer:st-louis-city-sc",
+              "name": "St. Louis CITY SC",
+              "abbreviation": "STL",
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 28
+            },
+            {
+              "id": "soccer:major-league-soccer:toronto-fc",
+              "name": "Toronto FC",
+              "abbreviation": "TOR",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 29
+            },
+            {
+              "id": "soccer:major-league-soccer:vancouver-whitecaps-fc",
+              "name": "Vancouver Whitecaps FC",
+              "abbreviation": "VAN",
+              "country": "Canada",
+              "aliases": [],
+              "sortOrder": 30
+            }
+          ],
+          "notes": null,
+          "sortOrder": 20
+        },
+        {
+          "id": "soccer:national-women-s-soccer-league",
+          "name": "National Women's Soccer League",
+          "abbreviation": "NWSL",
+          "country": "United States",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "soccer:national-women-s-soccer-league:angel-city-fc",
+              "name": "Angel City FC",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "soccer:national-women-s-soccer-league:bay-fc",
+              "name": "Bay FC",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "soccer:national-women-s-soccer-league:boston-legacy-fc",
+              "name": "Boston Legacy FC",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "soccer:national-women-s-soccer-league:chicago-stars-fc",
+              "name": "Chicago Stars FC",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "soccer:national-women-s-soccer-league:denver-summit-fc",
+              "name": "Denver Summit FC",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "soccer:national-women-s-soccer-league:gotham-fc",
+              "name": "Gotham FC",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [
+                "NJ/NY Gotham FC"
+              ],
+              "sortOrder": 6
+            },
+            {
+              "id": "soccer:national-women-s-soccer-league:houston-dash",
+              "name": "Houston Dash",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "soccer:national-women-s-soccer-league:kansas-city-current",
+              "name": "Kansas City Current",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "soccer:national-women-s-soccer-league:north-carolina-courage",
+              "name": "North Carolina Courage",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 9
+            },
+            {
+              "id": "soccer:national-women-s-soccer-league:orlando-pride",
+              "name": "Orlando Pride",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 10
+            },
+            {
+              "id": "soccer:national-women-s-soccer-league:portland-thorns-fc",
+              "name": "Portland Thorns FC",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 11
+            },
+            {
+              "id": "soccer:national-women-s-soccer-league:racing-louisville-fc",
+              "name": "Racing Louisville FC",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 12
+            },
+            {
+              "id": "soccer:national-women-s-soccer-league:san-diego-wave-fc",
+              "name": "San Diego Wave FC",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 13
+            },
+            {
+              "id": "soccer:national-women-s-soccer-league:seattle-reign-fc",
+              "name": "Seattle Reign FC",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 14
+            },
+            {
+              "id": "soccer:national-women-s-soccer-league:utah-royals-fc",
+              "name": "Utah Royals FC",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 15
+            },
+            {
+              "id": "soccer:national-women-s-soccer-league:washington-spirit",
+              "name": "Washington Spirit",
+              "abbreviation": null,
+              "country": "United States",
+              "aliases": [],
+              "sortOrder": 16
+            }
+          ],
+          "notes": null,
+          "sortOrder": 21
+        },
+        {
+          "id": "soccer:premier-league",
+          "name": "Premier League",
+          "abbreviation": "EPL",
+          "country": "England",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "fixed",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [
+            {
+              "id": "soccer:premier-league:afc-bournemouth",
+              "name": "AFC Bournemouth",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 1
+            },
+            {
+              "id": "soccer:premier-league:arsenal",
+              "name": "Arsenal",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 2
+            },
+            {
+              "id": "soccer:premier-league:aston-villa",
+              "name": "Aston Villa",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 3
+            },
+            {
+              "id": "soccer:premier-league:brentford",
+              "name": "Brentford",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 4
+            },
+            {
+              "id": "soccer:premier-league:brighton-and-hove-albion",
+              "name": "Brighton & Hove Albion",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 5
+            },
+            {
+              "id": "soccer:premier-league:chelsea",
+              "name": "Chelsea",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 6
+            },
+            {
+              "id": "soccer:premier-league:coventry-city",
+              "name": "Coventry City",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 7
+            },
+            {
+              "id": "soccer:premier-league:crystal-palace",
+              "name": "Crystal Palace",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 8
+            },
+            {
+              "id": "soccer:premier-league:everton",
+              "name": "Everton",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 9
+            },
+            {
+              "id": "soccer:premier-league:fulham",
+              "name": "Fulham",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 10
+            },
+            {
+              "id": "soccer:premier-league:hull-city",
+              "name": "Hull City",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 11
+            },
+            {
+              "id": "soccer:premier-league:ipswich-town",
+              "name": "Ipswich Town",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 12
+            },
+            {
+              "id": "soccer:premier-league:leeds-united",
+              "name": "Leeds United",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 13
+            },
+            {
+              "id": "soccer:premier-league:liverpool",
+              "name": "Liverpool",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 14
+            },
+            {
+              "id": "soccer:premier-league:manchester-city",
+              "name": "Manchester City",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 15
+            },
+            {
+              "id": "soccer:premier-league:manchester-united",
+              "name": "Manchester United",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 16
+            },
+            {
+              "id": "soccer:premier-league:newcastle-united",
+              "name": "Newcastle United",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 17
+            },
+            {
+              "id": "soccer:premier-league:nottingham-forest",
+              "name": "Nottingham Forest",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 18
+            },
+            {
+              "id": "soccer:premier-league:sunderland",
+              "name": "Sunderland",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 19
+            },
+            {
+              "id": "soccer:premier-league:tottenham-hotspur",
+              "name": "Tottenham Hotspur",
+              "abbreviation": null,
+              "country": "England",
+              "aliases": [],
+              "sortOrder": 20
+            }
+          ],
+          "notes": null,
+          "sortOrder": 22
+        },
+        {
+          "id": "soccer:primeira-liga",
+          "name": "Primeira Liga",
+          "abbreviation": "Liga Portugal",
+          "country": "Portugal",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 23
+        },
+        {
+          "id": "soccer:saudi-pro-league",
+          "name": "Saudi Pro League",
+          "abbreviation": "SPL",
+          "country": "Saudi Arabia",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 24
+        },
+        {
+          "id": "soccer:scottish-premiership",
+          "name": "Scottish Premiership",
+          "abbreviation": "SPFL",
+          "country": "Scotland",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 25
+        },
+        {
+          "id": "soccer:serie-a",
+          "name": "Serie A",
+          "abbreviation": "Serie A",
+          "country": "Italy",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 26
+        },
+        {
+          "id": "soccer:super-lig",
+          "name": "Süper Lig",
+          "abbreviation": "Süper Lig",
+          "country": "Turkey",
+          "region": null,
+          "selectionEntityType": "team",
+          "membershipType": "dynamic",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 27
+        },
+        {
+          "id": "soccer:uefa-champions-league",
+          "name": "UEFA Champions League",
+          "abbreviation": "UCL",
+          "country": null,
+          "region": "Europe",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 28
+        },
+        {
+          "id": "soccer:uefa-conference-league",
+          "name": "UEFA Conference League",
+          "abbreviation": "UECL",
+          "country": null,
+          "region": "Europe",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 29
+        },
+        {
+          "id": "soccer:uefa-europa-league",
+          "name": "UEFA Europa League",
+          "abbreviation": "UEL",
+          "country": null,
+          "region": "Europe",
+          "selectionEntityType": "team",
+          "membershipType": "qualification",
+          "season": "2026-27",
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 30
+        }
+      ]
+    },
+    {
+      "id": "tennis",
+      "name": "Tennis",
+      "uiSortOrder": 6,
+      "leagues": [
+        {
+          "id": "tennis:atp-challenger-tour",
+          "name": "ATP Challenger Tour",
+          "abbreviation": "ATP Challenger",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "player",
+          "membershipType": "individual",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 1
+        },
+        {
+          "id": "tennis:atp-tour",
+          "name": "ATP Tour",
+          "abbreviation": "ATP",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "player",
+          "membershipType": "individual",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 2
+        },
+        {
+          "id": "tennis:itf-men-s-world-tennis-tour",
+          "name": "ITF Men's World Tennis Tour",
+          "abbreviation": "ITF Men",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "player",
+          "membershipType": "individual",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 3
+        },
+        {
+          "id": "tennis:itf-women-s-world-tennis-tour",
+          "name": "ITF Women's World Tennis Tour",
+          "abbreviation": "ITF Women",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "player",
+          "membershipType": "individual",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 4
+        },
+        {
+          "id": "tennis:wta-125",
+          "name": "WTA 125",
+          "abbreviation": "WTA 125",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "player",
+          "membershipType": "individual",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 5
+        },
+        {
+          "id": "tennis:wta-tour",
+          "name": "WTA Tour",
+          "abbreviation": "WTA",
+          "country": null,
+          "region": "International",
+          "selectionEntityType": "player",
+          "membershipType": "individual",
+          "season": null,
+          "enabled": true,
+          "aliases": [],
+          "teams": [],
+          "notes": null,
+          "sortOrder": 6
+        }
+      ]
+    }
+  ]
+}

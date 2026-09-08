@@ -131,7 +131,7 @@ extension ESPNService {
         return response.toSummary()
     }
 
-    func golfTournament(for league: League, eventID: String, gameID: StadiaEntityID) async throws -> StadiaGolfTournament {
+    func golfTournament(for league: League, eventID: String, gameID: BannerEntityID) async throws -> BannerGolfTournament {
         var components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/summary")!
         components.queryItems = [URLQueryItem(name: "event", value: eventID)]
         var request = URLRequest(url: components.url!)
@@ -229,21 +229,21 @@ private struct GameSummaryResponse: Decodable {
         )
     }
 
-    func toGolfTournament(league: League, eventID: String, gameID: StadiaEntityID) throws -> StadiaGolfTournament {
+    func toGolfTournament(league: League, eventID: String, gameID: BannerEntityID) throws -> BannerGolfTournament {
         let competition = header?.competitions?.first
-        let status = StadiaTournamentStatus(gameStatus: StadiaGameStatus(espnState: competition?.status?.type?.state))
+        let status = BannerTournamentStatus(gameStatus: BannerGameStatus(espnState: competition?.status?.type?.state))
         let provider = SportsDataProviderID.espn
         let provenance = DataProvenance(provider: provider, fetchedAt: Date(), providerEntityID: eventID, confidence: 0.72)
         let mappedEntries = (competition?.competitors ?? []).enumerated().compactMap { index, competitor in
             competitor.toGolfLeaderboardEntry(index: index, league: league, eventID: eventID, provenance: provenance)
         }
         let leaderEntries = mappedEntries.isEmpty ? golfLeaderEntriesFromLeaders(league: league, eventID: eventID, provenance: provenance) : []
-        let leaderboard = StadiaGolfLeaderboardNormalizer.normalized(mappedEntries.isEmpty ? leaderEntries : mappedEntries)
+        let leaderboard = BannerGolfLeaderboardNormalizer.normalized(mappedEntries.isEmpty ? leaderEntries : mappedEntries)
         guard !leaderboard.isEmpty || competition != nil else { throw SportsDataError.unsupportedCapability(.golfTournament) }
 
         let course = competition?.venue.map { venue in
-            StadiaGolfCourse(
-                id: venue.id.map { StadiaEntityID(rawValue: "course:espn:\($0)") },
+            BannerGolfCourse(
+                id: venue.id.map { BannerEntityID(rawValue: "course:espn:\($0)") },
                 name: venue.fullName ?? venue.displayName ?? venue.name ?? "Course",
                 location: [venue.address?.city, venue.address?.state, venue.address?.country].compactMap { $0 }.joined(separator: ", ").nilIfEmpty(),
                 par: nil,
@@ -252,8 +252,8 @@ private struct GameSummaryResponse: Decodable {
             )
         }
 
-        return StadiaGolfTournament(
-            id: StadiaEntityID(rawValue: "golfTournament:espn:\(eventID)"),
+        return BannerGolfTournament(
+            id: BannerEntityID(rawValue: "golfTournament:espn:\(eventID)"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             gameID: gameID,
             tournamentName: header?.name ?? header?.shortName ?? competition?.notes?.first?.headline ?? league.name,
@@ -267,21 +267,21 @@ private struct GameSummaryResponse: Decodable {
             leaderboard: leaderboard,
             broadcasts: (competition?.broadcasts ?? []).compactMap { broadcast in
                 guard let name = broadcast.names?.first ?? broadcast.market else { return nil }
-                return StadiaBroadcast(network: name, type: broadcast.type, countryCode: nil)
+                return BannerBroadcast(network: name, type: broadcast.type, countryCode: nil)
             },
             stats: [],
             provenance: provenance
         )
     }
 
-    private func golfLeaderEntriesFromLeaders(league: League, eventID: String, provenance: DataProvenance) -> [StadiaGolfLeaderboardEntry] {
-        var output: [StadiaGolfLeaderboardEntry] = []
+    private func golfLeaderEntriesFromLeaders(league: League, eventID: String, provenance: DataProvenance) -> [BannerGolfLeaderboardEntry] {
+        var output: [BannerGolfLeaderboardEntry] = []
         func walk(_ nodes: [SummaryLeaderNodeDTO], category: String?) {
             for node in nodes {
                 if let athlete = node.athlete, let name = athlete.displayName, let value = node.displayValue {
                     let playerID = SportsIdentityResolver().canonicalPlayerID(league: league, provider: .espn, providerPlayerID: athlete.id, fullName: name)
-                    output.append(StadiaGolfLeaderboardEntry(
-                        id: StadiaEntityID(rawValue: "golfEntry:espn:\(eventID):\(athlete.id ?? SportsIdentityResolver.slug(name))"),
+                    output.append(BannerGolfLeaderboardEntry(
+                        id: BannerEntityID(rawValue: "golfEntry:espn:\(eventID):\(athlete.id ?? SportsIdentityResolver.slug(name))"),
                         playerID: playerID,
                         playerName: name,
                         position: nil,
@@ -332,14 +332,14 @@ private struct SummaryCompetitionCompetitorDTO: Decodable {
     let linescores: [SummaryLineScoreDTO]?
     let statistics: [BoxscoreLeafStatDTO]?
 
-    func toGolfLeaderboardEntry(index: Int, league: League, eventID: String, provenance: DataProvenance) -> StadiaGolfLeaderboardEntry? {
+    func toGolfLeaderboardEntry(index: Int, league: League, eventID: String, provenance: DataProvenance) -> BannerGolfLeaderboardEntry? {
         let providerID = id ?? athlete?.id ?? team?.id
         let name = athlete?.displayName ?? team?.displayName ?? providerID
         guard let name, !name.isEmpty else { return nil }
         let canonicalPlayerID = SportsIdentityResolver().canonicalPlayerID(league: league, provider: .espn, providerPlayerID: providerID, fullName: name)
-        let stats = (statistics ?? []).compactMap { stat -> StadiaStatValue? in
+        let stats = (statistics ?? []).compactMap { stat -> BannerStatValue? in
             guard let label = stat.displayLabel, let value = stat.displayValue else { return nil }
-            return StadiaStatValue(key: "espn_\(SportsIdentityResolver.slug(label))", displayName: label, value: value)
+            return BannerStatValue(key: "espn_\(SportsIdentityResolver.slug(label))", displayName: label, value: value)
         }
         let rawPosition = SummaryGolfValueParser.stat(named: ["rank", "position", "pos"], in: statistics ?? []) ?? curatedRank?.current.map(String.init)
         let position = rawPosition.map { SummaryGolfValueParser.position($0) }
@@ -347,7 +347,7 @@ private struct SummaryCompetitionCompetitorDTO: Decodable {
         let today = SummaryGolfValueParser.score(SummaryGolfValueParser.stat(named: ["today", "currentRound", "round"], in: statistics ?? []))
         let thru = SummaryGolfValueParser.stat(named: ["thru", "through", "holes"], in: statistics ?? [])
         let rounds = (linescores ?? []).enumerated().map { offset, line in
-            StadiaGolfRound(
+            BannerGolfRound(
                 number: line.period ?? offset + 1,
                 displayName: line.period.map { "R\($0)" },
                 score: line.displayValue ?? line.value.map { SummaryGolfValueParser.score(String($0)) ?? String($0) },
@@ -357,8 +357,8 @@ private struct SummaryCompetitionCompetitorDTO: Decodable {
             )
         }
 
-        return StadiaGolfLeaderboardEntry(
-            id: StadiaEntityID(rawValue: "golfEntry:espn:\(eventID):\(providerID ?? "\(index)")"),
+        return BannerGolfLeaderboardEntry(
+            id: BannerEntityID(rawValue: "golfEntry:espn:\(eventID):\(providerID ?? "\(index)")"),
             playerID: providerID == nil ? nil : canonicalPlayerID,
             playerName: name,
             position: position,
@@ -430,7 +430,7 @@ private enum SummaryGolfValueParser {
     }
 
     static func score(_ value: String?) -> String? {
-        StadiaGolfScoreFormatter.format(raw: value)
+        BannerGolfScoreFormatter.format(raw: value)
     }
 
     static func position(_ value: String) -> String {
@@ -449,7 +449,7 @@ private enum SummaryGolfValueParser {
     }
 }
 
-private extension StadiaGameStatus {
+private extension BannerGameStatus {
     init(espnState: String?) {
         switch espnState?.lowercased() {
         case "pre", "pregame":

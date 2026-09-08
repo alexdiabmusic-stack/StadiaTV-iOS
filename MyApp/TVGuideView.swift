@@ -11,7 +11,7 @@ struct TVGuideView: View {
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var guideStore: GuideChannelStore
     @EnvironmentObject private var fantasyStore: FantasyStore
-    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
+    @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
     @StateObject private var vm = TVGuideViewModel()
 
     @Environment(\.dismiss) private var dismiss
@@ -439,7 +439,7 @@ private struct ProgrammeGridView: View {
     @ObservedObject var vm: TVGuideViewModel
     @EnvironmentObject var repository: EPGRepository
     @EnvironmentObject var fantasyStore: FantasyStore
-    @EnvironmentObject var nativeFantasyStore: StadiaFantasyStore
+    @EnvironmentObject var nativeFantasyStore: BannerFantasyStore
     let scrollState: EPGScrollState
     let scrollToNowTrigger: Int
     let now: Date
@@ -953,7 +953,7 @@ struct ProgrammeDetailSheet: View {
     @EnvironmentObject private var reminderStore: ProgrammeReminderStore
     @EnvironmentObject private var recordingService: RecordingService
     @EnvironmentObject private var fantasyStore: FantasyStore
-    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
+    @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
 
     @State private var catchupState: CatchupState = .idle
     @State private var selectedLeadTime: Int = 5

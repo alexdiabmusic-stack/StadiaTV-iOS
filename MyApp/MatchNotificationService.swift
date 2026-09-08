@@ -21,7 +21,7 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
     static let shared = MatchNotificationService()
 
     private let center = UNUserNotificationCenter.current()
-    private let identifierPrefix = "stadiatv.match."
+    private let identifierPrefix = "bannertv.match."
 
     private override init() {
         super.init()
@@ -95,7 +95,7 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
         let settings = await center.notificationSettings()
         guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
 
-        center.removePendingNotificationRequests(withIdentifiers: ["stadiatv.morning.digest"])
+        center.removePendingNotificationRequests(withIdentifiers: ["bannertv.morning.digest"])
 
         let calendar = Calendar.current
         let todayMatches = matches
@@ -115,7 +115,7 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
         dateComponents.hour = 8
         dateComponents.minute = 0
         let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
-        let request = UNNotificationRequest(identifier: "stadiatv.morning.digest", content: content, trigger: trigger)
+        let request = UNNotificationRequest(identifier: "bannertv.morning.digest", content: content, trigger: trigger)
         try? await center.add(request)
     }
 
@@ -133,7 +133,7 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
 
         let content = UNMutableNotificationContent()
         content.title = "It's game time in \(leadTime.minutes) minutes!!"
-        content.body = "Don't forget to tune into StadiaTV to watch the action live!"
+        content.body = "Don't forget to tune into BannerTV to watch the action live!"
         content.sound = .default
         content.userInfo = [
             "matchID": match.id,

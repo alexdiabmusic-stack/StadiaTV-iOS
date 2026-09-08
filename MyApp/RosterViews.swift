@@ -312,7 +312,7 @@ struct PlayerDetailView: View {
         // Fall back to the bare numeric ID check for legacy ESPN-sourced athletes.
         let entityIDValue = athlete.canonicalID ?? (athlete.id.allSatisfy(\.isNumber) ? athlete.id : nil)
         if let entityIDValue {
-            let playerEntityID = StadiaEntityID(rawValue: entityIDValue)
+            let playerEntityID = BannerEntityID(rawValue: entityIDValue)
             if let playerStats = try? await SportsRepository.shared.playerStats(for: league, playerIDs: Set([playerEntityID]), range: nil),
                let stat = playerStats.first, !stat.stats.isEmpty {
                 let year = Calendar.current.component(.year, from: Date())

@@ -41,7 +41,7 @@ struct HomeView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var fantasyStore: FantasyStore
-    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
+    @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
     @EnvironmentObject private var launchCoordinator: StartupCoordinator
     @StateObject private var viewModel = HomeViewModel()
     @Environment(\.scenePhase) private var scenePhase
@@ -1704,7 +1704,7 @@ final class HomeViewModel: ObservableObject {
         })
         let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
         let favoriteSignature = favorites
-            .flatMap { favorite in [favorite.id, favorite.canonicalTeamID, favorite.teamID, favorite.leaguePath, favorite.leagueStadiaKey] + favorite.providerAliases.map(\.id) }
+            .flatMap { favorite in [favorite.id, favorite.canonicalTeamID, favorite.teamID, favorite.leaguePath, favorite.leagueBannerKey] + favorite.providerAliases.map(\.id) }
             .sorted()
             .joined(separator: "|")
         featuredPicks = featuredCalendar.picks()
@@ -1726,9 +1726,9 @@ final class HomeViewModel: ObservableObject {
             isLoading = false
         }
 
-        let favoriteLeagueIDs = Set(favorites.flatMap { [$0.leaguePath, $0.leagueStadiaKey] })
+        let favoriteLeagueIDs = Set(favorites.flatMap { [$0.leaguePath, $0.leagueBannerKey] })
         let favoriteLeagues = League.all.filter {
-            favoriteLeagueIDs.contains($0.id) || favoriteLeagueIDs.contains($0.stadiaKey)
+            favoriteLeagueIDs.contains($0.id) || favoriteLeagueIDs.contains($0.bannerKey)
         }
         let p2Leagues = leagues
         let p3Leagues = favoriteLeagues
@@ -2002,7 +2002,7 @@ final class HomeViewModel: ObservableObject {
             if let teamID = side.teamID,
                favoriteIDs.contains(teamID) ||
                favoriteIDs.contains("\(match.league.path)-\(teamID)") ||
-               favoriteIDs.contains("\(match.league.stadiaKey)-\(teamID)") {
+               favoriteIDs.contains("\(match.league.bannerKey)-\(teamID)") {
                 return true
             }
             if let canonicalID = side.canonicalIDString, favoriteIDs.contains(canonicalID) {

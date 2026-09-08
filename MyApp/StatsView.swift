@@ -18,7 +18,7 @@ struct StatsView: View {
     }
 
     private var favoriteTeams: [FavoriteTeam] {
-        prefs.favoriteTeams.filter { $0.leaguePath == selectedLeague.path || $0.leagueStadiaKey == selectedLeague.stadiaKey }
+        prefs.favoriteTeams.filter { $0.leaguePath == selectedLeague.path || $0.leagueBannerKey == selectedLeague.bannerKey }
     }
 
     private var availableSections: [StatsSection] {

@@ -7,7 +7,7 @@ struct XtreamCredentials: Codable, Hashable {
 }
 
 enum KeychainStore {
-    private static let service = "com.alexdiab.StadiaTV.xtream"
+    private static let service = "com.alexdiab.BannerTV.xtream"
 
     static func saveXtreamCredentials(_ credentials: XtreamCredentials, for playlistID: UUID) throws {
         let data = try JSONEncoder().encode(credentials)

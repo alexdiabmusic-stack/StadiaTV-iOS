@@ -193,7 +193,7 @@ struct AddPlaylistView: View {
                 }
 
                 Section {
-                    Text("Stadia TV does not provide, host, or sell streaming content. This feature is intended for use with paid subscription services and personal DVR systems (such as Plex or Channels DVR) that you already subscribe to and that permit playlist export.")
+                    Text("Banner TV does not provide, host, or sell streaming content. This feature is intended for use with paid subscription services and personal DVR systems (such as Plex or Channels DVR) that you already subscribe to and that permit playlist export.")
                         .font(.footnote)
                         .foregroundStyle(Theme.textSecondary)
                 }

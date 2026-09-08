@@ -25,7 +25,7 @@ struct Team: Identifiable, Hashable {
 /// A favorited team, stored with enough context to rebuild it without a network call.
 struct FavoriteTeam: Codable, Hashable, Identifiable {
     var leaguePath: String
-    var leagueStadiaKey: String
+    var leagueBannerKey: String
     var teamID: String
     var displayName: String
     var abbreviation: String
@@ -33,13 +33,13 @@ struct FavoriteTeam: Codable, Hashable, Identifiable {
     var canonicalTeamIDString: String?
     var providerAliases: [ProviderEntityAlias]
 
-    var id: String { "\(leagueStadiaKey)-\(canonicalTeamID)" }
+    var id: String { "\(leagueBannerKey)-\(canonicalTeamID)" }
     var logoURL: URL? { logoURLString.flatMap(URL.init(string:)) }
     var canonicalTeamID: String { canonicalTeamIDString ?? Self.canonicalTeamID(legacyTeamID: teamID, abbreviation: abbreviation, displayName: displayName, leaguePath: leaguePath) }
 
     init(team: Team, league: League) {
         self.leaguePath = league.path
-        self.leagueStadiaKey = league.stadiaKey
+        self.leagueBannerKey = league.bannerKey
         self.teamID = team.id
         self.displayName = team.displayName
         self.abbreviation = team.abbreviation
@@ -51,7 +51,7 @@ struct FavoriteTeam: Codable, Hashable, Identifiable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         leaguePath = try container.decode(String.self, forKey: .leaguePath)
-        leagueStadiaKey = try container.decodeIfPresent(String.self, forKey: .leagueStadiaKey)
+        leagueBannerKey = try container.decodeIfPresent(String.self, forKey: .leagueBannerKey)
             ?? SportsProviderRouteConfiguration.leagueKey(forLegacyPath: leaguePath)
         teamID = try container.decode(String.self, forKey: .teamID)
         displayName = try container.decode(String.self, forKey: .displayName)
@@ -64,7 +64,7 @@ struct FavoriteTeam: Codable, Hashable, Identifiable {
     }
 
     func matches(_ team: Team, in league: League) -> Bool {
-        guard leaguePath == league.path || leagueStadiaKey == league.stadiaKey else { return false }
+        guard leaguePath == league.path || leagueBannerKey == league.bannerKey else { return false }
         let teamCanonicalID = team.canonicalIDString ?? Self.canonicalTeamID(team: team, league: league)
         return canonicalTeamID == teamCanonicalID
             || teamID == team.id
@@ -73,7 +73,7 @@ struct FavoriteTeam: Codable, Hashable, Identifiable {
 
     func migrated() -> FavoriteTeam {
         var copy = self
-        copy.leagueStadiaKey = SportsProviderRouteConfiguration.leagueKey(forLegacyPath: leaguePath)
+        copy.leagueBannerKey = SportsProviderRouteConfiguration.leagueKey(forLegacyPath: leaguePath)
         if copy.canonicalTeamIDString == nil {
             copy.canonicalTeamIDString = Self.canonicalTeamID(legacyTeamID: teamID, abbreviation: abbreviation, displayName: displayName, leaguePath: leaguePath)
         }
@@ -84,19 +84,19 @@ struct FavoriteTeam: Codable, Hashable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case leaguePath, leagueStadiaKey, teamID, displayName, abbreviation, logoURLString, canonicalTeamIDString, providerAliases
+        case leaguePath, leagueBannerKey, teamID, displayName, abbreviation, logoURLString, canonicalTeamIDString, providerAliases
     }
 
     private static func canonicalTeamID(team: Team, league: League) -> String {
         if let canonicalID = team.canonicalIDString, !canonicalID.isEmpty { return canonicalID }
         if team.id.hasPrefix("team:") { return team.id }
         if team.id.hasPrefix("umc.") {
-            return "team:\(league.stadiaKey):appleSports:\(team.id)"
+            return "team:\(league.bannerKey):appleSports:\(team.id)"
         }
         if league.path == "hockey/nhl", team.id.rangeOfCharacter(from: .decimalDigits) == nil {
-            return "team:\(league.stadiaKey):nhl:\(team.id)"
+            return "team:\(league.bannerKey):nhl:\(team.id)"
         }
-        return "team:\(league.stadiaKey):espn:\(team.id)"
+        return "team:\(league.bannerKey):espn:\(team.id)"
     }
 
     private static func canonicalTeamID(legacyTeamID: String, abbreviation: String, displayName: String, leaguePath: String) -> String {
@@ -227,8 +227,8 @@ struct UserPreferences: Codable, Equatable {
 final class PreferencesStore: ObservableObject {
     @Published private(set) var prefs: UserPreferences
 
-    private let defaultsKey = "stadiatv.preferences.v1"
-    private let favoriteTeamNotificationPromptKey = "stadiatv.favoriteTeamNotificationPromptAnswered.v1"
+    private let defaultsKey = "bannertv.preferences.v1"
+    private let favoriteTeamNotificationPromptKey = "bannertv.favoriteTeamNotificationPromptAnswered.v1"
 
     init() {
         CloudSyncService.shared.start()
@@ -255,7 +255,7 @@ final class PreferencesStore: ObservableObject {
         }
         CloudSyncService.shared.setEnabled(prefs.cloudSyncEnabled)
         NotificationCenter.default.addObserver(
-            forName: .stadiatvCloudSyncDidChange,
+            forName: .bannertvCloudSyncDidChange,
             object: nil,
             queue: .main
         ) { [weak self] _ in
@@ -470,7 +470,7 @@ final class PreferencesStore: ObservableObject {
 
     /// True when a match involves one of the user's favorite teams.
     func isFavoriteMatch(_ match: Match) -> Bool {
-        let leagueFavorites = prefs.favoriteTeams.filter { $0.leaguePath == match.league.path || $0.leagueStadiaKey == match.league.stadiaKey }
+        let leagueFavorites = prefs.favoriteTeams.filter { $0.leaguePath == match.league.path || $0.leagueBannerKey == match.league.bannerKey }
         guard !leagueFavorites.isEmpty else { return false }
         let matchIDs = Set([match.home.canonicalIDString, match.away.canonicalIDString, match.home.teamID, match.away.teamID].compactMap { $0 })
         let matchNames = Set([match.home.displayName.lowercased(), match.away.displayName.lowercased()])

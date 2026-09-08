@@ -26,19 +26,19 @@ struct FOXRSSNewsProvider: SportsNewsProvider {
         )
     }
 
-    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [StadiaNewsArticle] {
+    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [BannerNewsArticle] {
         guard page == 1 else { throw SportsDataError.unsupportedCapability(.newsMetadata) }
         guard metadata.isEnabled else { throw SportsDataError.providerDisabled(.foxRSS) }
 
         let feedURLs = foxFeeds(for: league)
         guard !feedURLs.isEmpty else { throw SportsDataError.unsupportedCapability(.newsMetadata) }
 
-        let http = StadiaNewsHTTPClient.shared
+        let http = BannerNewsHTTPClient.shared
         let now = Date()
         let targetLeagueID = SportsIdentityResolver.canonicalLeagueID(for: league)
-        var collected: [StadiaNewsArticle] = []
+        var collected: [BannerNewsArticle] = []
 
-        await withTaskGroup(of: [StadiaNewsArticle].self) { group in
+        await withTaskGroup(of: [BannerNewsArticle].self) { group in
             for feedURL in feedURLs {
                 group.addTask {
                     guard let url = URL(string: feedURL) else { return [] }
@@ -47,15 +47,15 @@ struct FOXRSSNewsProvider: SportsNewsProvider {
                             from: url,
                             accept: "application/rss+xml, application/xml, text/xml"
                         )
-                        return StadiaRSSParser.parse(data).compactMap { item -> StadiaNewsArticle? in
+                        return BannerRSSParser.parse(data).compactMap { item -> BannerNewsArticle? in
                             guard let title = item.title, !title.isEmpty else { return nil }
                             let urlStr = item.link ?? item.guid ?? ""
                             let seed = item.guid ?? urlStr
-                            return StadiaNewsArticle(
-                                id: StadiaEntityID(rawValue: "news:foxRSS:\(StadiaNewsDeduplicator.articleHash(seed))"),
+                            return BannerNewsArticle(
+                                id: BannerEntityID(rawValue: "news:foxRSS:\(BannerNewsDeduplicator.articleHash(seed))"),
                                 headline: title,
                                 description: item.description ?? item.content ?? "",
-                                published: StadiaRSSParser.parseDate(item.publishedRaw),
+                                published: BannerRSSParser.parseDate(item.publishedRaw),
                                 url: URL(string: urlStr),
                                 imageURL: item.imageURL.flatMap(URL.init(string:)),
                                 leagueID: targetLeagueID,
@@ -80,7 +80,7 @@ struct FOXRSSNewsProvider: SportsNewsProvider {
         }
 
         guard !collected.isEmpty else { throw SportsDataError.unsupportedCapability(.newsMetadata) }
-        return StadiaNewsDeduplicator.deduplicate(
+        return BannerNewsDeduplicator.deduplicate(
             collected.sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
         ).prefix(limit).map { $0 }
     }

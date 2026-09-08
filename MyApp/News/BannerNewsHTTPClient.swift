@@ -2,8 +2,8 @@ import Foundation
 
 // MARK: - HTTP client for news feeds with ETag/conditional-GET support
 
-actor StadiaNewsHTTPClient {
-    static let shared = StadiaNewsHTTPClient()
+actor BannerNewsHTTPClient {
+    static let shared = BannerNewsHTTPClient()
 
     enum HTTPError: Error, LocalizedError {
         case badURL
@@ -33,7 +33,7 @@ actor StadiaNewsHTTPClient {
         cfg.timeoutIntervalForResource = 30
         cfg.requestCachePolicy = .reloadIgnoringLocalCacheData
         cfg.httpAdditionalHeaders = [
-            "User-Agent": "Stadia/1.0 NewsAggregator (iOS; like Safari)",
+            "User-Agent": "Banner/1.0 NewsAggregator (iOS; like Safari)",
             "Accept-Encoding": "gzip, deflate, br",
         ]
         return URLSession(configuration: cfg)

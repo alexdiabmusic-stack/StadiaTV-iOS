@@ -478,7 +478,7 @@ struct RecordingScheduleSheet: View {
         case .providerDVR:
             return "Provider DVR — your provider will archive this stream. No local storage is used. Playback is available within the catch-up retention window."
         case .local:
-            return "Local recording — segments are saved to this device while StadiaTV is in the foreground. The recording will stop if the app is suspended by iOS."
+            return "Local recording — segments are saved to this device while BannerTV is in the foreground. The recording will stop if the app is suspended by iOS."
         case .unavailable:
             return "Recording is not available for this channel. Enable catch-up on a compatible provider to use DVR."
         }

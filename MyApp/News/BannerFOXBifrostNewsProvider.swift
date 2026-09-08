@@ -28,13 +28,13 @@ struct FOXBifrostNewsProvider: SportsNewsProvider {
         )
     }
 
-    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [StadiaNewsArticle] {
+    func newsMetadata(for league: League, limit: Int, page: Int) async throws -> [BannerNewsArticle] {
         guard page == 1 else { throw SportsDataError.unsupportedCapability(.newsMetadata) }
         guard metadata.isEnabled else { throw SportsDataError.providerDisabled(.foxBifrostNews) }
 
-        let http = StadiaNewsHTTPClient.shared
+        let http = BannerNewsHTTPClient.shared
         let now = Date()
-        var collected: [StadiaNewsArticle] = []
+        var collected: [BannerNewsArticle] = []
 
         // 1. Trending articles (general — filter post-fetch)
         let trendingURL = Self.trendingURL()
@@ -56,7 +56,7 @@ struct FOXBifrostNewsProvider: SportsNewsProvider {
         }
 
         guard !collected.isEmpty else { throw SportsDataError.unsupportedCapability(.newsMetadata) }
-        return StadiaNewsDeduplicator.deduplicate(collected).prefix(limit).map { $0 }
+        return BannerNewsDeduplicator.deduplicate(collected).prefix(limit).map { $0 }
     }
 
     // MARK: - URL builders
@@ -82,7 +82,7 @@ struct FOXBifrostNewsProvider: SportsNewsProvider {
 
     // MARK: - Parsing
 
-    private func parseBifrostResponse(_ data: Data, league: League, type articleType: String, now: Date) -> [StadiaNewsArticle]? {
+    private func parseBifrostResponse(_ data: Data, league: League, type articleType: String, now: Date) -> [BannerNewsArticle]? {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
 
         // Response envelope: {"articles": [...]} or {"page": {"content": [...]}} or bare array
@@ -100,7 +100,7 @@ struct FOXBifrostNewsProvider: SportsNewsProvider {
 
         let targetLeagueID = SportsIdentityResolver.canonicalLeagueID(for: league)
 
-        return rawItems.compactMap { item -> StadiaNewsArticle? in
+        return rawItems.compactMap { item -> BannerNewsArticle? in
             guard let headline = (item["export_headline"] as? String)
                     ?? (item["title"] as? String),
                   !headline.isEmpty else { return nil }
@@ -123,7 +123,7 @@ struct FOXBifrostNewsProvider: SportsNewsProvider {
             // Date
             let dateStr = (item["last_published_date"] as? String)
                 ?? (item["published_date"] as? String)
-            let publishedDate = dateStr.flatMap { StadiaRSSParser.parseDate($0) }
+            let publishedDate = dateStr.flatMap { BannerRSSParser.parseDate($0) }
 
             // League classification from tags
             let tags = (item["tags"] as? [[String: Any]]) ?? []
@@ -135,7 +135,7 @@ struct FOXBifrostNewsProvider: SportsNewsProvider {
                 }
                 return nil
             }
-            let (_, classifiedLeagueID) = StadiaNewsDeduplicator.classify(
+            let (_, classifiedLeagueID) = BannerNewsDeduplicator.classify(
                 headline: headline,
                 description: item["dek"] as? String,
                 tags: tagStrings
@@ -144,10 +144,10 @@ struct FOXBifrostNewsProvider: SportsNewsProvider {
             if let cid = classifiedLeagueID, cid != targetLeagueID { return nil }
 
             let seed = fullURL.isEmpty ? headline : fullURL
-            let idHash = StadiaNewsDeduplicator.articleHash(seed)
+            let idHash = BannerNewsDeduplicator.articleHash(seed)
 
-            return StadiaNewsArticle(
-                id: StadiaEntityID(rawValue: "news:foxBifrost:\(idHash)"),
+            return BannerNewsArticle(
+                id: BannerEntityID(rawValue: "news:foxBifrost:\(idHash)"),
                 headline: headline,
                 description: item["dek"] as? String ?? "",
                 published: publishedDate,

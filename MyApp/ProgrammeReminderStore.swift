@@ -42,8 +42,8 @@ final class ProgrammeReminderStore: ObservableObject {
     @Published private(set) var reminders: [ProgrammeReminder] = []
 
     private let center = UNUserNotificationCenter.current()
-    private let storeKey = "stadiatv.programme.reminders.v1"
-    private let idPrefix = "stadiatv.prog."
+    private let storeKey = "bannertv.programme.reminders.v1"
+    private let idPrefix = "bannertv.prog."
 
     private init() {
         load()
@@ -80,7 +80,7 @@ final class ProgrammeReminderStore: ObservableObject {
         content.body = "\(channel.name) · starts in \(leadTimeMinutes == 1 ? "1 minute" : "\(leadTimeMinutes) minutes")"
         content.sound = .default
         content.userInfo = [
-            "stadiatv_type":    "programme_reminder",
+            "bannertv_type":    "programme_reminder",
             "channelID":        channel.id,
             "programmeTitle":   programme.title,
             "programmeStart":   programme.start.timeIntervalSince1970

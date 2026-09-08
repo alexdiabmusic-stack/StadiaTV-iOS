@@ -19,7 +19,7 @@ actor LiveChannelStore {
 
     static let shared: LiveChannelStore = {
         let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        let url = caches.appendingPathComponent("StadiaTV_Live.sqlite")
+        let url = caches.appendingPathComponent("BannerTV_Live.sqlite")
         do {
             try FileManager.default.createDirectory(
                 at: url.deletingLastPathComponent(),

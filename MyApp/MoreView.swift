@@ -97,8 +97,8 @@ struct MoreView: View {
                 NavigationLink { HelpFeedbackSettingsView() } label: {
                     MoreNavigationRow(title: "Help & Feedback")
                 }
-                NavigationLink { AboutStadiaTVSettingsView() } label: {
-                    MoreNavigationRow(title: "About StadiaTV")
+                NavigationLink { AboutBannerTVSettingsView() } label: {
+                    MoreNavigationRow(title: "About BannerTV")
                 }
             }
         }

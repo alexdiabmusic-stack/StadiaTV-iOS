@@ -9,17 +9,17 @@ struct FantasyPlayerResolver: Sendable {
 
     func resolve(
         players: [FantasyPlayer],
-        knownStadiaPlayers: [StadiaPlayerIdentity] = []
+        knownBannerPlayers: [BannerPlayerIdentity] = []
     ) async -> [String: FantasyPlayerResolution] {
         var persisted = await persistence.loadMappings()
         var output: [String: FantasyPlayerResolution] = [:]
-        let knownByESPNID = Dictionary(grouping: knownStadiaPlayers.compactMap { identity in
+        let knownByESPNID = Dictionary(grouping: knownBannerPlayers.compactMap { identity in
             identity.espnAthleteID.map { ($0, identity) }
         }, by: { $0.0 }).mapValues { $0.map(\.1) }
-        let knownByNameTeam = Dictionary(grouping: knownStadiaPlayers, by: {
+        let knownByNameTeam = Dictionary(grouping: knownBannerPlayers, by: {
             Self.nameTeamKey(name: $0.displayName, team: $0.teamAbbreviation)
         })
-        let knownBySurnameTeamPosition = Dictionary(grouping: knownStadiaPlayers, by: {
+        let knownBySurnameTeamPosition = Dictionary(grouping: knownBannerPlayers, by: {
             Self.surnameTeamPositionKey(name: $0.displayName, team: $0.teamAbbreviation, position: $0.position)
         })
 
@@ -39,9 +39,9 @@ struct FantasyPlayerResolver: Sendable {
                     output[player.id] = .ambiguous(candidates)
                     continue
                 } else {
-                    let identity = StadiaPlayerIdentity(
+                    let identity = BannerPlayerIdentity(
                         id: "espn:\(espnID)",
-                        leaguePath: player.sport.stadiaLeague?.path ?? "",
+                        leaguePath: player.sport.bannerLeague?.path ?? "",
                         displayName: player.fullName,
                         teamAbbreviation: player.teamAbbreviation,
                         position: player.position,
@@ -74,14 +74,14 @@ struct FantasyPlayerResolver: Sendable {
                 continue
             }
 
-            let fuzzyCandidates = carefullyFuzzyMatch(player, in: knownStadiaPlayers)
+            let fuzzyCandidates = carefullyFuzzyMatch(player, in: knownBannerPlayers)
             if fuzzyCandidates.count == 1 {
                 output[player.id] = .resolved(fuzzyCandidates[0])
                 persisted[player.id] = fuzzyCandidates[0]
             } else if fuzzyCandidates.count > 1 {
                 output[player.id] = .ambiguous(fuzzyCandidates)
             } else {
-                output[player.id] = .unresolved("No reliable Stadia player identity match")
+                output[player.id] = .unresolved("No reliable Banner player identity match")
             }
         }
 
@@ -95,7 +95,7 @@ struct FantasyPlayerResolver: Sendable {
         await persistence.saveMappings(mappings)
     }
 
-    private func cachedStillMatches(_ cached: StadiaPlayerIdentity, player: FantasyPlayer) -> Bool {
+    private func cachedStillMatches(_ cached: BannerPlayerIdentity, player: FantasyPlayer) -> Bool {
         if let cachedTeam = cached.teamAbbreviation, let currentTeam = player.teamAbbreviation, cachedTeam != currentTeam {
             return false
         }
@@ -105,7 +105,7 @@ struct FantasyPlayerResolver: Sendable {
         return true
     }
 
-    private func carefullyFuzzyMatch(_ player: FantasyPlayer, in identities: [StadiaPlayerIdentity]) -> [StadiaPlayerIdentity] {
+    private func carefullyFuzzyMatch(_ player: FantasyPlayer, in identities: [BannerPlayerIdentity]) -> [BannerPlayerIdentity] {
         guard let team = player.teamAbbreviation, !team.isEmpty else { return [] }
         let target = FantasyStringNormalizer.normalize(player.fullName)
         let candidates = identities.filter { identity in

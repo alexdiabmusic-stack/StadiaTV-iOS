@@ -105,7 +105,7 @@ struct PlayerView: View {
     @EnvironmentObject private var entitlements: EntitlementStore
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var fantasyStore: FantasyStore
-    @EnvironmentObject private var nativeFantasyStore: StadiaFantasyStore
+    @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
 
     // Zap / channel navigation state
     @State private var currentZapChannel: Channel
@@ -142,7 +142,7 @@ struct PlayerView: View {
     @State private var volumeOverlay: Float?
     @State private var hudHideTask: Task<Void, Never>?
     @State private var showGestureHint = false
-    private static let gestureOnboardingKey = "stadiatv.player.gestureOnboarding.v1"
+    private static let gestureOnboardingKey = "bannertv.player.gestureOnboarding.v1"
     #endif
 
     // Live score overlay
@@ -1047,7 +1047,7 @@ private enum PlayerMatchTextNormalizer {
 
 // MARK: - Sports-first Match Player
 
-private enum StadiaSport: String {
+private enum BannerSport: String {
     case baseball
     case hockey
     case americanFootball
@@ -1179,7 +1179,7 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
         self.videoContent = videoContent()
     }
 
-    private var sport: StadiaSport { StadiaSport(league: match?.league) }
+    private var sport: BannerSport { BannerSport(league: match?.league) }
     private var effectiveTab: SportPlayerTab { sport.tabs.contains(selectedTab) ? selectedTab : sport.tabs.first ?? .game }
 
     var body: some View {
@@ -1287,7 +1287,7 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
 private struct PlayerVideoContainer<VideoContent: View>: View {
     let channel: Channel
     let match: Match?
-    let sport: StadiaSport
+    let sport: BannerSport
     let isChromeVisible: Bool
     let streamSummary: String
     let orientation: PlayerOrientation
@@ -1302,7 +1302,7 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
     init(
         channel: Channel,
         match: Match?,
-        sport: StadiaSport,
+        sport: BannerSport,
         isChromeVisible: Bool,
         streamSummary: String,
         orientation: PlayerOrientation,
@@ -1500,7 +1500,7 @@ private struct PlayerBottomOverlay: View {
 
 private struct LiveScoreBug: View {
     let match: Match
-    let sport: StadiaSport
+    let sport: BannerSport
 
     var body: some View {
         VStack(spacing: 7) {
@@ -1648,7 +1648,7 @@ private struct MatchTabs: View {
 private struct SportGameCentre: View {
     let match: Match?
     let state: PlayerMatchResolutionState
-    let sport: StadiaSport
+    let sport: BannerSport
     let selectedTab: SportPlayerTab
 
     var body: some View {
@@ -1941,7 +1941,7 @@ private struct SituationGrid: View {
 
 private struct TeamStatsPlaceholder: View {
     let match: Match?
-    let sport: StadiaSport
+    let sport: BannerSport
 
     var body: some View {
         GameCentreCard(title: statsTitle) {
@@ -2001,7 +2001,7 @@ private struct TeamStatsPlaceholder: View {
 private struct EventsPlaceholder: View {
     let match: Match?
     var state: PlayerMatchResolutionState = .connected
-    let sport: StadiaSport
+    let sport: BannerSport
 
     var body: some View {
         GameCentreCard(title: sport == .soccer ? "Recent Events" : "Recent") {
@@ -2029,7 +2029,7 @@ private struct EventsPlaceholder: View {
 
 private struct BoxScorePlaceholder: View {
     let match: Match?
-    let sport: StadiaSport
+    let sport: BannerSport
     var body: some View {
         GameCentreCard(title: sport == .basketball ? "Box Score" : "Line Score") {
             if let boxScore = match?.liveContext.boxScore, !boxScore.playerStats.isEmpty {
@@ -2057,7 +2057,7 @@ private struct BoxScorePlaceholder: View {
 
 private struct LineupsPlaceholder: View {
     let match: Match?
-    let sport: StadiaSport
+    let sport: BannerSport
     var body: some View {
         GameCentreCard(title: sport == .hockey ? "Lineups" : "Lineups") {
             if let formations = match?.liveContext.formations, !formations.isEmpty {
@@ -2138,7 +2138,7 @@ private struct DrivesPlaceholder: View {
 
 private struct LandscapeGameCentrePanel: View {
     let match: Match?
-    let sport: StadiaSport
+    let sport: BannerSport
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

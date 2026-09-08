@@ -3,16 +3,16 @@ import CryptoKit
 
 // MARK: - Multi-source news deduplication, classification, and ranking
 
-enum StadiaNewsDeduplicator {
+enum BannerNewsDeduplicator {
 
     // MARK: - Merge and rank from multiple providers
 
     nonisolated static func mergeAndRank(
-        _ collected: [(SportsDataProviderID, [StadiaNewsArticle])],
+        _ collected: [(SportsDataProviderID, [BannerNewsArticle])],
         league: League,
         limit: Int
-    ) -> [StadiaNewsArticle] {
-        var all: [StadiaNewsArticle] = []
+    ) -> [BannerNewsArticle] {
+        var all: [BannerNewsArticle] = []
         for (_, articles) in collected { all.append(contentsOf: articles) }
         let deduped = deduplicate(all)
         return rank(deduped, league: league, collected: collected, limit: limit)
@@ -20,10 +20,10 @@ enum StadiaNewsDeduplicator {
 
     // MARK: - Deduplication
 
-    nonisolated static func deduplicate(_ articles: [StadiaNewsArticle]) -> [StadiaNewsArticle] {
+    nonisolated static func deduplicate(_ articles: [BannerNewsArticle]) -> [BannerNewsArticle] {
         var seenURLs: Set<String> = []
         var seenTitles: Set<String> = []
-        var result: [StadiaNewsArticle] = []
+        var result: [BannerNewsArticle] = []
 
         for article in articles {
             let urlKey = canonicalURLKey(article.url)
@@ -42,15 +42,15 @@ enum StadiaNewsDeduplicator {
     // MARK: - Ranking with source diversity
 
     nonisolated static func rank(
-        _ articles: [StadiaNewsArticle],
+        _ articles: [BannerNewsArticle],
         league: League,
-        collected: [(SportsDataProviderID, [StadiaNewsArticle])],
+        collected: [(SportsDataProviderID, [BannerNewsArticle])],
         limit: Int
-    ) -> [StadiaNewsArticle] {
+    ) -> [BannerNewsArticle] {
         let now = Date()
 
         // Score each article
-        let scored: [(StadiaNewsArticle, Double)] = articles.map { article in
+        let scored: [(BannerNewsArticle, Double)] = articles.map { article in
             var score = 0.0
 
             // Freshness: decay over 24h window
@@ -92,7 +92,7 @@ enum StadiaNewsDeduplicator {
     // MARK: - League classification
 
     /// Attempts to identify the most relevant league for a headline + description.
-    nonisolated static func classify(headline: String, description: String?, tags: [String] = []) -> (sport: SportGroup?, leagueID: StadiaEntityID?) {
+    nonisolated static func classify(headline: String, description: String?, tags: [String] = []) -> (sport: SportGroup?, leagueID: BannerEntityID?) {
         let text = ([headline, description ?? ""] + tags).joined(separator: " ").lowercased()
 
         // Sorted from most-specific to least-specific so short tokens don't collide.

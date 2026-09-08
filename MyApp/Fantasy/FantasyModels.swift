@@ -5,7 +5,7 @@ extension GameState: Codable, Sendable {}
 // MARK: - Provider-independent Fantasy domain
 
 enum FantasyProvider: String, Codable, CaseIterable, Identifiable, Sendable {
-    case stadia
+    case banner
     case sleeper
     case espn
 
@@ -13,7 +13,7 @@ enum FantasyProvider: String, Codable, CaseIterable, Identifiable, Sendable {
 
     nonisolated var displayName: String {
         switch self {
-        case .stadia: return "Stadia Fantasy"
+        case .banner: return "Banner Fantasy"
         case .sleeper: return "Sleeper"
         case .espn: return "ESPN Fantasy"
         }
@@ -28,11 +28,11 @@ enum FantasySport: String, Codable, CaseIterable, Identifiable, Sendable {
 
     nonisolated var id: String { rawValue }
 
-    nonisolated var stadiaLeague: League? {
-        League.all.first { $0.path == stadiaLeaguePath }
+    nonisolated var bannerLeague: League? {
+        League.all.first { $0.path == bannerLeaguePath }
     }
 
-    nonisolated var stadiaLeaguePath: String {
+    nonisolated var bannerLeaguePath: String {
         switch self {
         case .nfl: return "football/nfl"
         case .nhl: return "hockey/nhl"
@@ -274,7 +274,7 @@ struct FantasyScoringSettings: Codable, Hashable, Sendable {
     let values: [String: Double]
 }
 
-struct StadiaPlayerIdentity: Identifiable, Codable, Hashable, Sendable {
+struct BannerPlayerIdentity: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leaguePath: String
     let displayName: String
@@ -285,11 +285,11 @@ struct StadiaPlayerIdentity: Identifiable, Codable, Hashable, Sendable {
 }
 
 enum FantasyPlayerResolution: Codable, Hashable, Sendable {
-    case resolved(StadiaPlayerIdentity)
-    case ambiguous([StadiaPlayerIdentity])
+    case resolved(BannerPlayerIdentity)
+    case ambiguous([BannerPlayerIdentity])
     case unresolved(String)
 
-    var identity: StadiaPlayerIdentity? {
+    var identity: BannerPlayerIdentity? {
         if case .resolved(let identity) = self { return identity }
         return nil
     }
@@ -298,7 +298,7 @@ enum FantasyPlayerResolution: Codable, Hashable, Sendable {
 struct FantasyPlayerGame: Identifiable, Hashable, Sendable {
     let id: String
     let fantasyPlayer: FantasyPlayer
-    let stadiaPlayer: StadiaPlayerIdentity?
+    let bannerPlayer: BannerPlayerIdentity?
     let event: Match?
     let opponent: TeamSide?
     let gameState: FantasyGameLinkState
@@ -311,7 +311,7 @@ struct FantasyPlayerGame: Identifiable, Hashable, Sendable {
     init(
         id: String,
         fantasyPlayer: FantasyPlayer,
-        stadiaPlayer: StadiaPlayerIdentity?,
+        bannerPlayer: BannerPlayerIdentity?,
         event: Match?,
         opponent: TeamSide?,
         gameState: FantasyGameLinkState,
@@ -323,7 +323,7 @@ struct FantasyPlayerGame: Identifiable, Hashable, Sendable {
     ) {
         self.id = id
         self.fantasyPlayer = fantasyPlayer
-        self.stadiaPlayer = stadiaPlayer
+        self.bannerPlayer = bannerPlayer
         self.event = event
         self.opponent = opponent
         self.gameState = gameState
@@ -355,7 +355,7 @@ struct FantasyEventContext: Identifiable, Hashable, Sendable {
 struct CachedFantasyPlayerGame: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let fantasyPlayer: FantasyPlayer
-    let stadiaPlayer: StadiaPlayerIdentity?
+    let bannerPlayer: BannerPlayerIdentity?
     let event: CachedFantasyMatch?
     let opponent: CachedFantasyTeamSide?
     let gameState: FantasyGameLinkState
@@ -369,7 +369,7 @@ struct CachedFantasyPlayerGame: Identifiable, Codable, Hashable, Sendable {
     nonisolated init(game: FantasyPlayerGame) {
         self.id = game.id
         self.fantasyPlayer = game.fantasyPlayer
-        self.stadiaPlayer = game.stadiaPlayer
+        self.bannerPlayer = game.bannerPlayer
         self.event = game.event.map(CachedFantasyMatch.init(match:))
         self.opponent = game.opponent.map(CachedFantasyTeamSide.init(side:))
         self.gameState = game.gameState
@@ -386,7 +386,7 @@ struct CachedFantasyPlayerGame: Identifiable, Codable, Hashable, Sendable {
         return FantasyPlayerGame(
             id: id,
             fantasyPlayer: fantasyPlayer,
-            stadiaPlayer: stadiaPlayer,
+            bannerPlayer: bannerPlayer,
             event: event.flatMap { $0.toDomain() },
             opponent: opponent?.toDomain(),
             gameState: gameState,

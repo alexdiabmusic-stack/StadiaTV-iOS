@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import StadiaTV
+@testable import BannerTV
 
 // MARK: - Helpers (shared with SourceMatcherRegressionTests via file-private scope)
 

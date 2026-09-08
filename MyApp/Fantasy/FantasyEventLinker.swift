@@ -15,7 +15,7 @@ struct FantasyEventLinker: FantasyEventLinking {
         preferredLanguages: Set<String>,
         knownMatches: [Match]? = nil
     ) async -> [FantasyPlayerGame] {
-        let fantasyLeague = players.first?.sport.stadiaLeague
+        let fantasyLeague = players.first?.sport.bannerLeague
         let matches: [Match]
         if let knownMatches {
             matches = knownMatches
@@ -36,7 +36,7 @@ struct FantasyEventLinker: FantasyEventLinking {
             return FantasyPlayerGame(
                 id: "\(player.id)-\(match?.id ?? "none")",
                 fantasyPlayer: player,
-                stadiaPlayer: identity,
+                bannerPlayer: identity,
                 event: match,
                 opponent: opponent,
                 gameState: match.map(Self.gameLinkState) ?? .noGame,
@@ -54,7 +54,7 @@ struct FantasyEventLinker: FantasyEventLinking {
         return [:]
     }
 
-    private func match(for player: FantasyPlayer, identity: StadiaPlayerIdentity?, in matches: [Match]) -> Match? {
+    private func match(for player: FantasyPlayer, identity: BannerPlayerIdentity?, in matches: [Match]) -> Match? {
         let team = identity?.teamAbbreviation ?? player.teamAbbreviation
         guard let team, !team.isEmpty else { return nil }
         let relevant = matches.filter { match in
@@ -71,7 +71,7 @@ struct FantasyEventLinker: FantasyEventLinking {
         }.first
     }
 
-    private func opponent(for player: FantasyPlayer, identity: StadiaPlayerIdentity?, match: Match) -> TeamSide? {
+    private func opponent(for player: FantasyPlayer, identity: BannerPlayerIdentity?, match: Match) -> TeamSide? {
         let team = identity?.teamAbbreviation ?? player.teamAbbreviation
         guard let team else { return nil }
         if match.home.abbreviation.caseInsensitiveCompare(team) == .orderedSame { return match.away }

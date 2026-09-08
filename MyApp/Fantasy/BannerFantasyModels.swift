@@ -1,8 +1,8 @@
 import Foundation
 
-// MARK: - Native Stadia Fantasy Domain
+// MARK: - Native Banner Fantasy Domain
 
-enum StadiaFantasyLeagueSource: String, Codable, CaseIterable, Identifiable, Sendable {
+enum BannerFantasyLeagueSource: String, Codable, CaseIterable, Identifiable, Sendable {
     case native
     case importedESPN
     case importedSleeper
@@ -11,14 +11,14 @@ enum StadiaFantasyLeagueSource: String, Codable, CaseIterable, Identifiable, Sen
 
     var displayName: String {
         switch self {
-        case .native: return "Stadia"
+        case .native: return "Banner"
         case .importedESPN: return "ESPN Fantasy"
         case .importedSleeper: return "Sleeper"
         }
     }
 }
 
-enum StadiaFantasyVisibility: String, Codable, CaseIterable, Identifiable, Sendable {
+enum BannerFantasyVisibility: String, Codable, CaseIterable, Identifiable, Sendable {
     case `public`
     case `private`
 
@@ -26,7 +26,7 @@ enum StadiaFantasyVisibility: String, Codable, CaseIterable, Identifiable, Senda
     var displayName: String { self == .public ? "Public" : "Private" }
 }
 
-enum StadiaFantasyMode: String, Codable, CaseIterable, Identifiable, Sendable {
+enum BannerFantasyMode: String, Codable, CaseIterable, Identifiable, Sendable {
     case personalTeam
     case simulatedLeague
 
@@ -40,7 +40,7 @@ enum StadiaFantasyMode: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum StadiaFantasyScoringType: String, Codable, CaseIterable, Identifiable, Sendable {
+enum BannerFantasyScoringType: String, Codable, CaseIterable, Identifiable, Sendable {
     case headToHeadPoints
     case headToHeadCategories
     case rotisserie
@@ -56,14 +56,14 @@ enum StadiaFantasyScoringType: String, Codable, CaseIterable, Identifiable, Send
     }
 }
 
-enum StadiaFantasyDraftType: String, Codable, CaseIterable, Identifiable, Sendable {
+enum BannerFantasyDraftType: String, Codable, CaseIterable, Identifiable, Sendable {
     case snake
 
     var id: String { rawValue }
     var displayName: String { "Snake Draft" }
 }
 
-enum StadiaFantasyLeaguePhase: String, Codable, Sendable {
+enum BannerFantasyLeaguePhase: String, Codable, Sendable {
     case lobby
     case drafting
     case inSeason
@@ -71,12 +71,12 @@ enum StadiaFantasyLeaguePhase: String, Codable, Sendable {
     case complete
 }
 
-enum StadiaFantasyMembershipRole: String, Codable, Sendable {
+enum BannerFantasyMembershipRole: String, Codable, Sendable {
     case commissioner
     case manager
 }
 
-enum StadiaFantasyRosterSlot: String, Codable, CaseIterable, Identifiable, Sendable {
+enum BannerFantasyRosterSlot: String, Codable, CaseIterable, Identifiable, Sendable {
     case center = "C"
     case leftWing = "LW"
     case rightWing = "RW"
@@ -152,7 +152,7 @@ enum StadiaFantasyRosterSlot: String, Codable, CaseIterable, Identifiable, Senda
     var isActive: Bool { self != .bench && self != .injuredReserve && self != .injuredList }
 }
 
-enum StadiaFantasyStat: String, Codable, CaseIterable, Identifiable, Sendable {
+enum BannerFantasyStat: String, Codable, CaseIterable, Identifiable, Sendable {
     case goals
     case assists
     case plusMinus
@@ -267,7 +267,7 @@ enum StadiaFantasyStat: String, Codable, CaseIterable, Identifiable, Sendable {
     var isRatio: Bool { [.goalsAgainstAverage, .savePercentage, .fieldGoalPercentage, .freeThrowPercentage, .battingAverage, .onBasePercentage, .earnedRunAverage, .walksHitsPerInningPitched].contains(self) }
 }
 
-struct StadiaFantasySeason: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasySeason: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let year: Int
     let startsAt: Date?
@@ -275,34 +275,34 @@ struct StadiaFantasySeason: Identifiable, Codable, Hashable, Sendable {
     let scoringPeriodDays: Int
 }
 
-struct StadiaFantasyScoringRule: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyScoringRule: Identifiable, Codable, Hashable, Sendable {
     var id: String { stat.rawValue }
-    let stat: StadiaFantasyStat
+    let stat: BannerFantasyStat
     var points: Double
     var enabledForCategories: Bool
 }
 
-struct StadiaFantasyScoringRules: Codable, Hashable, Sendable {
-    var type: StadiaFantasyScoringType
-    var rules: [StadiaFantasyScoringRule]
+struct BannerFantasyScoringRules: Codable, Hashable, Sendable {
+    var type: BannerFantasyScoringType
+    var rules: [BannerFantasyScoringRule]
 
-    static func stadiaDefault(sport: FantasySport, type: StadiaFantasyScoringType = .headToHeadPoints) -> StadiaFantasyScoringRules {
+    static func bannerDefault(sport: FantasySport, type: BannerFantasyScoringType = .headToHeadPoints) -> BannerFantasyScoringRules {
         FantasySportConfiguration.configuration(for: sport).defaultScoring(type: type)
     }
 
-    static func stadiaDefault(type: StadiaFantasyScoringType = .headToHeadPoints) -> StadiaFantasyScoringRules {
-        stadiaDefault(sport: .nhl, type: type)
+    static func bannerDefault(type: BannerFantasyScoringType = .headToHeadPoints) -> BannerFantasyScoringRules {
+        bannerDefault(sport: .nhl, type: type)
     }
 }
 
-struct StadiaFantasyRosterConfiguration: Codable, Hashable, Sendable {
-    var slotCounts: [StadiaFantasyRosterSlot: Int]
+struct BannerFantasyRosterConfiguration: Codable, Hashable, Sendable {
+    var slotCounts: [BannerFantasyRosterSlot: Int]
 
-    static func standard(for sport: FantasySport) -> StadiaFantasyRosterConfiguration {
+    static func standard(for sport: FantasySport) -> BannerFantasyRosterConfiguration {
         FantasySportConfiguration.configuration(for: sport).defaultRoster
     }
 
-    static let standard = StadiaFantasyRosterConfiguration.standard(for: .nhl)
+    static let standard = BannerFantasyRosterConfiguration.standard(for: .nhl)
 }
 
 enum FantasyLineupFrequency: String, Codable, Sendable {
@@ -323,17 +323,17 @@ enum FantasyLockRule: String, Codable, Sendable {
 
 struct FantasySportConfiguration: Hashable, Sendable {
     let sport: FantasySport
-    let eligiblePositions: [StadiaFantasyRosterSlot]
-    let defaultRoster: StadiaFantasyRosterConfiguration
-    let availableScoringCategories: [StadiaFantasyStat]
+    let eligiblePositions: [BannerFantasyRosterSlot]
+    let defaultRoster: BannerFantasyRosterConfiguration
+    let availableScoringCategories: [BannerFantasyStat]
     let lineupFrequency: FantasyLineupFrequency
     let matchupStructure: FantasyMatchupStructure
     let lockRule: FantasyLockRule
-    let relevantLiveStatistics: [StadiaFantasyStat]
+    let relevantLiveStatistics: [BannerFantasyStat]
 
-    func defaultScoring(type: StadiaFantasyScoringType = .headToHeadPoints) -> StadiaFantasyScoringRules {
-        StadiaFantasyScoringRules(type: type, rules: availableScoringCategories.map { stat in
-            StadiaFantasyScoringRule(stat: stat, points: Self.defaultPointValue(for: stat), enabledForCategories: true)
+    func defaultScoring(type: BannerFantasyScoringType = .headToHeadPoints) -> BannerFantasyScoringRules {
+        BannerFantasyScoringRules(type: type, rules: availableScoringCategories.map { stat in
+            BannerFantasyScoringRule(stat: stat, points: Self.defaultPointValue(for: stat), enabledForCategories: true)
         })
     }
 
@@ -349,7 +349,7 @@ struct FantasySportConfiguration: Hashable, Sendable {
     private static let football = FantasySportConfiguration(
         sport: .nfl,
         eligiblePositions: [.quarterback, .runningBack, .wideReceiver, .tightEnd, .flex, .kicker, .defenseSpecialTeams, .bench, .injuredReserve],
-        defaultRoster: StadiaFantasyRosterConfiguration(slotCounts: [.quarterback: 1, .runningBack: 2, .wideReceiver: 2, .tightEnd: 1, .flex: 1, .kicker: 1, .defenseSpecialTeams: 1, .bench: 6, .injuredReserve: 2]),
+        defaultRoster: BannerFantasyRosterConfiguration(slotCounts: [.quarterback: 1, .runningBack: 2, .wideReceiver: 2, .tightEnd: 1, .flex: 1, .kicker: 1, .defenseSpecialTeams: 1, .bench: 6, .injuredReserve: 2]),
         availableScoringCategories: [.passingYards, .passingTouchdowns, .interceptions, .rushingYards, .rushingTouchdowns, .receptions, .receivingYards, .receivingTouchdowns, .fieldGoalsMade, .extraPointsMade, .defensiveSacks, .defensiveTakeaways],
         lineupFrequency: .weekly,
         matchupStructure: .weekly,
@@ -360,7 +360,7 @@ struct FantasySportConfiguration: Hashable, Sendable {
     private static let hockey = FantasySportConfiguration(
         sport: .nhl,
         eligiblePositions: [.center, .leftWing, .rightWing, .forward, .defense, .goalie, .utility, .bench, .injuredReserve],
-        defaultRoster: StadiaFantasyRosterConfiguration(slotCounts: [.center: 2, .leftWing: 2, .rightWing: 2, .defense: 4, .goalie: 2, .utility: 1, .bench: 5, .injuredReserve: 2]),
+        defaultRoster: BannerFantasyRosterConfiguration(slotCounts: [.center: 2, .leftWing: 2, .rightWing: 2, .defense: 4, .goalie: 2, .utility: 1, .bench: 5, .injuredReserve: 2]),
         availableScoringCategories: [.goals, .assists, .plusMinus, .penaltyMinutes, .powerPlayPoints, .shortHandedPoints, .shotsOnGoal, .hits, .blockedShots, .goalieWins, .saves, .goalsAgainst, .shutouts, .overtimeLosses, .goalsAgainstAverage, .savePercentage],
         lineupFrequency: .daily,
         matchupStructure: .dailyScoringPeriods,
@@ -371,7 +371,7 @@ struct FantasySportConfiguration: Hashable, Sendable {
     private static let basketball = FantasySportConfiguration(
         sport: .nba,
         eligiblePositions: [.pointGuard, .shootingGuard, .smallForward, .powerForward, .center, .comboGuard, .forward, .utility, .bench, .injuredReserve],
-        defaultRoster: StadiaFantasyRosterConfiguration(slotCounts: [.pointGuard: 1, .shootingGuard: 1, .smallForward: 1, .powerForward: 1, .center: 1, .comboGuard: 1, .forward: 1, .utility: 2, .bench: 5, .injuredReserve: 2]),
+        defaultRoster: BannerFantasyRosterConfiguration(slotCounts: [.pointGuard: 1, .shootingGuard: 1, .smallForward: 1, .powerForward: 1, .center: 1, .comboGuard: 1, .forward: 1, .utility: 2, .bench: 5, .injuredReserve: 2]),
         availableScoringCategories: [.points, .rebounds, .assists, .steals, .blockedShots, .threePointersMade, .fieldGoalPercentage, .freeThrowPercentage, .turnovers],
         lineupFrequency: .daily,
         matchupStructure: .dailyScoringPeriods,
@@ -382,7 +382,7 @@ struct FantasySportConfiguration: Hashable, Sendable {
     private static let baseball = FantasySportConfiguration(
         sport: .mlb,
         eligiblePositions: [.center, .firstBase, .secondBase, .thirdBase, .shortstop, .outfield, .utility, .startingPitcher, .reliefPitcher, .pitcher, .bench, .injuredList],
-        defaultRoster: StadiaFantasyRosterConfiguration(slotCounts: [.center: 1, .firstBase: 1, .secondBase: 1, .thirdBase: 1, .shortstop: 1, .outfield: 3, .utility: 1, .startingPitcher: 2, .reliefPitcher: 2, .pitcher: 2, .bench: 5, .injuredList: 2]),
+        defaultRoster: BannerFantasyRosterConfiguration(slotCounts: [.center: 1, .firstBase: 1, .secondBase: 1, .thirdBase: 1, .shortstop: 1, .outfield: 3, .utility: 1, .startingPitcher: 2, .reliefPitcher: 2, .pitcher: 2, .bench: 5, .injuredList: 2]),
         availableScoringCategories: [.runs, .homeRuns, .runsBattedIn, .stolenBases, .battingAverage, .onBasePercentage, .hitsAllowed, .totalBases, .pitcherWins, .savesPitching, .strikeouts, .earnedRunAverage, .walksHitsPerInningPitched, .inningsPitched, .qualityStarts],
         lineupFrequency: .daily,
         matchupStructure: .dailyScoringPeriods,
@@ -390,7 +390,7 @@ struct FantasySportConfiguration: Hashable, Sendable {
         relevantLiveStatistics: [.runs, .homeRuns, .runsBattedIn, .stolenBases, .pitcherWins, .savesPitching, .strikeouts]
     )
 
-    private static func defaultPointValue(for stat: StadiaFantasyStat) -> Double {
+    private static func defaultPointValue(for stat: BannerFantasyStat) -> Double {
         switch stat {
         case .goals: return 3
         case .assists: return 2
@@ -430,16 +430,16 @@ struct FantasySportConfiguration: Hashable, Sendable {
     }
 }
 
-struct StadiaFantasyDraftSettings: Codable, Hashable, Sendable {
-    var type: StadiaFantasyDraftType
+struct BannerFantasyDraftSettings: Codable, Hashable, Sendable {
+    var type: BannerFantasyDraftType
     var scheduledAt: Date?
     var pickTimerSeconds: Int
     var draftOrderTeamIDs: [String]
 
-    static let standard = StadiaFantasyDraftSettings(type: .snake, scheduledAt: nil, pickTimerSeconds: 90, draftOrderTeamIDs: [])
+    static let standard = BannerFantasyDraftSettings(type: .snake, scheduledAt: nil, pickTimerSeconds: 90, draftOrderTeamIDs: [])
 }
 
-struct StadiaFantasyWaiverSettings: Codable, Hashable, Sendable {
+struct BannerFantasyWaiverSettings: Codable, Hashable, Sendable {
     enum WaiverType: String, Codable, CaseIterable, Identifiable, Sendable {
         case freeAgency
         case rollingPriority
@@ -452,10 +452,10 @@ struct StadiaFantasyWaiverSettings: Codable, Hashable, Sendable {
     var usesFAAB: Bool
     var faabBudget: Int?
 
-    static let standard = StadiaFantasyWaiverSettings(type: .rollingPriority, waiverPeriodHours: 24, usesFAAB: false, faabBudget: nil)
+    static let standard = BannerFantasyWaiverSettings(type: .rollingPriority, waiverPeriodHours: 24, usesFAAB: false, faabBudget: nil)
 }
 
-struct StadiaFantasyTradeSettings: Codable, Hashable, Sendable {
+struct BannerFantasyTradeSettings: Codable, Hashable, Sendable {
     enum ReviewType: String, Codable, CaseIterable, Identifiable, Sendable {
         case none
         case commissioner
@@ -467,44 +467,44 @@ struct StadiaFantasyTradeSettings: Codable, Hashable, Sendable {
     var reviewType: ReviewType
 }
 
-struct StadiaFantasyPlayoffSettings: Codable, Hashable, Sendable {
+struct BannerFantasyPlayoffSettings: Codable, Hashable, Sendable {
     var regularSeasonPeriods: Int
     var playoffTeams: Int
     var playoffRounds: Int
     var championshipPeriod: Int?
 }
 
-struct StadiaFantasyLeague: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyLeague: Identifiable, Codable, Hashable, Sendable {
     let id: String
     var name: String
-    var source: StadiaFantasyLeagueSource
-    var mode: StadiaFantasyMode?
+    var source: BannerFantasyLeagueSource
+    var mode: BannerFantasyMode?
     var sport: FantasySport
-    var season: StadiaFantasySeason
-    var phase: StadiaFantasyLeaguePhase
-    var visibility: StadiaFantasyVisibility
+    var season: BannerFantasySeason
+    var phase: BannerFantasyLeaguePhase
+    var visibility: BannerFantasyVisibility
     var inviteCode: String
     var commissionerUserID: String
     var maxTeams: Int
-    var rosterConfiguration: StadiaFantasyRosterConfiguration
-    var scoringRules: StadiaFantasyScoringRules
-    var draftSettings: StadiaFantasyDraftSettings
-    var waiverSettings: StadiaFantasyWaiverSettings
-    var tradeSettings: StadiaFantasyTradeSettings
-    var playoffSettings: StadiaFantasyPlayoffSettings
+    var rosterConfiguration: BannerFantasyRosterConfiguration
+    var scoringRules: BannerFantasyScoringRules
+    var draftSettings: BannerFantasyDraftSettings
+    var waiverSettings: BannerFantasyWaiverSettings
+    var tradeSettings: BannerFantasyTradeSettings
+    var playoffSettings: BannerFantasyPlayoffSettings
     var createdAt: Date
 }
 
-struct StadiaFantasyMembership: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyMembership: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
     let userID: String
     var displayName: String
-    var role: StadiaFantasyMembershipRole
+    var role: BannerFantasyMembershipRole
     var joinedAt: Date
 }
 
-struct StadiaFantasyTeam: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyTeam: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
     let ownerUserID: String
@@ -513,7 +513,7 @@ struct StadiaFantasyTeam: Identifiable, Codable, Hashable, Sendable {
     var avatarID: String?
 }
 
-struct StadiaFantasyPlayerEntry: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyPlayerEntry: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
     let teamID: String
@@ -521,69 +521,69 @@ struct StadiaFantasyPlayerEntry: Identifiable, Codable, Hashable, Sendable {
     var playerName: String
     var nhlTeamAbbreviation: String?
     var primaryPosition: String?
-    var eligibleSlots: [StadiaFantasyRosterSlot]
+    var eligibleSlots: [BannerFantasyRosterSlot]
     var injuryStatus: String?
     var acquiredAt: Date
 }
 
-struct StadiaFantasyRoster: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyRoster: Identifiable, Codable, Hashable, Sendable {
     var id: String { teamID }
     let leagueID: String
     let teamID: String
-    var entries: [StadiaFantasyPlayerEntry]
+    var entries: [BannerFantasyPlayerEntry]
 }
 
-struct StadiaFantasyLineupSlot: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyLineupSlot: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let playerEntryID: String
-    var slot: StadiaFantasyRosterSlot
+    var slot: BannerFantasyRosterSlot
     var lockedAt: Date?
 }
 
-struct StadiaFantasyLineup: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyLineup: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
     let teamID: String
     let scoringDate: Date
-    var slots: [StadiaFantasyLineupSlot]
+    var slots: [BannerFantasyLineupSlot]
 }
 
-struct StadiaFantasyStatLine: Codable, Hashable, Sendable {
-    var values: [StadiaFantasyStat: Double]
+struct BannerFantasyStatLine: Codable, Hashable, Sendable {
+    var values: [BannerFantasyStat: Double]
     var appearances: Int
 
-    subscript(_ stat: StadiaFantasyStat) -> Double {
+    subscript(_ stat: BannerFantasyStat) -> Double {
         values[stat] ?? 0
     }
 }
 
-struct StadiaFantasyPlayerScore: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyPlayerScore: Identifiable, Codable, Hashable, Sendable {
     var id: String { playerEntryID }
     let playerEntryID: String
     let points: Double?
-    let categoryValues: [StadiaFantasyStat: Double]
+    let categoryValues: [BannerFantasyStat: Double]
 }
 
-struct StadiaFantasyMatchupSide: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyMatchupSide: Identifiable, Codable, Hashable, Sendable {
     var id: String { teamID }
     let teamID: String
     var points: Double?
-    var categoryValues: [StadiaFantasyStat: Double]
+    var categoryValues: [BannerFantasyStat: Double]
     var categoryWins: Int?
 }
 
-struct StadiaFantasyMatchup: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyMatchup: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
     let matchupPeriod: Int
     let startsAt: Date
     let endsAt: Date
-    var home: StadiaFantasyMatchupSide
-    var away: StadiaFantasyMatchupSide
+    var home: BannerFantasyMatchupSide
+    var away: BannerFantasyMatchupSide
     var winnerTeamID: String?
 }
 
-struct StadiaFantasyStanding: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyStanding: Identifiable, Codable, Hashable, Sendable {
     var id: String { teamID }
     let leagueID: String
     let teamID: String
@@ -595,7 +595,7 @@ struct StadiaFantasyStanding: Identifiable, Codable, Hashable, Sendable {
     var pointsAgainst: Double?
 }
 
-enum StadiaFantasyTransactionType: String, Codable, Sendable {
+enum BannerFantasyTransactionType: String, Codable, Sendable {
     case add
     case drop
     case addDrop
@@ -605,24 +605,24 @@ enum StadiaFantasyTransactionType: String, Codable, Sendable {
     case lineupChange
 }
 
-struct StadiaFantasyPersistenceEnvelope: Codable, Sendable {
+struct BannerFantasyPersistenceEnvelope: Codable, Sendable {
     var schemaVersion: Int
-    var bundles: [StadiaFantasyLeagueBundle]
+    var bundles: [BannerFantasyLeagueBundle]
 
     static let currentSchemaVersion = 1
 }
 
-struct StadiaFantasyTransaction: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyTransaction: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
     let teamID: String?
-    let type: StadiaFantasyTransactionType
+    let type: BannerFantasyTransactionType
     var playerEntryIDs: [String]
     var description: String
     var createdAt: Date
 }
 
-struct StadiaFantasyWaiver: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyWaiver: Identifiable, Codable, Hashable, Sendable {
     enum Status: String, Codable, Sendable { case pending, processed, failed, cancelled }
     let id: String
     let leagueID: String
@@ -634,7 +634,7 @@ struct StadiaFantasyWaiver: Identifiable, Codable, Hashable, Sendable {
     var createdAt: Date
 }
 
-struct StadiaFantasyTrade: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyTrade: Identifiable, Codable, Hashable, Sendable {
     enum Status: String, Codable, Sendable { case proposed, accepted, rejected, cancelled, underReview, processed }
     let id: String
     let leagueID: String
@@ -646,7 +646,7 @@ struct StadiaFantasyTrade: Identifiable, Codable, Hashable, Sendable {
     var createdAt: Date
 }
 
-struct StadiaFantasyDraftPick: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyDraftPick: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
     let teamID: String
@@ -658,53 +658,53 @@ struct StadiaFantasyDraftPick: Identifiable, Codable, Hashable, Sendable {
     var madeAt: Date?
 }
 
-struct StadiaFantasyDraft: Identifiable, Codable, Hashable, Sendable {
+struct BannerFantasyDraft: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
-    var status: StadiaFantasyLeaguePhase
+    var status: BannerFantasyLeaguePhase
     var currentPickOverall: Int
-    var picks: [StadiaFantasyDraftPick]
+    var picks: [BannerFantasyDraftPick]
 }
 
-struct StadiaFantasyLeagueBundle: Codable, Hashable, Sendable {
-    var league: StadiaFantasyLeague
-    var memberships: [StadiaFantasyMembership]
-    var teams: [StadiaFantasyTeam]
-    var rosters: [StadiaFantasyRoster]
-    var lineups: [StadiaFantasyLineup]
-    var matchups: [StadiaFantasyMatchup]
-    var standings: [StadiaFantasyStanding]
-    var transactions: [StadiaFantasyTransaction]
-    var draft: StadiaFantasyDraft?
+struct BannerFantasyLeagueBundle: Codable, Hashable, Sendable {
+    var league: BannerFantasyLeague
+    var memberships: [BannerFantasyMembership]
+    var teams: [BannerFantasyTeam]
+    var rosters: [BannerFantasyRoster]
+    var lineups: [BannerFantasyLineup]
+    var matchups: [BannerFantasyMatchup]
+    var standings: [BannerFantasyStanding]
+    var transactions: [BannerFantasyTransaction]
+    var draft: BannerFantasyDraft?
 
-    func team(for userID: String) -> StadiaFantasyTeam? {
+    func team(for userID: String) -> BannerFantasyTeam? {
         teams.first { $0.ownerUserID == userID }
     }
 }
 
-extension StadiaFantasyLeague {
-    var effectiveMode: StadiaFantasyMode {
+extension BannerFantasyLeague {
+    var effectiveMode: BannerFantasyMode {
         mode ?? (maxTeams <= 1 ? .personalTeam : .simulatedLeague)
     }
 }
 
-struct StadiaFantasyCreateLeagueRequest: Sendable {
+struct BannerFantasyCreateLeagueRequest: Sendable {
     var sport: FantasySport
-    var mode: StadiaFantasyMode
+    var mode: BannerFantasyMode
     var leagueName: String
     var teamName: String
     var maxTeams: Int
-    var visibility: StadiaFantasyVisibility
-    var scoringType: StadiaFantasyScoringType
-    var rosterConfiguration: StadiaFantasyRosterConfiguration
-    var scoringRules: StadiaFantasyScoringRules
-    var draftSettings: StadiaFantasyDraftSettings
-    var waiverSettings: StadiaFantasyWaiverSettings
-    var tradeSettings: StadiaFantasyTradeSettings
-    var playoffSettings: StadiaFantasyPlayoffSettings
+    var visibility: BannerFantasyVisibility
+    var scoringType: BannerFantasyScoringType
+    var rosterConfiguration: BannerFantasyRosterConfiguration
+    var scoringRules: BannerFantasyScoringRules
+    var draftSettings: BannerFantasyDraftSettings
+    var waiverSettings: BannerFantasyWaiverSettings
+    var tradeSettings: BannerFantasyTradeSettings
+    var playoffSettings: BannerFantasyPlayoffSettings
 }
 
-struct StadiaFantasyJoinLeagueRequest: Sendable {
+struct BannerFantasyJoinLeagueRequest: Sendable {
     var inviteCode: String
     var teamName: String
 }

@@ -368,7 +368,7 @@ struct ESPNFantasyCredentials: Codable, Hashable, Sendable {
 }
 
 struct ESPNFantasyCredentialStore: Sendable {
-    private let service = "com.alexdiab.StadiaTV.fantasy.espn"
+    private let service = "com.alexdiab.BannerTV.fantasy.espn"
 
     nonisolated init() {}
 

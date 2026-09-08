@@ -181,7 +181,7 @@ struct FeaturedEventPick: Identifiable, Hashable {
 
     private func canonicalTeamID(for displayName: String, league: League) -> String {
         let slug = normalized(displayName).replacingOccurrences(of: " ", with: "-")
-        return "stadia:\(league.stadiaKey):team:\(slug)"
+        return "banner:\(league.bannerKey):team:\(slug)"
     }
 
     private func normalized(_ value: String) -> String {

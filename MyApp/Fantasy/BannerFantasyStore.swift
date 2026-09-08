@@ -2,27 +2,27 @@ import Foundation
 import Combine
 
 @MainActor
-final class StadiaFantasyStore: ObservableObject {
-    static let shared = StadiaFantasyStore()
+final class BannerFantasyStore: ObservableObject {
+    static let shared = BannerFantasyStore()
 
-    @Published private(set) var leagues: [StadiaFantasyLeagueBundle] = []
+    @Published private(set) var leagues: [BannerFantasyLeagueBundle] = []
     @Published private(set) var selectedLeagueID: String?
-    @Published private(set) var availablePlayers: [StadiaFantasyAvailablePlayer] = []
+    @Published private(set) var availablePlayers: [BannerFantasyAvailablePlayer] = []
     @Published private(set) var fantasyEventContextsByEventID: [String: FantasyEventContext] = [:]
     @Published private(set) var fantasyGamesByChannelID: [String: [FantasyPlayerGame]] = [:]
     @Published private(set) var isLoading = false
     @Published private(set) var lastError: String?
 
-    private let backend: any StadiaFantasyBackendService
-    private let sportsDataProvider: any StadiaSportsDataProvider
-    private let userIDKey = "stadiatv.nativeFantasy.localUserID.v1"
-    private let selectedLeagueKey = "stadiatv.nativeFantasy.selectedLeagueID.v1"
+    private let backend: any BannerFantasyBackendService
+    private let sportsDataProvider: any BannerSportsDataProvider
+    private let userIDKey = "bannertv.nativeFantasy.localUserID.v1"
+    private let selectedLeagueKey = "bannertv.nativeFantasy.selectedLeagueID.v1"
 
     init(
-        backend: (any StadiaFantasyBackendService)? = nil,
-        sportsDataProvider: (any StadiaSportsDataProvider)? = nil
+        backend: (any BannerFantasyBackendService)? = nil,
+        sportsDataProvider: (any BannerSportsDataProvider)? = nil
     ) {
-        self.backend = backend ?? LocalStadiaFantasyBackendService.shared
+        self.backend = backend ?? LocalBannerFantasyBackendService.shared
         self.sportsDataProvider = sportsDataProvider ?? ESPNSportsDataProvider()
         self.selectedLeagueID = UserDefaults.standard.string(forKey: selectedLeagueKey)
     }
@@ -34,15 +34,15 @@ final class StadiaFantasyStore: ObservableObject {
         return created
     }
 
-    var selectedBundle: StadiaFantasyLeagueBundle? {
+    var selectedBundle: BannerFantasyLeagueBundle? {
         selectedLeagueID.flatMap { id in leagues.first { $0.league.id == id } } ?? leagues.first
     }
 
-    var selectedTeam: StadiaFantasyTeam? {
+    var selectedTeam: BannerFantasyTeam? {
         selectedBundle?.team(for: currentUserID)
     }
 
-    var selectedRoster: StadiaFantasyRoster? {
+    var selectedRoster: BannerFantasyRoster? {
         guard let selectedBundle, let selectedTeam else { return nil }
         return selectedBundle.rosters.first { $0.teamID == selectedTeam.id }
     }
@@ -69,7 +69,7 @@ final class StadiaFantasyStore: ObservableObject {
         persistSelectedLeague()
     }
 
-    func createLeague(_ request: StadiaFantasyCreateLeagueRequest) async {
+    func createLeague(_ request: BannerFantasyCreateLeagueRequest) async {
         isLoading = true
         lastError = nil
         defer { isLoading = false }
@@ -83,7 +83,7 @@ final class StadiaFantasyStore: ObservableObject {
         }
     }
 
-    func joinLeague(_ request: StadiaFantasyJoinLeagueRequest) async {
+    func joinLeague(_ request: BannerFantasyJoinLeagueRequest) async {
         isLoading = true
         lastError = nil
         defer { isLoading = false }
@@ -126,7 +126,7 @@ final class StadiaFantasyStore: ObservableObject {
             let ranked = match.map { SourceMatcher.rank(match: $0, channels: channels, preferredLanguages: preferredLanguages) } ?? []
             let player = FantasyPlayer(
                 id: "native-\(entry.id)",
-                provider: .stadia,
+                provider: .banner,
                 sport: sport,
                 firstName: nil,
                 lastName: nil,
@@ -142,7 +142,7 @@ final class StadiaFantasyStore: ObservableObject {
             return FantasyPlayerGame(
                 id: "native-\(entry.id)-\(match?.id ?? "none")",
                 fantasyPlayer: player,
-                stadiaPlayer: StadiaPlayerIdentity(id: entry.canonicalPlayerID, leaguePath: sport.stadiaLeaguePath, displayName: entry.playerName, teamAbbreviation: entry.nhlTeamAbbreviation, position: entry.primaryPosition, espnAthleteID: entry.canonicalPlayerID, source: "stadia.nativeFantasy"),
+                bannerPlayer: BannerPlayerIdentity(id: entry.canonicalPlayerID, leaguePath: sport.bannerLeaguePath, displayName: entry.playerName, teamAbbreviation: entry.nhlTeamAbbreviation, position: entry.primaryPosition, espnAthleteID: entry.canonicalPlayerID, source: "banner.nativeFantasy"),
                 event: match,
                 opponent: opponent,
                 gameState: match.map { Self.gameLinkState(for: $0) } ?? .noGame,
@@ -192,7 +192,7 @@ final class StadiaFantasyStore: ObservableObject {
             .sorted { $0.event.date < $1.event.date }
     }
 
-    func draft(player: StadiaFantasyAvailablePlayer) async {
+    func draft(player: BannerFantasyAvailablePlayer) async {
         guard let selectedBundle, let selectedTeam else { return }
         do {
             let bundle = try await backend.draftPlayer(leagueID: selectedBundle.league.id, teamID: selectedTeam.id, player: player, availablePlayers: availablePlayers)
@@ -202,7 +202,7 @@ final class StadiaFantasyStore: ObservableObject {
         }
     }
 
-    func add(player: StadiaFantasyAvailablePlayer, dropPlayerEntryID: String? = nil) async {
+    func add(player: BannerFantasyAvailablePlayer, dropPlayerEntryID: String? = nil) async {
         guard let selectedBundle, let selectedTeam else { return }
         do {
             let bundle = try await backend.addFreeAgent(leagueID: selectedBundle.league.id, teamID: selectedTeam.id, player: player, dropPlayerEntryID: dropPlayerEntryID)
@@ -222,7 +222,7 @@ final class StadiaFantasyStore: ObservableObject {
         }
     }
 
-    func exportData() async -> StadiaFantasyPersistenceEnvelope? {
+    func exportData() async -> BannerFantasyPersistenceEnvelope? {
         do {
             return try await backend.exportData()
         } catch {
@@ -244,7 +244,7 @@ final class StadiaFantasyStore: ObservableObject {
         }
     }
 
-    func moveLineup(playerEntryID: String, to slot: StadiaFantasyRosterSlot, scoringDate: Date = Date()) async {
+    func moveLineup(playerEntryID: String, to slot: BannerFantasyRosterSlot, scoringDate: Date = Date()) async {
         guard let selectedBundle, let selectedTeam else { return }
         do {
             _ = try await backend.moveLineupSlot(leagueID: selectedBundle.league.id, teamID: selectedTeam.id, scoringDate: scoringDate, playerEntryID: playerEntryID, to: slot)
@@ -264,7 +264,7 @@ final class StadiaFantasyStore: ObservableObject {
         fantasyGamesByChannelID = Dictionary(grouping: games.filter { $0.matchedChannel != nil }, by: { $0.matchedChannel!.channel.id })
     }
 
-    private static func match(for entry: StadiaFantasyPlayerEntry, in matches: [Match]) -> Match? {
+    private static func match(for entry: BannerFantasyPlayerEntry, in matches: [Match]) -> Match? {
         guard let team = entry.nhlTeamAbbreviation else { return nil }
         return matches
             .filter { $0.home.abbreviation.caseInsensitiveCompare(team) == .orderedSame || $0.away.abbreviation.caseInsensitiveCompare(team) == .orderedSame }
@@ -279,7 +279,7 @@ final class StadiaFantasyStore: ObservableObject {
             .first
     }
 
-    private static func opponent(for entry: StadiaFantasyPlayerEntry, match: Match) -> TeamSide? {
+    private static func opponent(for entry: BannerFantasyPlayerEntry, match: Match) -> TeamSide? {
         guard let team = entry.nhlTeamAbbreviation else { return nil }
         if match.home.abbreviation.caseInsensitiveCompare(team) == .orderedSame { return match.away }
         if match.away.abbreviation.caseInsensitiveCompare(team) == .orderedSame { return match.home }
@@ -294,7 +294,7 @@ final class StadiaFantasyStore: ObservableObject {
         }
     }
 
-    private func upsert(_ bundle: StadiaFantasyLeagueBundle) {
+    private func upsert(_ bundle: BannerFantasyLeagueBundle) {
         if let index = leagues.firstIndex(where: { $0.league.id == bundle.league.id }) {
             leagues[index] = bundle
         } else {
@@ -306,32 +306,32 @@ final class StadiaFantasyStore: ObservableObject {
         UserDefaults.standard.set(selectedLeagueID, forKey: selectedLeagueKey)
     }
 
-    private static func developmentPlayerPool(for sport: FantasySport) -> [StadiaFantasyAvailablePlayer] {
+    private static func developmentPlayerPool(for sport: FantasySport) -> [BannerFantasyAvailablePlayer] {
         switch sport {
         case .nfl:
             return [
-                StadiaFantasyAvailablePlayer(id: "espn-nfl-3139477", fullName: "Patrick Mahomes", teamAbbreviation: "KC", position: "QB", eligibleSlots: [.quarterback], injuryStatus: nil),
-                StadiaFantasyAvailablePlayer(id: "espn-nfl-4242335", fullName: "Justin Jefferson", teamAbbreviation: "MIN", position: "WR", eligibleSlots: [.wideReceiver, .flex], injuryStatus: nil),
-                StadiaFantasyAvailablePlayer(id: "espn-nfl-3117251", fullName: "Christian McCaffrey", teamAbbreviation: "SF", position: "RB", eligibleSlots: [.runningBack, .flex], injuryStatus: nil)
+                BannerFantasyAvailablePlayer(id: "espn-nfl-3139477", fullName: "Patrick Mahomes", teamAbbreviation: "KC", position: "QB", eligibleSlots: [.quarterback], injuryStatus: nil),
+                BannerFantasyAvailablePlayer(id: "espn-nfl-4242335", fullName: "Justin Jefferson", teamAbbreviation: "MIN", position: "WR", eligibleSlots: [.wideReceiver, .flex], injuryStatus: nil),
+                BannerFantasyAvailablePlayer(id: "espn-nfl-3117251", fullName: "Christian McCaffrey", teamAbbreviation: "SF", position: "RB", eligibleSlots: [.runningBack, .flex], injuryStatus: nil)
             ]
         case .nhl:
             return [
-                StadiaFantasyAvailablePlayer(id: "espn-nhl-4024123", fullName: "Auston Matthews", teamAbbreviation: "TOR", position: "C", eligibleSlots: [.center, .forward, .utility], injuryStatus: nil),
-                StadiaFantasyAvailablePlayer(id: "espn-nhl-3895074", fullName: "Connor McDavid", teamAbbreviation: "EDM", position: "C", eligibleSlots: [.center, .forward, .utility], injuryStatus: nil),
-                StadiaFantasyAvailablePlayer(id: "espn-nhl-4233563", fullName: "Cale Makar", teamAbbreviation: "COL", position: "D", eligibleSlots: [.defense, .utility], injuryStatus: nil),
-                StadiaFantasyAvailablePlayer(id: "espn-nhl-4063262", fullName: "Jake Oettinger", teamAbbreviation: "DAL", position: "G", eligibleSlots: [.goalie], injuryStatus: nil)
+                BannerFantasyAvailablePlayer(id: "espn-nhl-4024123", fullName: "Auston Matthews", teamAbbreviation: "TOR", position: "C", eligibleSlots: [.center, .forward, .utility], injuryStatus: nil),
+                BannerFantasyAvailablePlayer(id: "espn-nhl-3895074", fullName: "Connor McDavid", teamAbbreviation: "EDM", position: "C", eligibleSlots: [.center, .forward, .utility], injuryStatus: nil),
+                BannerFantasyAvailablePlayer(id: "espn-nhl-4233563", fullName: "Cale Makar", teamAbbreviation: "COL", position: "D", eligibleSlots: [.defense, .utility], injuryStatus: nil),
+                BannerFantasyAvailablePlayer(id: "espn-nhl-4063262", fullName: "Jake Oettinger", teamAbbreviation: "DAL", position: "G", eligibleSlots: [.goalie], injuryStatus: nil)
             ]
         case .nba:
             return [
-                StadiaFantasyAvailablePlayer(id: "espn-nba-1966", fullName: "LeBron James", teamAbbreviation: "LAL", position: "SF", eligibleSlots: [.smallForward, .forward, .utility], injuryStatus: nil),
-                StadiaFantasyAvailablePlayer(id: "espn-nba-3975", fullName: "Stephen Curry", teamAbbreviation: "GS", position: "PG", eligibleSlots: [.pointGuard, .comboGuard, .utility], injuryStatus: nil),
-                StadiaFantasyAvailablePlayer(id: "espn-nba-203999", fullName: "Nikola Jokic", teamAbbreviation: "DEN", position: "C", eligibleSlots: [.center, .utility], injuryStatus: nil)
+                BannerFantasyAvailablePlayer(id: "espn-nba-1966", fullName: "LeBron James", teamAbbreviation: "LAL", position: "SF", eligibleSlots: [.smallForward, .forward, .utility], injuryStatus: nil),
+                BannerFantasyAvailablePlayer(id: "espn-nba-3975", fullName: "Stephen Curry", teamAbbreviation: "GS", position: "PG", eligibleSlots: [.pointGuard, .comboGuard, .utility], injuryStatus: nil),
+                BannerFantasyAvailablePlayer(id: "espn-nba-203999", fullName: "Nikola Jokic", teamAbbreviation: "DEN", position: "C", eligibleSlots: [.center, .utility], injuryStatus: nil)
             ]
         case .mlb:
             return [
-                StadiaFantasyAvailablePlayer(id: "espn-mlb-39832", fullName: "Shohei Ohtani", teamAbbreviation: "LAD", position: "UTIL", eligibleSlots: [.utility], injuryStatus: nil),
-                StadiaFantasyAvailablePlayer(id: "espn-mlb-33192", fullName: "Aaron Judge", teamAbbreviation: "NYY", position: "OF", eligibleSlots: [.outfield, .utility], injuryStatus: nil),
-                StadiaFantasyAvailablePlayer(id: "espn-mlb-39878", fullName: "Corbin Burnes", teamAbbreviation: "ARI", position: "SP", eligibleSlots: [.startingPitcher, .pitcher], injuryStatus: nil)
+                BannerFantasyAvailablePlayer(id: "espn-mlb-39832", fullName: "Shohei Ohtani", teamAbbreviation: "LAD", position: "UTIL", eligibleSlots: [.utility], injuryStatus: nil),
+                BannerFantasyAvailablePlayer(id: "espn-mlb-33192", fullName: "Aaron Judge", teamAbbreviation: "NYY", position: "OF", eligibleSlots: [.outfield, .utility], injuryStatus: nil),
+                BannerFantasyAvailablePlayer(id: "espn-mlb-39878", fullName: "Corbin Burnes", teamAbbreviation: "ARI", position: "SP", eligibleSlots: [.startingPitcher, .pitcher], injuryStatus: nil)
             ]
         }
     }

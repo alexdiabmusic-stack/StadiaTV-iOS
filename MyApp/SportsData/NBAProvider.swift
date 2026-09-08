@@ -19,9 +19,9 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
         )
     }
 
-    func liveScores(for league: League) async throws -> [StadiaGame] {
+    func liveScores(for league: League) async throws -> [BannerGame] {
         try ensureNBA(league)
-        let games: [StadiaGame]
+        let games: [BannerGame]
         do {
             let response = try await client.todayScoreboard()
             games = (response.scoreboard?.games ?? []).compactMap { mapGame($0, league: league) }
@@ -34,7 +34,7 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
             .sorted { $0.scheduledStart < $1.scheduledStart }
     }
 
-    func schedule(for league: League, range: SportsDateRange) async throws -> StadiaSchedule {
+    func schedule(for league: League, range: SportsDateRange) async throws -> BannerSchedule {
         try ensureNBA(league)
         // Cap at 90 days to bound the request count; fetch in parallel chunks of 7.
         let allDays = NBASeason.days(in: range)
@@ -43,12 +43,12 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
         let today = Date()
         let localProvider = self  // struct copy — safe to capture across task boundaries
 
-        var games: [StadiaGame] = await withTaskGroup(of: [StadiaGame].self) { group in
+        var games: [BannerGame] = await withTaskGroup(of: [BannerGame].self) { group in
             var offset = 0
             while offset < days.count {
                 let chunk = Array(days[offset..<min(offset + chunkSize, days.count)])
                 group.addTask(priority: .utility) {
-                    var dayGames: [StadiaGame] = []
+                    var dayGames: [BannerGame] = []
                     for day in chunk {
                         do {
                             if Calendar.current.isDate(day, inSameDayAs: today) {
@@ -67,17 +67,17 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
                 }
                 offset += chunkSize
             }
-            var result: [StadiaGame] = []
+            var result: [BannerGame] = []
             for await dayGames in group { result.append(contentsOf: dayGames) }
             return result
         }
 
-        var seen = Set<StadiaEntityID>()
+        var seen = Set<BannerEntityID>()
         games = games.filter { seen.insert($0.id).inserted }
             .filter { $0.scheduledStart >= range.start && $0.scheduledStart <= range.end }
             .sorted { $0.scheduledStart < $1.scheduledStart }
-        return StadiaSchedule(
-            id: StadiaEntityID(rawValue: "schedule:nba:\(league.stadiaKey):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
+        return BannerSchedule(
+            id: BannerEntityID(rawValue: "schedule:nba:\(league.bannerKey):\(Int(range.start.timeIntervalSince1970)):\(Int(range.end.timeIntervalSince1970))"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             range: range,
             games: games,
@@ -85,7 +85,7 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
         )
     }
 
-    func gameDetails(for league: League, gameID: StadiaEntityID) async throws -> StadiaGame {
+    func gameDetails(for league: League, gameID: BannerEntityID) async throws -> BannerGame {
         try ensureNBA(league)
         let providerGameID = try resolvedNBAGameID(from: gameID)
         let response = try await client.boxScore(gameID: providerGameID)
@@ -93,7 +93,7 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
         return game
     }
 
-    func boxScore(for league: League, gameID: StadiaEntityID) async throws -> StadiaBoxScore {
+    func boxScore(for league: League, gameID: BannerEntityID) async throws -> BannerBoxScore {
         try ensureNBA(league)
         let providerGameID = try resolvedNBAGameID(from: gameID)
         do {
@@ -105,8 +105,8 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
                 (team.players ?? []).compactMap { mapPlayerStat($0, team: team, league: league, gameID: gameID) }
             }
             guard !teamStats.isEmpty || !playerStats.isEmpty else { throw SportsDataError.unsupportedCapability(.boxScore) }
-            return StadiaBoxScore(
-                id: StadiaEntityID(rawValue: "boxScore:nba:\(providerGameID)"),
+            return BannerBoxScore(
+                id: BannerEntityID(rawValue: "boxScore:nba:\(providerGameID)"),
                 gameID: gameID,
                 teamStats: teamStats,
                 playerStats: playerStats,
@@ -118,13 +118,13 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
         }
     }
 
-    func playByPlay(for league: League, gameID: StadiaEntityID) async throws -> StadiaPlayByPlay {
+    func playByPlay(for league: League, gameID: BannerEntityID) async throws -> BannerPlayByPlay {
         try ensureNBA(league)
         let providerGameID = try resolvedNBAGameID(from: gameID)
-        let plays: [StadiaPlay]
+        let plays: [BannerPlay]
         do {
             let response = try await client.playByPlay(gameID: providerGameID)
-            plays = (response.game?.actions ?? []).enumerated().compactMap { index, action -> StadiaPlay? in
+            plays = (response.game?.actions ?? []).enumerated().compactMap { index, action -> BannerPlay? in
                 guard let text = action.description, !text.isEmpty else { return nil }
                 return mapPlay(actionNumber: action.actionNumber ?? index, period: action.period, clock: action.clock, text: text, teamID: action.teamIDValue, awayScore: action.scoreAway, homeScore: action.scoreHome, isScoringPlay: action.isScoringPlay, league: league, providerGameID: providerGameID)
             }
@@ -133,31 +133,31 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
             plays = mapStatsPlayByPlay(response, league: league, providerGameID: providerGameID)
         }
         guard !plays.isEmpty else { throw SportsDataError.unsupportedCapability(.playByPlay) }
-        return StadiaPlayByPlay(
-            id: StadiaEntityID(rawValue: "pbp:nba:\(providerGameID)"),
+        return BannerPlayByPlay(
+            id: BannerEntityID(rawValue: "pbp:nba:\(providerGameID)"),
             gameID: gameID,
             plays: plays,
             provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerGameID, confidence: 0.84)
         )
     }
 
-    func teams(for league: League) async throws -> [StadiaTeam] {
+    func teams(for league: League) async throws -> [BannerTeam] {
         try ensureNBA(league)
         return NBATeamDirectory.teams.map { mapDirectoryTeam($0, league: league) }
     }
 
-    func standings(for league: League) async throws -> [StadiaStandingGroup] {
+    func standings(for league: League) async throws -> [BannerStandingGroup] {
         try ensureNBA(league)
         let response = try await client.leagueStandings(season: NBASeason.currentStatsSeason)
         let rows = response.firstResultSet(named: "Standings")?.rowsByHeader ?? response.firstResultSet()?.rowsByHeader ?? []
-        let standings = rows.enumerated().compactMap { index, row -> StadiaStanding? in
+        let standings = rows.enumerated().compactMap { index, row -> BannerStanding? in
             guard let teamID = row.string("TeamID", "TEAM_ID"), let team = NBATeamDirectory.team(id: teamID) else { return nil }
             let mapped = mapDirectoryTeam(team, league: league)
             let wins = row.string("WINS", "Wins")
             let losses = row.string("LOSSES", "Losses")
             let group = row.string("Conference", "CONF_NAME", "Division", "DIVISION_NAME") ?? "NBA"
-            return StadiaStanding(
-                id: StadiaEntityID(rawValue: "standing:nba:\(teamID)"),
+            return BannerStanding(
+                id: BannerEntityID(rawValue: "standing:nba:\(teamID)"),
                 teamID: mapped.id,
                 teamDisplayName: mapped.displayName,
                 teamAbbreviation: mapped.abbreviation,
@@ -176,23 +176,23 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
         guard !standings.isEmpty else { throw SportsDataError.invalidResponse }
         let grouped = Dictionary(grouping: standings) { $0.groupName ?? "NBA" }
         return grouped.keys.sorted().map { key in
-            StadiaStandingGroup(
-                id: StadiaEntityID(rawValue: "standings:nba:\(SportsIdentityResolver.slug(key))"),
+            BannerStandingGroup(
+                id: BannerEntityID(rawValue: "standings:nba:\(SportsIdentityResolver.slug(key))"),
                 name: key,
                 standings: (grouped[key] ?? []).sorted { ($0.rank ?? Int.max) < ($1.rank ?? Int.max) }
             )
         }
     }
 
-    func roster(for league: League, teamID: StadiaEntityID) async throws -> StadiaRoster {
+    func roster(for league: League, teamID: BannerEntityID) async throws -> BannerRoster {
         try ensureNBA(league)
         let providerTeamID = SportsIdentityResolver.providerID(from: teamID, provider: .nba) ?? NBAEntityIDParser.numericSuffix(from: teamID.rawValue)
         guard let providerTeamID else { throw SportsDataError.invalidResponse }
         let response = try await client.commonTeamRoster(teamID: providerTeamID, season: NBASeason.currentStatsSeason)
         let players = response.firstResultSet()?.rowsByHeader.compactMap { mapRosterPlayer($0, league: league, teamID: teamID, teamAbbreviation: NBATeamDirectory.team(id: providerTeamID)?.abbreviation) } ?? []
         guard !players.isEmpty else { throw SportsDataError.invalidResponse }
-        return StadiaRoster(
-            id: StadiaEntityID(rawValue: "roster:nba:\(providerTeamID)"),
+        return BannerRoster(
+            id: BannerEntityID(rawValue: "roster:nba:\(providerTeamID)"),
             teamID: teamID,
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             players: players,
@@ -200,7 +200,7 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
         )
     }
 
-    func teamStats(for league: League, teamIDs: Set<StadiaEntityID>, range: SportsDateRange?) async throws -> [StadiaTeamStat] {
+    func teamStats(for league: League, teamIDs: Set<BannerEntityID>, range: SportsDateRange?) async throws -> [BannerTeamStat] {
         try ensureNBA(league)
         let response = try await client.teamStats(season: NBASeason.currentStatsSeason)
         let rows = response.firstResultSet()?.rowsByHeader ?? []
@@ -219,18 +219,18 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
                 stat("turnovers", "Turnovers", row.string("TOV"))
             ].compactMap { $0 }
             guard !stats.isEmpty else { return nil }
-            return StadiaTeamStat(id: StadiaEntityID(rawValue: "teamStat:nba:\(providerTeamID):season"), teamID: mappedTeam.id, seasonID: StadiaEntityID(rawValue: "season:nba:\(NBASeason.currentStatsSeason)"), stats: stats, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerTeamID, confidence: 0.78))
+            return BannerTeamStat(id: BannerEntityID(rawValue: "teamStat:nba:\(providerTeamID):season"), teamID: mappedTeam.id, seasonID: BannerEntityID(rawValue: "season:nba:\(NBASeason.currentStatsSeason)"), stats: stats, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerTeamID, confidence: 0.78))
         }
     }
 
-    func playerStats(for league: League, playerIDs: Set<StadiaEntityID>, range: SportsDateRange?) async throws -> [StadiaPlayerStat] {
+    func playerStats(for league: League, playerIDs: Set<BannerEntityID>, range: SportsDateRange?) async throws -> [BannerPlayerStat] {
         try ensureNBA(league)
         let response = try await client.playerStats(season: NBASeason.currentStatsSeason)
         let rows = response.firstResultSet()?.rowsByHeader ?? []
         return rows.compactMap { row in
             guard let providerPlayerID = row.string("PLAYER_ID"), let name = row.string("PLAYER_NAME") else { return nil }
             let teamID = row.string("TEAM_ID").flatMap { mapTeamID($0, league: league) }
-            let playerID = StadiaEntityID(rawValue: "player:\(league.stadiaKey):nba:\(providerPlayerID)")
+            let playerID = BannerEntityID(rawValue: "player:\(league.bannerKey):nba:\(providerPlayerID)")
             guard playerIDs.isEmpty || playerIDs.contains(playerID) else { return nil }
             let stats = [
                 stat("points", "PTS", row.string("PTS")),
@@ -242,21 +242,21 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
                 stat("three_pct", "3P%", row.string("FG3_PCT"))
             ].compactMap { $0 }
             guard !stats.isEmpty else { return nil }
-            return StadiaPlayerStat(id: StadiaEntityID(rawValue: "playerStat:nba:\(providerPlayerID):season"), playerID: playerID, playerDisplayName: name, teamAbbreviation: row.string("TEAM_ABBREVIATION"), headshotURL: nil, teamID: teamID, seasonID: StadiaEntityID(rawValue: "season:nba:\(NBASeason.currentStatsSeason)"), stats: stats, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerPlayerID, confidence: 0.78))
+            return BannerPlayerStat(id: BannerEntityID(rawValue: "playerStat:nba:\(providerPlayerID):season"), playerID: playerID, playerDisplayName: name, teamAbbreviation: row.string("TEAM_ABBREVIATION"), headshotURL: nil, teamID: teamID, seasonID: BannerEntityID(rawValue: "season:nba:\(NBASeason.currentStatsSeason)"), stats: stats, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerPlayerID, confidence: 0.78))
         }
     }
 
-    func leaders(for league: League) async throws -> [StadiaLeader] {
+    func leaders(for league: League) async throws -> [BannerLeader] {
         try ensureNBA(league)
         let response = try await client.leagueLeaders(season: NBASeason.currentStatsSeason)
         let rows = response.firstResultSet()?.rowsByHeader ?? []
-        let players = rows.prefix(25).compactMap { row -> StadiaPlayerStat? in
+        let players = rows.prefix(25).compactMap { row -> BannerPlayerStat? in
             guard let providerPlayerID = row.string("PLAYER_ID"), let name = row.string("PLAYER") ?? row.string("PLAYER_NAME") else { return nil }
-            let playerID = StadiaEntityID(rawValue: "player:\(league.stadiaKey):nba:\(providerPlayerID)")
-            return StadiaPlayerStat(id: StadiaEntityID(rawValue: "leader:nba:pts:\(providerPlayerID)"), playerID: playerID, playerDisplayName: name, teamAbbreviation: row.string("TEAM"), headshotURL: nil, teamID: nil, seasonID: StadiaEntityID(rawValue: "season:nba:\(NBASeason.currentStatsSeason)"), stats: [StadiaStatValue(key: "points", displayName: "PTS", value: row.string("PTS") ?? row.string("VALUE") ?? "-")], provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerPlayerID, confidence: 0.76))
+            let playerID = BannerEntityID(rawValue: "player:\(league.bannerKey):nba:\(providerPlayerID)")
+            return BannerPlayerStat(id: BannerEntityID(rawValue: "leader:nba:pts:\(providerPlayerID)"), playerID: playerID, playerDisplayName: name, teamAbbreviation: row.string("TEAM"), headshotURL: nil, teamID: nil, seasonID: BannerEntityID(rawValue: "season:nba:\(NBASeason.currentStatsSeason)"), stats: [BannerStatValue(key: "points", displayName: "PTS", value: row.string("PTS") ?? row.string("VALUE") ?? "-")], provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerPlayerID, confidence: 0.76))
         }
         guard !players.isEmpty else { throw SportsDataError.invalidResponse }
-        return [StadiaLeader(id: StadiaEntityID(rawValue: "leader:nba:points"), statKey: "points", displayName: "Points", players: players, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: "PTS", confidence: 0.76))]
+        return [BannerLeader(id: BannerEntityID(rawValue: "leader:nba:points"), statKey: "points", displayName: "Points", players: players, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: "PTS", confidence: 0.76))]
     }
 
     private func ensureNBA(_ league: League) throws {
@@ -264,7 +264,7 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
         guard league.path == "basketball/nba" else { throw SportsDataError.unsupportedCapability(.liveScores) }
     }
 
-    private func resolvedNBAGameID(from gameID: StadiaEntityID) throws -> String {
+    private func resolvedNBAGameID(from gameID: BannerEntityID) throws -> String {
         if let providerID = SportsIdentityResolver.providerID(from: gameID, provider: .nba) { return providerID }
         let raw = gameID.rawValue
         if raw.count == 10, raw.allSatisfy(\.isNumber) { return raw }
@@ -272,15 +272,15 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
         throw SportsDataError.invalidResponse
     }
 
-    private func mapGame(_ dto: NBALiveGameDTO, league: League) -> StadiaGame? {
+    private func mapGame(_ dto: NBALiveGameDTO, league: League) -> BannerGame? {
         guard let providerGameID = dto.gameIDValue, let homeDTO = dto.homeTeam, let awayDTO = dto.awayTeam else { return nil }
         let home = mapTeam(homeDTO, league: league)
         let away = mapTeam(awayDTO, league: league)
         let start = NBADateFormatter.date(from: dto.gameTimeUTC ?? dto.gameTimeLocal ?? dto.gameEt) ?? Date()
-        let status = StadiaGameStatus(nbaStatusCode: dto.gameStatus, text: dto.gameStatusText, start: start)
+        let status = BannerGameStatus(nbaStatusCode: dto.gameStatus, text: dto.gameStatusText, start: start)
         let detail = NBAStatusFormatter.detail(status: status, text: dto.gameStatusText, start: start)
-        return StadiaGame(
-            id: StadiaEntityID(rawValue: "game:\(league.stadiaKey):nba:\(providerGameID)"),
+        return BannerGame(
+            id: BannerEntityID(rawValue: "game:\(league.bannerKey):nba:\(providerGameID)"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             scheduledStart: start,
             name: dto.gameLabel ?? "\(away.displayName) at \(home.displayName)",
@@ -289,17 +289,17 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
             statusDetail: detail,
             homeTeam: home,
             awayTeam: away,
-            score: StadiaScore(home: homeDTO.score.map(String.init), away: awayDTO.score.map(String.init)),
-            clock: dto.gameClock.flatMap { StadiaGameClock(displayValue: $0, remainingSeconds: nil, isRunning: status == .live) },
-            period: dto.period.map { StadiaPeriod(number: $0, displayName: NBAPeriodFormatter.displayName(for: $0)) },
-            venue: dto.stadiaVenue,
-            broadcasts: dto.stadiaBroadcasts,
+            score: BannerScore(home: homeDTO.score.map(String.init), away: awayDTO.score.map(String.init)),
+            clock: dto.gameClock.flatMap { BannerGameClock(displayValue: $0, remainingSeconds: nil, isRunning: status == .live) },
+            period: dto.period.map { BannerPeriod(number: $0, displayName: NBAPeriodFormatter.displayName(for: $0)) },
+            venue: dto.bannerVenue,
+            broadcasts: dto.bannerBroadcasts,
             aliases: [ProviderEntityAlias(provider: .nba, id: providerGameID)],
             provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerGameID, confidence: 0.88)
         )
     }
 
-    private func mapScoreboardV3(_ response: NBAStatsResponseDTO, league: League) -> [StadiaGame] {
+    private func mapScoreboardV3(_ response: NBAStatsResponseDTO, league: League) -> [BannerGame] {
         let rows = response.firstResultSet(named: "GameHeader")?.rowsByHeader ?? response.firstResultSet()?.rowsByHeader ?? []
         return rows.compactMap { row in
             guard let providerGameID = row.string("GAME_ID"),
@@ -311,9 +311,9 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
             let away = mapDirectoryTeam(awayDir, league: league)
             let date = NBADateFormatter.date(from: row.string("GAME_DATE_EST", "GAME_DATE")) ?? Date()
             let text = row.string("GAME_STATUS_TEXT")
-            let status = StadiaGameStatus(nbaStatusCode: row.int("GAME_STATUS_ID", "GAME_STATUS"), text: text, start: date)
-            return StadiaGame(
-                id: StadiaEntityID(rawValue: "game:\(league.stadiaKey):nba:\(providerGameID)"),
+            let status = BannerGameStatus(nbaStatusCode: row.int("GAME_STATUS_ID", "GAME_STATUS"), text: text, start: date)
+            return BannerGame(
+                id: BannerEntityID(rawValue: "game:\(league.bannerKey):nba:\(providerGameID)"),
                 leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
                 scheduledStart: date,
                 name: "\(away.displayName) at \(home.displayName)",
@@ -322,9 +322,9 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
                 statusDetail: NBAStatusFormatter.detail(status: status, text: text, start: date),
                 homeTeam: home,
                 awayTeam: away,
-                score: StadiaScore(home: row.string("HOME_TEAM_SCORE", "PTS_HOME"), away: row.string("VISITOR_TEAM_SCORE", "PTS_AWAY")),
+                score: BannerScore(home: row.string("HOME_TEAM_SCORE", "PTS_HOME"), away: row.string("VISITOR_TEAM_SCORE", "PTS_AWAY")),
                 clock: nil,
-                period: row.int("PERIOD").map { StadiaPeriod(number: $0, displayName: NBAPeriodFormatter.displayName(for: $0)) },
+                period: row.int("PERIOD").map { BannerPeriod(number: $0, displayName: NBAPeriodFormatter.displayName(for: $0)) },
                 venue: nil,
                 broadcasts: [],
                 aliases: [ProviderEntityAlias(provider: .nba, id: providerGameID)],
@@ -333,10 +333,10 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
         }
     }
 
-    private func mapStatsBoxScore(_ response: NBAStatsResponseDTO, league: League, gameID: StadiaEntityID, providerGameID: String) throws -> StadiaBoxScore {
+    private func mapStatsBoxScore(_ response: NBAStatsResponseDTO, league: League, gameID: BannerEntityID, providerGameID: String) throws -> BannerBoxScore {
         let teamRows = response.firstResultSet(named: "TeamStats")?.rowsByHeader ?? []
         let playerRows = response.firstResultSet(named: "PlayerStats")?.rowsByHeader ?? response.firstResultSet()?.rowsByHeader ?? []
-        let teamStats = teamRows.compactMap { row -> StadiaTeamStat? in
+        let teamStats = teamRows.compactMap { row -> BannerTeamStat? in
             guard let providerTeamID = row.string("teamId", "TEAM_ID"), let team = NBATeamDirectory.team(id: providerTeamID) else { return nil }
             let mapped = mapDirectoryTeam(team, league: league)
             let stats = [
@@ -350,9 +350,9 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
                 stat("three_pct", "3P%", row.string("threePointersPercentage", "FG3_PCT"))
             ].compactMap { $0 }
             guard !stats.isEmpty else { return nil }
-            return StadiaTeamStat(id: StadiaEntityID(rawValue: "teamStat:nba:\(providerGameID):\(providerTeamID)"), teamID: mapped.id, seasonID: nil, stats: stats, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerTeamID, confidence: 0.78))
+            return BannerTeamStat(id: BannerEntityID(rawValue: "teamStat:nba:\(providerGameID):\(providerTeamID)"), teamID: mapped.id, seasonID: nil, stats: stats, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerTeamID, confidence: 0.78))
         }
-        let playerStats = playerRows.compactMap { row -> StadiaPlayerStat? in
+        let playerStats = playerRows.compactMap { row -> BannerPlayerStat? in
             guard let providerPlayerID = row.string("personId", "PLAYER_ID"), let name = row.string("name", "nameI", "PLAYER_NAME") else { return nil }
             let providerTeamID = row.string("teamId", "TEAM_ID")
             let teamID = providerTeamID.flatMap { mapTeamID($0, league: league) }
@@ -367,13 +367,13 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
                 stat("plus_minus", "+/-", row.string("plusMinusPoints", "PLUS_MINUS"))
             ].compactMap { $0 }
             guard !stats.isEmpty else { return nil }
-            return StadiaPlayerStat(id: StadiaEntityID(rawValue: "playerStat:nba:\(providerGameID):\(providerPlayerID)"), playerID: StadiaEntityID(rawValue: "player:\(league.stadiaKey):nba:\(providerPlayerID)"), playerDisplayName: name, teamAbbreviation: row.string("teamTricode", "TEAM_ABBREVIATION"), headshotURL: nil, teamID: teamID, seasonID: nil, stats: stats, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerPlayerID, confidence: 0.78))
+            return BannerPlayerStat(id: BannerEntityID(rawValue: "playerStat:nba:\(providerGameID):\(providerPlayerID)"), playerID: BannerEntityID(rawValue: "player:\(league.bannerKey):nba:\(providerPlayerID)"), playerDisplayName: name, teamAbbreviation: row.string("teamTricode", "TEAM_ABBREVIATION"), headshotURL: nil, teamID: teamID, seasonID: nil, stats: stats, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerPlayerID, confidence: 0.78))
         }
         guard !teamStats.isEmpty || !playerStats.isEmpty else { throw SportsDataError.unsupportedCapability(.boxScore) }
-        return StadiaBoxScore(id: StadiaEntityID(rawValue: "boxScore:nba:\(providerGameID)"), gameID: gameID, teamStats: teamStats, playerStats: playerStats, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerGameID, confidence: 0.78))
+        return BannerBoxScore(id: BannerEntityID(rawValue: "boxScore:nba:\(providerGameID)"), gameID: gameID, teamStats: teamStats, playerStats: playerStats, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerGameID, confidence: 0.78))
     }
 
-    private func mapStatsPlayByPlay(_ response: NBAStatsResponseDTO, league: League, providerGameID: String) -> [StadiaPlay] {
+    private func mapStatsPlayByPlay(_ response: NBAStatsResponseDTO, league: League, providerGameID: String) -> [BannerPlay] {
         let rows = response.firstResultSet(named: "PlayByPlay")?.rowsByHeader ?? response.firstResultSet()?.rowsByHeader ?? []
         return rows.enumerated().compactMap { index, row in
             guard let text = row.string("description", "HOMEDESCRIPTION", "VISITORDESCRIPTION", "NEUTRALDESCRIPTION") else { return nil }
@@ -381,12 +381,12 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
         }
     }
 
-    private func mapPlay(actionNumber: Int, period: Int?, clock: String?, text: String, teamID: String?, awayScore: String?, homeScore: String?, isScoringPlay: Bool, league: League, providerGameID: String) -> StadiaPlay {
-        StadiaPlay(
-            id: StadiaEntityID(rawValue: "play:nba:\(providerGameID):\(actionNumber)"),
+    private func mapPlay(actionNumber: Int, period: Int?, clock: String?, text: String, teamID: String?, awayScore: String?, homeScore: String?, isScoringPlay: Bool, league: League, providerGameID: String) -> BannerPlay {
+        BannerPlay(
+            id: BannerEntityID(rawValue: "play:nba:\(providerGameID):\(actionNumber)"),
             sequence: actionNumber,
-            period: period.map { StadiaPeriod(number: $0, displayName: NBAPeriodFormatter.displayName(for: $0)) },
-            clock: clock.map { StadiaGameClock(displayValue: $0, remainingSeconds: nil, isRunning: nil) },
+            period: period.map { BannerPeriod(number: $0, displayName: NBAPeriodFormatter.displayName(for: $0)) },
+            clock: clock.map { BannerGameClock(displayValue: $0, remainingSeconds: nil, isRunning: nil) },
             text: text,
             teamID: teamID.flatMap { mapTeamID($0, league: league) },
             awayScore: awayScore,
@@ -396,12 +396,12 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
         )
     }
 
-    private func mapTeam(_ dto: NBATeamDTO, league: League) -> StadiaTeam {
+    private func mapTeam(_ dto: NBATeamDTO, league: League) -> BannerTeam {
         let providerID = dto.teamID.map(String.init) ?? dto.teamId.map(String.init) ?? dto.id.map(String.init) ?? dto.teamTricode ?? "nba"
         let abbreviation = dto.teamTricode ?? dto.triCode ?? dto.abbreviation ?? providerID
         let displayName = [dto.teamCity, dto.teamName].compactMap { $0 }.joined(separator: " ").nonEmpty ?? dto.teamName ?? dto.name ?? abbreviation
-        return StadiaTeam(
-            id: StadiaEntityID(rawValue: "team:\(league.stadiaKey):nba:\(providerID)"),
+        return BannerTeam(
+            id: BannerEntityID(rawValue: "team:\(league.bannerKey):nba:\(providerID)"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             displayName: displayName,
             shortName: dto.teamName ?? dto.name ?? abbreviation,
@@ -412,9 +412,9 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
         )
     }
 
-    private func mapDirectoryTeam(_ team: NBADirectoryTeam, league: League) -> StadiaTeam {
-        StadiaTeam(
-            id: StadiaEntityID(rawValue: "team:\(league.stadiaKey):nba:\(team.id)"),
+    private func mapDirectoryTeam(_ team: NBADirectoryTeam, league: League) -> BannerTeam {
+        BannerTeam(
+            id: BannerEntityID(rawValue: "team:\(league.bannerKey):nba:\(team.id)"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             displayName: team.displayName,
             shortName: team.nickname,
@@ -425,15 +425,15 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
         )
     }
 
-    private func mapTeamID(_ providerTeamID: String, league: League) -> StadiaEntityID? {
+    private func mapTeamID(_ providerTeamID: String, league: League) -> BannerEntityID? {
         guard NBATeamDirectory.team(id: providerTeamID) != nil else { return nil }
-        return StadiaEntityID(rawValue: "team:\(league.stadiaKey):nba:\(providerTeamID)")
+        return BannerEntityID(rawValue: "team:\(league.bannerKey):nba:\(providerTeamID)")
     }
 
-    private func mapRosterPlayer(_ row: [String: NBAStatsValue], league: League, teamID: StadiaEntityID, teamAbbreviation: String?) -> StadiaPlayer? {
+    private func mapRosterPlayer(_ row: [String: NBAStatsValue], league: League, teamID: BannerEntityID, teamAbbreviation: String?) -> BannerPlayer? {
         guard let providerPlayerID = row.string("PLAYER_ID", "PERSON_ID"), let name = row.string("PLAYER", "PLAYER_NAME") else { return nil }
-        return StadiaPlayer(
-            id: StadiaEntityID(rawValue: "player:\(league.stadiaKey):nba:\(providerPlayerID)"),
+        return BannerPlayer(
+            id: BannerEntityID(rawValue: "player:\(league.bannerKey):nba:\(providerPlayerID)"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             fullName: name,
             displayName: name,
@@ -448,7 +448,7 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
         )
     }
 
-    private func mapTeamStat(_ team: NBATeamDTO, league: League, gameID: StadiaEntityID) -> StadiaTeamStat? {
+    private func mapTeamStat(_ team: NBATeamDTO, league: League, gameID: BannerEntityID) -> BannerTeamStat? {
         let mapped = mapTeam(team, league: league)
         let stats = [
             stat("score", "Score", team.score.map(String.init)),
@@ -462,10 +462,10 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
             stat("blocks", "Blocks", team.statistics?.blocks.map(String.init))
         ].compactMap { $0 }
         guard !stats.isEmpty else { return nil }
-        return StadiaTeamStat(id: StadiaEntityID(rawValue: "teamStat:nba:\(gameID.rawValue):\(mapped.id.rawValue)"), teamID: mapped.id, seasonID: nil, stats: stats, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: team.providerID, confidence: 0.84))
+        return BannerTeamStat(id: BannerEntityID(rawValue: "teamStat:nba:\(gameID.rawValue):\(mapped.id.rawValue)"), teamID: mapped.id, seasonID: nil, stats: stats, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: team.providerID, confidence: 0.84))
     }
 
-    private func mapPlayerStat(_ player: NBAPlayerDTO, team: NBATeamDTO, league: League, gameID: StadiaEntityID) -> StadiaPlayerStat? {
+    private func mapPlayerStat(_ player: NBAPlayerDTO, team: NBATeamDTO, league: League, gameID: BannerEntityID) -> BannerPlayerStat? {
         guard let providerPlayerID = player.personID.map(String.init) ?? player.personId.map(String.init) ?? player.playerID.map(String.init), let name = player.name ?? player.nameI else { return nil }
         let teamID = mapTeam(team, league: league).id
         let stats = [
@@ -479,12 +479,12 @@ struct NBAProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, BoxSco
             stat("plus_minus", "+/-", player.statistics?.plusMinusPoints.map(String.init))
         ].compactMap { $0 }
         guard !stats.isEmpty else { return nil }
-        return StadiaPlayerStat(id: StadiaEntityID(rawValue: "playerStat:nba:\(gameID.rawValue):\(providerPlayerID)"), playerID: StadiaEntityID(rawValue: "player:\(league.stadiaKey):nba:\(providerPlayerID)"), playerDisplayName: name, teamAbbreviation: team.teamTricode ?? team.abbreviation, headshotURL: nil, teamID: teamID, seasonID: nil, stats: stats, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerPlayerID, confidence: 0.84))
+        return BannerPlayerStat(id: BannerEntityID(rawValue: "playerStat:nba:\(gameID.rawValue):\(providerPlayerID)"), playerID: BannerEntityID(rawValue: "player:\(league.bannerKey):nba:\(providerPlayerID)"), playerDisplayName: name, teamAbbreviation: team.teamTricode ?? team.abbreviation, headshotURL: nil, teamID: teamID, seasonID: nil, stats: stats, provenance: DataProvenance(provider: .nba, fetchedAt: Date(), providerEntityID: providerPlayerID, confidence: 0.84))
     }
 
-    private func stat(_ key: String, _ displayName: String, _ value: String?) -> StadiaStatValue? {
+    private func stat(_ key: String, _ displayName: String, _ value: String?) -> BannerStatValue? {
         guard let value, !value.isEmpty else { return nil }
-        return StadiaStatValue(key: key, displayName: displayName, value: value)
+        return BannerStatValue(key: key, displayName: displayName, value: value)
     }
 }
 
@@ -629,10 +629,10 @@ struct NBALiveGameDTO: Decodable, Sendable {
     }
 
     var gameIDValue: String? { gameID ?? gameId }
-    var stadiaBroadcasts: [StadiaBroadcast] { gameBroadcasters?.stadiaBroadcasts ?? [] }
-    var stadiaVenue: StadiaVenue? {
+    var bannerBroadcasts: [BannerBroadcast] { gameBroadcasters?.bannerBroadcasts ?? [] }
+    var bannerVenue: BannerVenue? {
         guard arenaName != nil || arenaCity != nil else { return nil }
-        return StadiaVenue(id: nil, name: arenaName ?? "Arena", city: arenaCity, state: arenaState, country: arenaCountry, aliases: [])
+        return BannerVenue(id: nil, name: arenaName ?? "Arena", city: arenaCity, state: arenaState, country: arenaCountry, aliases: [])
     }
 }
 
@@ -741,12 +741,12 @@ struct NBABroadcastersDTO: Decodable, Sendable {
     let homeTvBroadcasters: [NBABroadcastDTO]?
     let awayTvBroadcasters: [NBABroadcastDTO]?
 
-    var stadiaBroadcasts: [StadiaBroadcast] {
+    var bannerBroadcasts: [BannerBroadcast] {
         let broadcasters = (nationalTvBroadcasters ?? []) + (homeTvBroadcasters ?? []) + (awayTvBroadcasters ?? [])
         var seen = Set<String>()
         return broadcasters.compactMap { item in
             guard let network = item.broadcasterDisplay ?? item.broadcasterName, !network.isEmpty, seen.insert(network).inserted else { return nil }
-            return StadiaBroadcast(network: network, type: "TV", countryCode: nil)
+            return BannerBroadcast(network: network, type: "TV", countryCode: nil)
         }
     }
 }
@@ -981,7 +981,7 @@ enum NBAPeriodFormatter {
 }
 
 enum NBAStatusFormatter {
-    nonisolated static func detail(status: StadiaGameStatus, text: String?, start: Date) -> String {
+    nonisolated static func detail(status: BannerGameStatus, text: String?, start: Date) -> String {
         if let text, !text.isEmpty { return text }
         if status == .final { return "Final" }
         if status == .live { return "In Progress" }
@@ -989,7 +989,7 @@ enum NBAStatusFormatter {
     }
 }
 
-extension StadiaGameStatus {
+extension BannerGameStatus {
     // Status codes take priority over text patterns.
     // Code 1 = scheduled, code 2 = live/in-progress, code 3 = final.
     // Text fallbacks only apply when the code is absent (nil).

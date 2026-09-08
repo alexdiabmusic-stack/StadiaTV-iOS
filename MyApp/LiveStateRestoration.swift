@@ -9,12 +9,12 @@ final class LiveStateRestoration {
     static let shared = LiveStateRestoration()
 
     private enum Keys {
-        static let liveFilter         = "stadiatv.live.restore.filter.v1"
-        static let playlistID         = "stadiatv.live.restore.playlistID.v1"
-        static let groupID            = "stadiatv.live.restore.groupID.v1"
-        static let guideDisplayMode   = "stadiatv.live.restore.guideMode.v1"
-        static let guideChannelOffset = "stadiatv.live.restore.guideChanOffset.v1"
-        static let guideTimeOffset    = "stadiatv.live.restore.guideTimeOffset.v1"
+        static let liveFilter         = "bannertv.live.restore.filter.v1"
+        static let playlistID         = "bannertv.live.restore.playlistID.v1"
+        static let groupID            = "bannertv.live.restore.groupID.v1"
+        static let guideDisplayMode   = "bannertv.live.restore.guideMode.v1"
+        static let guideChannelOffset = "bannertv.live.restore.guideChanOffset.v1"
+        static let guideTimeOffset    = "bannertv.live.restore.guideTimeOffset.v1"
     }
 
     private init() {}

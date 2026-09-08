@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// StadiaTV visual language — neutral foundation with colour reserved for meaning.
+/// BannerTV visual language — neutral foundation with colour reserved for meaning.
 enum Theme {
     static let background       = dynamic(dark: 0x080A0F, light: 0xF4F5F7)
     static let surface          = dynamic(dark: 0x12151C, light: 0xFFFFFF)
@@ -61,18 +61,23 @@ extension View {
 }
 
 struct BrandMark: View {
-    /// Color for the "TV" portion. Defaults to Stadia blue.
-    /// Pass `.white` during the launch animation's initial white-logo state.
+    /// Pass `.white` during the launch animation's initial white-logo state;
+    /// any other value (including the default `Theme.accent`) shows the full-colour logo.
     var tvColor: Color = Theme.accent
 
+    private var isAllWhite: Bool { tvColor == .white }
+
     var body: some View {
-        HStack(spacing: 0) {
-            Text("STADIA")
-                .foregroundStyle(Theme.textPrimary)
-            Text("TV")
-                .foregroundStyle(tvColor)
+        ZStack {
+            Image("BannerTVBlue")
+                .resizable()
+                .scaledToFit()
+                .opacity(isAllWhite ? 0.0 : 1.0)
+            Image("BannerTVWhite")
+                .resizable()
+                .scaledToFit()
+                .opacity(isAllWhite ? 1.0 : 0.0)
         }
-        .font(.system(size: Theme.scaled(20), weight: .heavy))
-        .tracking(1)
+        .frame(height: Theme.scaled(22))
     }
 }

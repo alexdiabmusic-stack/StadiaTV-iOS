@@ -9,7 +9,7 @@ final class CustomGroupStore: ObservableObject {
 
     @Published private(set) var groups: [CustomGroup] = []
 
-    private let defaultsKey = "stadiatv.customgroups.v1"
+    private let defaultsKey = "bannertv.customgroups.v1"
 
     init() { load() }
 

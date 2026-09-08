@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import StadiaTV
+@testable import BannerTV
 
 @Suite("Sports data foundation")
 struct SportsDataFoundationTests {
@@ -16,8 +16,8 @@ struct SportsDataFoundationTests {
     @Test func routeConfigurationIsCapabilitySpecific() throws {
         let league = try #require(League.all.first { $0.path == "hockey/nhl" })
         let config = SportsProviderRouteConfiguration(routes: [
-            ProviderRoute(leagueID: league.stadiaKey, capability: .liveScores, providers: [.nhl, .espn]),
-            ProviderRoute(leagueID: league.stadiaKey, capability: .injuries, providers: [.cbsSports, .espn])
+            ProviderRoute(leagueID: league.bannerKey, capability: .liveScores, providers: [.nhl, .espn]),
+            ProviderRoute(leagueID: league.bannerKey, capability: .injuries, providers: [.cbsSports, .espn])
         ])
         #expect(config.providers(for: league, capability: .liveScores).first == .nhl)
         #expect(config.providers(for: league, capability: .injuries).first == .cbsSports)
@@ -91,7 +91,7 @@ struct SportsDataFoundationTests {
         #expect(game.providerID == "7d3e8f84-1312-11ef-afd1-646009f18b2e")
         #expect(game.awayTeam?.abbreviation == "GB")
         #expect(game.homeTeam?.fullName == "Minnesota Vikings")
-        #expect(StadiaGameStatus(nflStatus: game.status, start: NFLDateFormatter.date(from: game.date) ?? Date()) == .scheduled)
+        #expect(BannerGameStatus(nflStatus: game.status, start: NFLDateFormatter.date(from: game.date) ?? Date()) == .scheduled)
     }
 
     @Test func nflGameDetailEnvelopeUnwrapsPlayByPlayPayload() throws {
@@ -112,14 +112,14 @@ struct SportsDataFoundationTests {
         #expect(detail.homeTeam?.totalYards == 180)
         #expect(detail.visitorTeam?.score == 7)
         #expect(detail.plays?.first?.playDescription == "Josh Allen pass complete for 12 yards")
-        #expect(StadiaGameStatus(nflStatus: detail.status, start: Date()) == .live)
+        #expect(BannerGameStatus(nflStatus: detail.status, start: Date()) == .live)
     }
 
     @Test func bundledTeamLogoResolverReturnsAssetURLsForPrimaryLeagues() {
-        #expect(TeamLogoAssetResolver.nbaAssetURL(abbreviation: "TOR")?.stadiaImageAssetName == "NBALogo_TOR")
-        #expect(TeamLogoAssetResolver.nflAssetURL(abbreviation: "JAC")?.stadiaImageAssetName == "NFLLogo_JAX")
-        #expect(TeamLogoAssetResolver.mlbAssetURL(abbreviation: "TOR", displayName: "Toronto Blue Jays", providerTeamID: "141")?.stadiaImageAssetName == "MLBLogo_Toronto_Blue_Jays")
-        #expect(TeamLogoAssetResolver.assetURL(leaguePath: "soccer/fra.1", abbreviation: nil, displayName: "Paris Saint Germain")?.stadiaImageAssetName == "MSILogo_ligue_1_paris_saint_germain")
+        #expect(TeamLogoAssetResolver.nbaAssetURL(abbreviation: "TOR")?.bannerImageAssetName == "NBALogo_TOR")
+        #expect(TeamLogoAssetResolver.nflAssetURL(abbreviation: "JAC")?.bannerImageAssetName == "NFLLogo_JAX")
+        #expect(TeamLogoAssetResolver.mlbAssetURL(abbreviation: "TOR", displayName: "Toronto Blue Jays", providerTeamID: "141")?.bannerImageAssetName == "MLBLogo_Toronto_Blue_Jays")
+        #expect(TeamLogoAssetResolver.assetURL(leaguePath: "soccer/fra.1", abbreviation: nil, displayName: "Paris Saint Germain")?.bannerImageAssetName == "MSILogo_ligue_1_paris_saint_germain")
     }
 
     @Test func nbaScoreboardFixtureDecodesLiveGameShape() throws {
@@ -145,8 +145,8 @@ struct SportsDataFoundationTests {
         #expect(game.gameIDValue == "0022500001")
         #expect(game.homeTeam?.teamTricode == "GSW")
         #expect(game.awayTeam?.score == 51)
-        #expect(game.stadiaBroadcasts.first?.network == "TNT")
-        #expect(StadiaGameStatus(nbaStatusCode: game.gameStatus, text: game.gameStatusText, start: NBADateFormatter.date(from: game.gameTimeUTC) ?? Date()) == .live)
+        #expect(game.bannerBroadcasts.first?.network == "TNT")
+        #expect(BannerGameStatus(nbaStatusCode: game.gameStatus, text: game.gameStatusText, start: NBADateFormatter.date(from: game.gameTimeUTC) ?? Date()) == .live)
     }
 
     @Test func nbaBoxScoreFixtureDecodesTeamAndPlayerStats() throws {
@@ -226,14 +226,14 @@ struct SportsDataFoundationTests {
         #expect(game.teams?.away?.team?.abbreviation == "SEA")
         #expect(game.venue?.location?.city == "Toronto")
         #expect(game.broadcasts?.first?.name == "Sportsnet")
-        #expect(StadiaGameStatus(mlbAbstractState: game.status?.abstractGameState, detailedState: game.status?.detailedState, statusCode: game.status?.statusCode) == .live)
+        #expect(BannerGameStatus(mlbAbstractState: game.status?.abstractGameState, detailedState: game.status?.detailedState, statusCode: game.status?.statusCode) == .live)
         #expect(MLBStatusFormatter.detail(status: .live, detailedState: game.status?.detailedState, linescore: game.linescore, start: Date()) == "Top 7th · 1 out")
     }
 
     @Test func mlbStatusMapperTreatsDetailedInningStatesAsLive() {
-        #expect(StadiaGameStatus(mlbAbstractState: nil, detailedState: "Top 4th", statusCode: nil) == .live)
-        #expect(StadiaGameStatus(mlbAbstractState: nil, detailedState: "In Progress", statusCode: nil) == .live)
-        #expect(StadiaGameStatus(mlbAbstractState: nil, detailedState: "Game Over", statusCode: nil) == .final)
+        #expect(BannerGameStatus(mlbAbstractState: nil, detailedState: "Top 4th", statusCode: nil) == .live)
+        #expect(BannerGameStatus(mlbAbstractState: nil, detailedState: "In Progress", statusCode: nil) == .live)
+        #expect(BannerGameStatus(mlbAbstractState: nil, detailedState: "Game Over", statusCode: nil) == .final)
     }
 
     @Test func mlbBoxScoreStatsFlattenBaseballFields() throws {
@@ -291,17 +291,17 @@ struct SportsDataFoundationTests {
 
     @Test func repositoryRoutesBoxScoreCapability() async throws {
         let league = try #require(League.all.first { $0.path == "basketball/wnba" })
-        let gameID = StadiaEntityID(rawValue: "umc.cse.example")
-        let teamID = StadiaEntityID(rawValue: "team:basketball/wnba:appleSports:umc.cst.example")
-        let stat = StadiaTeamStat(
-            id: StadiaEntityID(rawValue: "teamStat:example"),
+        let gameID = BannerEntityID(rawValue: "umc.cse.example")
+        let teamID = BannerEntityID(rawValue: "team:basketball/wnba:appleSports:umc.cst.example")
+        let stat = BannerTeamStat(
+            id: BannerEntityID(rawValue: "teamStat:example"),
             teamID: teamID,
             seasonID: nil,
-            stats: [StadiaStatValue(key: "event_score", displayName: "Score", value: "96")],
+            stats: [BannerStatValue(key: "event_score", displayName: "Score", value: "96")],
             provenance: DataProvenance(provider: .appleSports, fetchedAt: Date(), providerEntityID: "umc.cst.example", confidence: 1)
         )
-        let boxScore = StadiaBoxScore(
-            id: StadiaEntityID(rawValue: "boxScore:example"),
+        let boxScore = BannerBoxScore(
+            id: BannerEntityID(rawValue: "boxScore:example"),
             gameID: gameID,
             teamStats: [stat],
             playerStats: [],
@@ -322,10 +322,10 @@ struct SportsDataFoundationTests {
 
     @Test func repositoryRoutesGolfTournamentCapabilityWithNormalizedLeaderboard() async throws {
         let league = try #require(League.all.first { $0.path == "golf/pga" })
-        let gameID = StadiaEntityID(rawValue: "umc.cse.golf")
-        let playerID = StadiaEntityID(rawValue: "player:league-golf-pga:appleSports:golfer-1")
-        let tournament = StadiaGolfTournament(
-            id: StadiaEntityID(rawValue: "golfTournament:appleSports:umc.cse.golf"),
+        let gameID = BannerEntityID(rawValue: "umc.cse.golf")
+        let playerID = BannerEntityID(rawValue: "player:league-golf-pga:appleSports:golfer-1")
+        let tournament = BannerGolfTournament(
+            id: BannerEntityID(rawValue: "golfTournament:appleSports:umc.cse.golf"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             gameID: gameID,
             tournamentName: "PGA Tour Champions",
@@ -334,17 +334,17 @@ struct SportsDataFoundationTests {
             statusDetail: "Round 2",
             currentRound: 2,
             totalRounds: 4,
-            course: StadiaGolfCourse(id: nil, name: "Example Course", location: nil, par: 72, yardage: nil, holes: []),
+            course: BannerGolfCourse(id: nil, name: "Example Course", location: nil, par: 72, yardage: nil, holes: []),
             cutLine: "-2",
-            leaderboard: StadiaGolfLeaderboardNormalizer.normalized([
-                StadiaGolfLeaderboardEntry(
-                    id: StadiaEntityID(rawValue: "golfEntry:appleSports:umc.cse.golf:golfer-1"),
+            leaderboard: BannerGolfLeaderboardNormalizer.normalized([
+                BannerGolfLeaderboardEntry(
+                    id: BannerEntityID(rawValue: "golfEntry:appleSports:umc.cse.golf:golfer-1"),
                     playerID: playerID,
                     playerName: "V. Taylor",
                     position: nil,
                     isTied: false,
-                    totalScore: StadiaGolfScoreFormatter.format(raw: "-12"),
-                    todayScore: StadiaGolfScoreFormatter.format(raw: "-4"),
+                    totalScore: BannerGolfScoreFormatter.format(raw: "-12"),
+                    todayScore: BannerGolfScoreFormatter.format(raw: "-4"),
                     thru: "15",
                     status: nil,
                     rounds: [],
@@ -353,7 +353,7 @@ struct SportsDataFoundationTests {
                     provenance: DataProvenance(provider: .appleSports, fetchedAt: Date(), providerEntityID: "golfer-1", confidence: 1)
                 )
             ]),
-            broadcasts: [StadiaBroadcast(network: "Golf Channel", type: nil, countryCode: nil)],
+            broadcasts: [BannerBroadcast(network: "Golf Channel", type: nil, countryCode: nil)],
             stats: [],
             provenance: DataProvenance(provider: .appleSports, fetchedAt: Date(), providerEntityID: "umc.cse.golf", confidence: 1)
         )
@@ -449,12 +449,12 @@ struct SportsDataFoundationTests {
 
     @Test func repositoryRoutesPlayByPlayCapability() async throws {
         let league = try #require(League.all.first { $0.path == "hockey/nhl" })
-        let gameID = StadiaEntityID(rawValue: "2025020001")
-        let play = StadiaPlay(
-            id: StadiaEntityID(rawValue: "play:nhl:2025020001:1"),
+        let gameID = BannerEntityID(rawValue: "2025020001")
+        let play = BannerPlay(
+            id: BannerEntityID(rawValue: "play:nhl:2025020001:1"),
             sequence: 1,
-            period: StadiaPeriod(number: 1, displayName: "Period 1"),
-            clock: StadiaGameClock(displayValue: "19:59", remainingSeconds: nil, isRunning: nil),
+            period: BannerPeriod(number: 1, displayName: "Period 1"),
+            clock: BannerGameClock(displayValue: "19:59", remainingSeconds: nil, isRunning: nil),
             text: "Puck dropped",
             teamID: nil,
             awayScore: nil,
@@ -519,7 +519,7 @@ struct SportsDataFoundationTests {
         }
         """#.data(using: .utf8)!
         let favorite = try JSONDecoder().decode(FavoriteTeam.self, from: data)
-        #expect(favorite.leagueStadiaKey == "league.hockey-nhl")
+        #expect(favorite.leagueBannerKey == "league.hockey-nhl")
         #expect(favorite.canonicalTeamID == "team:league.hockey-nhl:espn:10")
         #expect(favorite.providerAliases == [ProviderEntityAlias(provider: .espn, id: "10")])
     }
@@ -528,14 +528,14 @@ struct SportsDataFoundationTests {
         let league = try #require(League.all.first { $0.path == "hockey/nhl" })
         let overrides = SportsProviderRouteOverrideStore(storageKey: "sportsData.tests.routeOverrides")
         await overrides.removeAll()
-        await overrides.setProvider(.nhl, enabled: false, leagueID: league.stadiaKey, capability: .liveScores)
+        await overrides.setProvider(.nhl, enabled: false, leagueID: league.bannerKey, capability: .liveScores)
         let router = SportsProviderRouter(
             registry: SportsProviderRegistry(providers: [
                 MockScoreProvider(id: .nhl, result: .success([])),
                 MockScoreProvider(id: .espn, result: .success([]))
             ]),
             routeConfiguration: SportsProviderRouteConfiguration(routes: [
-                ProviderRoute(leagueID: league.stadiaKey, capability: .liveScores, providers: [.nhl, .espn])
+                ProviderRoute(leagueID: league.bannerKey, capability: .liveScores, providers: [.nhl, .espn])
             ]),
             healthMonitor: ProviderHealthMonitor(),
             routeOverrides: overrides
@@ -548,8 +548,8 @@ struct SportsDataFoundationTests {
     @Test func repositoryCachesTeamsCapability() async throws {
         let league = try #require(League.all.first { $0.path == "hockey/nhl" })
         let counter = SportsCounter()
-        let team = StadiaTeam(
-            id: StadiaEntityID(rawValue: "team:\(league.stadiaKey):nhl:TOR"),
+        let team = BannerTeam(
+            id: BannerEntityID(rawValue: "team:\(league.bannerKey):nhl:TOR"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             displayName: "Toronto Maple Leafs",
             shortName: "Maple Leafs",
@@ -561,7 +561,7 @@ struct SportsDataFoundationTests {
         let router = SportsProviderRouter(
             registry: SportsProviderRegistry(providers: [MockTeamProvider(counter: counter, teams: [team])]),
             routeConfiguration: SportsProviderRouteConfiguration(routes: [
-                ProviderRoute(leagueID: league.stadiaKey, capability: .teams, providers: [.nhl])
+                ProviderRoute(leagueID: league.bannerKey, capability: .teams, providers: [.nhl])
             ]),
             healthMonitor: ProviderHealthMonitor(),
             routeOverrides: SportsProviderRouteOverrideStore(storageKey: "sportsData.tests.teamCache")
@@ -579,8 +579,8 @@ struct SportsDataFoundationTests {
         let router = SportsProviderRouter(
             registry: SportsProviderRegistry(providers: [MockScheduleSnapshotProvider(capture: capture)]),
             routeConfiguration: SportsProviderRouteConfiguration(routes: [
-                ProviderRoute(leagueID: league.stadiaKey, capability: .liveScores, providers: [.mlb]),
-                ProviderRoute(leagueID: league.stadiaKey, capability: .schedule, providers: [.mlb])
+                ProviderRoute(leagueID: league.bannerKey, capability: .liveScores, providers: [.mlb]),
+                ProviderRoute(leagueID: league.bannerKey, capability: .schedule, providers: [.mlb])
             ]),
             healthMonitor: ProviderHealthMonitor(),
             routeOverrides: SportsProviderRouteOverrideStore(storageKey: "sportsData.tests.liveSnapshotRange")
@@ -609,8 +609,8 @@ struct SportsDataFoundationTests {
         let router = SportsProviderRouter(
             registry: SportsProviderRegistry(providers: [MockScoreScheduleProvider(scoreResult: .success([]), scheduleGames: [scheduledButLive])]),
             routeConfiguration: SportsProviderRouteConfiguration(routes: [
-                ProviderRoute(leagueID: league.stadiaKey, capability: .liveScores, providers: [.appleSports]),
-                ProviderRoute(leagueID: league.stadiaKey, capability: .schedule, providers: [.appleSports])
+                ProviderRoute(leagueID: league.bannerKey, capability: .liveScores, providers: [.appleSports]),
+                ProviderRoute(leagueID: league.bannerKey, capability: .schedule, providers: [.appleSports])
             ]),
             healthMonitor: ProviderHealthMonitor(),
             routeOverrides: SportsProviderRouteOverrideStore(storageKey: "sportsData.tests.liveSnapshotScored")
@@ -660,14 +660,14 @@ struct SportsDataFoundationTests {
         providerID: SportsDataProviderID,
         providerGameID: String,
         scheduledStart: Date = Date(timeIntervalSince1970: 1_800_000_000),
-        status: StadiaGameStatus = .scheduled,
+        status: BannerGameStatus = .scheduled,
         statusDetail: String = "Tonight",
         homeScore: String? = nil,
         awayScore: String? = nil
-    ) -> StadiaGame {
+    ) -> BannerGame {
         let resolver = SportsIdentityResolver()
         let provenance = DataProvenance(provider: providerID, fetchedAt: Date(), providerEntityID: providerGameID, confidence: 1)
-        let home = StadiaTeam(
+        let home = BannerTeam(
             id: resolver.canonicalTeamID(league: league, provider: providerID, providerTeamID: "1", abbreviation: "HME", displayName: "Home"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             displayName: "Home",
@@ -677,7 +677,7 @@ struct SportsDataFoundationTests {
             aliases: [ProviderEntityAlias(provider: providerID, id: "1")],
             provenance: provenance
         )
-        let away = StadiaTeam(
+        let away = BannerTeam(
             id: resolver.canonicalTeamID(league: league, provider: providerID, providerTeamID: "2", abbreviation: "AWY", displayName: "Away"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             displayName: "Away",
@@ -687,7 +687,7 @@ struct SportsDataFoundationTests {
             aliases: [ProviderEntityAlias(provider: providerID, id: "2")],
             provenance: provenance
         )
-        return StadiaGame(
+        return BannerGame(
             id: resolver.canonicalGameID(league: league, provider: providerID, providerGameID: providerGameID, home: home, away: away, scheduledStart: scheduledStart),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             scheduledStart: scheduledStart,
@@ -697,7 +697,7 @@ struct SportsDataFoundationTests {
             statusDetail: statusDetail,
             homeTeam: home,
             awayTeam: away,
-            score: StadiaScore(home: homeScore, away: awayScore),
+            score: BannerScore(home: homeScore, away: awayScore),
             clock: nil,
             period: nil,
             venue: nil,
@@ -724,9 +724,9 @@ private struct MockBoxScoreProvider: BoxScoreProvider {
         isEnabled: true,
         requestTimeout: 1
     )
-    let result: Result<StadiaBoxScore, Error>
+    let result: Result<BannerBoxScore, Error>
 
-    func boxScore(for league: League, gameID: StadiaEntityID) async throws -> StadiaBoxScore {
+    func boxScore(for league: League, gameID: BannerEntityID) async throws -> BannerBoxScore {
         try result.get()
     }
 }
@@ -743,11 +743,11 @@ private struct MockPlayByPlayProvider: PlayByPlayProvider {
         isEnabled: true,
         requestTimeout: 1
     )
-    let result: Result<[StadiaPlay], Error>
+    let result: Result<[BannerPlay], Error>
 
-    func playByPlay(for league: League, gameID: StadiaEntityID) async throws -> StadiaPlayByPlay {
-        StadiaPlayByPlay(
-            id: StadiaEntityID(rawValue: "pbp:mock:\(gameID.rawValue)"),
+    func playByPlay(for league: League, gameID: BannerEntityID) async throws -> BannerPlayByPlay {
+        BannerPlayByPlay(
+            id: BannerEntityID(rawValue: "pbp:mock:\(gameID.rawValue)"),
             gameID: gameID,
             plays: try result.get(),
             provenance: DataProvenance(provider: .nhl, fetchedAt: Date(), providerEntityID: gameID.rawValue, confidence: 1)
@@ -767,18 +767,18 @@ private struct MockGolfTournamentProvider: GolfTournamentProvider {
         isEnabled: true,
         requestTimeout: 1
     )
-    let result: Result<StadiaGolfTournament, Error>
+    let result: Result<BannerGolfTournament, Error>
 
-    func golfTournament(for league: League, gameID: StadiaEntityID) async throws -> StadiaGolfTournament {
+    func golfTournament(for league: League, gameID: BannerEntityID) async throws -> BannerGolfTournament {
         try result.get()
     }
 }
 
 private struct MockScoreProvider: ScoreProvider {
     let metadata: SportsDataProviderMetadata
-    let result: Result<[StadiaGame], Error>
+    let result: Result<[BannerGame], Error>
 
-    init(id: SportsDataProviderID, result: Result<[StadiaGame], Error>) {
+    init(id: SportsDataProviderID, result: Result<[BannerGame], Error>) {
         self.metadata = SportsDataProviderMetadata(
             id: id,
             name: id.rawValue,
@@ -793,7 +793,7 @@ private struct MockScoreProvider: ScoreProvider {
         self.result = result
     }
 
-    func liveScores(for league: League) async throws -> [StadiaGame] {
+    func liveScores(for league: League) async throws -> [BannerGame] {
         try result.get()
     }
 }
@@ -810,16 +810,16 @@ private struct MockScoreScheduleProvider: ScoreProvider, ScheduleProvider {
         isEnabled: true,
         requestTimeout: 1
     )
-    let scoreResult: Result<[StadiaGame], Error>
-    let scheduleGames: [StadiaGame]
+    let scoreResult: Result<[BannerGame], Error>
+    let scheduleGames: [BannerGame]
 
-    func liveScores(for league: League) async throws -> [StadiaGame] {
+    func liveScores(for league: League) async throws -> [BannerGame] {
         try scoreResult.get()
     }
 
-    func schedule(for league: League, range: SportsDateRange) async throws -> StadiaSchedule {
-        StadiaSchedule(
-            id: StadiaEntityID(rawValue: "schedule:scoreScheduleMock:\(league.stadiaKey)"),
+    func schedule(for league: League, range: SportsDateRange) async throws -> BannerSchedule {
+        BannerSchedule(
+            id: BannerEntityID(rawValue: "schedule:scoreScheduleMock:\(league.bannerKey)"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             range: range,
             games: scheduleGames,
@@ -841,9 +841,9 @@ private struct MockTeamProvider: TeamProvider {
         requestTimeout: 1
     )
     let counter: SportsCounter
-    let teams: [StadiaTeam]
+    let teams: [BannerTeam]
 
-    func teams(for league: League) async throws -> [StadiaTeam] {
+    func teams(for league: League) async throws -> [BannerTeam] {
         await counter.increment()
         return teams
     }
@@ -863,14 +863,14 @@ private struct MockScheduleSnapshotProvider: ScoreProvider, ScheduleProvider {
     )
     let capture: SportsScheduleRangeCapture
 
-    func liveScores(for league: League) async throws -> [StadiaGame] {
+    func liveScores(for league: League) async throws -> [BannerGame] {
         []
     }
 
-    func schedule(for league: League, range: SportsDateRange) async throws -> StadiaSchedule {
+    func schedule(for league: League, range: SportsDateRange) async throws -> BannerSchedule {
         await capture.set(range)
-        return StadiaSchedule(
-            id: StadiaEntityID(rawValue: "schedule:mock:\(league.stadiaKey)"),
+        return BannerSchedule(
+            id: BannerEntityID(rawValue: "schedule:mock:\(league.bannerKey)"),
             leagueID: SportsIdentityResolver.canonicalLeagueID(for: league),
             range: range,
             games: [],

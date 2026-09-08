@@ -53,9 +53,9 @@ final class ArticleLibraryStore: ObservableObject {
     @Published private(set) var hiddenArticleIDs: Set<String> = []
     @Published private(set) var mutedSources: Set<String> = []
 
-    private let savedArticlesKey = "stadiatv.savedArticles.v1"
-    private let hiddenArticlesKey = "stadiatv.hiddenArticles.v1"
-    private let mutedSourcesKey = "stadiatv.mutedArticleSources.v1"
+    private let savedArticlesKey = "bannertv.savedArticles.v1"
+    private let hiddenArticlesKey = "bannertv.hiddenArticles.v1"
+    private let mutedSourcesKey = "bannertv.mutedArticleSources.v1"
 
     init() {
         load()

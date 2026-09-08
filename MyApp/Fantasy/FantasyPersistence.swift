@@ -60,9 +60,9 @@ actor FantasyPersistenceStore {
 
     init(
         defaults: UserDefaults = .standard,
-        snapshotKey: String = "stadiatv.fantasy.snapshot.v1",
-        playerDirectoryKey: String = "stadiatv.fantasy.sleeper.players.nfl.v1",
-        mappingsKey: String = "stadiatv.fantasy.playerMappings.v1",
+        snapshotKey: String = "bannertv.fantasy.snapshot.v1",
+        playerDirectoryKey: String = "bannertv.fantasy.sleeper.players.nfl.v1",
+        mappingsKey: String = "bannertv.fantasy.playerMappings.v1",
         cacheDirectoryURL: URL? = nil
     ) {
         self.defaults = defaults
@@ -108,12 +108,12 @@ actor FantasyPersistenceStore {
         try? data.write(to: playerDirectoryFileURL(provider: provider, sport: sport), options: [.atomic])
     }
 
-    func loadMappings() -> [String: StadiaPlayerIdentity] {
+    func loadMappings() -> [String: BannerPlayerIdentity] {
         guard let data = defaults.data(forKey: mappingsKey) else { return [:] }
-        return (try? decoder.decode([String: StadiaPlayerIdentity].self, from: data)) ?? [:]
+        return (try? decoder.decode([String: BannerPlayerIdentity].self, from: data)) ?? [:]
     }
 
-    func saveMappings(_ mappings: [String: StadiaPlayerIdentity]) {
+    func saveMappings(_ mappings: [String: BannerPlayerIdentity]) {
         guard let data = try? encoder.encode(mappings) else { return }
         defaults.set(data, forKey: mappingsKey)
     }
@@ -153,7 +153,7 @@ actor FantasyPersistenceStore {
     private nonisolated static func defaultCacheDirectoryURL() -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        return base.appendingPathComponent("StadiaTV/Fantasy", isDirectory: true)
+        return base.appendingPathComponent("BannerTV/Fantasy", isDirectory: true)
     }
 }
 

@@ -62,9 +62,9 @@ final class PodcastStore: ObservableObject {
     private let api = PodcastIndexService.shared
     private let teamResolver = TeamPodcastResolver()
 
-    private let subscribedKey  = "stadiatv.podcasts.subscribed.v1"
-    private let progressKey    = "stadiatv.podcasts.progress.v1"
-    private let playedKey      = "stadiatv.podcasts.played.v1"
+    private let subscribedKey  = "bannertv.podcasts.subscribed.v1"
+    private let progressKey    = "bannertv.podcasts.progress.v1"
+    private let playedKey      = "bannertv.podcasts.played.v1"
 
     // MARK: - Init
 
@@ -540,7 +540,7 @@ final class PodcastStore: ObservableObject {
         if let data = try? JSONEncoder().encode(episodeProgress) { defaults.set(data, forKey: progressKey) }
         defaults.set(Array(playedEpisodeIDs), forKey: playedKey)
         if let data = try? JSONEncoder().encode(Dictionary(uniqueKeysWithValues: podcastMetaCache.map { ($0.key, $0.value) })) {
-            defaults.set(data, forKey: "stadiatv.podcasts.meta.v1")
+            defaults.set(data, forKey: "bannertv.podcasts.meta.v1")
         }
     }
 
@@ -552,7 +552,7 @@ final class PodcastStore: ObservableObject {
            let decoded = try? JSONDecoder().decode([String: TimeInterval].self, from: data) {
             episodeProgress = decoded
         }
-        if let data = defaults.data(forKey: "stadiatv.podcasts.meta.v1"),
+        if let data = defaults.data(forKey: "bannertv.podcasts.meta.v1"),
            let decoded = try? JSONDecoder().decode([String: Podcast].self, from: data) {
             podcastMetaCache = decoded
         }

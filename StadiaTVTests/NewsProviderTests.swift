@@ -1,11 +1,11 @@
 import Testing
 import Foundation
-@testable import Stadia_TV
+@testable import Banner_TV
 
 // MARK: - RSS Parser tests
 
-@Suite("StadiaRSSParser")
-struct StadiaRSSParserTests {
+@Suite("BannerRSSParser")
+struct BannerRSSParserTests {
 
     // Minimal RSS 2.0 fixture
     private static let rss2Fixture = """
@@ -53,7 +53,7 @@ struct StadiaRSSParserTests {
 
     @Test("Parses RSS 2.0 items")
     func parsesRSS2Items() {
-        let items = StadiaRSSParser.parse(rss2Fixture)
+        let items = BannerRSSParser.parse(rss2Fixture)
         #expect(items.count == 2)
         #expect(items[0].title == "Eagles win Super Bowl in overtime thriller")
         #expect(items[0].link == "https://example.com/eagles-super-bowl")
@@ -65,7 +65,7 @@ struct StadiaRSSParserTests {
 
     @Test("Parses Atom feed")
     func parsesAtomFeed() {
-        let items = StadiaRSSParser.parse(atomFixture)
+        let items = BannerRSSParser.parse(atomFixture)
         #expect(items.count == 1)
         #expect(items[0].title == "LeBron James scores 40 in Lakers victory")
         #expect(items[0].link == "https://nbcsports.com/lakers-win")
@@ -75,7 +75,7 @@ struct StadiaRSSParserTests {
 
     @Test("Parses RFC 822 date")
     func parsesRFC822Date() {
-        let date = StadiaRSSParser.parseDate("Mon, 03 Feb 2025 02:30:00 +0000")
+        let date = BannerRSSParser.parseDate("Mon, 03 Feb 2025 02:30:00 +0000")
         #expect(date != nil)
         let comps = Calendar(identifier: .gregorian).dateComponents(in: TimeZone(identifier: "UTC")!, from: date!)
         #expect(comps.month == 2)
@@ -85,19 +85,19 @@ struct StadiaRSSParserTests {
 
     @Test("Parses ISO 8601 date")
     func parsesISO8601Date() {
-        let date = StadiaRSSParser.parseDate("2025-02-01T22:00:00Z")
+        let date = BannerRSSParser.parseDate("2025-02-01T22:00:00Z")
         #expect(date != nil)
     }
 
     @Test("Returns nil for nil date")
     func nilDateReturnsNil() {
-        #expect(StadiaRSSParser.parseDate(nil) == nil)
+        #expect(BannerRSSParser.parseDate(nil) == nil)
     }
 
     @Test("Returns empty array for malformed XML")
     func malformedXMLReturnsEmpty() {
         let bad = "<this is not valid xml <<<".data(using: .utf8)!
-        let items = StadiaRSSParser.parse(bad)
+        let items = BannerRSSParser.parse(bad)
         #expect(items.isEmpty)
     }
 
@@ -112,7 +112,7 @@ struct StadiaRSSParserTests {
         </channel></rss>
         """.data(using: .utf8)!
         // Should not throw or crash; may return zero items or an item with empty title
-        let items = StadiaRSSParser.parse(xxeFeed)
+        let items = BannerRSSParser.parse(xxeFeed)
         // The important invariant: no file system read occurs (title won't be /etc/passwd content)
         for item in items {
             #expect(item.title?.contains("root:") != true)
@@ -122,8 +122,8 @@ struct StadiaRSSParserTests {
 
 // MARK: - Deduplicator tests
 
-@Suite("StadiaNewsDeduplicator")
-struct StadiaNewsDeduplicatorTests {
+@Suite("BannerNewsDeduplicator")
+struct BannerNewsDeduplicatorTests {
 
     private func makeArticle(
         id: String,
@@ -131,9 +131,9 @@ struct StadiaNewsDeduplicatorTests {
         url: String? = nil,
         published: Date = Date(),
         provider: SportsDataProviderID = .espn
-    ) -> StadiaNewsArticle {
-        StadiaNewsArticle(
-            id: StadiaEntityID(rawValue: id),
+    ) -> BannerNewsArticle {
+        BannerNewsArticle(
+            id: BannerEntityID(rawValue: id),
             headline: headline,
             description: "",
             published: published,
@@ -151,7 +151,7 @@ struct StadiaNewsDeduplicatorTests {
     func deduplicatesExactURLs() {
         let a1 = makeArticle(id: "a1", headline: "Chiefs win", url: "https://espn.com/article/1")
         let a2 = makeArticle(id: "a2", headline: "Chiefs win", url: "https://espn.com/article/1", provider: .yahooSports)
-        let result = StadiaNewsDeduplicator.deduplicate([a1, a2])
+        let result = BannerNewsDeduplicator.deduplicate([a1, a2])
         #expect(result.count == 1)
     }
 
@@ -159,7 +159,7 @@ struct StadiaNewsDeduplicatorTests {
     func deduplicatesURLsWithUTMParams() {
         let a1 = makeArticle(id: "b1", headline: "Title", url: "https://example.com/story?utm_source=twitter&utm_medium=social")
         let a2 = makeArticle(id: "b2", headline: "Title", url: "https://example.com/story?utm_campaign=nfl")
-        let result = StadiaNewsDeduplicator.deduplicate([a1, a2])
+        let result = BannerNewsDeduplicator.deduplicate([a1, a2])
         #expect(result.count == 1)
     }
 
@@ -167,7 +167,7 @@ struct StadiaNewsDeduplicatorTests {
     func deduplicatesNearIdenticalTitles() {
         let a1 = makeArticle(id: "c1", headline: "Eagles win Super Bowl in overtime thriller - ESPN")
         let a2 = makeArticle(id: "c2", headline: "Eagles win Super Bowl in overtime thriller | CBS Sports")
-        let result = StadiaNewsDeduplicator.deduplicate([a1, a2])
+        let result = BannerNewsDeduplicator.deduplicate([a1, a2])
         #expect(result.count == 1)
     }
 
@@ -175,13 +175,13 @@ struct StadiaNewsDeduplicatorTests {
     func doesNotDeduplicateDifferentArticles() {
         let a1 = makeArticle(id: "d1", headline: "Chiefs defeat Eagles 31-14", url: "https://espn.com/1")
         let a2 = makeArticle(id: "d2", headline: "Eagles sign star receiver to extension", url: "https://espn.com/2")
-        let result = StadiaNewsDeduplicator.deduplicate([a1, a2])
+        let result = BannerNewsDeduplicator.deduplicate([a1, a2])
         #expect(result.count == 2)
     }
 
     @Test("Classification identifies NFL from headline")
     func classifiesNFLFromHeadline() {
-        let (_, lid) = StadiaNewsDeduplicator.classify(headline: "Chiefs win NFL championship", description: nil)
+        let (_, lid) = BannerNewsDeduplicator.classify(headline: "Chiefs win NFL championship", description: nil)
         let nfl = League.all.first { $0.path == "football/nfl" }
         let expectedID = nfl.map { SportsIdentityResolver.canonicalLeagueID(for: $0) }
         #expect(lid != nil)
@@ -190,7 +190,7 @@ struct StadiaNewsDeduplicatorTests {
 
     @Test("Classification identifies NBA from tags")
     func classifiesNBAFromTags() {
-        let (_, lid) = StadiaNewsDeduplicator.classify(headline: "Star player drops 40 points", description: nil, tags: ["NBA", "basketball"])
+        let (_, lid) = BannerNewsDeduplicator.classify(headline: "Star player drops 40 points", description: nil, tags: ["NBA", "basketball"])
         let nba = League.all.first { $0.path == "basketball/nba" }
         let expectedID = nba.map { SportsIdentityResolver.canonicalLeagueID(for: $0) }
         #expect(lid == expectedID)
@@ -198,18 +198,18 @@ struct StadiaNewsDeduplicatorTests {
 
     @Test("mergeAndRank respects source diversity cap")
     func mergeAndRankRespectsSourceCap() {
-        var espnArticles: [StadiaNewsArticle] = (0..<15).map { i in
+        var espnArticles: [BannerNewsArticle] = (0..<15).map { i in
             makeArticle(id: "e\(i)", headline: "ESPN story \(i)", url: "https://espn.com/\(i)", provider: .espn)
         }
-        var cbsArticles: [StadiaNewsArticle] = (0..<5).map { i in
+        var cbsArticles: [BannerNewsArticle] = (0..<5).map { i in
             makeArticle(id: "c\(i)", headline: "CBS story \(i)", url: "https://cbssports.com/\(i)", provider: .cbsRSS)
         }
         let nfl = League.all.first { $0.path == "football/nfl" }!
-        let collected: [(SportsDataProviderID, [StadiaNewsArticle])] = [
+        let collected: [(SportsDataProviderID, [BannerNewsArticle])] = [
             (.espn, espnArticles),
             (.cbsRSS, cbsArticles),
         ]
-        let result = StadiaNewsDeduplicator.mergeAndRank(collected, league: nfl, limit: 10)
+        let result = BannerNewsDeduplicator.mergeAndRank(collected, league: nfl, limit: 10)
         #expect(result.count <= 10)
         // ESPN shouldn't flood all 10 slots
         let espnCount = result.filter { $0.provenance?.provider == .espn }.count
@@ -272,8 +272,8 @@ struct NewsProviderMetadataTests {
     @Test("toLegacyArticle preserves publisher in byline")
     func toLegacyArticlePreservesPublisher() {
         let nfl = League.all.first { $0.path == "football/nfl" }!
-        let article = StadiaNewsArticle(
-            id: StadiaEntityID(rawValue: "test:1"),
+        let article = BannerNewsArticle(
+            id: BannerEntityID(rawValue: "test:1"),
             headline: "Test headline",
             description: "Description",
             published: nil,

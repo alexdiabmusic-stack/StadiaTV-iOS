@@ -26,7 +26,7 @@ final class RecordingService: ObservableObject {
 
     private init() {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = support.appendingPathComponent("StadiaTV", isDirectory: true)
+        let dir = support.appendingPathComponent("BannerTV", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         storeURL = dir.appendingPathComponent("recordings.json")
         load()
@@ -294,10 +294,10 @@ final class RecordingService: ObservableObject {
 
         let content = UNMutableNotificationContent()
         content.title = "Recording starting soon"
-        content.body  = "\(job.programmeTitle) on \(job.channelName) — keep StadiaTV open to record."
+        content.body  = "\(job.programmeTitle) on \(job.channelName) — keep BannerTV open to record."
         content.sound = .default
         content.userInfo = [
-            "stadiatv_type": "recording_reminder",
+            "bannertv_type": "recording_reminder",
             "jobID": job.id.uuidString
         ]
         let comps   = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: fireDate)
@@ -315,7 +315,7 @@ final class RecordingService: ObservableObject {
         notifCenter.removePendingNotificationRequests(withIdentifiers: [notifID(for: id)])
     }
 
-    private func notifID(for id: UUID) -> String { "stadiatv.rec.\(id.uuidString)" }
+    private func notifID(for id: UUID) -> String { "bannertv.rec.\(id.uuidString)" }
 
     // MARK: - Internal helpers
 
@@ -334,7 +334,7 @@ final class RecordingService: ObservableObject {
 
     func recordingDirectory() -> URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = support.appendingPathComponent("StadiaTV/Recordings", isDirectory: true)
+        let dir = support.appendingPathComponent("BannerTV/Recordings", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }

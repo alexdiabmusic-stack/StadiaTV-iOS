@@ -99,7 +99,7 @@ enum FantasyProviderError: LocalizedError, Equatable, Sendable {
         switch self {
         case .invalidIdentifier: return "Enter a valid Fantasy account identifier."
         case .userNotFound: return "No Fantasy user was found for that identifier."
-        case .badResponse: return "The Fantasy provider returned data Stadia could not read."
+        case .badResponse: return "The Fantasy provider returned data Banner could not read."
         case .httpError(let status): return "The Fantasy provider returned HTTP \(status)."
         case .noConnectedUserRoster: return "No roster in this league belongs to the connected Fantasy account."
         case .unsupportedProvider: return "That Fantasy provider is not supported yet."

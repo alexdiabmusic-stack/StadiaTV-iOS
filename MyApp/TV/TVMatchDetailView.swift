@@ -6,6 +6,7 @@ struct TVMatchDetailView: View {
     @EnvironmentObject private var playlistStore: PlaylistStore
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var epgRepository: EPGRepository
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
     @State private var rankedSources: [RankedSource] = []
     @State private var playingChannel: Channel?
 
@@ -52,9 +53,15 @@ struct TVMatchDetailView: View {
         let channels = playlistStore.allChannels
         let match = self.match
         let preferredLanguages = prefs.preferredStreamLanguages
-        var ranked = await Task.detached(priority: .userInitiated) {
-            SourceMatcher.rank(match: match, channels: channels, preferredLanguages: preferredLanguages)
-        }.value
+
+        var ranked: [RankedSource]
+        if let cached = streamStore.sourcesByMatchId[match.id], !cached.isEmpty {
+            ranked = cached
+        } else {
+            ranked = await Task.detached(priority: .userInitiated) {
+                SourceMatcher.rank(match: match, channels: channels, preferredLanguages: preferredLanguages)
+            }.value
+        }
 
         let titleHints = [match.name, match.shortName, match.home.displayName, match.away.displayName]
             .filter { !$0.isEmpty }

@@ -10,8 +10,8 @@ import UIKit
 /// ───────────────
 /// • The view covers the entire screen (ignores safe area) so it aligns
 ///   with the native iOS launch screen without any gap or flash.
-/// • `BrandMark` uses the *exact same* font as the toolbar BrandMark,
-///   scaled 2× for the splash presentation.  When the animation ends, the
+/// • `BrandMark` is scaled 4× for the splash presentation so the SVG logo
+///   fills the screen at a natural weight.  When the animation ends, the
 ///   overlay logo is at scale 1× over the nav-bar centre — pixel-aligned
 ///   with the toolbar logo that becomes visible at `phase == .home`.
 ///
@@ -30,7 +30,9 @@ struct LaunchAnimationView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // Splash scale relative to the standard toolbar BrandMark (which is scale 1.0).
-    private static let splashScale: CGFloat = 2.0
+    // 4× gives the SVG wordmark ~88 pt height / ~220 pt width on a standard iPhone —
+    // comparable visual weight to the previous text-based logo at 2×.
+    private static let splashScale: CGFloat = 4.0
 
     @State private var bounceScale: CGFloat = 1.0
 

@@ -78,7 +78,7 @@ struct League: Identifiable, Hashable {
         self.keywords = keywords
     }
 
-    static let all: [League] = [
+    nonisolated static let all: [League] = [
         // Football
         League(name: "NFL", shortName: "NFL", path: "football/nfl", group: .football,
                keywords: ["nfl", "football", "sunday", "monday night", "thursday night"]),
@@ -744,6 +744,11 @@ struct RankedSource: Identifiable, Hashable {
         evidenceCategories.contains(.teamNameMatch) ||
         evidenceCategories.contains(.eventTitleMatch)
     }
+
+    /// v3 precision status derived from evidence. CONFIRMED maps 1:1 with isConfirmed.
+    var matchStatus: MatchStatus {
+        isConfirmed ? .confirmed : .possible
+    }
 }
 
 /// Carries the explicitly-selected event identity from match selection into the media player.
@@ -752,18 +757,74 @@ struct MatchPlaybackContext: Identifiable, Sendable {
     let match: Match
     let channel: Channel
     let rankedSources: [RankedSource]
+    /// Unique ID for this playback request. Async operations should cancel themselves when
+    /// this ID no longer matches the current context, preventing stale results from landing.
+    let requestGenerationID: UUID
 
     var id: String { "\(match.id)-\(channel.id)" }
 
-    init(match: Match, channel: Channel, rankedSources: [RankedSource] = []) {
+    init(match: Match, channel: Channel, rankedSources: [RankedSource] = [], requestGenerationID: UUID = UUID()) {
         self.match = match
         self.channel = channel
         self.rankedSources = rankedSources
+        self.requestGenerationID = requestGenerationID
     }
 
     var selectedSource: RankedSource? {
         rankedSources.first { $0.channel.id == channel.id } ?? rankedSources.first
     }
+}
+
+// MARK: - v3 Precision Stream Matching Types
+
+/// Confidence level for a stream's association with a selected event.
+enum MatchStatus: String, Hashable, Sendable {
+    /// Event-specific evidence confirmed: EPG match, both team names, or event title.
+    case confirmed
+    /// Discovery-only: broadcaster rights, league keyword, or feed family match.
+    /// The stream may carry the event but cannot be proven to do so.
+    case possible
+    /// Hard conflict exists — wrong sport, wrong session, non-sports channel, etc.
+    case rejected
+}
+
+/// Types of hard conflicts that reject a candidate before scoring.
+/// A single hard conflict makes the result `.rejected` regardless of positive evidence.
+enum HardConflictType: String, Hashable, Sendable {
+    case wrongSport               // HC-001: feed family incompatible with event sport
+    case wrongRacingSession       // HC-010: qualifying channel for race event (or vice versa)
+    case nonSportsChannelFamily   // HC-015: news / weather / cooking channel
+    case wrongEventInstance       // HC-016: EPG programme is a different game/leg/session
+    case sourceDisagreement       // HC-018: EPG and dynamic title disagree on which event is airing
+}
+
+struct HardConflict: Hashable, Sendable {
+    let type: HardConflictType
+    let description: String
+}
+
+/// Relationship between a candidate stream and the selected event.
+enum EventRelationship: String, Hashable, Sendable {
+    /// The stream is carrying this specific event live — the only relationship eligible
+    /// for primary stream selection.
+    case exactEvent
+    case pregame
+    case postgame
+    case replay
+    case highlights
+    case unknown
+}
+
+/// Current playability state of a stream, independent of event identity.
+enum StreamAvailabilityState: String, Hashable, Sendable {
+    case online
+    case offline
+    /// Channel confirmed for this event but stream has not yet started.
+    case placeholder
+    case drmBlocked
+    case geoBlocked
+    case authRequired
+    case unknown
 }
 
 // MARK: - News

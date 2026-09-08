@@ -225,6 +225,13 @@ private extension SportsDataProviderID {
         case .foxSports: return "FOX"
         case .appleSports: return "Apple Sports"
         case .espn: return "ESPN"
+        case .foxBifrostNews: return "FOX Bifrost"
+        case .cbsRSS: return "CBS RSS"
+        case .bbcSport: return "BBC Sport"
+        case .skySports: return "Sky Sports"
+        case .nbcSports: return "NBC Sports"
+        case .foxRSS: return "FOX RSS"
+        case .bleacherReport: return "Bleacher Report"
         }
     }
 }

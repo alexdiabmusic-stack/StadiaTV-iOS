@@ -153,9 +153,9 @@ struct NewsView: View {
     private var emptyText: String {
         if let err = viewModel.lastError { return err }
         if let league = selectedLeague {
-            return "ESPN did not return news for \(league.name)."
+            return "No news available for \(league.name)."
         }
-        return "ESPN did not return news for your followed leagues."
+        return "No news available for your followed leagues."
     }
 }
 

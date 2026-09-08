@@ -15,6 +15,13 @@ enum AppConfiguration {
     private nonisolated static let cbsSportsEnabledName = "CBSSportsProviderEnabled"
     private nonisolated static let yahooSportsEnabledName = "YahooSportsProviderEnabled"
     private nonisolated static let foxSportsEnabledName = "FoxSportsProviderEnabled"
+    private nonisolated static let foxBifrostNewsEnabledName = "FOXBifrostNewsProviderEnabled"
+    private nonisolated static let cbsRSSEnabledName = "CBSRSSNewsProviderEnabled"
+    private nonisolated static let bbcSportEnabledName = "BBCSportNewsProviderEnabled"
+    private nonisolated static let skySportsNewsEnabledName = "SkySportsNewsProviderEnabled"
+    private nonisolated static let nbcSportsNewsEnabledName = "NBCSportsNewsProviderEnabled"
+    private nonisolated static let foxRSSEnabledName = "FOXRSSNewsProviderEnabled"
+    private nonisolated static let bleacherReportEnabledName = "BleacherReportNewsProviderEnabled"
 
     static var oddsAPIKey: String? {
         sanitizedString(for: oddsAPIKeyName)
@@ -83,12 +90,48 @@ enum AppConfiguration {
     }
 
     nonisolated static var isYahooSportsProviderEnabled: Bool {
-        guard let value = sanitizedString(for: yahooSportsEnabledName)?.lowercased() else { return true }
+        guard let value = sanitizedString(for: yahooSportsEnabledName)?.lowercased() else { return false }
         return ["1", "true", "yes", "enabled"].contains(value)
     }
 
     nonisolated static var isFoxSportsProviderEnabled: Bool {
         guard let value = sanitizedString(for: foxSportsEnabledName)?.lowercased() else { return true }
+        return ["1", "true", "yes", "enabled"].contains(value)
+    }
+
+    nonisolated static var isFOXBifrostNewsProviderEnabled: Bool {
+        guard let value = sanitizedString(for: foxBifrostNewsEnabledName)?.lowercased() else { return true }
+        return ["1", "true", "yes", "enabled"].contains(value)
+    }
+
+    nonisolated static var isCBSRSSNewsProviderEnabled: Bool {
+        guard let value = sanitizedString(for: cbsRSSEnabledName)?.lowercased() else { return true }
+        return ["1", "true", "yes", "enabled"].contains(value)
+    }
+
+    nonisolated static var isBBCSportNewsProviderEnabled: Bool {
+        guard let value = sanitizedString(for: bbcSportEnabledName)?.lowercased() else { return true }
+        return ["1", "true", "yes", "enabled"].contains(value)
+    }
+
+    nonisolated static var isSkySportsNewsProviderEnabled: Bool {
+        guard let value = sanitizedString(for: skySportsNewsEnabledName)?.lowercased() else { return true }
+        return ["1", "true", "yes", "enabled"].contains(value)
+    }
+
+    nonisolated static var isNBCSportsNewsProviderEnabled: Bool {
+        guard let value = sanitizedString(for: nbcSportsNewsEnabledName)?.lowercased() else { return true }
+        return ["1", "true", "yes", "enabled"].contains(value)
+    }
+
+    nonisolated static var isFOXRSSNewsProviderEnabled: Bool {
+        guard let value = sanitizedString(for: foxRSSEnabledName)?.lowercased() else { return true }
+        return ["1", "true", "yes", "enabled"].contains(value)
+    }
+
+    /// Bleacher Report legacy API — defaults disabled; endpoints are verified offline.
+    nonisolated static var isBleacherReportNewsProviderEnabled: Bool {
+        guard let value = sanitizedString(for: bleacherReportEnabledName)?.lowercased() else { return false }
         return ["1", "true", "yes", "enabled"].contains(value)
     }
 

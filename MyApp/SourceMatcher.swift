@@ -11,9 +11,13 @@ import Foundation
 nonisolated enum SourceMatcher {
 
     /// Words that carry no discriminating value when matching team/channel names.
+    ///
+    /// NOTE: "city" and "united" are intentionally NOT stop words — they are identity-bearing
+    /// in soccer (Manchester City, Manchester United, DC United) and must not be discarded.
+    /// They are still filtered from non-soccer team tokens via `soccerClubWords`.
     private static let stopWords: Set<String> = [
         "fc", "cf", "sc", "afc", "the", "of", "and", "de", "du", "le", "la", "les",
-        "city", "united", "club", "hd", "sd", "fhd", "uhd", "4k", "tv", "channel", "live", "sports", "sport",
+        "club", "hd", "sd", "fhd", "uhd", "4k", "tv", "channel", "live", "sports", "sport",
         "featured", "coverage", "session", "players", "tbd", "early", "weekday", "day", "night", "round", "rounds"
     ]
 
@@ -30,6 +34,12 @@ nonisolated enum SourceMatcher {
         let leagueKeywords = (match.league.keywords + eventAliases(for: match)).map { normalize($0) }
         let leagueShort = normalize(match.league.shortName)
 
+        // Pre-compute event identity for hard conflict checks inside the channel loop.
+        let eventFeedFamily = SportsOntology.feedFamily(for: match.league.path)
+        let eventRacingSession: RacingSessionKind = match.league.group == .racing
+            ? RacingSessionKind.detect(from: "\(match.name) \(match.shortName)")
+            : .unknown
+
         var ranked: [RankedSource] = []
 
         for channel in channels {
@@ -38,6 +48,17 @@ nonisolated enum SourceMatcher {
 
             // Channels whose name marks them as news or finance content never carry live sports.
             guard haystackTokens.isDisjoint(with: Self.nonSportsNameTokens) else { continue }
+
+            // HC-001: Feed family hard reject — wrong sport (e.g. NBA-branded channel for MLB event).
+            let channelFeedFamily = SportsOntology.classifyFeedFamily(from: channel.name)
+            if SportsOntology.isIncompatible(candidate: channelFeedFamily, with: eventFeedFamily) { continue }
+
+            // HC-010: Racing session hard reject — different session within the same race weekend
+            // (e.g. "Italian GP Qualifying" channel for an "Italian GP Race" event).
+            if eventRacingSession != .unknown {
+                let channelSession = RacingSessionKind.detect(from: channel.name)
+                if channelSession != .unknown && channelSession != eventRacingSession { continue }
+            }
 
             let paddedHaystack = " \(haystack) "
             var score = 0
@@ -49,8 +70,8 @@ nonisolated enum SourceMatcher {
             let distinctHome = sharedTeamTokens.isEmpty ? homeTokens : homeTokens.filter { !sharedTeamTokens.contains($0) }
             let distinctAway = sharedTeamTokens.isEmpty ? awayTokens : awayTokens.filter { !sharedTeamTokens.contains($0) }
 
-            let homeHit = matches(distinctHome.isEmpty ? homeTokens : distinctHome, in: haystack, tokens: haystackTokens) || aliasMatches(homeAliases, padded: paddedHaystack, tokens: haystackTokens)
-            let awayHit = matches(distinctAway.isEmpty ? awayTokens : distinctAway, in: haystack, tokens: haystackTokens) || aliasMatches(awayAliases, padded: paddedHaystack, tokens: haystackTokens)
+            let homeHit = matches(distinctHome.isEmpty ? homeTokens : distinctHome, tokens: haystackTokens) || aliasMatches(homeAliases, padded: paddedHaystack, tokens: haystackTokens)
+            let awayHit = matches(distinctAway.isEmpty ? awayTokens : distinctAway, tokens: haystackTokens) || aliasMatches(awayAliases, padded: paddedHaystack, tokens: haystackTokens)
 
             // Both teams named -> almost certainly the event feed.
             if homeHit && awayHit {
@@ -167,13 +188,14 @@ nonisolated enum SourceMatcher {
 
     // MARK: - Helpers
 
-    private static func matches(_ needleTokens: [String], in haystack: String, tokens haystackTokens: Set<String>) -> Bool {
+    /// Returns true when any needle token (≥ 3 chars) appears as a whole word in the haystack token set.
+    ///
+    /// Substring fallback is intentionally absent: "sparta" must not match "spartanburg" or "isparta"
+    /// (v3 spec INV-007: participant boundary rule).
+    private static func matches(_ needleTokens: [String], tokens haystackTokens: Set<String>) -> Bool {
         guard !needleTokens.isEmpty else { return false }
-        // A team matches if any of its significant tokens appears as a whole word.
         for token in needleTokens where token.count >= 3 {
             if haystackTokens.contains(token) { return true }
-            // City/nickname often appears joined, allow substring for longer tokens.
-            if token.count >= 5 && haystack.contains(token) { return true }
         }
         return false
     }

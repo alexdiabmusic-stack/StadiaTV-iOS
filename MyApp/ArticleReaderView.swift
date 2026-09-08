@@ -114,6 +114,15 @@ struct ArticleReaderView: View {
         return url.contains("/insider/") || article.isPremium
     }
 
+    private var isESPNArticle: Bool {
+        article.url?.host?.contains("espn.com") ?? (article.byline == nil)
+    }
+
+    private var articlePublisherLabel: String {
+        if let byline = article.byline, !byline.isEmpty { return byline }
+        return article.url?.host.map { $0.replacingOccurrences(of: "www.", with: "") } ?? "source"
+    }
+
     private var readTimeMinutes: Int {
         let words = bodyParagraphs.joined(separator: " ")
             .components(separatedBy: .whitespaces).filter { !$0.isEmpty }.count
@@ -400,7 +409,7 @@ struct ArticleReaderView: View {
             HStack(spacing: 6) {
                 Image(systemName: prominent ? "newspaper" : "arrow.up.right.square")
                     .font(.footnote)
-                Text(prominent ? "Read full story at ESPN.com" : "Open at ESPN.com")
+                Text(prominent ? "Read full story at \(articlePublisherLabel)" : "Open at \(articlePublisherLabel)")
                     .font(.footnote.weight(.semibold))
                 if prominent {
                     Image(systemName: "arrow.up.right")
@@ -433,7 +442,11 @@ struct ArticleReaderView: View {
             fullyLoaded = true
             return
         }
-        guard let articleURL = article.url else { return }
+        // ESPN body-fetch API only works for ESPN articles
+        guard isESPNArticle, let articleURL = article.url else {
+            fullyLoaded = true
+            return
+        }
         isLoading = true
         let fetched = (try? await SportsRepository.shared.legacyArticleBody(from: articleURL)) ?? []
         isLoading = false

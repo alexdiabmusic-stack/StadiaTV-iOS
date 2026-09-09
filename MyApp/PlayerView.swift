@@ -308,6 +308,7 @@ struct PlayerView: View {
         .contentShape(Rectangle())
         #if os(iOS)
         .simultaneousGesture(playerDismissalGesture)
+        .simultaneousGesture(landscapeSwipeGesture)
         .simultaneousGesture(TapGesture().onEnded { toggleChromeVisibility() })
         .overlay {
             ZStack {
@@ -654,6 +655,19 @@ struct PlayerView: View {
             dismissalDragOffset = .zero
             activeDismissalGesture = nil
         }
+    }
+
+    private var landscapeSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 80, coordinateSpace: .global)
+            .onEnded { value in
+                guard preferredOrientation == .portrait else { return }
+                guard value.translation.height < -80,
+                      abs(value.translation.height) > abs(value.translation.width) * 1.5,
+                      abs(value.predictedEndTranslation.height) > 160 else { return }
+                let videoAreaThreshold = UIScreen.main.bounds.height * 0.55
+                guard value.startLocation.y < videoAreaThreshold else { return }
+                toggleOrientation()
+            }
     }
     #endif
 
@@ -1185,7 +1199,7 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
     var body: some View {
         GeometryReader { proxy in
             if proxy.size.width > proxy.size.height {
-                landscapeLayout
+                landscapeLayout(proxy: proxy)
             } else {
                 portraitLayout(height: proxy.size.height, topSafeArea: proxy.safeAreaInsets.top)
             }
@@ -1230,7 +1244,7 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
         .ignoresSafeArea(edges: .top)
     }
 
-    private var landscapeLayout: some View {
+    private func landscapeLayout(proxy: GeometryProxy) -> some View {
         ZStack(alignment: .trailing) {
             PlayerVideoContainer(
                 channel: channel,
@@ -1239,6 +1253,7 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
                 isChromeVisible: isChromeVisible,
                 streamSummary: streamSummary,
                 orientation: orientation,
+                topOverlayShowsDismiss: false,
                 onDismiss: onDismiss,
                 onMore: onMore,
                 onSourceSelector: onSourceSelector,
@@ -1250,7 +1265,15 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
 
             if isChromeVisible {
                 VStack {
+                    HStack {
+                        PlayerChromeButton(systemImage: "chevron.backward", accessibilityLabel: "Back", action: onDismiss)
+                        Spacer()
+                    }
+                    .padding(.top, max(proxy.safeAreaInsets.top, 12))
+                    .padding(.leading, max(proxy.safeAreaInsets.leading, 16))
+
                     Spacer()
+
                     HStack(spacing: 10) {
                         if hasPreviousChannel {
                             PlayerChromeButton(systemImage: "chevron.left", accessibilityLabel: "Previous channel", action: onPreviousChannel)
@@ -1269,7 +1292,8 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
                             withAnimation(.snappy) { isLandscapeGameCentreVisible.toggle() }
                         }
                     }
-                    .padding(.bottom, 26)
+                    .padding(.bottom, max(proxy.safeAreaInsets.bottom, 26))
+                    .padding(.trailing, max(proxy.safeAreaInsets.trailing, 0))
                 }
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
@@ -1291,6 +1315,7 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
     let isChromeVisible: Bool
     let streamSummary: String
     let orientation: PlayerOrientation
+    let topOverlayShowsDismiss: Bool
     let onDismiss: () -> Void
     let onMore: () -> Void
     let onSourceSelector: () -> Void
@@ -1306,6 +1331,7 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
         isChromeVisible: Bool,
         streamSummary: String,
         orientation: PlayerOrientation,
+        topOverlayShowsDismiss: Bool = true,
         onDismiss: @escaping () -> Void,
         onMore: @escaping () -> Void,
         onSourceSelector: @escaping () -> Void,
@@ -1320,6 +1346,7 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
         self.isChromeVisible = isChromeVisible
         self.streamSummary = streamSummary
         self.orientation = orientation
+        self.topOverlayShowsDismiss = topOverlayShowsDismiss
         self.onDismiss = onDismiss
         self.onMore = onMore
         self.onSourceSelector = onSourceSelector
@@ -1347,6 +1374,7 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
                             title: match?.shortName ?? channel.name,
                             subtitle: streamSummary,
                             orientation: orientation,
+                            showsDismiss: topOverlayShowsDismiss,
                             onDismiss: onDismiss,
                             onMore: onMore,
                             onToggleOrientation: onToggleOrientation
@@ -1359,12 +1387,6 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
                     Spacer()
 
                     VStack(spacing: 8) {
-                        if let match {
-                            LiveScoreBug(match: match, sport: sport)
-                                .padding(.horizontal, 18)
-                                .transition(.opacity.combined(with: .scale(scale: 0.98)))
-                        }
-
                         if isChromeVisible {
                             PlayerBottomOverlay(
                                 channel: channel,
@@ -1389,13 +1411,16 @@ private struct PlayerTopOverlay: View {
     let title: String
     let subtitle: String
     let orientation: PlayerOrientation
+    var showsDismiss: Bool = true
     let onDismiss: () -> Void
     let onMore: () -> Void
     let onToggleOrientation: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
-            PlayerChromeButton(systemImage: "chevron.backward", accessibilityLabel: "Back", action: onDismiss)
+            if showsDismiss {
+                PlayerChromeButton(systemImage: "chevron.backward", accessibilityLabel: "Back", action: onDismiss)
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)

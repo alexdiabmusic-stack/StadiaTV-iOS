@@ -28,6 +28,7 @@ import UIKit
 struct LaunchAnimationView: View {
     @EnvironmentObject private var coordinator: StartupCoordinator
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.horizontalSizeClass) private var hSizeClass
 
     // Splash scale relative to the standard toolbar BrandMark (which is scale 1.0).
     // 4× gives the SVG wordmark ~88 pt height / ~220 pt width on a standard iPhone —
@@ -53,11 +54,10 @@ struct LaunchAnimationView: View {
     // MARK: - Background
 
     private var splashBackground: some View {
-        // Use the exact same colour as Theme.background (dark: #080A0F) so
-        // the transition from the native launch screen is a single seamless frame.
-        // easeIn means the background stays mostly opaque during early logo travel
-        // then clears quickly, letting sections show through as the logo arrives.
-        Color(hex: 0x080A0F)
+        let imageName = hSizeClass == .regular ? "LaunchSplashPad" : "LaunchSplashPhone"
+        return Image(imageName)
+            .resizable()
+            .scaledToFill()
             .opacity(backgroundOpacity)
             .animation(
                 reduceMotion

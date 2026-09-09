@@ -79,8 +79,9 @@ nonisolated enum SourceMatcher {
                 score += 100
                 evidence.insert(.teamNameMatch)
             } else if homeHit || awayHit {
-                // Single-team hit: score boost but not enough to claim both teams are listed.
-                score += 40
+                // Single-team hit: team-branded streams (RSN, club channels) are typically the most
+                // reliable broadcast for any sport, so give them a strong boost.
+                score += 65
             }
 
             // Event-title feeds matter for non-team sports and special broadcasts

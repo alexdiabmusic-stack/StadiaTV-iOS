@@ -653,15 +653,19 @@ private struct TeamSportStatsTab: View {
 
     private func statComparison(away: GameSummary.TeamBox, home: GameSummary.TeamBox) -> some View {
         VStack(spacing: 0) {
-            HStack {
-                Text(away.abbreviation.isEmpty ? match.away.abbreviation : away.abbreviation)
-                    .frame(width: 74, alignment: .leading)
+            HStack(spacing: 6) {
+                TeamLogo(url: match.away.logoURL, size: 20)
+                Text(match.away.shortName)
+                    .font(.caption.weight(.heavy))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
                 Spacer()
-                Text(home.abbreviation.isEmpty ? match.home.abbreviation : home.abbreviation)
-                    .frame(width: 74, alignment: .trailing)
+                Text(match.home.shortName)
+                    .font(.caption.weight(.heavy))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
+                TeamLogo(url: match.home.logoURL, size: 20)
             }
-            .font(.caption.weight(.heavy))
-            .foregroundStyle(Theme.textPrimary)
             .padding(.vertical, 8)
 
             ForEach(Array(away.stats.prefix(14)), id: \.label) { stat in

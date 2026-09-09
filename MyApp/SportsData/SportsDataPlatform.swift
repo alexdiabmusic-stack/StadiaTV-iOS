@@ -854,6 +854,10 @@ actor ProviderHealthMonitor {
     }
 
     func recordFailure(providerID: SportsDataProviderID, error: Error, at now: Date = Date()) {
+        // Capability mismatches and intentional disables are not infrastructure failures.
+        if case SportsDataError.unsupportedCapability = error { return }
+        if case SportsDataError.providerDisabled = error { return }
+
         var snapshot = snapshots[providerID] ?? SportsProviderHealthSnapshot.healthySnapshot
         snapshot.lastFailureAt = now
         snapshot.recentFailures += 1
@@ -1611,10 +1615,11 @@ struct SportsRepository: Sendable {
         guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.newsMetadata, league.path) }
 
         // Run all providers concurrently; aggregate, deduplicate, and rank results.
+        // A nil sentinel is returned by the timeout task to cap collection at 7 seconds.
         let start = Date()
         var collected: [(SportsDataProviderID, [BannerNewsArticle])] = []
         var failures: [String] = []
-        await withTaskGroup(of: (SportsDataProviderID, [BannerNewsArticle], Error?).self) { group in
+        await withTaskGroup(of: Optional<(SportsDataProviderID, [BannerNewsArticle], Error?)>.self) { group in
             for provider in providers {
                 group.addTask {
                     let t = Date()
@@ -1628,7 +1633,15 @@ struct SportsRepository: Sendable {
                     }
                 }
             }
-            for await (providerID, articles, error) in group {
+            group.addTask {
+                try? await Task.sleep(for: .seconds(7))
+                return nil
+            }
+            for await result in group {
+                guard let (providerID, articles, error) = result else {
+                    group.cancelAll()
+                    break
+                }
                 if let error {
                     failures.append("\(providerID.rawValue): \(error.localizedDescription)")
                 } else if !articles.isEmpty {

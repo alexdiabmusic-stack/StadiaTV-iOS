@@ -561,6 +561,7 @@ private struct TeamSportGameCentre: View {
                                             teamID: teamID,
                                             teamName: selectedSide.shortName,
                                             athletes: rosterPreviewByTeamID[teamID] ?? [],
+                                            isLoaded: rosterPreviewByTeamID[teamID] != nil,
                                             selectedPosition: $selectedRosterPosition,
                                             isShowingAll: $isShowingFullRosterPreview)
 
@@ -737,6 +738,8 @@ private struct GameCentreTeamRosterPreview: View {
     let teamID: String
     let teamName: String
     let athletes: [RosterAthlete]
+    /// True once the load attempt has completed (even if it returned no players).
+    let isLoaded: Bool
     @Binding var selectedPosition: String?
     @Binding var isShowingAll: Bool
 
@@ -767,8 +770,10 @@ private struct GameCentreTeamRosterPreview: View {
                 .foregroundStyle(Theme.accent)
             }
 
-            if athletes.isEmpty {
+            if !isLoaded {
                 GameCentreLoadingState(message: "Loading players")
+            } else if athletes.isEmpty {
+                GameCentreEmptyState(systemImage: "person.3.sequence", message: "No player data available for this team.")
             } else {
                 if positions.count > 1 {
                     ScrollView(.horizontal, showsIndicators: false) {

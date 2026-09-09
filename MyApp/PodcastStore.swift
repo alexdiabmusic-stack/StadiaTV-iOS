@@ -72,6 +72,28 @@ final class PodcastStore: ObservableObject {
         loadPersistedState()
         loadBundledCatalog()
         setupRemoteCommands()
+        prefetchTopArtwork()
+    }
+
+    // MARK: - Startup artwork prefetch
+
+    private func prefetchTopArtwork() {
+        Task(priority: .background) {
+            // Pre-warm URLCache for feeds with artwork URLs already known from catalog
+            for feed in catalog.prefix(24) {
+                let key = feed.feedURL.absoluteString
+                if let artworkURL = podcastMetaCache[key]?.artworkURL {
+                    _ = try? await URLSession.shared.data(from: artworkURL)
+                }
+            }
+            // Resolve artwork URLs for the first few catalog feeds that lack them
+            for feed in catalog.prefix(12) {
+                let key = feed.feedURL.absoluteString
+                if podcastMetaCache[key]?.artworkURL == nil {
+                    await fetchArtwork(for: feed.feedURL)
+                }
+            }
+        }
     }
 
     // MARK: - Catalog loading

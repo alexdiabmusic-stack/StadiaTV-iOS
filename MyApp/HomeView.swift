@@ -188,7 +188,6 @@ struct HomeView: View {
         // position; the toolbar logo takes over atomically in one frame.
         ToolbarItem(placement: .principal) {
             BrandMark()
-                .scaleEffect(1.15)
                 .opacity(launchCoordinator.phase == .home ? 1 : 0)
         }
         // Appears ~80 ms after the logo begins moving. `.buttonStyle(.plain)` removes

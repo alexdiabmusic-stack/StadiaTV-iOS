@@ -864,10 +864,14 @@ struct PodcastArtwork: View {
     let url: URL?
     let size: CGFloat
 
+    @State private var cachedImage: Image?
+
     var body: some View {
-        AsyncImage(url: url) { phase in
-            if case .success(let image) = phase {
-                image.resizable().scaledToFill()
+        ZStack {
+            if let cachedImage {
+                cachedImage
+                    .resizable()
+                    .scaledToFill()
             } else {
                 Theme.surfaceElevated.overlay {
                     Image(systemName: "mic.fill")
@@ -878,6 +882,15 @@ struct PodcastArtwork: View {
         }
         .frame(width: size, height: size)
         .clipped()
+        // Keep the loaded image in @State so re-renders (e.g. from playback ticks)
+        // don't flash the placeholder while the same URL re-loads from cache.
+        .task(id: url) {
+            guard let url, cachedImage == nil else { return }
+            let request = URLRequest(url: url, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 30)
+            guard let (data, _) = try? await URLSession.shared.data(for: request),
+                  let uiImage = UIImage(data: data) else { return }
+            cachedImage = Image(uiImage: uiImage)
+        }
     }
 }
 

@@ -110,7 +110,8 @@ struct NHLProvider: ScoreProvider, ScheduleProvider, StandingsProvider, TeamProv
     func roster(for league: League, teamID: BannerEntityID) async throws -> BannerRoster {
         try ensureNHL(league)
         guard let abbreviation = SportsIdentityResolver.providerID(from: teamID, provider: .nhl) else {
-            throw SportsDataError.invalidResponse
+            // Team ID is from a different provider (e.g., ESPN numeric ID) — not a health failure.
+            throw SportsDataError.unsupportedCapability(.rosters)
         }
         let response = try await client.roster(teamAbbreviation: abbreviation)
         let players = [

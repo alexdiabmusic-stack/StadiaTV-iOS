@@ -78,7 +78,7 @@ struct LaunchAnimationView: View {
         // Render at the full splash height so the SVG is never upscaled.
         // scaleEffect goes 1.0 → (1/splashScale) during the fly-to-navbar transition,
         // scaling down cleanly instead of blurrily scaling up a small rasterised bitmap.
-        let splashHeight = Theme.scaled(22) * Self.splashScale
+        let splashHeight = Theme.scaled(36) * Self.splashScale
         let isAllWhite = coordinator.phase == .brandWhite
 
         ZStack {

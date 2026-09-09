@@ -94,7 +94,18 @@ struct LiveView: View {
     private var liveList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 20) {
-                if !viewModel.allLive.isEmpty {
+                if filter == .forYou {
+                    let n = displayedMatches.count
+                    if n > 0 {
+                        HStack(spacing: 5) {
+                            Image(systemName: "star.fill")
+                                .font(.caption.weight(.bold))
+                            Text(n == 1 ? "1 of your teams is live" : "\(n) of your teams are live")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .foregroundStyle(Theme.accent)
+                    }
+                } else if !viewModel.allLive.isEmpty {
                     Text(viewModel.allLive.count == 1 ? "1 game currently live" : "\(viewModel.allLive.count) games currently live")
                         .font(.subheadline)
                         .foregroundStyle(Theme.textSecondary)
@@ -197,13 +208,17 @@ struct LiveView: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             withAnimation(.snappy) { filter = f }
         } label: {
-            Text(f.label)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(filter == f ? .white : Theme.textSecondary)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 9)
-                .background(filter == f ? Theme.live : Theme.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(filter == f ? Theme.live : Theme.hairline))
+            HStack(spacing: 5) {
+                Image(systemName: f.icon)
+                    .font(.caption2.weight(.bold))
+                Text(f.label)
+                    .font(.subheadline.weight(.semibold))
+            }
+            .foregroundStyle(filter == f ? .white : Theme.textSecondary)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(filter == f ? f.activeColor : Theme.surface, in: Capsule())
+            .overlay(Capsule().strokeBorder(filter == f ? f.activeColor : Theme.hairline))
         }
         .buttonStyle(.plain)
     }
@@ -212,12 +227,11 @@ struct LiveView: View {
         let base: [Match]
         switch filter {
         case .forYou:
+            // Strictly only matches involving the user's favourite teams — no fantasy blending,
+            // no fallback to all-live. An empty result means none of your teams are currently live.
             let favIDs = Set(prefs.favoriteTeams.map(\.id) + prefs.favoriteTeams.map(\.canonicalTeamID))
             let favNames = Set(prefs.favoriteTeams.map { $0.displayName.lowercased() })
-            let favoriteMatches = viewModel.allLive.filter { involvesFavorite($0, favIDs: favIDs, favNames: favNames) }
-            let fantasyMatches = viewModel.allLive.filter { !liveFantasyContext(for: $0).isEmpty }
-            let personalized = mergedMatches(favoriteMatches + fantasyMatches)
-            base = personalized.isEmpty ? viewModel.allLive : personalized.sorted { relevanceScore($0, favIDs: favIDs, favNames: favNames) > relevanceScore($1, favIDs: favIDs, favNames: favNames) }
+            base = viewModel.allLive.filter { involvesFavorite($0, favIDs: favIDs, favNames: favNames) }
         case .all:
             base = viewModel.allLive
         case .guide:
@@ -333,26 +347,6 @@ struct LiveView: View {
     private func liveFantasyContext(for match: Match) -> [FantasyPlayerGame] {
         guard fantasyStore.settings.showFantasyIndicatorsInLive else { return [] }
         return (fantasyStore.fantasyEventContext(for: match)?.playerGames ?? []) + (nativeFantasyStore.fantasyEventContext(for: match)?.playerGames ?? [])
-    }
-
-    private func mergedMatches(_ matches: [Match]) -> [Match] {
-        var seen: Set<String> = []
-        var merged: [Match] = []
-        for match in matches where seen.insert(match.id).inserted {
-            merged.append(match)
-        }
-        return merged
-    }
-
-    private func relevanceScore(_ match: Match, favIDs: Set<String>, favNames: Set<String>) -> Int {
-        var score = 0
-        if involvesFavorite(match, favIDs: favIDs, favNames: favNames) { score += 100 }
-        let fantasyContext = liveFantasyContext(for: match)
-        score += min(fantasyContext.filter(\.isFantasyStarter).count, 3) * 35
-        score += min(fantasyContext.filter(\.isFantasyBench).count, 3) * 15
-        score += min(fantasyContext.filter { !$0.isFantasyStarter && !$0.isFantasyBench }.count, 2) * 10
-        if isClose(match) { score += 10 }
-        return score
     }
 
     private func isClose(_ match: Match) -> Bool {
@@ -690,6 +684,22 @@ enum LiveFilter: String, CaseIterable, Identifiable {
         case .forYou: return "For You"
         case .all:    return "All Live"
         case .guide:  return "Guide"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .forYou: return "star.fill"
+        case .all:    return "circle.fill"
+        case .guide:  return "tv"
+        }
+    }
+
+    var activeColor: Color {
+        switch self {
+        case .forYou: return Theme.accent
+        case .all:    return Theme.live
+        case .guide:  return Theme.accent
         }
     }
 }

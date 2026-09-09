@@ -44,7 +44,8 @@ struct BBCSportNewsProvider: SportsNewsProvider {
                     do {
                         let data = try await http.dataWithRetry(
                             from: url,
-                            accept: "application/rss+xml, application/xml, text/xml"
+                            accept: "application/rss+xml, application/xml, text/xml",
+                            maxAttempts: 1
                         )
                         return BannerRSSParser.parse(data).compactMap { item -> BannerNewsArticle? in
                             guard let title = item.title, !title.isEmpty else { return nil }
@@ -88,23 +89,24 @@ struct BBCSportNewsProvider: SportsNewsProvider {
 
     private func bbcFeeds(for league: League) -> [String] {
         let b = Self.base
-        var feeds = ["\(b)/rss.xml"]  // general sports top stories
+        // Only return sport-specific feeds. Returning the general /rss.xml for every
+        // league causes cross-sport contamination (e.g. tennis articles tagged as NHL).
+        // Sports without a BBC-specific feed return [] so the provider throws
+        // .unsupportedCapability and the platform falls back to ESPN for those leagues.
         switch league.group {
         case .soccer:
-            // BBC sport/football section covers soccer/football
-            feeds += ["\(b)/football/rss.xml", "\(b)/football/premier-league/rss.xml"]
+            return ["\(b)/football/rss.xml", "\(b)/football/premier-league/rss.xml"]
         case .racing:
-            feeds.append("\(b)/formula1/rss.xml")
+            return ["\(b)/formula1/rss.xml"]
         case .tennis:
-            feeds.append("\(b)/tennis/rss.xml")
+            return ["\(b)/tennis/rss.xml"]
         case .golf:
-            feeds.append("\(b)/golf/rss.xml")
+            return ["\(b)/golf/rss.xml"]
         case .cycling:
-            feeds.append("\(b)/cycling/rss.xml")
+            return ["\(b)/cycling/rss.xml"]
         default:
-            break
+            return []
         }
-        return feeds
     }
 
 }

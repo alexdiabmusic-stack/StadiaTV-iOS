@@ -218,6 +218,20 @@ struct TVSettingsView: View {
 
     private var streamingSection: some View {
         Section {
+            Picker("Streaming Language", selection: Binding(
+                get: { prefs.preferredStreamLanguages.first ?? "en" },
+                set: { code in
+                    if let lang = StreamLanguage.all.first(where: { $0.code == code }) {
+                        prefs.setDefaultStreamLanguage(lang)
+                    }
+                }
+            )) {
+                ForEach(StreamLanguage.all) { lang in
+                    Text(lang.name).tag(lang.code)
+                }
+            }
+            .listRowBackground(Theme.surface)
+
             Toggle(isOn: Binding(
                 get: { prefs.showLiveScoreBadge },
                 set: { prefs.setShowLiveScoreBadge($0) }

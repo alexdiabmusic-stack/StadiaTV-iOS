@@ -18,7 +18,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
         self.metadata = SportsDataProviderMetadata(
             id: .appleSports,
             name: "Apple Sports",
-            supportLevel: .experimental,
+            supportLevel: .firstPartyWeb,
             supportedSports: Set(SportGroup.allCases),
             supportedLeagues: Set(AppleSportsLeagueMapping.supportedLeaguePaths.flatMap { [$0, SportsProviderRouteConfiguration.leagueKey(forLegacyPath: $0)] }),
             capabilities: [.liveScores, .schedule, .gameStatus, .gameDetails, .boxScore, .standings, .teams, .playerStats, .teamStats, .leagueLeaders, .golfTournament],
@@ -435,6 +435,7 @@ struct AppleSportsProvider: ScoreProvider, ScheduleProvider, StandingsProvider, 
 actor AppleSportsManifestService {
     private let client: AppleSportsClient
     private var cachedManifest: AppleSportsManifest?
+    private var inflight: Task<AppleSportsManifest, Error>?
 
     init(client: AppleSportsClient) {
         self.client = client
@@ -442,10 +443,21 @@ actor AppleSportsManifestService {
 
     func manifest(locale: String) async throws -> AppleSportsManifest {
         if let cachedManifest { return cachedManifest }
-        let response = try await client.manifest(locale: locale)
-        let manifest = AppleSportsManifest(response: response)
-        cachedManifest = manifest
-        return manifest
+        if let inflight { return try await inflight.value }
+        let task = Task<AppleSportsManifest, Error> { [client] in
+            let response = try await client.manifest(locale: locale)
+            return AppleSportsManifest(response: response)
+        }
+        inflight = task
+        do {
+            let manifest = try await task.value
+            cachedManifest = manifest
+            inflight = nil
+            return manifest
+        } catch {
+            inflight = nil
+            throw error
+        }
     }
 }
 

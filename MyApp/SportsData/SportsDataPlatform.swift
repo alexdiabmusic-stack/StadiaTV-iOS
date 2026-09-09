@@ -1022,11 +1022,89 @@ struct SportsProviderRouteConfiguration: Sendable {
     static let firstPass = SportsProviderRouteConfiguration(routes: Self.defaultRoutes())
 
     private static func defaultRoutes() -> [ProviderRoute] {
+        // Routes are first-match-wins. Capability-specific overrides are prepended so they take
+        // priority over the general firstPartyCore and applePrimaryLeagues routes below.
+
+        let soccerLeaguePaths = [
+            "soccer/eng.1", "soccer/eng.2", "soccer/usa.1", "soccer/usa.nwsl",
+            "soccer/esp.1", "soccer/ita.1", "soccer/ger.1", "soccer/fra.1",
+            "soccer/mex.1", "soccer/ned.1", "soccer/por.1", "soccer/ksa.1",
+            "soccer/uefa.champions", "soccer/uefa.europa", "soccer/fifa.world", "soccer/fifa.wwc"
+        ]
+
+        // Standings: first-party APIs own standings for big 4; Apple is primary for everything else.
+        let standingsOverrides: [(String, [SportsDataProviderID])] = [
+            (leagueKey(forLegacyPath: "hockey/nhl"),                           [.nhl, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
+            (leagueKey(forLegacyPath: "baseball/mlb"),                         [.mlb, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
+            (leagueKey(forLegacyPath: "basketball/nba"),                       [.nba, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
+            (leagueKey(forLegacyPath: "football/nfl"),                         [.nfl, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
+            (leagueKey(forLegacyPath: "basketball/wnba"),                      [.appleSports, .cbsSports, .yahooSports, .espn]),
+            (leagueKey(forLegacyPath: "football/college-football"),            [.appleSports, .cbsSports, .yahooSports, .espn]),
+            (leagueKey(forLegacyPath: "basketball/mens-college-basketball"),   [.appleSports, .cbsSports, .espn]),
+            (leagueKey(forLegacyPath: "basketball/womens-college-basketball"), [.appleSports, .cbsSports, .espn]),
+            (leagueKey(forLegacyPath: "racing/f1"),                            [.appleSports, .espn]),
+            (leagueKey(forLegacyPath: "racing/nascar-premier"),                [.appleSports, .foxSports, .cbsSports, .yahooSports]),
+            (leagueKey(forLegacyPath: "racing/nascar-truck"),                  [.appleSports, .foxSports, .cbsSports]),
+            (leagueKey(forLegacyPath: "racing/irl"),                           [.appleSports, .cbsSports, .espn]),
+            (leagueKey(forLegacyPath: "golf/pga"),                             [.appleSports, .espn]),
+            (leagueKey(forLegacyPath: "golf/lpga"),                            [.appleSports, .espn]),
+            (leagueKey(forLegacyPath: "golf/champions-tour"),                  [.appleSports, .espn]),
+            (leagueKey(forLegacyPath: "golf/eur"),                             [.appleSports, .espn]),
+            (leagueKey(forLegacyPath: "tennis/atp"),                           [.appleSports, .yahooSports, .cbsSports, .espn]),
+            (leagueKey(forLegacyPath: "tennis/wta"),                           [.appleSports, .yahooSports, .cbsSports, .espn]),
+        ]
+
+        // Player stats: first-party APIs own player databases for big 4.
+        // Yahoo leads college football (richer stats); CBS leads college basketball.
+        // Apple covers match-level stats for soccer, racing, golf, tennis.
+        let playerStatsOverrides: [(String, [SportsDataProviderID])] = [
+            (leagueKey(forLegacyPath: "hockey/nhl"),                           [.nhl, .appleSports, .cbsSports, .foxSports, .yahooSports, .espn]),
+            (leagueKey(forLegacyPath: "baseball/mlb"),                         [.mlb, .appleSports, .cbsSports, .foxSports, .yahooSports, .espn]),
+            (leagueKey(forLegacyPath: "basketball/nba"),                       [.nba, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
+            (leagueKey(forLegacyPath: "football/nfl"),                         [.nfl, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
+            (leagueKey(forLegacyPath: "basketball/wnba"),                      [.appleSports, .cbsSports, .yahooSports, .espn]),
+            (leagueKey(forLegacyPath: "football/college-football"),            [.yahooSports, .cbsSports, .appleSports, .espn]),
+            (leagueKey(forLegacyPath: "basketball/mens-college-basketball"),   [.cbsSports, .appleSports, .espn]),
+            (leagueKey(forLegacyPath: "basketball/womens-college-basketball"), [.cbsSports, .appleSports, .espn]),
+            (leagueKey(forLegacyPath: "racing/f1"),                            [.appleSports, .espn]),
+            (leagueKey(forLegacyPath: "racing/nascar-premier"),                [.appleSports, .foxSports, .cbsSports, .yahooSports]),
+            (leagueKey(forLegacyPath: "racing/nascar-truck"),                  [.appleSports, .foxSports, .cbsSports]),
+            (leagueKey(forLegacyPath: "racing/irl"),                           [.appleSports, .cbsSports, .espn]),
+            (leagueKey(forLegacyPath: "golf/pga"),                             [.appleSports, .espn]),
+            (leagueKey(forLegacyPath: "golf/lpga"),                            [.appleSports, .espn]),
+            (leagueKey(forLegacyPath: "golf/champions-tour"),                  [.appleSports, .espn]),
+            (leagueKey(forLegacyPath: "golf/eur"),                             [.appleSports, .espn]),
+            (leagueKey(forLegacyPath: "tennis/atp"),                           [.appleSports, .yahooSports, .cbsSports, .espn]),
+            (leagueKey(forLegacyPath: "tennis/wta"),                           [.appleSports, .yahooSports, .cbsSports, .espn]),
+        ]
+
+        // leagueLeaders: same first-party ownership as standings for big 4.
+        let leagueLeadersOverrides: [(String, [SportsDataProviderID])] = [
+            (leagueKey(forLegacyPath: "hockey/nhl"),     [.nhl, .appleSports, .cbsSports, .foxSports, .espn]),
+            (leagueKey(forLegacyPath: "baseball/mlb"),   [.mlb, .appleSports, .cbsSports, .foxSports, .espn]),
+            (leagueKey(forLegacyPath: "basketball/nba"), [.nba, .appleSports, .cbsSports, .foxSports, .espn]),
+            (leagueKey(forLegacyPath: "football/nfl"),   [.nfl, .appleSports, .cbsSports, .espn]),
+        ]
+
+        var routes: [ProviderRoute] = standingsOverrides.map { ProviderRoute(leagueID: $0, capability: .standings, providers: $1) }
+        routes += soccerLeaguePaths.map { ProviderRoute(leagueID: leagueKey(forLegacyPath: $0), capability: .standings, providers: [.appleSports, .cbsSports, .yahooSports, .foxSports, .espn]) }
+
+        routes += playerStatsOverrides.map { ProviderRoute(leagueID: $0, capability: .playerStats, providers: $1) }
+        routes += soccerLeaguePaths.map { ProviderRoute(leagueID: leagueKey(forLegacyPath: $0), capability: .playerStats, providers: [.appleSports, .yahooSports, .cbsSports, .foxSports, .espn]) }
+
+        // teamStats mirrors playerStats hierarchy
+        routes += playerStatsOverrides.map { ProviderRoute(leagueID: $0, capability: .teamStats, providers: $1) }
+        routes += soccerLeaguePaths.map { ProviderRoute(leagueID: leagueKey(forLegacyPath: $0), capability: .teamStats, providers: [.appleSports, .yahooSports, .cbsSports, .foxSports, .espn]) }
+
+        routes += leagueLeadersOverrides.map { ProviderRoute(leagueID: $0, capability: .leagueLeaders, providers: $1) }
+
+        // General routes — Apple Sports first for live scores/schedule/details on all leagues.
+        // The capability-specific overrides above already handle standings/playerStats/teamStats/leagueLeaders.
         let firstPartyCore: [(String, [SportsDataProviderID])] = [
-            (leagueKey(forLegacyPath: "hockey/nhl"), [.nhl, .appleSports, .foxSports, .cbsSports, .espn]),
-            (leagueKey(forLegacyPath: "baseball/mlb"), [.mlb, .appleSports, .foxSports, .cbsSports, .espn]),
-            (leagueKey(forLegacyPath: "basketball/nba"), [.nba, .appleSports, .foxSports, .cbsSports, .espn]),
-            (leagueKey(forLegacyPath: "football/nfl"), [.nfl, .appleSports, .cbsSports, .espn])
+            (leagueKey(forLegacyPath: "hockey/nhl"),     [.appleSports, .nhl, .foxSports, .cbsSports, .espn]),
+            (leagueKey(forLegacyPath: "baseball/mlb"),   [.appleSports, .mlb, .foxSports, .cbsSports, .espn]),
+            (leagueKey(forLegacyPath: "basketball/nba"), [.appleSports, .nba, .foxSports, .cbsSports, .espn]),
+            (leagueKey(forLegacyPath: "football/nfl"),   [.appleSports, .nfl, .cbsSports, .espn])
         ]
         let cfbLeagueID = leagueKey(forLegacyPath: "football/college-football")
         let foxBasketballFallbackLeaguePaths = [
@@ -1069,7 +1147,7 @@ struct SportsProviderRouteConfiguration: Sendable {
         let applePrimaryLeagues = applePrimaryLeaguePaths.map(leagueKey(forLegacyPath:))
         let defaultCapabilities: [SportsDataCapability] = [.liveScores, .schedule, .gameStatus, .gameDetails, .playByPlay, .boxScore, .standings, .teams, .players, .rosters, .playerStats, .teamStats, .injuries, .leagueLeaders, .fantasyRelevantData]
         let appleBaselineCapabilities: [SportsDataCapability] = [.liveScores, .schedule, .gameStatus, .gameDetails, .boxScore, .standings, .teams, .playerStats, .teamStats, .leagueLeaders, .golfTournament]
-        var routes = firstPartyCore.flatMap { leagueID, providers in
+        routes += firstPartyCore.flatMap { leagueID, providers in
             defaultCapabilities.map { ProviderRoute(leagueID: leagueID, capability: $0, providers: providers) }
         }
         routes += applePrimaryLeagues.flatMap { leagueID in

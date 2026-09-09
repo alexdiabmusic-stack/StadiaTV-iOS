@@ -1,5 +1,10 @@
 import SwiftUI
 
+private struct IdentifiableURL: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
 // MARK: - Reader Setting Types
 
 enum ReaderAppearance: String, CaseIterable {
@@ -51,7 +56,6 @@ enum ReaderSpacing: String, CaseIterable {
 
 struct ArticleReaderView: View {
     let article: ESPNArticle
-    @Environment(\.openURL) private var openURL
 
     // Content
     @State private var bodyParagraphs: [String] = []
@@ -68,6 +72,7 @@ struct ArticleReaderView: View {
     // UI state
     @State private var showingReaderSettings = false
     @State private var scrollProgress: CGFloat = 0
+    @State private var safariItem: IdentifiableURL?
 
     // MARK: Computed appearance
 
@@ -213,6 +218,10 @@ struct ArticleReaderView: View {
             )
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $safariItem) { item in
+            SafariSheet(url: item.url)
+                .ignoresSafeArea()
         }
         .preferredColorScheme(preferredScheme)
         .tint(Theme.accent)
@@ -405,16 +414,12 @@ struct ArticleReaderView: View {
     }
 
     private func footerLink(url: URL, prominent: Bool) -> some View {
-        Button { openURL(url) } label: {
+        Button { safariItem = IdentifiableURL(url: url) } label: {
             HStack(spacing: 6) {
-                Image(systemName: prominent ? "newspaper" : "arrow.up.right.square")
+                Image(systemName: prominent ? "newspaper" : "safari")
                     .font(.footnote)
-                Text(prominent ? "Read full story at \(articlePublisherLabel)" : "Open at \(articlePublisherLabel)")
+                Text(prominent ? "Read full story at \(articlePublisherLabel)" : "Open in Browser")
                     .font(.footnote.weight(.semibold))
-                if prominent {
-                    Image(systemName: "arrow.up.right")
-                        .font(.footnote)
-                }
             }
             .foregroundStyle(prominent ? Theme.accent : readerSecondary)
             .padding(.vertical, prominent ? 12 : 8)

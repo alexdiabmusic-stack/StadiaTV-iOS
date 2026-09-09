@@ -78,6 +78,6 @@ struct BrandMark: View {
                 .scaledToFit()
                 .opacity(isAllWhite ? 1.0 : 0.0)
         }
-        .frame(height: Theme.scaled(22))
+        .frame(height: Theme.scaled(30))
     }
 }

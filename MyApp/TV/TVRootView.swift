@@ -5,6 +5,7 @@ struct TVRootView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var playlistStore: PlaylistStore
     @EnvironmentObject private var fantasyStore: FantasyStore
+    @EnvironmentObject private var bannerFantasyStore: BannerFantasyStore
     @StateObject private var liveViewModel = LiveViewModel()
     @StateObject private var epgRepository = EPGRepository()
     @StateObject private var streamStore = StreamAvailabilityStore()
@@ -58,7 +59,18 @@ struct TVRootView: View {
         }
         .onChange(of: playlistStore.channelsByPlaylist) {
             epgRepository.setupWithChannels(playlistStore.allChannels)
-            Task { await fantasyStore.refresh(channels: playlistStore.allChannels, preferredLanguages: prefs.preferredStreamLanguages, force: true) }
+            Task {
+                async let espnRefresh: Void = fantasyStore.refresh(
+                    channels: playlistStore.allChannels,
+                    preferredLanguages: prefs.preferredStreamLanguages,
+                    force: true
+                )
+                async let eventContextRefresh: Void = bannerFantasyStore.refreshEventContexts(
+                    channels: playlistStore.allChannels,
+                    preferredLanguages: prefs.preferredStreamLanguages
+                )
+                _ = await (espnRefresh, eventContextRefresh)
+            }
         }
     }
 }
@@ -71,6 +83,7 @@ struct TVRootView: View {
         .environmentObject(EntitlementStore())
         .environmentObject(PredictionsStore())
         .environmentObject(FantasyStore.shared)
+        .environmentObject(BannerFantasyStore.shared)
         .preferredColorScheme(.dark)
 }
 #endif

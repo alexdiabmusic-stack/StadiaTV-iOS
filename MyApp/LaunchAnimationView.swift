@@ -28,7 +28,6 @@ import UIKit
 struct LaunchAnimationView: View {
     @EnvironmentObject private var coordinator: StartupCoordinator
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.horizontalSizeClass) private var hSizeClass
 
     // Splash scale relative to the standard toolbar BrandMark (which is scale 1.0).
     // 4× gives the SVG wordmark ~88 pt height / ~220 pt width on a standard iPhone —
@@ -54,10 +53,7 @@ struct LaunchAnimationView: View {
     // MARK: - Background
 
     private var splashBackground: some View {
-        let imageName = hSizeClass == .regular ? "LaunchSplashPad" : "LaunchSplashPhone"
-        return Image(imageName)
-            .resizable()
-            .scaledToFill()
+        Color(hex: 0x080A0F)
             .opacity(backgroundOpacity)
             .animation(
                 reduceMotion

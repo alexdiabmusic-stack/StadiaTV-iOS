@@ -976,7 +976,11 @@ enum AppleSportsImageResolver {
 
 enum AppleSportsDateParser {
     nonisolated static func date(fromEpochSeconds value: Double?) -> Date? {
-        value.map { Date(timeIntervalSince1970: $0) }
+        guard let value else { return nil }
+        // Epoch seconds for any date within ±50 years of 2026 stay well below 1e10.
+        // Values above 1e10 are milliseconds (a common JSON convention for timestamps).
+        let seconds = value > 1.0e10 ? value / 1000.0 : value
+        return Date(timeIntervalSince1970: seconds)
     }
 }
 
@@ -1059,7 +1063,7 @@ enum AppleSportsLocalizedText {
         let text: String?
     }
 
-    nonisolated static func first<Key: CodingKey>(from container: KeyedDecodingContainer<Key>, key: Key) -> String? {
+    static func first<Key: CodingKey>(from container: KeyedDecodingContainer<Key>, key: Key) -> String? {
         guard let values = try? container.decodeIfPresent([Value].self, forKey: key) else { return nil }
         return values.first?.text
     }

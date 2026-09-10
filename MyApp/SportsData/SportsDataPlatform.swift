@@ -2135,12 +2135,21 @@ struct SportsRepository: Sendable {
         guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.liveScores, league.path) }
         var failures: [String] = []
         var fallbacks: [SportsDataProviderID] = []
+        var lastEmptyResult: (games: [BannerGame], providerID: SportsDataProviderID, latency: TimeInterval)?
         for provider in providers {
             let start = Date()
             do {
                 let games = try await provider.liveScores(for: league)
                 let latency = Date().timeIntervalSince(start)
                 await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
+                guard !games.isEmpty else {
+                    // Primary returned empty — remember it and try the next provider so we
+                    // always get the richest available result rather than silently suppressing
+                    // a fallback that may have data (e.g. ESPN when Apple Sports has none).
+                    lastEmptyResult = (games, provider.metadata.id, latency)
+                    fallbacks.append(provider.metadata.id)
+                    continue
+                }
                 await cache.store(games, for: key, ttl: SportsDataCache.defaultTTL(for: .liveScores, containsLiveGames: games.contains { $0.status == .live }))
                 await recordDiagnostics(league: league, capability: .liveScores, currentProvider: provider.metadata.id, latency: latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
                 return games
@@ -2149,6 +2158,12 @@ struct SportsRepository: Sendable {
                 await router.healthMonitor.recordFailure(providerID: provider.metadata.id, error: error)
                 fallbacks.append(provider.metadata.id)
             }
+        }
+        // All providers exhausted — return the last empty success if we got one, otherwise throw.
+        if let empty = lastEmptyResult {
+            await cache.store(empty.games, for: key, ttl: SportsDataCache.defaultTTL(for: .liveScores, containsLiveGames: false))
+            await recordDiagnostics(league: league, capability: .liveScores, currentProvider: empty.providerID, latency: empty.latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
+            return empty.games
         }
         throw SportsDataError.unavailable
     }
@@ -2326,12 +2341,18 @@ struct SportsRepository: Sendable {
         guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.schedule, league.path) }
         var failures: [String] = []
         var fallbacks: [SportsDataProviderID] = []
+        var lastEmptyResult: (schedule: BannerSchedule, providerID: SportsDataProviderID, latency: TimeInterval)?
         for provider in providers {
             let start = Date()
             do {
                 let schedule = try await provider.schedule(for: league, range: range)
                 let latency = Date().timeIntervalSince(start)
                 await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
+                guard !schedule.games.isEmpty else {
+                    lastEmptyResult = (schedule, provider.metadata.id, latency)
+                    fallbacks.append(provider.metadata.id)
+                    continue
+                }
                 await cache.store(schedule, for: key, ttl: SportsDataCache.defaultTTL(for: .schedule, containsLiveGames: schedule.games.contains { $0.status == .live }))
                 await recordDiagnostics(league: league, capability: .schedule, currentProvider: provider.metadata.id, latency: latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
                 return schedule
@@ -2340,6 +2361,11 @@ struct SportsRepository: Sendable {
                 await router.healthMonitor.recordFailure(providerID: provider.metadata.id, error: error)
                 fallbacks.append(provider.metadata.id)
             }
+        }
+        if let empty = lastEmptyResult {
+            await cache.store(empty.schedule, for: key, ttl: SportsDataCache.defaultTTL(for: .schedule, containsLiveGames: false))
+            await recordDiagnostics(league: league, capability: .schedule, currentProvider: empty.providerID, latency: empty.latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
+            return empty.schedule
         }
         throw SportsDataError.unavailable
     }

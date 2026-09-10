@@ -64,7 +64,11 @@ struct FeaturedEventPick: Identifiable, Hashable {
     private var matchedLeague: League? {
         let normalizedLeague = normalized(league)
         return League.all.first { existing in
-            normalized(existing.name) == normalizedLeague || normalized(existing.shortName) == normalizedLeague
+            let n = normalized(existing.name)
+            let s = normalized(existing.shortName)
+            // Exact match first, then substring (handles "UEFA Champions League" → "Champions League").
+            return n == normalizedLeague || s == normalizedLeague
+                || normalizedLeague.contains(n) || n.contains(normalizedLeague)
         }
     }
 

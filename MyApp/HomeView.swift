@@ -651,14 +651,26 @@ private struct TeamMatchupHero: View {
                     // Team logos + VS
                     HStack(spacing: 0) {
                         Spacer()
-                        TeamLogo(url: awaySide.logoURL, size: 48)
+                        VStack(spacing: 4) {
+                            TeamLogo(url: awaySide.logoURL, size: 48)
+                            Text(awaySide.shortName)
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.80))
+                                .lineLimit(1)
+                        }
                         Spacer()
                         Text("VS")
                             .font(.system(size: 10, weight: .black))
                             .foregroundStyle(.white.opacity(0.50))
                             .frame(width: 28)
                         Spacer()
-                        TeamLogo(url: homeSide.logoURL, size: 48)
+                        VStack(spacing: 4) {
+                            TeamLogo(url: homeSide.logoURL, size: 48)
+                            Text(homeSide.shortName)
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.80))
+                                .lineLimit(1)
+                        }
                         Spacer()
                     }
                     .padding(.horizontal, 48)
@@ -1753,10 +1765,11 @@ final class HomeViewModel: ObservableObject {
         let p2Leagues = leagues
         let p3Leagues = favoriteLeagues
 
-        // Phase 1: live-first aggregation across followed leagues. This
-        // goes through the provider router's liveScores capability and only asks
-        // schedule providers for the near-future cards.
-        let initialSnapshotLeagues = leagues.isEmpty ? discoveryLeagues : leagues
+        // Phase 1: live-first aggregation across ALL discoverable leagues so that
+        // live games from any sport appear in Home Live Now immediately, matching
+        // what the Live tab shows. Schedule-heavy phases (2/3) still use the
+        // followed-leagues set to keep subsequent requests focused.
+        let initialSnapshotLeagues = discoveryLeagues
         let liveSnapshot = await SportsRepository.shared.liveMatchSnapshot(
             leagues: initialSnapshotLeagues,
             startingSoonWindow: 6 * 3600,

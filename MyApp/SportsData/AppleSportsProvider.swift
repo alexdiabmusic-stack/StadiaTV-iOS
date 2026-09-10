@@ -1059,7 +1059,7 @@ enum AppleSportsLocalizedText {
         let text: String?
     }
 
-    nonisolated static func first<Key: CodingKey>(from container: KeyedDecodingContainer<Key>, key: Key) -> String? {
+    static func first<Key: CodingKey>(from container: KeyedDecodingContainer<Key>, key: Key) -> String? {
         guard let values = try? container.decodeIfPresent([Value].self, forKey: key) else { return nil }
         return values.first?.text
     }

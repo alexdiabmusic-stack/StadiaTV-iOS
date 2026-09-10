@@ -88,19 +88,11 @@ struct WelcomeView: View {
     }
 
     private var textBlock: some View {
-        VStack(spacing: 10) {
-            Text("Every game. One place.")
-                .font(.system(size: 32, weight: .bold))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-                .shadow(color: .black.opacity(0.4), radius: 4, x: 0, y: 2)
-
-            Text("Live sports, scores, schedules,\nand your channels.")
-                .font(.system(size: 17, weight: .regular))
-                .foregroundStyle(.white.opacity(0.82))
-                .multilineTextAlignment(.center)
-                .lineSpacing(3)
-        }
+        Text("Live sports, scores, schedules,\nand your channels.")
+            .font(.system(size: 17, weight: .regular))
+            .foregroundStyle(.white.opacity(0.82))
+            .multilineTextAlignment(.center)
+            .lineSpacing(3)
     }
 
     private var ctaBlock: some View {

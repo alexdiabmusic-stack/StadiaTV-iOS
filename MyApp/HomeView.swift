@@ -1794,6 +1794,13 @@ final class HomeViewModel: ObservableObject {
             errorMessage = firstError ?? "No live or upcoming games were returned for today."
         }
 
+        // Prime the news cache in the background so the News tab loads instantly when opened.
+        // Fires after Phase 1 (live scores visible) so it doesn't compete with sports data requests.
+        let newsLeagues = leagues
+        Task.detached(priority: .utility) {
+            await SportsRepository.shared.prefetchNews(for: newsLeagues)
+        }
+
         let sevenDaySchedules = await loadSchedules(for: p2Leagues, days: 7, maxConcurrentLoads: 3)
         for (leagueID, matches) in sevenDaySchedules where !matches.isEmpty {
             if Task.isCancelled { break }
@@ -1964,8 +1971,7 @@ final class HomeViewModel: ObservableObject {
     }
 
     private func mergeMatches(_ matches: [Match]) -> [Match] {
-        // For duplicate IDs, prefer the highest-quality state so a stale "scheduled"
-        // entry never evicts a "live" entry that arrived from a different fetch path.
+        // Pass 1: deduplicate by exact ID, preferring the highest-quality state.
         var bestByID: [String: Match] = [:]
         for match in matches {
             if let existing = bestByID[match.id] {
@@ -1976,7 +1982,35 @@ final class HomeViewModel: ObservableObject {
                 bestByID[match.id] = match
             }
         }
-        return bestByID.values.sorted { $0.date < $1.date }
+        // Pass 2: fuzzy-deduplicate by team abbreviations + half-hour bucket.
+        // Catches cross-provider duplicates where the same game has different IDs
+        // (e.g. Apple Sports canonical ID vs ESPN numeric ID).
+        var bestByFuzzyKey: [String: Match] = [:]
+        for match in bestByID.values {
+            let key = fuzzyMatchKey(match)
+            if let existing = bestByFuzzyKey[key] {
+                if matchQuality(match) > matchQuality(existing) {
+                    bestByFuzzyKey[key] = match
+                }
+            } else {
+                bestByFuzzyKey[key] = match
+            }
+        }
+        return bestByFuzzyKey.values.sorted { $0.date < $1.date }
+    }
+
+    private func fuzzyMatchKey(_ match: Match) -> String {
+        let bucket = Int(match.date.timeIntervalSince1970 / 1800)
+        let participants = [match.away.abbreviation, match.home.abbreviation]
+            .map { $0.lowercased() }
+            .filter { !$0.isEmpty && $0 != "tbd" }
+            .sorted()
+            .joined(separator: ":")
+        guard !participants.isEmpty else {
+            let day = Int(Calendar.current.startOfDay(for: match.date).timeIntervalSince1970)
+            return "\(match.league.bannerKey):\(day):\(match.id)"
+        }
+        return "\(match.league.bannerKey):\(bucket):\(participants)"
     }
 
     private func matchQuality(_ match: Match) -> Int {

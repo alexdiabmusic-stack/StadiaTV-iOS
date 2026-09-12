@@ -978,7 +978,7 @@ actor SportsDataCache {
         case .injuries:
             return 15 * 60
         case .newsMetadata:
-            return 10 * 60
+            return 30 * 60
         case .odds:
             return 60
         case .fantasyRelevantData:
@@ -1404,6 +1404,7 @@ struct SportsRepository: Sendable {
     private let boxScoreDeduplicator = SportsRequestDeduplicator<String, BannerBoxScore>()
     private let playByPlayDeduplicator = SportsRequestDeduplicator<String, BannerPlayByPlay>()
     private let golfTournamentDeduplicator = SportsRequestDeduplicator<String, BannerGolfTournament>()
+    private let newsDeduplicator = SportsRequestDeduplicator<String, [BannerNewsArticle]>()
 
     init(router: SportsProviderRouter = SportsProviderRouter(), cache: SportsDataCache = SportsDataCache()) {
         self.router = router
@@ -1688,12 +1689,20 @@ struct SportsRepository: Sendable {
             await recordDiagnostics(league: league, capability: .newsMetadata, currentProvider: cached.first?.provenance?.provider, latency: nil, cacheHit: true, cacheAge: await cache.age(for: key), fallbacks: [], failures: [])
             return cached
         }
+        return try await newsDeduplicator.value(for: key.rawValue) {
+            try await self.requestNews(for: league, limit: limit, page: page, key: key)
+        }
+    }
+
+    private func requestNews(for league: League, limit: Int, page: Int, key: SportsCacheKey) async throws -> [BannerNewsArticle] {
         let allProviders = await router.providers(for: league, capability: .newsMetadata, as: (any SportsNewsProvider).self)
         let providers = page > 1 ? allProviders.filter(\.supportsPagination) : allProviders
         guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.newsMetadata, league.path) }
 
         // Run all providers concurrently; aggregate, deduplicate, and rank results.
-        // A nil sentinel is returned by the timeout task to cap collection at 7 seconds.
+        // A nil sentinel is returned by the timeout task to cap collection at 3 seconds.
+        // Providers with results but still running past the cutoff are dropped for this
+        // request; their data will appear on the next refresh (which hits the cache fast).
         let start = Date()
         var collected: [(SportsDataProviderID, [BannerNewsArticle])] = []
         var failures: [String] = []
@@ -1712,7 +1721,7 @@ struct SportsRepository: Sendable {
                 }
             }
             group.addTask {
-                try? await Task.sleep(for: .seconds(7))
+                try? await Task.sleep(for: .seconds(3))
                 return nil
             }
             for await result in group {
@@ -1921,6 +1930,16 @@ struct SportsRepository: Sendable {
         try await newsMetadata(for: league, limit: limit, page: page).map { $0.toLegacyArticle(league: league) }
     }
 
+    /// Silently warms the news cache for a set of leagues so the News tab loads from cache.
+    /// Uses the same limit as NewsViewModel so the cache key matches. Errors are ignored.
+    func prefetchNews(for leagues: [League]) async {
+        await withTaskGroup(of: Void.self) { group in
+            for league in leagues {
+                group.addTask { _ = try? await self.newsMetadata(for: league, limit: 50, page: 1) }
+            }
+        }
+    }
+
     func legacyScoreboard(for league: League, on date: Date? = nil) async throws -> [Match] {
         if let date {
             let start = Calendar.current.startOfDay(for: date)
@@ -2075,9 +2094,13 @@ struct SportsRepository: Sendable {
         default:
             let participants = [match.away, match.home]
                 .map { side in
+                    // Abbreviation is provider-neutral ("NYM", "LAL") — all sources agree on it.
+                    // canonicalIDString encodes the provider ("team:...:espn:21" vs "team:...:NYM:new-york-mets"),
+                    // so using it first causes the same game from different providers to produce
+                    // different keys and appear as duplicates.
+                    if !side.abbreviation.isEmpty { return side.abbreviation }
                     if let canonicalID = side.canonicalIDString { return canonicalID }
                     if let teamID = side.teamID { return teamID }
-                    if !side.abbreviation.isEmpty { return side.abbreviation }
                     return side.shortName
                 }
                 .map { SportsIdentityResolver.slug($0) }

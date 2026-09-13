@@ -987,6 +987,61 @@ actor SportsDataCache {
     }
 }
 
+// MARK: - Disk Cache
+
+actor SportsDataDiskCache {
+    static let shared = SportsDataDiskCache()
+
+    private let directory: URL
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
+
+    init() {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        directory = caches.appendingPathComponent("BannerSportsDataV1", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    private struct DiskEntry<T: Codable>: Codable {
+        let value: T
+        let fetchedAt: Date
+        let ttl: TimeInterval
+    }
+
+    func value<T: Codable>(for key: SportsCacheKey) -> T? {
+        let url = fileURL(for: key)
+        guard let data = try? Data(contentsOf: url),
+              let entry = try? decoder.decode(DiskEntry<T>.self, from: data),
+              Date().timeIntervalSince(entry.fetchedAt) < entry.ttl else {
+            return nil
+        }
+        return entry.value
+    }
+
+    func store<T: Codable>(_ value: T, for key: SportsCacheKey, ttl: TimeInterval) {
+        let entry = DiskEntry(value: value, fetchedAt: Date(), ttl: ttl)
+        guard let data = try? encoder.encode(entry) else { return }
+        try? data.write(to: fileURL(for: key), options: .atomic)
+    }
+
+    func invalidate(for key: SportsCacheKey) {
+        try? FileManager.default.removeItem(at: fileURL(for: key))
+    }
+
+    func removeAll() {
+        guard let contents = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
+        contents.forEach { try? FileManager.default.removeItem(at: $0) }
+    }
+
+    private func fileURL(for key: SportsCacheKey) -> URL {
+        let safe = key.rawValue
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: ":", with: "-")
+            .replacingOccurrences(of: "|", with: "~")
+        return directory.appendingPathComponent("\(safe).json")
+    }
+}
+
 actor SportsRequestDeduplicator<Key: Hashable, Value: Sendable> {
     private var inFlight: [Key: Task<Value, Error>] = [:]
 
@@ -1437,6 +1492,7 @@ struct SportsRepository: Sendable {
 
     func clearCache() async {
         await cache.removeAll()
+        await SportsDataDiskCache.shared.removeAll()
     }
 
     func liveScores(for league: League) async throws -> [BannerGame] {
@@ -1484,9 +1540,17 @@ struct SportsRepository: Sendable {
                 return exactSchedule
             }
             await cache.remove(for: key)
+            await SportsDataDiskCache.shared.invalidate(for: key)
 #if DEBUG
             print("[Schedule] Bypassing stale cache for \(league.shortName) - past-start game still scheduled")
 #endif
+        }
+        // Disk cache: on cold launch this serves the last saved schedule immediately;
+        // the deduplicator issues a fresh network request in parallel.
+        if let onDisk: BannerSchedule = await SportsDataDiskCache.shared.value(for: key) {
+            await cache.store(onDisk, for: key, ttl: SportsDataCache.defaultTTL(for: .schedule, containsLiveGames: onDisk.games.contains { $0.status == .live }))
+            await recordDiagnostics(league: league, capability: .schedule, currentProvider: onDisk.provenance.provider, latency: nil, cacheHit: true, cacheAge: nil, fallbacks: [], failures: [])
+            return filterSchedule(onDisk, to: range, league: league)
         }
         let schedule = try await scheduleDeduplicator.value(for: key.rawValue) {
             try await requestSchedule(for: league, range: cacheRange, key: key)
@@ -1573,7 +1637,12 @@ struct SportsRepository: Sendable {
         )
     }
 
-    func liveMatchSnapshot(leagues: [League], startingSoonWindow: TimeInterval = 4 * 3600, nextLimit: Int = 12) async -> SportsLiveMatchSnapshot {
+    func liveMatchSnapshot(
+        leagues: [League],
+        startingSoonWindow: TimeInterval = 4 * 3600,
+        nextLimit: Int = 12,
+        onPartialResult: (@Sendable (SportsLiveMatchSnapshot) -> Void)? = nil
+    ) async -> SportsLiveMatchSnapshot {
         var seenLeagueIDs: Set<String> = []
         let uniqueLeagues = leagues.filter { seenLeagueIDs.insert($0.bannerKey).inserted }
         let now = Date()
@@ -1584,7 +1653,7 @@ struct SportsRepository: Sendable {
         var failures: [String] = []
 
         await withTaskGroup(of: SportsLiveLeagueLoadResult.self) { group in
-            let maxConcurrentLoads = 4
+            let maxConcurrentLoads = 10
             var nextLeagueIndex = 0
 
             func enqueueNextLeague() {
@@ -1604,10 +1673,17 @@ struct SportsRepository: Sendable {
                 live.append(contentsOf: result.live)
                 scheduled.append(contentsOf: result.scheduled)
                 failures.append(contentsOf: result.failures)
+                if let onPartialResult {
+                    onPartialResult(buildLiveSnapshot(live: live, scheduled: scheduled, now: now, soonEnd: soonEnd, nextLimit: nextLimit, failures: failures))
+                }
                 enqueueNextLeague()
             }
         }
 
+        return buildLiveSnapshot(live: live, scheduled: scheduled, now: now, soonEnd: soonEnd, nextLimit: nextLimit, failures: failures)
+    }
+
+    private func buildLiveSnapshot(live: [Match], scheduled: [Match], now: Date, soonEnd: Date, nextLimit: Int, failures: [String]) -> SportsLiveMatchSnapshot {
         let merged = mergeLiveAggregationMatches(live + scheduled)
         let liveMatches = merged
             .filter { isLiveAggregationMatch($0, now: now) }
@@ -1631,7 +1707,6 @@ struct SportsRepository: Sendable {
             $0.date > dayStart &&
             $0.date <= now
         }
-
         return SportsLiveMatchSnapshot(
             live: liveMatches,
             startingSoon: startingSoon,
@@ -2376,7 +2451,9 @@ struct SportsRepository: Sendable {
                     fallbacks.append(provider.metadata.id)
                     continue
                 }
-                await cache.store(schedule, for: key, ttl: SportsDataCache.defaultTTL(for: .schedule, containsLiveGames: schedule.games.contains { $0.status == .live }))
+                let ttl = SportsDataCache.defaultTTL(for: .schedule, containsLiveGames: schedule.games.contains { $0.status == .live })
+                await cache.store(schedule, for: key, ttl: ttl)
+                await SportsDataDiskCache.shared.store(schedule, for: key, ttl: SportsDataCache.defaultTTL(for: .schedule, containsLiveGames: false))
                 await recordDiagnostics(league: league, capability: .schedule, currentProvider: provider.metadata.id, latency: latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
                 return schedule
             } catch {
@@ -2387,6 +2464,7 @@ struct SportsRepository: Sendable {
         }
         if let empty = lastEmptyResult {
             await cache.store(empty.schedule, for: key, ttl: SportsDataCache.defaultTTL(for: .schedule, containsLiveGames: false))
+            await SportsDataDiskCache.shared.store(empty.schedule, for: key, ttl: SportsDataCache.defaultTTL(for: .schedule, containsLiveGames: false))
             await recordDiagnostics(league: league, capability: .schedule, currentProvider: empty.providerID, latency: empty.latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
             return empty.schedule
         }

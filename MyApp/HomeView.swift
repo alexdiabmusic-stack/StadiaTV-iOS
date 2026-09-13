@@ -1697,6 +1697,7 @@ final class HomeViewModel: ObservableObject {
     private var lastLoadedFavoriteSignature: String = ""
     private var lastLoadedAt: Date?
     private var isLoadInFlight = false
+    private var matchesByLeague: [String: [Match]] = [:]
     private let cacheLifetime: TimeInterval = 120
     // Shorter cache window while live games are in progress so state stays current
     private let cacheLifetimeLive: TimeInterval = 25
@@ -1752,7 +1753,7 @@ final class HomeViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         demandScoreCache.removeAll(keepingCapacity: true)
-        var matchesByLeague: [String: [Match]] = [:]
+        matchesByLeague.removeAll(keepingCapacity: true)
         defer {
             isLoadInFlight = false
             isLoading = false
@@ -1765,20 +1766,48 @@ final class HomeViewModel: ObservableObject {
         let p2Leagues = leagues
         let p3Leagues = favoriteLeagues
 
-        // Phase 1: live-first aggregation across ALL discoverable leagues so that
-        // live games from any sport appear in Home Live Now immediately, matching
-        // what the Live tab shows. Schedule-heavy phases (2/3) still use the
-        // followed-leagues set to keep subsequent requests focused.
-        let initialSnapshotLeagues = discoveryLeagues
-        let liveSnapshot = await SportsRepository.shared.liveMatchSnapshot(
-            leagues: initialSnapshotLeagues,
+        // Phase 0: all requests fire concurrently — live scores, 7-day schedule,
+        // and full-season schedule all start at the same time as the news prefetch.
+        let newsLeagues = leagues
+        Task.detached(priority: .utility) {
+            await SportsRepository.shared.prefetchNews(for: newsLeagues)
+        }
+
+        // Capture loop-local sets so the callback closure can safely cross actor boundaries.
+        let capturedFollowedIDs = followedLeagueIDs
+        let capturedFavoriteIDs = favoriteIDs
+        let capturedFavoriteNames = favoriteNames
+        async let liveSnapshotTask = SportsRepository.shared.liveMatchSnapshot(
+            leagues: discoveryLeagues,
             startingSoonWindow: 6 * 3600,
-            nextLimit: 8
+            nextLimit: 8,
+            onPartialResult: { [weak self] partial in
+                // Fire a main-actor task for each league that completes so the UI
+                // updates incrementally rather than waiting for all leagues to finish.
+                Task { @MainActor [weak self] in
+                    guard let self, self.isLoadInFlight else { return }
+                    for match in partial.live + partial.startingSoon + partial.next + partial.pastStartToday {
+                        self.matchesByLeague[match.league.id, default: []].append(match)
+                    }
+                    for key in self.matchesByLeague.keys {
+                        self.matchesByLeague[key] = self.mergeMatches(self.matchesByLeague[key] ?? [])
+                    }
+                    self.rebuildSections(matchesByLeague: self.matchesByLeague, followedIDs: capturedFollowedIDs, favoriteIDs: capturedFavoriteIDs, favoriteNames: capturedFavoriteNames)
+                    self.isLoading = false
+                }
+            }
         )
+        async let sevenDaySchedulesTask = loadSchedules(for: p2Leagues, days: 7, maxConcurrentLoads: 8)
+        async let favoriteSeasonSchedulesTask = loadSchedules(for: p3Leagues, days: 365, maxConcurrentLoads: 6)
+
+        // Await the final snapshot and reset to a clean baseline for the schedule phase.
+        // The callbacks above have already populated the UI incrementally.
+        let liveSnapshot = await liveSnapshotTask
         let firstError = liveSnapshot.failures.first
         // Include pastStartToday so games that started but still show as scheduled are
         // present in allMatches — they can appear in Live Now via the featured-IDs special
         // case and will be correctly matched to featured picks.
+        matchesByLeague.removeAll(keepingCapacity: true)
         for match in liveSnapshot.live + liveSnapshot.startingSoon + liveSnapshot.next + liveSnapshot.pastStartToday {
             matchesByLeague[match.league.id, default: []].append(match)
         }
@@ -1794,14 +1823,7 @@ final class HomeViewModel: ObservableObject {
             errorMessage = firstError ?? "No live or upcoming games were returned for today."
         }
 
-        // Prime the news cache in the background so the News tab loads instantly when opened.
-        // Fires after Phase 1 (live scores visible) so it doesn't compete with sports data requests.
-        let newsLeagues = leagues
-        Task.detached(priority: .utility) {
-            await SportsRepository.shared.prefetchNews(for: newsLeagues)
-        }
-
-        let sevenDaySchedules = await loadSchedules(for: p2Leagues, days: 7, maxConcurrentLoads: 3)
+        let sevenDaySchedules = await sevenDaySchedulesTask
         for (leagueID, matches) in sevenDaySchedules where !matches.isEmpty {
             if Task.isCancelled { break }
             matchesByLeague[leagueID] = mergeMatches((matchesByLeague[leagueID] ?? []) + matches)
@@ -1810,22 +1832,7 @@ final class HomeViewModel: ObservableObject {
             rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
         }
 
-        if !Task.isCancelled, Set(initialSnapshotLeagues.map(\.id)) != discoveryLeagueIDs {
-            let discoverySnapshot = await SportsRepository.shared.liveMatchSnapshot(
-                leagues: discoveryLeagues,
-                startingSoonWindow: 6 * 3600,
-                nextLimit: 8
-            )
-            for match in discoverySnapshot.live + discoverySnapshot.startingSoon + discoverySnapshot.next + discoverySnapshot.pastStartToday {
-                matchesByLeague[match.league.id, default: []].append(match)
-            }
-            for key in matchesByLeague.keys {
-                matchesByLeague[key] = mergeMatches(matchesByLeague[key] ?? [])
-            }
-            rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
-        }
-
-        let favoriteSeasonSchedules = await loadSchedules(for: p3Leagues, days: 365, maxConcurrentLoads: 2)
+        let favoriteSeasonSchedules = await favoriteSeasonSchedulesTask
         for (leagueID, matches) in favoriteSeasonSchedules where !matches.isEmpty {
             if Task.isCancelled { break }
             matchesByLeague[leagueID] = mergeMatches((matchesByLeague[leagueID] ?? []) + matches)
@@ -1876,7 +1883,7 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
-    private func loadSchedules(for leagues: [League], days: Int, maxConcurrentLoads: Int) async -> [(String, [Match])] {
+    private nonisolated func loadSchedules(for leagues: [League], days: Int, maxConcurrentLoads: Int) async -> [(String, [Match])] {
         guard !leagues.isEmpty else { return [] }
         return await withTaskGroup(of: (String, [Match]).self) { group in
             let maxActiveLoads = max(1, maxConcurrentLoads)

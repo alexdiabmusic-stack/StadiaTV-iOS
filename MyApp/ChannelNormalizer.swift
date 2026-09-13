@@ -14,22 +14,24 @@ nonisolated final class ChannelNormalizer {
     // These handle real-world provider naming conventions (★, ◉, CAF prefix, etc.)
     private static let providerCountryPrefixRe = try! NSRegularExpression(
         // "CAF ★ ", "CA ★ ", "US ★ ", "DE ★ ", "UK ★ " etc.
-        pattern: #"^[A-Z]{2,4}\s*[★\*⭐]\s*"#, options: [])
+        pattern: #"^\s*(?:\[)?(CAF|CANADA|UNITED STATES|USA|CA|US|UK|GB|AU|FR|DE|BE|NL|ES|IT|PT|TR|PL|IN|AR|BR|MX|ZA|NZ|IE|CH|AT|SE|NO|DK|FI|GR|RU|JP|KR|CN|INTL)(?:\])?\s*(?:[★\*⭐:|\-]\s*|(?<=\])\s*)"#,
+        options: .caseInsensitive)
 
     private static let decorativeCharRe = try! NSRegularExpression(
         // ★ ◉ ⭐ ● ◆ ▶ etc.
         pattern: "[★◉⭐●◆▶►◀◄◈◇⊕⊗⊘☆✦✧]", options: [])
 
     private static let bracketTagRe = try! NSRegularExpression(
-        // [BK], [HD], [BACKUP], [FHD] etc.
-        pattern: #"\[[A-Z0-9\s]{1,12}\]"#, options: .caseInsensitive)
+        // Strip only known technical/language tags. [EAST], [TSN 2], and event IDs are identity.
+        pattern: #"\[(?:BK|BACKUP|BCKP|HD|SD|FHD|UHD|4K|HEVC|H[.]?26[45]|ENG|ESP|FRA|GER|ITA|POR|ARA|TUR|POL|NLD|ZHO|JPN|KOR|HIN|RUS)\]"#,
+        options: .caseInsensitive)
 
     // Patterns for pre-normalization metadata extraction
     // Slot: "PEACOCK 01: " / "TSN+ 7: " / "APPLE TV+ SERIES 8 HD" / "STAN EVENT 4"
     private static let slotWithColonRe = try! NSRegularExpression(
-        pattern: #"(?:^|(?:SERIE[S]?\s+|EVENT\s+))(\d{1,2})\s*:\s*$"#, options: .caseInsensitive)
+        pattern: #"\b(\d{1,4})\s*:(?:\s|$)"#, options: .caseInsensitive)
     private static let namedSlotRe = try! NSRegularExpression(
-        pattern: #"(?:SERIE[S]?|EVENT)\s+(\d{1,2})(?:\s|$)"#, options: .caseInsensitive)
+        pattern: #"(?:SERIE[S]?|EVENT)\s+(\d{1,4})(?:\s|$)"#, options: .caseInsensitive)
     // Event date: YYYY-MM-DD or standalone 4-digit year
     private static let isoDateRe = try! NSRegularExpression(
         pattern: #"\b(20\d{2}-\d{2}-\d{2})\b"#, options: [])
@@ -40,13 +42,8 @@ nonisolated final class ChannelNormalizer {
         pattern: #"\[(BACKUP|BK)\]"#, options: .caseInsensitive)
     // Language tag in brackets: [ESP], [FRA], [GER] etc.
     private static let languageTagRe = try! NSRegularExpression(
-        pattern: #"\b(ESP|FRA|GER|ITA|POR|ARA|TUR|POL|NLD|ZHO|JPN|KOR|HIN|RUS|ENG)\b"#,
+        pattern: #"\[(ESP|FRA|GER|ITA|POR|ARA|TUR|POL|NLD|ZHO|JPN|KOR|HIN|RUS|ENG)\]"#,
         options: .caseInsensitive)
-
-    private static let numberedSuffixRe = try! NSRegularExpression(
-        // Strip trailing 3+ digit stream indices ("ESPN+ 449", "Flo 682").
-        // 1-2 digit numbers like "RDS 2" are intentional channel names — keep them.
-        pattern: #"\s+\d{3,}\s*:?\s*$"#, options: [])
 
     private static let longBracketSuffixRe = try! NSRegularExpression(
         // [Hockey:2025 Battlefords North Stars...] event descriptions
@@ -54,6 +51,9 @@ nonisolated final class ChannelNormalizer {
 
     private static let trailingColonRe = try! NSRegularExpression(
         pattern: #"\s*:\s*$"#, options: [])
+
+    private static let decoratedQualityRe = try! NSRegularExpression(
+        pattern: #"\b(?:FHD|UHD|HD|SD|4K)[⁰¹²³⁴⁵⁶⁷⁸⁹]+"#, options: .caseInsensitive)
 
     init(config: CuratedGuideConfig) {
         let opts: NSRegularExpression.Options = [.caseInsensitive]
@@ -75,14 +75,14 @@ nonisolated final class ChannelNormalizer {
 
     /// Returns a clean, normalized channel name suitable for matching.
     nonisolated func normalize(_ name: String) -> String {
-        var result = name
+        var result = strip(Self.decoratedQualityRe, from: name)
+            .folding(options: [.diacriticInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX"))
 
         // Phase 1: Strip provider decoration (order matters)
         result = strip(Self.longBracketSuffixRe, from: result)      // [Hockey:2025...] event suffixes
-        result = strip(Self.bracketTagRe, from: result)              // [BK], [FHD] etc.
         result = strip(Self.providerCountryPrefixRe, from: result)   // "CAF ★ ", "US ★ "
+        result = strip(Self.bracketTagRe, from: result)              // [BK], [FHD] etc.
         result = strip(Self.decorativeCharRe, from: result)          // remaining ★ ◉ etc.
-        result = strip(Self.numberedSuffixRe, from: result)          // trailing " 449", " 01 :"
         result = strip(Self.trailingColonRe, from: result)           // trailing " :"
 
         // Phase 2: JSON-defined rules
@@ -97,9 +97,10 @@ nonisolated final class ChannelNormalizer {
         }
 
         // Phase 3: Clean up whitespace and punctuation
-        result = result
-            .trimmingCharacters(in: CharacterSet.alphanumerics.inverted.union(.init(charactersIn: " ")))
-            .components(separatedBy: .whitespaces)
+        // Plus and all feed/channel numbers are identity-bearing (ESPN+ != ESPN,
+        // Sportsnet 360 != Sportsnet, ESPN+ 449 != ESPN+). Preserve them for matching.
+        result = String(result.map { $0.isLetter || $0.isNumber || $0 == "+" ? $0 : " " })
+            .components(separatedBy: .whitespacesAndNewlines)
             .filter { !$0.isEmpty }
             .joined(separator: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -112,29 +113,20 @@ nonisolated final class ChannelNormalizer {
     /// Detects country/region hint from provider prefix patterns like "CAF ★", "CA ★", "US ★".
     nonisolated func extractCountryHint(from name: String) -> String? {
         // Map provider prefixes to ISO country codes
-        let prefixMap: [(prefix: String, country: String)] = [
-            ("CAF", "CA"), ("CA", "CA"),
-            ("US", "US"), ("UK", "GB"), ("GB", "GB"),
-            ("AU", "AU"), ("FR", "FR"), ("DE", "DE"),
-            ("BE", "BE"), ("NL", "NL"), ("ES", "ES"),
-            ("IT", "IT"), ("PT", "PT"), ("TR", "TR"),
-            ("PL", "PL"), ("IN", "IN"), ("AR", "AR"),
-        ]
+        let prefixMap = ["CAF": "CA", "CANADA": "CA", "USA": "US", "UNITED STATES": "US", "UK": "GB"]
         let nsName = name as NSString
         let range = NSRange(location: 0, length: nsName.length)
         if let match = Self.providerCountryPrefixRe.firstMatch(in: name, range: range) {
-            let matchStr = nsName.substring(with: match.range).trimmingCharacters(in: .whitespaces)
-            for (prefix, country) in prefixMap {
-                if matchStr.hasPrefix(prefix) { return country }
-            }
+            let prefix = nsName.substring(with: match.range(at: 1)).uppercased()
+            return prefixMap[prefix] ?? prefix
         }
         return nil
     }
 
     // MARK: - Pre-normalization metadata extraction
 
-    /// Extracts metadata that the normalizer will otherwise strip (slot numbers, dates, backup flags).
-    /// Must be called on the raw name BEFORE `normalize()` runs.
+    /// Extracts raw slot labels, dates, backup flags and event descriptions before display cleanup.
+    /// Feed numbers also remain in the normalized identity; they never collapse to a base network.
     nonisolated func extractStreamMetadata(from name: String) -> StreamMetadata {
         let nsName = name as NSString
         let range = NSRange(location: 0, length: nsName.length)
@@ -147,8 +139,8 @@ nonisolated final class ChannelNormalizer {
             let digits = nsName.substring(with: m.range(at: 1))
             slotNumber = Int(digits)
             // Label = everything before the colon, stripped of decoration
-            let full = nsName.substring(with: m.range).trimmingCharacters(in: .whitespaces)
-            slotLabel = full.components(separatedBy: ":").first?.trimmingCharacters(in: .whitespaces)
+            let end = m.range(at: 1).location + m.range(at: 1).length
+            slotLabel = nsName.substring(to: end).trimmingCharacters(in: .whitespaces)
         } else if let m = Self.namedSlotRe.firstMatch(in: name, range: range),
                   m.numberOfRanges > 1, m.range(at: 1).location != NSNotFound {
             let digits = nsName.substring(with: m.range(at: 1))

@@ -73,9 +73,10 @@ nonisolated struct BroadcastRightsPolicy: Sendable {
     /// - Parameters:
     ///   - date: Evaluate validity at this date.
     ///   - session: Filter to session-specific entries. `.unknown` includes session-agnostic broadcasters.
-    func activeBroadcasters(at date: Date = Date(), session: RacingSessionKind = .unknown) -> [String] {
+    func activeBroadcasters(at date: Date = Date(), session: RacingSessionKind = .unknown, country: String? = nil) -> [String] {
         broadcasters
             .filter { b in
+                if let country, !b.countries.isEmpty, !b.countries.contains(country.uppercased()) { return false }
                 if let from = b.validFrom, date < from { return false }
                 if let until = b.validUntil, date >= until { return false }
                 if let sessions = b.sessions {
@@ -106,9 +107,10 @@ nonisolated struct BroadcastRightsStore: Sendable {
     func broadcasters(
         for leaguePath: String,
         at date: Date = Date(),
-        session: RacingSessionKind = .unknown
+        session: RacingSessionKind = .unknown,
+        country: String? = nil
     ) -> [String] {
-        policies[leaguePath]?.activeBroadcasters(at: date, session: session) ?? []
+        policies[leaguePath]?.activeBroadcasters(at: date, session: session, country: country) ?? []
     }
 
     // MARK: - Policy definitions

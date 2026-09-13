@@ -209,7 +209,7 @@
       "\\\\b(HEVC|H\\\\.265|H265|H\\\\.264|H264|60FPS|50FPS)\\\\b"
     ],
     "strip_source_tokens_regex": [
-      "\\\\b(VIP|PREMIUM|RAW|SOURCE|MAIN|ALT|ALTERNATE|BACKUP|BCKP|BKUP|SERVER\\\\s*\\\\d+)\\\\b"
+      "\\\\b(VIP|RAW|SOURCE|BACKUP|BCKP|BKUP|SERVER\\\\s*\\\\d+)\\\\b"
     ],
     "collapse_whitespace": true,
     "strip_decorative_symbols": true,
@@ -3728,7 +3728,8 @@
         "CA: NBA TV Canada",
         "NBA TV Canada HD",
         "NBA TV Canada FHD",
-        "NBA TV Canada 1080p"
+        "NBA TV Canada 1080p",
+        "NBA TV"
       ]
     },
     {
@@ -3748,7 +3749,8 @@
         "CA: NFL Network Canada",
         "NFL Network Canada HD",
         "NFL Network Canada FHD",
-        "NFL Network Canada 1080p"
+        "NFL Network Canada 1080p",
+        "NFL NETWORK"
       ]
     },
     {
@@ -3768,7 +3770,8 @@
         "CA: MLB Network Canada",
         "MLB Network Canada HD",
         "MLB Network Canada FHD",
-        "MLB Network Canada 1080p"
+        "MLB Network Canada 1080p",
+        "MLB NETWORK"
       ]
     },
     {
@@ -8779,7 +8782,8 @@
         "US: ESPNU",
         "ESPNU HD",
         "ESPNU FHD",
-        "ESPNU 1080p"
+        "ESPNU 1080p",
+        "ESPN U"
       ]
     },
     {
@@ -8799,7 +8803,8 @@
         "US: ESPNews",
         "ESPNews HD",
         "ESPNews FHD",
-        "ESPNews 1080p"
+        "ESPNews 1080p",
+        "ESPN NEWS"
       ]
     },
     {
@@ -8819,7 +8824,8 @@
         "US: SEC Network",
         "SEC Network HD",
         "SEC Network FHD",
-        "SEC Network 1080p"
+        "SEC Network 1080p",
+        "ESPN SEC NETWORK"
       ]
     },
     {
@@ -8839,7 +8845,8 @@
         "US: ACC Network",
         "ACC Network HD",
         "ACC Network FHD",
-        "ACC Network 1080p"
+        "ACC Network 1080p",
+        "ESPN ACC NETWORK"
       ]
     },
     {
@@ -8859,7 +8866,8 @@
         "US: FS1",
         "FS1 HD",
         "FS1 FHD",
-        "FS1 1080p"
+        "FS1 1080p",
+        "FOX SPORTS 1"
       ]
     },
     {
@@ -8879,7 +8887,8 @@
         "US: FS2",
         "FS2 HD",
         "FS2 FHD",
-        "FS2 1080p"
+        "FS2 1080p",
+        "FOX SPORTS 2"
       ]
     },
     {
@@ -8939,7 +8948,8 @@
         "US: Golf Channel",
         "Golf Channel HD",
         "Golf Channel FHD",
-        "Golf Channel 1080p"
+        "Golf Channel 1080p",
+        "NBC GOLF"
       ]
     },
     {
@@ -9310,7 +9320,8 @@
         "US: NBC Sports Philadelphia",
         "NBC Sports Philadelphia HD",
         "NBC Sports Philadelphia FHD",
-        "NBC Sports Philadelphia 1080p"
+        "NBC Sports Philadelphia 1080p",
+        "NBC SPORTS PHILLY"
       ]
     },
     {

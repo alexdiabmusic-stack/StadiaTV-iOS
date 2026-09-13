@@ -14,7 +14,6 @@ nonisolated enum SourceMatcher {
     ///
     /// NOTE: "city" and "united" are intentionally NOT stop words — they are identity-bearing
     /// in soccer (Manchester City, Manchester United, DC United) and must not be discarded.
-    /// They are still filtered from non-soccer team tokens via `soccerClubWords`.
     private static let stopWords: Set<String> = [
         "fc", "cf", "sc", "afc", "the", "of", "and", "de", "du", "le", "la", "les",
         "club", "hd", "sd", "fhd", "uhd", "4k", "tv", "channel", "live", "sports", "sport",
@@ -22,159 +21,148 @@ nonisolated enum SourceMatcher {
     ]
 
     static func rank(match: Match, channels: [Channel], preferredLanguages: Set<String> = []) -> [RankedSource] {
-        let homeTokens = teamTokens(for: match.home, league: match.league)
-        let awayTokens = teamTokens(for: match.away, league: match.league)
-        let homeAliases = teamAliases(for: match.home, league: match.league).map { normalize($0) }
-        let awayAliases = teamAliases(for: match.away, league: match.league).map { normalize($0) }
-        let homeAbbr = match.home.abbreviation.lowercased()
-        let awayAbbr = match.away.abbreviation.lowercased()
-        let broadcasts = match.broadcasts.map { normalize($0) }
-        let eventSpecificBroadcasters = eventBroadcasterAliases(for: match).map { normalize($0) }
-        let leagueKeywords = (match.league.keywords + eventAliases(for: match)).map { normalize($0) }
+        guard match.state != .final else { return [] }
+        let participants = ParticipantIdentity(match)
+        let broadcasts = match.broadcasts.map(ProviderChannelIdentity.init).filter { !$0.tokens.isEmpty }
+        let leagueKeywords = Set((match.league.keywords + eventAliases(for: match)).map(normalize))
         let leagueShort = normalize(match.league.shortName)
-
-        // Shared team tokens (e.g. "Los Angeles" for Lakers vs Clippers) must not confirm either
-        // team — filter them from both team matching and event-title generation before the loop.
-        let sharedTeamTokens = Set(homeTokens).intersection(Set(awayTokens))
-        let distinctHome = sharedTeamTokens.isEmpty ? homeTokens : homeTokens.filter { !sharedTeamTokens.contains($0) }
-        let distinctAway = sharedTeamTokens.isEmpty ? awayTokens : awayTokens.filter { !sharedTeamTokens.contains($0) }
-        let eventTokens = eventTokens(from: match, excluding: sharedTeamTokens)
-
-        // Pre-compute event identity for hard conflict checks inside the channel loop.
-        let eventFeedFamily = SportsOntology.feedFamily(for: match.league.path)
-        let eventRacingSession: RacingSessionKind = match.league.group == .racing
-            ? RacingSessionKind.detect(from: "\(match.name) \(match.shortName)")
-            : .unknown
-
-        var ranked: [RankedSource] = []
+        var rightsByCountry: [String: [ProviderChannelIdentity]] = [:]
+        var rankedByID: [String: RankedSource] = [:]
 
         for channel in channels {
-            let haystack = normalize([channel.name, channel.group ?? "", channel.playlistName].joined(separator: " "))
-            let haystackTokens = Set(haystack.split(separator: " ").map(String.init))
-
-            // Channels whose name marks them as news or finance content never carry live sports.
-            guard haystackTokens.isDisjoint(with: Self.nonSportsNameTokens) else { continue }
-
-            // HC-001: Feed family hard reject — wrong sport or wrong sub-league
-            // (e.g. NBA-branded channel for MLB event, WNBA-branded channel for NBA event).
-            let channelFeedFamily = SportsOntology.classifyFeedFamily(from: channel.name)
-            if SportsOntology.isIncompatible(candidate: channelFeedFamily, with: eventFeedFamily) { continue }
-
-            // HC-010: Racing session hard reject — different session within the same race weekend
-            // (e.g. "Italian GP Qualifying" channel for an "Italian GP Race" event).
-            if eventRacingSession != .unknown {
-                let channelSession = RacingSessionKind.detect(from: channel.name)
-                if channelSession != .unknown && channelSession != eventRacingSession { continue }
-            }
-
-            let paddedHaystack = " \(haystack) "
+            let identity = ProviderChannelIdentity(channel.name)
+            let haystack = identity.eventText
+            guard isEligible(name: channel.name, normalizedName: haystack, for: match,
+                             participants: participants) else { continue }
+            let (homeHit, awayHit) = participants.hits(in: haystack, labelledFixture: hasFixtureSeparator(channel.name))
             var score = 0
             var evidence: Set<StreamEvidenceCategory> = []
-
-            let homeHit = matches(distinctHome.isEmpty ? homeTokens : distinctHome, tokens: haystackTokens) || aliasMatches(homeAliases, padded: paddedHaystack, tokens: haystackTokens)
-            let awayHit = matches(distinctAway.isEmpty ? awayTokens : distinctAway, tokens: haystackTokens) || aliasMatches(awayAliases, padded: paddedHaystack, tokens: haystackTokens)
-
-            // Both teams named -> almost certainly the event feed.
             if homeHit && awayHit {
-                score += 100
+                score = 200
                 evidence.insert(.teamNameMatch)
             } else if homeHit || awayHit {
-                // Single-team hit: team-branded streams (RSN, club channels) are typically the most
-                // reliable broadcast for any sport, so give them a strong boost.
-                score += 65
+                score = 35
             }
-
-            // Event-title feeds matter for non-team sports and special broadcasts
-            // such as Tour de France stages.
-            if eventTitleMatches(eventTokens, in: haystack, tokens: haystackTokens) {
-                score += 80
+            // Team-event titles must prove both participants. Two city words or one full
+            // team's name cannot independently confirm the entire fixture.
+            if !usesParticipants(match), eventTitleMatches(match, in: haystack) {
+                score = max(score, 180)
                 evidence.insert(.eventTitleMatch)
             }
 
-            // Abbreviation matches (whole-token only, 3-char minimum to prevent
-            // 2-char country-code prefixes like "US ★" or "DE ★" from scoring
-            // against national team abbreviations like "US" or "DE").
-            if homeAbbr.count >= 3, haystackTokens.contains(homeAbbr) { score += 15 }
-            if awayAbbr.count >= 3, haystackTokens.contains(awayAbbr) { score += 15 }
-
-            // Rights store broadcasters checked first so matched aliases can be deduplicated
-            // against the event metadata list below — a single broadcaster must not contribute
-            // both +70 (rights store) and +35 (event metadata) for a combined +105.
-            var rightStoreMatchedAliases: Set<String> = []
-            for alias in eventSpecificBroadcasters {
-                let hit = alias.contains(" ")
-                    ? paddedHaystack.contains(" \(alias) ")
-                    : haystackTokens.contains(alias)
-                if hit { rightStoreMatchedAliases.insert(alias) }
+            let exactBroadcast = broadcasts.contains { identity.exactlyMatches($0) }
+            let countryKey = identity.country ?? ""
+            if rightsByCountry[countryKey] == nil {
+                rightsByCountry[countryKey] = eventBroadcasterAliases(for: match, country: identity.country)
+                    .map(ProviderChannelIdentity.init)
             }
-            if !rightStoreMatchedAliases.isEmpty {
-                score += 70
+            // An explicit ESPN2/ESPN+ listing outweighs a broad ESPN policy. The sibling
+            // may still be a separately evidenced event feed, but earns no rights evidence.
+            let contradictsBroadcast = !exactBroadcast && broadcasts.contains { identity.isSibling(of: $0) }
+            let rightsHit = !contradictsBroadcast && (rightsByCountry[countryKey] ?? []).contains {
+                identity.belongs(to: $0)
+            }
+            if exactBroadcast {
+                score += 65
+                evidence.insert(.broadcastRightsMatch)
+            } else if rightsHit {
+                score += 28
                 evidence.insert(.broadcastRightsMatch)
             }
 
-            // Broadcast network from event metadata — +35 per unique match not already
-            // scored via the rights store above.
-            for network in broadcasts where !network.isEmpty && !rightStoreMatchedAliases.contains(network) {
-                let hit = network.contains(" ")
-                    ? paddedHaystack.contains(" \(network) ")
-                    : haystackTokens.contains(network)
-                if hit {
-                    score += 35
-                    evidence.insert(.broadcastRightsMatch)
-                }
+            let padded = " \(haystack) "
+            let keywordHit = leagueKeywords.contains { !$0.isEmpty && padded.contains(" \($0) ") }
+            let leagueHit = !leagueShort.isEmpty && padded.contains(" \(leagueShort) ")
+            if keywordHit || leagueHit {
+                score += leagueHit ? 25 : 12
+                evidence.insert(.leagueKeyword)
             }
-
-            // League keywords — word-boundary only to prevent "nba" matching inside "wnba".
-            var leagueKeywordHit = false
-            for keyword in leagueKeywords {
-                let hit = keyword.contains(" ")
-                    ? paddedHaystack.contains(" \(keyword) ")
-                    : haystackTokens.contains(keyword)
-                if hit {
-                    score += 12
-                    leagueKeywordHit = true
-                }
-            }
-            // Dedicated league-branded channel bonus: channels like "NHL GAME 07",
-            // "DAZN NBA 1", or "SKY SPORT F1" contain the league's short name as a
-            // whole word and deserve a bigger boost than a generic keyword substring hit.
-            if haystackTokens.contains(leagueShort) {
-                score += 30
-                leagueKeywordHit = true
-            }
-            if leagueKeywordHit { evidence.insert(.leagueKeyword) }
-
-            // Sports group / generic sports network bonus.
-            if let group = channel.group?.lowercased(),
-               group.contains("sport") || group.contains(match.league.group.rawValue.lowercased()) {
-                score += 6
-            }
+            // Preferences and a generic Sports category are tie-breakers only; they
+            // cannot create a candidate without independent event or broadcaster evidence.
+            guard score >= minimumScore(for: match) else { continue }
             if isKnownSportsNetwork(haystack) {
-                score += 5
+                score += 3
                 evidence.insert(.networkNameMatch)
             }
-
-            // Language preference: boost streams tagged with a preferred
-            // language (e.g. "EN:" means an English stream), deprioritize
-            // streams tagged with a different one. Untagged streams stay neutral.
+            if channel.group?.lowercased().contains("sport") == true { score += 2 }
             if !preferredLanguages.isEmpty {
                 let tags = languageTags(in: channel.name)
-                if !tags.isEmpty {
-                    score += tags.isDisjoint(with: preferredLanguages) ? -25 : 25
-                }
+                if !tags.isEmpty { score += tags.isDisjoint(with: preferredLanguages) ? -8 : 8 }
             }
-
-            if score >= minimumScore(for: match) {
-                var result = RankedSource(channel: channel, score: score)
-                result.evidenceCategories = evidence
-                ranked.append(result)
-            }
+            var result = RankedSource(channel: channel, score: score)
+            result.evidenceCategories = evidence
+            // IDs are scoped by playlist: two providers can legitimately use the same number.
+            let key = "\(channel.playlistID.uuidString)|\(channel.id)"
+            if let old = rankedByID[key], !ranksBefore(result, old) { continue }
+            rankedByID[key] = result
         }
+        return rankedByID.values.sorted(by: ranksBefore)
+    }
 
-        return ranked.sorted {
-            if $0.score != $1.score { return $0.score > $1.score }
-            return $0.channel.name.localizedCaseInsensitiveCompare($1.channel.name) == .orderedAscending
+    /// Shared hard gates also apply when a guide injects a previously unranked channel.
+    static func isEligible(channel: Channel, for match: Match) -> Bool {
+        isEligible(name: channel.name, normalizedName: ProviderChannelIdentity(channel.name).eventText,
+                   for: match, participants: ParticipantIdentity(match))
+    }
+
+    private static func isEligible(name: String, normalizedName: String, for match: Match,
+                                   participants: ParticipantIdentity) -> Bool {
+        guard match.state != .final else { return false }
+        let words = Set(normalizedName.split(separator: " ").map(String.init))
+        guard words.isDisjoint(with: nonSportsNameTokens), !hasStaleOrReplayLabel(name, at: match.date),
+              !SportsOntology.isIncompatible(candidate: SportsOntology.classifyFeedFamily(from: name),
+                                               with: SportsOntology.feedFamily(for: match.league.path)) else { return false }
+        if match.league.group == .racing {
+            let expected = RacingSessionKind.detect(from: "\(match.name) \(match.shortName)")
+            let actual = RacingSessionKind.detect(from: name)
+            if expected != .unknown && actual != .unknown && actual != expected { return false }
         }
+        if usesParticipants(match), hasFixtureSeparator(name) {
+            let (home, away) = participants.hits(in: normalizedName, labelledFixture: true)
+            return home && away
+        }
+        return true
+    }
+
+    /// Shared ordering for discovery and both detail screens. Confirmed event evidence
+    /// precedes possible broadcasters regardless of accumulated keyword bonuses.
+    static func ranksBefore(_ lhs: RankedSource, _ rhs: RankedSource) -> Bool {
+        let confirming: Set<StreamEvidenceCategory> = [.guideListsMatch, .teamNameMatch, .eventTitleMatch]
+        let leftConfirmed = !lhs.evidenceCategories.isDisjoint(with: confirming)
+        let rightConfirmed = !rhs.evidenceCategories.isDisjoint(with: confirming)
+        if leftConfirmed != rightConfirmed { return leftConfirmed }
+        let leftGuide = lhs.evidenceCategories.contains(.guideListsMatch)
+        let rightGuide = rhs.evidenceCategories.contains(.guideListsMatch)
+        if leftGuide != rightGuide { return leftGuide }
+        if lhs.score != rhs.score { return lhs.score > rhs.score }
+        if lhs.channel.name != rhs.channel.name { return lhs.channel.name < rhs.channel.name }
+        if lhs.channel.playlistID != rhs.channel.playlistID {
+            return lhs.channel.playlistID.uuidString < rhs.channel.playlistID.uuidString
+        }
+        return lhs.channel.id < rhs.channel.id
+    }
+
+    /// A nearby guide entry is a retrieval candidate, not confirmation. Require the
+    /// actual fixture/session and substantial overlap with its scheduled window.
+    static func confirms(programme: EPGProgramme, for match: Match) -> Bool {
+        guard match.state != .final, programme.isValid,
+              programme.start <= match.date.addingTimeInterval(30 * 60),
+              programme.end >= match.date.addingTimeInterval(15 * 60) else { return false }
+        let title = [programme.title, programme.subtitle ?? ""].joined(separator: " ")
+        guard !hasStaleOrReplayLabel(title, at: match.date),
+              !SportsOntology.isIncompatible(candidate: SportsOntology.classifyFeedFamily(from: title),
+                                               with: SportsOntology.feedFamily(for: match.league.path)) else { return false }
+        if match.league.group == .racing {
+            let expected = RacingSessionKind.detect(from: "\(match.name) \(match.shortName)")
+            let actual = RacingSessionKind.detect(from: title)
+            if expected != .unknown && actual != .unknown && expected != actual { return false }
+        }
+        let normalized = normalize(title)
+        if usesParticipants(match) {
+            let (home, away) = ParticipantIdentity(match).hits(in: normalized, labelledFixture: hasFixtureSeparator(title))
+            return home && away
+        }
+        return eventTitleMatches(match, in: normalized)
     }
 
     /// Language tags detected on a channel name, from whole-word tokens such as
@@ -198,27 +186,146 @@ nonisolated enum SourceMatcher {
 
     // MARK: - Helpers
 
-    /// Returns true when any needle token (≥ 3 chars) appears as a whole word in the haystack token set.
-    ///
-    /// Substring fallback is intentionally absent: "sparta" must not match "spartanburg" or "isparta"
-    /// (v3 spec INV-007: participant boundary rule).
-    private static func matches(_ needleTokens: [String], tokens haystackTokens: Set<String>) -> Bool {
-        guard !needleTokens.isEmpty else { return false }
-        for token in needleTokens where token.count >= 3 {
-            if haystackTokens.contains(token) { return true }
-        }
-        return false
+    private static func usesParticipants(_ match: Match) -> Bool {
+        ![SportGroup.racing, .golf, .cycling, .wrestling].contains(match.league.group)
     }
 
-    private static func eventTitleMatches(_ eventTokens: [String], in haystack: String, tokens haystackTokens: Set<String>) -> Bool {
-        guard !eventTokens.isEmpty else { return false }
-        let phrase = eventTokens.joined(separator: " ")
-        if eventTokens.count >= 2, haystack.contains(phrase) { return true }
+    private struct ParticipantIdentity {
+        let home: [String]
+        let away: [String]
 
-        let matchedTokenCount = eventTokens.reduce(0) { count, token in
-            count + (haystackTokens.contains(token) ? 1 : 0)
+        init(_ match: Match) {
+            let homeAliases = SourceMatcher.teamAliases(for: match.home, league: match.league)
+            let awayAliases = SourceMatcher.teamAliases(for: match.away, league: match.league)
+            let homeWords = Set(homeAliases.flatMap { SourceMatcher.normalize($0).split(separator: " ").map(String.init) })
+            let awayWords = Set(awayAliases.flatMap { SourceMatcher.normalize($0).split(separator: " ").map(String.init) })
+            let shared = homeWords.intersection(awayWords)
+            func phrases(_ aliases: [String], otherWords: Set<String>) -> [String] {
+                var values = Set<String>()
+                for alias in aliases {
+                    let words = SourceMatcher.normalize(alias).split(separator: " ").map(String.init)
+                    guard words.contains(where: { !shared.contains($0) && !SourceMatcher.stopWords.contains($0) }) else { continue }
+                    if words.count > 1 || (words.first?.count ?? 0) >= 3 {
+                        values.insert(words.joined(separator: " "))
+                    }
+                    // Common team nickname shorthand, with geographic/club fragments excluded.
+                    if words.count > 1, let last = words.last, last.count >= 4,
+                       !otherWords.contains(last), !Self.weakWords.contains(last),
+                       !SourceMatcher.stopWords.contains(last) {
+                        values.insert(last)
+                    }
+                }
+                return values.sorted()
+            }
+            home = phrases(homeAliases, otherWords: awayWords)
+            away = phrases(awayAliases, otherWords: homeWords)
         }
-        return eventTokens.count == 1 ? matchedTokenCount == 1 : matchedTokenCount >= 2
+
+        func hits(in text: String, labelledFixture: Bool = false) -> (Bool, Bool) {
+            if labelledFixture {
+                // A trailing @ Sep 25 7:05 PM is scheduling metadata, not a third team.
+                let fixture = text.replacingOccurrences(
+                    of: #" (?:versus|at) (?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?) \d.*$"#,
+                    with: "", options: .regularExpression)
+                let segments = fixture.components(separatedBy: " versus ")
+                    .flatMap { $0.components(separatedBy: " vs ") }
+                    .flatMap { $0.components(separatedBy: " at ") }
+                    .flatMap { $0.components(separatedBy: " v ") }
+                // A listing of several fixtures cannot confirm a synthetic cross-pair.
+                guard segments.count == 2 else { return (false, false) }
+                let forward = segment(segments[0], matches: home) && segment(segments[1], matches: away)
+                let reverse = segment(segments[0], matches: away) && segment(segments[1], matches: home)
+                return (forward || reverse, forward || reverse)
+            }
+            let padded = " \(text) "
+            return (home.contains { padded.contains(" \($0) ") }, away.contains { padded.contains(" \($0) ") })
+        }
+
+        private func segment(_ text: String, matches aliases: [String]) -> Bool {
+            let padded = " \(text) "
+            return aliases.contains { alias in
+                guard padded.contains(" \(alias) ") else { return false }
+                if alias.contains(" ") { return true }
+                // A bare nickname/abbreviation is useful, but 'Mississippi State Bulldogs'
+                // cannot establish 'Georgia Bulldogs' merely through their shared nickname.
+                let remainder = padded.replacingOccurrences(of: " \(alias) ", with: " ")
+                    .split(separator: " ").map(String.init)
+                return remainder.allSatisfy { Self.fixtureContext.contains($0) || $0.allSatisfy(\.isNumber) }
+            }
+        }
+
+        private static let fixtureContext: Set<String> = [
+            "us", "ca", "uk", "gb", "en", "english", "nba", "wnba", "nfl", "nhl", "mlb", "milb",
+            "ncaaf", "ncaab", "ncaa", "epl", "mls", "football", "basketball", "hockey", "baseball",
+            "soccer", "tennis", "atp", "wta", "espn", "espnplus", "plus", "dazn", "flo", "flosports",
+            "peacock", "tsn", "rds", "sky", "sports", "sport", "live", "hd", "fhd", "uhd", "sd",
+            "game", "event", "events", "tv", "feed", "stream", "backup", "bk", "pm", "am"
+        ]
+
+        private static let weakWords: Set<String> = [
+            "city", "united", "state", "town", "county", "athletic", "national", "international",
+            "york", "angeles", "diego", "antonio", "francisco", "jose", "louis", "orleans",
+            "north", "south", "east", "west", "central", "university", "college", "football",
+            "basketball", "hockey", "baseball", "soccer", "rotterdam", "manchester"
+        ]
+    }
+
+    private static func eventTitleMatches(_ match: Match, in text: String) -> Bool {
+        if match.league.group == .racing {
+            let expected = RacingSessionKind.detect(from: "\(match.name) \(match.shortName)")
+            let actual = RacingSessionKind.detect(from: text)
+            if expected != .unknown && actual != expected { return false }
+        }
+        let generic = stopWords.union(["at", "vs", "versus", "race", "grand", "prix", "formula", "practice", "qualifying"])
+        let wanted = Set(tokens(from: match.name).filter { !generic.contains($0) })
+        let actual = Set(text.split(separator: " ").map(String.init))
+        // The discriminating venue/event/stage tokens must all be present. Session-only
+        // or sport-only text cannot establish a specific race or tournament.
+        let distinctive = wanted.filter { $0.count >= 3 && !$0.allSatisfy(\.isNumber) }
+        guard !distinctive.isEmpty, wanted.isSubset(of: actual) else { return false }
+        let numbers = Set(normalize(match.name).split(separator: " ").filter { $0.allSatisfy(\.isNumber) }.map(String.init))
+        return numbers.isSubset(of: actual)
+    }
+
+    private static let fixtureSeparator = try! NSRegularExpression(
+        pattern: #"(?i)\s(?:vs[.]?|versus|v[.]|at|@)\s"#)
+    private static let dateLabel = try! NSRegularExpression(pattern: #"\b(20\d{2})-(\d{2})-(\d{2})\b"#)
+    private static let monthDateLabel = try! NSRegularExpression(
+        pattern: #"(?i)\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?\b"#)
+    private static let replayWords: Set<String> = ["replay", "rerun", "highlights", "classic", "encore"]
+
+    private static func hasFixtureSeparator(_ text: String) -> Bool {
+        fixtureSeparator.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+    }
+
+    private static func hasStaleOrReplayLabel(_ text: String, at date: Date) -> Bool {
+        let words = Set(normalize(text).split(separator: " ").map(String.init))
+        if !words.isDisjoint(with: replayWords) { return true }
+        // Provider timestamps have no reliable zone. Permit adjacent calendar dates
+        // across the international date line, but reject explicitly stale fixtures.
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let eventDay = calendar.startOfDay(for: date)
+        let raw = text as NSString
+        for found in dateLabel.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            let components = DateComponents(year: Int(raw.substring(with: found.range(at: 1))),
+                                            month: Int(raw.substring(with: found.range(at: 2))),
+                                            day: Int(raw.substring(with: found.range(at: 3))))
+            guard let labelled = calendar.date(from: components) else { return true }
+            if abs(labelled.timeIntervalSince(eventDay)) > 86400 { return true }
+        }
+        let months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+        let year = calendar.component(.year, from: date)
+        for found in monthDateLabel.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+            let monthText = String(raw.substring(with: found.range(at: 1)).lowercased().prefix(3))
+            guard let monthIndex = months.firstIndex(of: monthText),
+                  let day = Int(raw.substring(with: found.range(at: 2))) else { return true }
+            let nearbyDates = [year - 1, year, year + 1].compactMap { year in
+                calendar.date(from: DateComponents(year: year, month: monthIndex + 1, day: day))
+            }
+            if !nearbyDates.contains(where: { abs($0.timeIntervalSince(eventDay)) <= 86400 }) { return true }
+        }
+        return false
     }
 
     private static func minimumScore(for match: Match) -> Int {
@@ -228,30 +335,6 @@ nonisolated enum SourceMatcher {
         default:
             return 12
         }
-    }
-
-    /// Matches any alias against a channel haystack using whole-word boundaries.
-    /// Single-word aliases require a whole token; multi-word phrases require space-padded
-    /// containment so "nba tv" does not match inside "wnba tv".
-    private static func aliasMatches(_ aliases: [String], padded paddedHaystack: String, tokens haystackTokens: Set<String>) -> Bool {
-        aliases.contains { alias in
-            guard !alias.isEmpty else { return false }
-            if alias.contains(" ") { return paddedHaystack.contains(" \(alias) ") }
-            return haystackTokens.contains(alias)
-        }
-    }
-
-    private static func teamTokens(for team: TeamSide, league: League) -> [String] {
-        let names = [team.displayName, team.shortName, team.abbreviation]
-        var seen: Set<String> = []
-        return names.flatMap(tokens(from:))
-            .filter { token in
-                if league.group == .soccer {
-                    return true
-                }
-                return !soccerClubWords.contains(token)
-            }
-            .filter { seen.insert($0).inserted }
     }
 
     private static func teamAliases(for team: TeamSide, league: League) -> [String] {
@@ -275,13 +358,6 @@ nonisolated enum SourceMatcher {
             .filter { $0.count >= 2 && !stopWords.contains($0) }
     }
 
-    private static func eventTokens(from match: Match, excluding sharedTokens: Set<String> = []) -> [String] {
-        var seen: Set<String> = []
-        return tokens(from: "\(match.name) \(match.shortName)")
-            .filter { $0.count >= 3 && !sharedTokens.contains($0) }
-            .filter { seen.insert($0).inserted }
-    }
-
     private static func eventAliases(for match: Match) -> [String] {
         let title = normalize("\(match.name) \(match.shortName) \(match.league.name)")
         var aliases: [String] = []
@@ -294,20 +370,20 @@ nonisolated enum SourceMatcher {
         return aliases
     }
 
-    private static func eventBroadcasterAliases(for match: Match) -> [String] {
+    private static func eventBroadcasterAliases(for match: Match, country: String? = nil) -> [String] {
         // For motorsport events, detect the session type so session-specific policies apply.
         // (e.g. ESPN carries F1 qualifying + race but not practice sessions in the US.)
         let session: RacingSessionKind = match.league.group == .racing
             ? RacingSessionKind.detect(from: "\(match.name) \(match.shortName)")
             : .unknown
 
-        let aliases = BroadcastRightsStore.shared.broadcasters(for: match.league.path, at: match.date, session: session)
+        let aliases = BroadcastRightsStore.shared.broadcasters(for: match.league.path, at: match.date, session: session, country: country)
         if !aliases.isEmpty { return aliases }
 
         // Tour de France: not in the ESPN league catalog, detected by event title pattern.
         let title = normalize("\(match.name) \(match.shortName) \(match.league.name)")
         guard isTourDeFrance(title) else { return [] }
-        return BroadcastRightsStore.shared.broadcasters(for: "cycling/tour-de-france", at: match.date)
+        return BroadcastRightsStore.shared.broadcasters(for: "cycling/tour-de-france", at: match.date, country: country)
     }
 
 
@@ -315,33 +391,9 @@ nonisolated enum SourceMatcher {
         normalizedTitle.contains("tour") && normalizedTitle.contains("france")
     }
 
-    /// Lowercases, strips diacritics, removes country/group prefixes (e.g. "US:", "UK|",
-    /// "US ★ ", "DE ★ ", "MotoGP ★ ") and punctuation, and collapses whitespace.
     private static func normalize(_ input: String) -> String {
-        var s = input.folding(options: .diacriticInsensitive, locale: .current).lowercased()
-        // Drop a leading "xx:" or "xx|" M3U country/quality prefix.
-        if let separatorIndex = s.firstIndex(where: { $0 == ":" || $0 == "|" }),
-           s.distance(from: s.startIndex, to: separatorIndex) <= 4 {
-            s = String(s[s.index(after: separatorIndex)...])
-        }
-        // Drop a leading "XX ★ " Xtream/IPTV country-group prefix (e.g. "US ★ ", "SPORT ★ ",
-        // "MotoGP ★ "). Threshold of 8 covers prefixes up to 7 chars + space before ★.
-        if let starIndex = s.firstIndex(where: { $0 == "\u{2605}" }),
-           s.distance(from: s.startIndex, to: starIndex) <= 8 {
-            let after = s.index(after: starIndex)
-            s = String(s[after...])
-        }
-        // Preserve "+" as "plus" so ESPN+ stays distinguishable from ESPN after punctuation strip.
-        s = s.replacingOccurrences(of: "+", with: "plus")
-        let allowed = s.map { char -> Character in
-            char.isLetter || char.isNumber ? char : " "
-        }
-        return String(allowed)
-            .split(separator: " ")
-            .joined(separator: " ")
+        ProviderChannelIdentity.text(input)
     }
-
-    private static let soccerClubWords: Set<String> = ["fc", "cf", "sc", "city", "united"]
 
     private static let mlsTeamAliases: [String: [String]] = [
         "atlanta united": ["atlanta united", "atl utd", "atlanta utd"],

@@ -202,7 +202,7 @@ struct MatchDetailView: View {
 
         // Build a lookup from canonical channel ID → best-scoring join.
         var bestJoinByCanonical: [String: ProgrammeEventJoin] = [:]
-        for join in joins {
+        for join in joins where SourceMatcher.confirms(programme: join.programme, for: match) {
             if let existing = bestJoinByCanonical[join.canonicalChannelId] {
                 if join.score > existing.score { bestJoinByCanonical[join.canonicalChannelId] = join }
             } else {
@@ -215,9 +215,8 @@ struct MatchDetailView: View {
         ranked = ranked.map { source in
             guard let canonicalId = channelToCanonical[source.channel.id],
                   let join = bestJoinByCanonical[canonicalId],
-                  // Require strong title similarity, or a network match corroborated by
-                  // at least partial title overlap — network-only is not specific enough.
-                  join.titleSimilarity >= 0.6 || (join.networkMatches && join.titleSimilarity >= 0.4) else {
+                  // Guide confirmation requires the actual fixture and scheduled time.
+                  SourceMatcher.confirms(programme: join.programme, for: match) else {
                 return source
             }
             var enriched = source
@@ -238,9 +237,10 @@ struct MatchDetailView: View {
             }
         }
         for (canonicalId, join) in bestJoinByCanonical {
-            guard join.titleSimilarity >= 0.6 || (join.networkMatches && join.titleSimilarity >= 0.4) else { continue }
+            guard SourceMatcher.confirms(programme: join.programme, for: match) else { continue }
             for channel in (canonicalToChannels[canonicalId] ?? []) {
-                guard !rankedChannelIds.contains(channel.id) else { continue }
+                guard !rankedChannelIds.contains(channel.id),
+                      SourceMatcher.isEligible(channel: channel, for: match) else { continue }
                 var injected = RankedSource(channel: channel, score: 55 + Int(join.titleSimilarity * 40))
                 injected.evidenceCategories = [.guideListsMatch]
                 injected.epgProgramme = join.programme
@@ -250,12 +250,7 @@ struct MatchDetailView: View {
         }
 
         // Sort by strongest evidence tier, then score within tier.
-        ranked.sort {
-            let lp = $0.strongestEvidence?.priority ?? 0
-            let rp = $1.strongestEvidence?.priority ?? 0
-            if lp != rp { return lp > rp }
-            return $0.score > $1.score
-        }
+        ranked.sort(by: SourceMatcher.ranksBefore)
         rankedSources = Array(ranked.prefix(30))
         isRankingSources = false
     }

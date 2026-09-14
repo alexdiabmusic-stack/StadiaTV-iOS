@@ -24,14 +24,36 @@ final class SportsCatalogRepository {
         }
     }
 
+    // MARK: - Active league filter
+
+    /// Catalog league IDs that are currently active in the app.
+    /// Only these leagues appear in onboarding, team pickers, and news.
+    private static let activeCatalogLeagueIDs: Set<String> = [
+        "football:national-football-league",
+        "football:canadian-football-league",
+        "basketball:nba",
+        "basketball:wnba",
+        "baseball:major-league-baseball",
+        "hockey:national-hockey-league",
+        "soccer:liga-mx",
+        "soccer:premier-league",
+        "soccer:major-league-soccer",
+        "racing:formula-1",
+        "golf:pga-tour",
+    ]
+
     // MARK: - Ordered accessors
 
     var sports: [CatalogSport] {
-        (catalog?.sports ?? []).sorted { $0.uiSortOrder < $1.uiSortOrder }
+        (catalog?.sports ?? [])
+            .sorted { $0.uiSortOrder < $1.uiSortOrder }
+            .filter { sport in sport.leagues.contains { Self.activeCatalogLeagueIDs.contains($0.id) } }
     }
 
     func leagues(for sport: CatalogSport) -> [CatalogLeague] {
-        sport.leagues.filter(\.enabled).sorted { $0.sortOrder < $1.sortOrder }
+        sport.leagues
+            .filter { $0.enabled && Self.activeCatalogLeagueIDs.contains($0.id) }
+            .sorted { $0.sortOrder < $1.sortOrder }
     }
 
     func teams(for league: CatalogLeague) -> [CatalogTeam] {

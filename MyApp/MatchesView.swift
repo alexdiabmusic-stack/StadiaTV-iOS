@@ -24,6 +24,7 @@ struct MatchesView: View {
     @EnvironmentObject private var predictions: PredictionsStore
     @EnvironmentObject private var playlists: PlaylistStore
     @EnvironmentObject private var streamStore: StreamAvailabilityStore
+    @EnvironmentObject private var epgRepository: EPGRepository
 
     @State private var selectedSelection: FollowingSelection = .all
     @State private var comingUpSportFilter: SportGroup? = nil
@@ -66,7 +67,7 @@ struct MatchesView: View {
             await streamStore.scan(
                 matches: viewModel.allFollowedMatches + viewModel.matches,
                 channels: playlists.allChannels,
-                preferredLanguages: prefs.preferredStreamLanguages
+                epgRepository: epgRepository
             )
         }
         .onAppear { viewModel.startAutoRefresh() }
@@ -84,7 +85,7 @@ struct MatchesView: View {
     }
 
     private var streamScanKey: String {
-        "\(viewModel.allFollowedMatches.count)-\(viewModel.matches.count)-\(playlists.allChannels.count)"
+        "\(viewModel.allFollowedMatches.count)-\(viewModel.matches.count)-\(playlists.allChannels.count)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))"
     }
 
     private func loadAll() async {

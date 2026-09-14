@@ -164,8 +164,8 @@ struct MatchDetailView: View {
         }
     }
 
-    /// Scores the playlist channels against this match off the main thread,
-    /// then enriches results with EPG evidence from the guide index.
+    /// Finds streams for this match using the EPG guide as the primary source,
+    /// then appends all team-named channels as backups.
     private func rankSources() async {
         guard match.state != .final else {
             rankedSources = []
@@ -175,22 +175,15 @@ struct MatchDetailView: View {
 
         let channels = playlists.allChannels
         let match = self.match
-        let preferredLanguages = prefs.preferredStreamLanguages
 
-        // Use pre-ranked sources from the background store if available so the
-        // channel list appears immediately without a spinner.
-        var ranked: [RankedSource]
+        // Fast path: background scan already ran for this match — display immediately.
         if let cached = streamStore.sourcesByMatchId[match.id], !cached.isEmpty {
-            ranked = cached
+            rankedSources = cached
             isRankingSources = false
-        } else {
-            ranked = await Task.detached(priority: .userInitiated) {
-                SourceMatcher.rank(match: match, channels: channels, preferredLanguages: preferredLanguages)
-            }.value
+            return
         }
 
-        // Enrich with EPG evidence: find programmes near the match window and
-        // map them back to ranked sources via the canonical channel index.
+        // Primary: channels the EPG guide confirms for this event.
         let titleHints = [match.name, match.shortName, match.home.displayName, match.away.displayName]
             .filter { !$0.isEmpty }
         let broadcastNetworks = match.broadcasts.filter { !$0.isEmpty }
@@ -200,7 +193,6 @@ struct MatchDetailView: View {
             broadcastNetworks: broadcastNetworks
         )
 
-        // Build a lookup from canonical channel ID → best-scoring join.
         var bestJoinByCanonical: [String: ProgrammeEventJoin] = [:]
         for join in joins where SourceMatcher.confirms(programme: join.programme, for: match) {
             if let existing = bestJoinByCanonical[join.canonicalChannelId] {
@@ -211,47 +203,34 @@ struct MatchDetailView: View {
         }
 
         let channelToCanonical = epgRepository.channelToCanonicalMap
-
-        ranked = ranked.map { source in
-            guard let canonicalId = channelToCanonical[source.channel.id],
-                  let join = bestJoinByCanonical[canonicalId],
-                  // Guide confirmation requires the actual fixture and scheduled time.
-                  SourceMatcher.confirms(programme: join.programme, for: match) else {
-                return source
-            }
-            var enriched = source
-            enriched.epgProgramme = join.programme
-            enriched.canonicalChannelId = canonicalId
-            enriched.evidenceCategories.insert(.guideListsMatch)
-            return enriched
-        }
-
-        // EPG injection: add channels the guide confirms for this event that SourceMatcher
-        // didn't surface — e.g. a regional feed below the score threshold, or a rights holder
-        // not yet in the policy store (TSN1 for an F1 race whose TSN entry was missing).
-        let rankedChannelIds = Set(ranked.map { $0.channel.id })
         var canonicalToChannels: [String: [Channel]] = [:]
         for channel in channels {
             if let cid = channelToCanonical[channel.id] {
                 canonicalToChannels[cid, default: []].append(channel)
             }
         }
+
+        var primarySources: [RankedSource] = []
+        var primaryIds = Set<String>()
         for (canonicalId, join) in bestJoinByCanonical {
-            guard SourceMatcher.confirms(programme: join.programme, for: match) else { continue }
             for channel in (canonicalToChannels[canonicalId] ?? []) {
-                guard !rankedChannelIds.contains(channel.id),
-                      SourceMatcher.isEligible(channel: channel, for: match) else { continue }
-                var injected = RankedSource(channel: channel, score: 55 + Int(join.titleSimilarity * 40))
-                injected.evidenceCategories = [.guideListsMatch]
-                injected.epgProgramme = join.programme
-                injected.canonicalChannelId = canonicalId
-                ranked.append(injected)
+                guard SourceMatcher.isEligible(channel: channel, for: match) else { continue }
+                var source = RankedSource(channel: channel, score: 100 + Int(join.titleSimilarity * 50))
+                source.evidenceCategories = [.guideListsMatch]
+                source.epgProgramme = join.programme
+                source.canonicalChannelId = canonicalId
+                primarySources.append(source)
+                primaryIds.insert(channel.id)
             }
         }
+        primarySources.sort(by: SourceMatcher.ranksBefore)
 
-        // Sort by strongest evidence tier, then score within tier.
-        ranked.sort(by: SourceMatcher.ranksBefore)
-        rankedSources = Array(ranked.prefix(30))
+        // Backup: every channel whose name contains a team name or event/series keyword.
+        let backupSources = await Task.detached(priority: .userInitiated) {
+            SourceMatcher.teamNameBackups(match: match, channels: channels, excludeIds: primaryIds)
+        }.value
+
+        rankedSources = primarySources + backupSources
         isRankingSources = false
     }
 

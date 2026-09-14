@@ -358,6 +358,97 @@ nonisolated enum SourceMatcher {
             .filter { $0.count >= 2 && !stopWords.contains($0) }
     }
 
+    // MARK: - EPG-first backup matching
+
+    /// Returns all channels whose names contain a team name or event/series keyword,
+    /// excluding those already confirmed by the EPG guide.
+    ///
+    /// This is the fallback layer when the guide has no confirmed stream: it casts the
+    /// widest reasonable net — any channel that mentions either team (or, for racing/golf,
+    /// the series name) — without the scoring algorithm.
+    static func teamNameBackups(match: Match, channels: [Channel], excludeIds: Set<String> = []) -> [RankedSource] {
+        guard match.state != .final else { return [] }
+
+        var results: [RankedSource] = []
+        var seen = excludeIds
+
+        if usesParticipants(match) {
+            let participants = ParticipantIdentity(match)
+            for channel in channels {
+                guard !seen.contains(channel.id) else { continue }
+                let identity = ProviderChannelIdentity(channel.name)
+                let haystack = identity.eventText
+                let (homeHit, awayHit) = participants.hits(in: haystack, labelledFixture: hasFixtureSeparator(channel.name))
+                guard homeHit || awayHit else { continue }
+                seen.insert(channel.id)
+                let score = homeHit && awayHit ? 200 : 35
+                var source = RankedSource(channel: channel, score: score)
+                if homeHit && awayHit { source.evidenceCategories = [.teamNameMatch] }
+                results.append(source)
+            }
+        } else {
+            let tokens = eventSeriesTokens(for: match)
+            guard !tokens.isEmpty else { return [] }
+            for channel in channels {
+                guard !seen.contains(channel.id) else { continue }
+                let identity = ProviderChannelIdentity(channel.name)
+                let haystack = " \(identity.eventText) "
+                guard tokens.contains(where: { !$0.isEmpty && haystack.contains(" \($0) ") }) else { continue }
+                seen.insert(channel.id)
+                var source = RankedSource(channel: channel, score: 60)
+                source.evidenceCategories = [.eventTitleMatch]
+                results.append(source)
+            }
+        }
+
+        return results.sorted(by: ranksBefore)
+    }
+
+    /// Tokens to match against channel names for non-participant sports (racing, golf, cycling, wrestling).
+    private static func eventSeriesTokens(for match: Match) -> [String] {
+        var tokens: [String] = []
+        let leagueNorm = normalize(match.league.name + " " + match.league.shortName)
+        switch match.league.group {
+        case .racing:
+            if leagueNorm.contains("formula") || leagueNorm.contains("f1") {
+                tokens += ["f1", "formula 1", "formula one"]
+            } else if leagueNorm.contains("motogp") {
+                tokens += ["motogp", "moto gp"]
+            } else if leagueNorm.contains("nascar") {
+                tokens += ["nascar"]
+            } else if leagueNorm.contains("indycar") {
+                tokens += ["indycar"]
+            } else {
+                let short = normalize(match.league.shortName)
+                if !short.isEmpty { tokens.append(short) }
+            }
+            // Include distinctive race-name tokens (e.g., "british", "monaco")
+            let raceTokens = normalize(match.name).split(separator: " ").map(String.init)
+                .filter { $0.count >= 4 && !stopWords.contains($0) && !$0.allSatisfy(\.isNumber) }
+            tokens += raceTokens
+        case .golf:
+            tokens += ["pga", "golf"]
+            if leagueNorm.contains("lpga") { tokens.append("lpga") }
+            if leagueNorm.contains("european") { tokens += ["dp world", "european tour"] }
+            let eventTokens = normalize(match.name).split(separator: " ").map(String.init)
+                .filter { $0.count >= 4 && !stopWords.contains($0) && !$0.allSatisfy(\.isNumber) }
+            tokens += eventTokens
+        case .cycling:
+            tokens += ["cycling", "cyclisme"]
+            if isTourDeFrance(normalize(match.name + " " + match.league.name)) {
+                tokens += ["tour de france", "tdf", "le tour"]
+            }
+        case .wrestling:
+            tokens += ["wwe", "aew", "wrestling"]
+            let eventTokens = normalize(match.name).split(separator: " ").map(String.init)
+                .filter { $0.count >= 4 && !stopWords.contains($0) }
+            tokens += eventTokens
+        default:
+            break
+        }
+        return tokens.filter { !$0.isEmpty }
+    }
+
     private static func eventAliases(for match: Match) -> [String] {
         let title = normalize("\(match.name) \(match.shortName) \(match.league.name)")
         var aliases: [String] = []

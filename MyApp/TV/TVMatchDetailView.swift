@@ -52,17 +52,14 @@ struct TVMatchDetailView: View {
 
         let channels = playlistStore.allChannels
         let match = self.match
-        let preferredLanguages = prefs.preferredStreamLanguages
 
-        var ranked: [RankedSource]
+        // Fast path: background scan already ran for this match — display immediately.
         if let cached = streamStore.sourcesByMatchId[match.id], !cached.isEmpty {
-            ranked = cached
-        } else {
-            ranked = await Task.detached(priority: .userInitiated) {
-                SourceMatcher.rank(match: match, channels: channels, preferredLanguages: preferredLanguages)
-            }.value
+            rankedSources = cached
+            return
         }
 
+        // Primary: channels confirmed by the EPG programme guide.
         let titleHints = [match.name, match.shortName, match.home.displayName, match.away.displayName]
             .filter { !$0.isEmpty }
         let broadcastNetworks = match.broadcasts.filter { !$0.isEmpty }
@@ -82,44 +79,34 @@ struct TVMatchDetailView: View {
         }
 
         let channelToCanonical = epgRepository.channelToCanonicalMap
-        ranked = ranked.map { source in
-            guard let canonicalId = channelToCanonical[source.channel.id],
-                  let join = bestJoinByCanonical[canonicalId],
-                  SourceMatcher.confirms(programme: join.programme, for: match) else {
-                return source
-            }
-            var enriched = source
-            enriched.epgProgramme = join.programme
-            enriched.canonicalChannelId = canonicalId
-            enriched.evidenceCategories.insert(.guideListsMatch)
-            return enriched
-        }
-
-        // EPG injection: add channels the guide confirms for this event that SourceMatcher
-        // didn't surface — e.g. a regional feed below the score threshold, or a rights holder
-        // not yet in the policy store.
-        let rankedChannelIds = Set(ranked.map { $0.channel.id })
         var canonicalToChannels: [String: [Channel]] = [:]
         for channel in channels {
             if let cid = channelToCanonical[channel.id] {
                 canonicalToChannels[cid, default: []].append(channel)
             }
         }
+
+        var primarySources: [RankedSource] = []
+        var primaryIds = Set<String>()
         for (canonicalId, join) in bestJoinByCanonical {
-            guard SourceMatcher.confirms(programme: join.programme, for: match) else { continue }
             for channel in (canonicalToChannels[canonicalId] ?? []) {
-                guard !rankedChannelIds.contains(channel.id),
-                      SourceMatcher.isEligible(channel: channel, for: match) else { continue }
-                var injected = RankedSource(channel: channel, score: 55 + Int(join.titleSimilarity * 40))
-                injected.evidenceCategories = [.guideListsMatch]
-                injected.epgProgramme = join.programme
-                injected.canonicalChannelId = canonicalId
-                ranked.append(injected)
+                guard SourceMatcher.isEligible(channel: channel, for: match) else { continue }
+                var source = RankedSource(channel: channel, score: 100 + Int(join.titleSimilarity * 50))
+                source.evidenceCategories = [.guideListsMatch]
+                source.epgProgramme = join.programme
+                source.canonicalChannelId = canonicalId
+                primarySources.append(source)
+                primaryIds.insert(channel.id)
             }
         }
+        primarySources.sort(by: SourceMatcher.ranksBefore)
 
-        ranked.sort(by: SourceMatcher.ranksBefore)
-        rankedSources = Array(ranked.prefix(20))
+        // Backup: every channel whose name contains a team name or event/series keyword.
+        let backupSources = await Task.detached(priority: .userInitiated) {
+            SourceMatcher.teamNameBackups(match: match, channels: channels, excludeIds: primaryIds)
+        }.value
+
+        rankedSources = primarySources + backupSources
     }
 
     // MARK: - Hero scoreboard

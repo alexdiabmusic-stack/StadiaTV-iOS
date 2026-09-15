@@ -255,13 +255,18 @@ final class BannerFantasyStore: ObservableObject {
     }
 
     private func rebuildIndexes(from games: [FantasyPlayerGame]) {
-        let byEvent = Dictionary(grouping: games.filter { $0.event != nil }, by: { $0.event!.id })
+        var byEvent: [String: [FantasyPlayerGame]] = [:]
+        var byChannel: [String: [FantasyPlayerGame]] = [:]
+        for game in games {
+            if let eventId = game.event?.id { byEvent[eventId, default: []].append(game) }
+            if let channelId = game.matchedChannel?.channel.id { byChannel[channelId, default: []].append(game) }
+        }
         fantasyEventContextsByEventID = Dictionary(uniqueKeysWithValues: byEvent.compactMap { eventID, games in
             guard let event = games.first?.event else { return nil }
             let matched = games.compactMap(\.matchedChannel).sorted { $0.score > $1.score }.first
             return (eventID, FantasyEventContext(event: event, playerGames: games, matchedChannel: matched))
         })
-        fantasyGamesByChannelID = Dictionary(grouping: games.filter { $0.matchedChannel != nil }, by: { $0.matchedChannel!.channel.id })
+        fantasyGamesByChannelID = byChannel
     }
 
     private static func match(for entry: BannerFantasyPlayerEntry, in matches: [Match]) -> Match? {

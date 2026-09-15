@@ -43,14 +43,13 @@ struct TVLiveSportsView: View {
                 sidebarRow(sport: nil, label: "All Sports", icon: "sportscourt.fill",
                            count: liveViewModel.allLive.count)
 
-                let activeSports = activeSportGroups
-                if !activeSports.isEmpty {
+                let sportData = activeSportData
+                if !sportData.isEmpty {
                     Divider().background(Theme.hairline).padding(.vertical, 4)
 
-                    ForEach(activeSports, id: \.self) { sport in
-                        let count = liveViewModel.allLive.filter { $0.league.group == sport }.count
-                        sidebarRow(sport: sport, label: sport.rawValue,
-                                   icon: sport.systemImage, count: count)
+                    ForEach(sportData, id: \.sport) { item in
+                        sidebarRow(sport: item.sport, label: item.sport.rawValue,
+                                   icon: item.sport.systemImage, count: item.count)
                     }
                 }
 
@@ -175,12 +174,15 @@ struct TVLiveSportsView: View {
         return liveViewModel.allLive.filter { $0.league.group == sport }
     }
 
-    private var activeSportGroups: [SportGroup] {
-        var seen: [SportGroup] = []
+    private var activeSportData: [(sport: SportGroup, count: Int)] {
+        var ordered: [SportGroup] = []
+        var counts: [SportGroup: Int] = [:]
         for match in liveViewModel.allLive {
-            if !seen.contains(match.league.group) { seen.append(match.league.group) }
+            let group = match.league.group
+            if counts[group] == nil { ordered.append(group) }
+            counts[group, default: 0] += 1
         }
-        return seen
+        return ordered.map { ($0, counts[$0] ?? 0) }
     }
 }
 #endif

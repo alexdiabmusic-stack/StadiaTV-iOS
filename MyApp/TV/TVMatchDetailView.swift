@@ -9,6 +9,7 @@ struct TVMatchDetailView: View {
     @EnvironmentObject private var streamStore: StreamAvailabilityStore
     @State private var rankedSources: [RankedSource] = []
     @State private var playingChannel: Channel?
+    @State private var matchNews: [ESPNArticle] = []
 
     var body: some View {
         ZStack {
@@ -33,6 +34,9 @@ struct TVMatchDetailView: View {
                         broadcastsSection
                     }
                     matchInfoSection
+                    if !matchNews.isEmpty {
+                        newsSection
+                    }
                 }
                 .padding(.horizontal, 48)
                 .padding(.vertical, 48)
@@ -41,6 +45,9 @@ struct TVMatchDetailView: View {
         .navigationTitle(match.shortName)
         .task(id: "\(match.id)-\(playlistStore.allChannels.count)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
             await rankSources()
+        }
+        .task(id: match.id) {
+            matchNews = (try? await SportsRepository.shared.legacyNews(for: match.league, limit: 6)) ?? []
         }
         .fullScreenCover(item: $playingChannel) { channel in
             TVPlayerView(channel: channel, initialMatch: match)
@@ -242,6 +249,52 @@ struct TVMatchDetailView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
+    }
+
+    // MARK: - News
+
+    private var newsSection: some View {
+        TVShelfRow(title: "Related News", systemImage: "newspaper.fill") {
+            ForEach(matchNews) { article in
+                TVNewsCard(article: article)
+            }
+        }
+    }
+}
+
+private struct TVNewsCard: View {
+    let article: ESPNArticle
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            AsyncImage(url: article.imageURL) { phase in
+                if case .success(let image) = phase {
+                    image.resizable().scaledToFill()
+                } else {
+                    Image(systemName: "newspaper.fill")
+                        .font(.title)
+                        .foregroundStyle(Theme.accent)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+            .frame(width: 280, height: 158)
+            .background(Theme.surfaceElevated)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(article.headline)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                if let published = article.published {
+                    Text(published, style: .relative)
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+        }
+        .frame(width: 280)
     }
 }
 #endif

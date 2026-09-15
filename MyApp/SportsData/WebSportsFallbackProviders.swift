@@ -285,6 +285,14 @@ struct FoxSportsProvider: ScoreProvider, ScheduleProvider, GameDetailsProvider, 
     }
 }
 
+struct MultiURLFetchError: LocalizedError {
+    let failures: [(url: URL, error: Error)]
+    var errorDescription: String? {
+        guard !failures.isEmpty else { return "No URLs to fetch" }
+        return failures.map { "\($0.url.lastPathComponent): \($0.error.localizedDescription)" }.joined(separator: "; ")
+    }
+}
+
 struct WebSportsClient: Sendable {
     let providerID: SportsDataProviderID
     let session: URLSession
@@ -295,15 +303,15 @@ struct WebSportsClient: Sendable {
     }
 
     func firstSuccessfulJSON(urls: [URL]) async throws -> WebSportsJSON {
-        var lastError: Error = SportsDataError.unavailable
+        var failures: [(url: URL, error: Error)] = []
         for url in urls {
             do {
                 return try await json(url: url)
             } catch {
-                lastError = error
+                failures.append((url, error))
             }
         }
-        throw lastError
+        throw MultiURLFetchError(failures: failures)
     }
 
     func json(url: URL) async throws -> WebSportsJSON {
@@ -757,7 +765,7 @@ enum YahooSportsEndpoint {
 }
 
 enum FoxSportsEndpoint {
-    nonisolated static let dataKey = "jE7yBJVRNAwdDesMgTzTXUUSx1It41Fq"
+    nonisolated static var dataKey: String { AppConfiguration.foxSportsAPIKey }
     nonisolated static let supportedLeaguePaths = ["football/college-football", "basketball/nba", "basketball/mens-college-basketball", "basketball/womens-college-basketball", "basketball/wnba", "baseball/mlb", "hockey/nhl"]
 
     nonisolated static func slug(for league: League) -> String? {
@@ -925,12 +933,13 @@ enum WebSportsText {
 }
 
 extension WebSportsJSON {
-    func recursiveObjects() -> [[String: WebSportsJSON]] {
+    func recursiveObjects(depth: Int = 0) -> [[String: WebSportsJSON]] {
+        guard depth < 20 else { return [] }
         switch self {
         case let .object(object):
-            return [object] + object.values.flatMap { $0.recursiveObjects() }
+            return [object] + object.values.flatMap { $0.recursiveObjects(depth: depth + 1) }
         case let .array(values):
-            return values.flatMap { $0.recursiveObjects() }
+            return values.flatMap { $0.recursiveObjects(depth: depth + 1) }
         default:
             return []
         }

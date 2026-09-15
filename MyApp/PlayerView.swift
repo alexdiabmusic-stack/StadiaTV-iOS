@@ -1,5 +1,6 @@
 import SwiftUI
 import AVKit
+import Combine
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -158,6 +159,7 @@ struct PlayerView: View {
     #if os(iOS)
     @State private var dismissalDragOffset: CGSize = .zero
     @State private var activeDismissalGesture: PlayerDismissalGestureKind?
+    @State private var pipController: AVPictureInPictureController?
     #endif
 
     init(channel: Channel, zapChannels: [Channel] = [], currentIndex: Int = 0, showsLiveTVControls: Bool = true) {
@@ -276,6 +278,11 @@ struct PlayerView: View {
             onSourceSelector: { showingSourceSelector = true; revealChromeTemporarily() },
             onCycleSource: cycleSource(direction:),
             onToggleOrientation: { toggleOrientation() },
+            onPiP: {
+                #if os(iOS)
+                pipController?.startPictureInPicture()
+                #endif
+            },
             orientation: preferredOrientation
         ) {
             StreamTile(
@@ -295,6 +302,11 @@ struct PlayerView: View {
                 },
                 onPlayerItemReady: { item in
                     handlePlayerItemReady(item)
+                },
+                onPiPControllerReady: { controller in
+                    #if os(iOS)
+                    pipController = controller
+                    #endif
                 }
             )
             .id(activePlaybackChannel.id)
@@ -1136,6 +1148,7 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
     let onSourceSelector: () -> Void
     let onCycleSource: (Int) -> Void
     let onToggleOrientation: () -> Void
+    var onPiP: (() -> Void)? = nil
     let orientation: PlayerOrientation
     let videoContent: VideoContent
 
@@ -1163,6 +1176,7 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
         onSourceSelector: @escaping () -> Void,
         onCycleSource: @escaping (Int) -> Void,
         onToggleOrientation: @escaping () -> Void,
+        onPiP: (() -> Void)? = nil,
         orientation: PlayerOrientation,
         @ViewBuilder videoContent: () -> VideoContent
     ) {
@@ -1189,6 +1203,7 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
         self.onSourceSelector = onSourceSelector
         self.onCycleSource = onCycleSource
         self.onToggleOrientation = onToggleOrientation
+        self.onPiP = onPiP
         self.orientation = orientation
         self.videoContent = videoContent()
     }
@@ -1224,6 +1239,7 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
                 onSourceSelector: onSourceSelector,
                 onCycleSource: onCycleSource,
                 onToggleOrientation: onToggleOrientation,
+                onPiP: onPiP,
                 topSafeArea: topSafeArea,
                 videoContent: { videoContent }
             )
@@ -1259,6 +1275,7 @@ private struct MatchPlayerScreen<VideoContent: View>: View {
                 onSourceSelector: onSourceSelector,
                 onCycleSource: onCycleSource,
                 onToggleOrientation: onToggleOrientation,
+                onPiP: onPiP,
                 videoContent: { videoContent }
             )
             .ignoresSafeArea()
@@ -1321,6 +1338,7 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
     let onSourceSelector: () -> Void
     let onCycleSource: (Int) -> Void
     let onToggleOrientation: () -> Void
+    var onPiP: (() -> Void)? = nil
     let topSafeArea: CGFloat
     let videoContent: VideoContent
 
@@ -1337,6 +1355,7 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
         onSourceSelector: @escaping () -> Void,
         onCycleSource: @escaping (Int) -> Void,
         onToggleOrientation: @escaping () -> Void,
+        onPiP: (() -> Void)? = nil,
         topSafeArea: CGFloat = 0,
         @ViewBuilder videoContent: () -> VideoContent
     ) {
@@ -1352,6 +1371,7 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
         self.onSourceSelector = onSourceSelector
         self.onCycleSource = onCycleSource
         self.onToggleOrientation = onToggleOrientation
+        self.onPiP = onPiP
         self.topSafeArea = topSafeArea
         self.videoContent = videoContent()
     }
@@ -1377,7 +1397,8 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
                             showsDismiss: topOverlayShowsDismiss,
                             onDismiss: onDismiss,
                             onMore: onMore,
-                            onToggleOrientation: onToggleOrientation
+                            onToggleOrientation: onToggleOrientation,
+                            onPiP: onPiP
                         )
                         .padding(.horizontal, 14)
                         .padding(.top, max(topSafeArea, 8) + 8)
@@ -1415,6 +1436,7 @@ private struct PlayerTopOverlay: View {
     let onDismiss: () -> Void
     let onMore: () -> Void
     let onToggleOrientation: () -> Void
+    var onPiP: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 10) {
@@ -1439,6 +1461,19 @@ private struct PlayerTopOverlay: View {
                 .frame(width: 42, height: 38)
                 .background(.black.opacity(0.56), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.12)))
+
+            if let onPiP, AVPictureInPictureController.isPictureInPictureSupported() {
+                Button(action: onPiP) {
+                    Image(systemName: "pip.enter")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 42, height: 38)
+                        .background(.black.opacity(0.56), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.white.opacity(0.12)))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Picture in Picture")
+            }
             #endif
 
             PlayerChromeButton(systemImage: orientation.systemImage, accessibilityLabel: orientation.accessibilityLabel, action: onToggleOrientation)
@@ -2657,6 +2692,14 @@ private enum MultiScreenLayout: String, CaseIterable, Identifiable {
     }
 }
 
+/// Holds an AVPictureInPictureController so StreamTile can check PiP state from stop().
+#if os(iOS)
+private final class PiPHolder: ObservableObject {
+    @Published var controller: AVPictureInPictureController?
+    var isActive: Bool { controller?.isPictureInPictureActive == true }
+}
+#endif
+
 private struct StreamTile: View {
     let channel: Channel
     let isPrimary: Bool
@@ -2666,17 +2709,26 @@ private struct StreamTile: View {
     var onFailure: (() -> Void)? = nil
     var onMetadata: ((StreamRuntimeMetadata) -> Void)? = nil
     var onPlayerItemReady: ((AVPlayerItem) -> Void)? = nil
+    var onPiPControllerReady: ((AVPictureInPictureController) -> Void)? = nil
 
     @State private var player: AVPlayer?
     @State private var failed = false
     @State private var metadataTask: Task<Void, Never>?
+    #if os(iOS)
+    @StateObject private var pipHolder = PiPHolder()
+    #endif
 
     var body: some View {
         ZStack {
             Color.black
 
             if let player {
-                VideoSurface(player: player, showsPlaybackControls: false, allowsPictureInPicture: !showsChrome)
+                VideoSurface(player: player, showsPlaybackControls: false, allowsPictureInPicture: !showsChrome) { pip in
+                    #if os(iOS)
+                    pipHolder.controller = pip
+                    #endif
+                    onPiPControllerReady?(pip)
+                }
             } else if failed {
                 VStack(spacing: 10) {
                     Image(systemName: "exclamationmark.triangle")
@@ -2779,6 +2831,10 @@ private struct StreamTile: View {
 
     private func stop() {
         metadataTask?.cancel()
+        #if os(iOS)
+        // Keep the player alive while PiP is active so video continues in the overlay.
+        guard !pipHolder.isActive else { return }
+        #endif
         player?.pause()
         player = nil
     }
@@ -2815,10 +2871,21 @@ private struct VideoSurface: UIViewRepresentable {
     let player: AVPlayer
     let showsPlaybackControls: Bool
     let allowsPictureInPicture: Bool
+    var onPiPControllerReady: ((AVPictureInPictureController) -> Void)? = nil
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> PlayerLayerView {
         let view = PlayerLayerView()
         view.player = player
+        #if os(iOS)
+        if allowsPictureInPicture, AVPictureInPictureController.isPictureInPictureSupported(),
+           let pip = AVPictureInPictureController(playerLayer: view.playerLayer) {
+            pip.canStartPictureInPictureAutomaticallyFromInline = true
+            context.coordinator.pipController = pip
+            onPiPControllerReady?(pip)
+        }
+        #endif
         return view
     }
 
@@ -2826,6 +2893,10 @@ private struct VideoSurface: UIViewRepresentable {
         if view.player !== player {
             view.player = player
         }
+    }
+
+    final class Coordinator: NSObject {
+        var pipController: AVPictureInPictureController?
     }
 }
 #endif

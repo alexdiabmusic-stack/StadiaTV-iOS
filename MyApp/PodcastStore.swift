@@ -389,7 +389,7 @@ final class PodcastStore: ObservableObject {
     // MARK: - Audio session
 
     private func configureAudioSession() {
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.allowBluetoothHFP])
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.allowBluetoothHFP, .allowAirPlay])
         try? AVAudioSession.sharedInstance().setActive(true)
     }
 

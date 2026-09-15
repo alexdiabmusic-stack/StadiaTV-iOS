@@ -45,6 +45,8 @@ struct MatchDetailView: View {
     @State private var isLoadingOdds = false
     @State private var showPickCelebration = false
     @State private var gameCenterTab: GameCenterTab = .players
+    @State private var matchNews: [ESPNArticle] = []
+    @State private var presentedMatchArticle: ESPNArticle?
 
     private enum GameCenterTab: String, CaseIterable, Identifiable {
         case players = "Players"
@@ -124,6 +126,7 @@ struct MatchDetailView: View {
                     if match.state != .final {
                         highlightsSection
                     }
+                    matchNewsSection
                 }
                 .padding(16)
                 .padding(.bottom, isPickingMultiscreen ? 92 : 24)
@@ -159,8 +162,14 @@ struct MatchDetailView: View {
         .task(id: match.id) {
             await loadOdds()
         }
+        .task(id: match.id) {
+            matchNews = (try? await SportsRepository.shared.legacyNews(for: match.league, limit: 5)) ?? []
+        }
         .task(id: "\(match.id)-\(playlists.allChannels.count)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
             await rankSources()
+        }
+        .navigationDestination(item: $presentedMatchArticle) { article in
+            ArticleReaderView(article: article)
         }
     }
 
@@ -2409,6 +2418,32 @@ struct MatchDetailView: View {
             ("tudn", "https://www.tudn.com")
         ]
         return known.first(where: { key.contains($0.needle) }).flatMap { URL(string: $0.url) }
+    }
+
+    // MARK: - Match News
+
+    @ViewBuilder private var matchNewsSection: some View {
+        if !matchNews.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "newspaper.fill")
+                        .foregroundStyle(Theme.accent)
+                    Text("RELATED NEWS")
+                        .font(.caption.weight(.heavy))
+                        .foregroundStyle(Theme.accent)
+                }
+                VStack(spacing: 10) {
+                    ForEach(matchNews) { article in
+                        NewsArticleCard(article: article) {
+                            presentedMatchArticle = article
+                        }
+                    }
+                }
+            }
+            .padding(14)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        }
     }
 }
 

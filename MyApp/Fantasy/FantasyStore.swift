@@ -333,7 +333,7 @@ final class FantasyStore: ObservableObject {
                 return
             }
 
-            let league = settings.selectedLeagueID.flatMap { id in loadedLeagues.first { $0.id == id } } ?? loadedLeagues.first!
+            guard let league = settings.selectedLeagueID.flatMap({ id in loadedLeagues.first { $0.id == id } }) ?? loadedLeagues.first else { return }
             selectedLeague = league
             settings.selectedLeagueID = league.id
             snapshot.settings = settings
@@ -533,9 +533,15 @@ final class FantasyStore: ObservableObject {
     }
 
     private func rebuildFantasyIndexes(from games: [FantasyPlayerGame]) {
-        fantasyGamesByEventID = Dictionary(grouping: games.filter { $0.event != nil }, by: { $0.event!.id })
-        fantasyGamesByChannelID = Dictionary(grouping: games.filter { $0.matchedChannel != nil }, by: { $0.matchedChannel!.channel.id })
-        fantasyEventContextsByEventID = Dictionary(uniqueKeysWithValues: fantasyGamesByEventID.compactMap { eventID, games in
+        var byEvent: [String: [FantasyPlayerGame]] = [:]
+        var byChannel: [String: [FantasyPlayerGame]] = [:]
+        for game in games {
+            if let eventId = game.event?.id { byEvent[eventId, default: []].append(game) }
+            if let channelId = game.matchedChannel?.channel.id { byChannel[channelId, default: []].append(game) }
+        }
+        fantasyGamesByEventID = byEvent
+        fantasyGamesByChannelID = byChannel
+        fantasyEventContextsByEventID = Dictionary(uniqueKeysWithValues: byEvent.compactMap { eventID, games in
             guard let event = games.first?.event else { return nil }
             let matchedChannel = games.compactMap(\.matchedChannel).sorted { $0.score > $1.score }.first
             return (eventID, FantasyEventContext(event: event, playerGames: games, matchedChannel: matchedChannel))

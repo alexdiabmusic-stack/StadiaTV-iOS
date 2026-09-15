@@ -72,6 +72,12 @@ struct TVMatchCard: View {
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.live)
                     .lineLimit(1)
+                if !match.broadcasts.isEmpty {
+                    Text(match.broadcasts.prefix(2).joined(separator: " · "))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
+                }
             }
         }
         .frame(maxWidth: .infinity)

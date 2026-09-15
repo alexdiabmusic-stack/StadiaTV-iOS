@@ -25,7 +25,6 @@ struct TVPlayerView: View {
     @State private var liveScoreMatch: Match?
     @State private var isScoreExpanded = false
     @State private var isScoreDismissed = false
-    @State private var scoreFetchTask: Task<Void, Never>?
 
     private var canStartMultiscreen: Bool {
         playlistStore.channelsByPlaylist.values.contains { channels in
@@ -93,18 +92,15 @@ struct TVPlayerView: View {
             player?.pause()
             player = nil
             chromeHideTask?.cancel()
-            scoreFetchTask?.cancel()
         }
         .task(id: channel.id) {
             isScoreDismissed = false
             isScoreExpanded = false
-            scoreFetchTask?.cancel()
             if let match = initialMatch {
                 liveScoreMatch = match
-                let m = match
-                scoreFetchTask = Task { await pollMatchUpdates(for: m) }
+                await pollMatchUpdates(for: match)
             } else {
-                scoreFetchTask = Task { await findAndPollLiveMatch() }
+                await findAndPollLiveMatch()
             }
         }
         .task(id: playlistStore.allChannels.count) {

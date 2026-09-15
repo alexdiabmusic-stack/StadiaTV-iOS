@@ -2,6 +2,34 @@ import Foundation
 
 // MARK: - ESPN networking
 
+/// Coalesces concurrent requests to the same ESPN URL into a single network call.
+private actor ESPNRequestDeduplicator {
+    private var inFlight: [URL: Task<Data, Error>] = [:]
+
+    func fetch(url: URL, using session: URLSession) async throws -> Data {
+        if let existing = inFlight[url] {
+            return try await existing.value
+        }
+        let task = Task<Data, Error> {
+            let (data, response) = try await session.data(from: url)
+            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+                let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+                throw ESPNService.ServiceError.httpError(status)
+            }
+            return data
+        }
+        inFlight[url] = task
+        do {
+            let result = try await task.value
+            inFlight.removeValue(forKey: url)
+            return result
+        } catch {
+            inFlight.removeValue(forKey: url)
+            throw error
+        }
+    }
+}
+
 /// Fetches scoreboards from ESPN's public site API and maps them into `Match` values.
 struct ESPNService {
 
@@ -16,6 +44,8 @@ struct ESPNService {
         }
     }
 
+
+    private static let deduplicator = ESPNRequestDeduplicator()
 
     private let session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -47,11 +77,7 @@ struct ESPNService {
         }
         if !query.isEmpty { components.queryItems = query }
 
-        let (data, response) = try await session.data(from: components.url!)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-            throw ServiceError.httpError(status)
-        }
+        let data = try await Self.deduplicator.fetch(url: components.url!, using: session)
         let decoded = try JSONDecoder().decode(ScoreboardResponse.self, from: data)
         return decoded.events?.compactMap { $0.toMatch(league: league) } ?? []
     }
@@ -191,19 +217,20 @@ struct ESPNService {
     /// Recursively searches JSON for the longest string value matching `key` with at least `minLength` characters.
     private static func deepFindLongest(key: String, in value: Any, minLength: Int) -> String? {
         var best: String? = nil
-        func search(_ v: Any) {
+        func search(_ v: Any, depth: Int) {
+            guard depth < 20 else { return }
             switch v {
             case let dict as [String: Any]:
                 if let str = dict[key] as? String, str.count >= minLength, str.count > (best?.count ?? 0) {
                     best = str
                 }
-                dict.values.forEach { search($0) }
+                dict.values.forEach { search($0, depth: depth + 1) }
             case let arr as [Any]:
-                arr.forEach { search($0) }
+                arr.forEach { search($0, depth: depth + 1) }
             default: break
             }
         }
-        search(value)
+        search(value, depth: 0)
         return best
     }
 

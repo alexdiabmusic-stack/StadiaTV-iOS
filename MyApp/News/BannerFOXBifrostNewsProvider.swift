@@ -9,8 +9,7 @@ struct FOXBifrostNewsProvider: SportsNewsProvider {
     let metadata: SportsDataProviderMetadata
     var supportsPagination: Bool { false }
 
-    // Public default from SportsDataverse fox.ts — not a private credential.
-    private static let apiKey = "jE7yBJVRNAwdDesMgTzTXUUSx1It41Fq"
+    private static var apiKey: String { AppConfiguration.foxSportsAPIKey }
     private static let apiVersion = "1.1"
     private static let bifrostBase = "https://api.foxsports.com/bifrost/v1"
 

@@ -87,14 +87,15 @@ actor BannerNewsHTTPClient {
                 lastError = HTTPError.httpStatus(code)
                 attempt += 1
                 if attempt < maxAttempts {
-                    let delay = pow(2.0, Double(attempt)) * 0.5
+                    let delay = pow(2.0, Double(attempt)) * 0.5 * Double.random(in: 0.5...1.5)
                     try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 }
             } catch HTTPError.timeout {
                 lastError = HTTPError.timeout
                 attempt += 1
                 if attempt < maxAttempts {
-                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    let delay = Double.random(in: 0.75...1.5)
+                    try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 }
             } catch {
                 throw error  // non-retryable

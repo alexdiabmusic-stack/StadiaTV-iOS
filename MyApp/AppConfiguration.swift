@@ -15,6 +15,9 @@ enum AppConfiguration {
     private nonisolated static let cbsSportsEnabledName = "CBSSportsProviderEnabled"
     private nonisolated static let yahooSportsEnabledName = "YahooSportsProviderEnabled"
     private nonisolated static let foxSportsEnabledName = "FoxSportsProviderEnabled"
+    private nonisolated static let foxSportsAPIKeyName = "FoxSportsAPIKey"
+    // Public default from SportsDataverse fox.ts — not a private credential.
+    private nonisolated static let foxSportsAPIKeyFallback = "jE7yBJVRNAwdDesMgTzTXUUSx1It41Fq"
     private nonisolated static let foxBifrostNewsEnabledName = "FOXBifrostNewsProviderEnabled"
     private nonisolated static let cbsRSSEnabledName = "CBSRSSNewsProviderEnabled"
     private nonisolated static let bbcSportEnabledName = "BBCSportNewsProviderEnabled"
@@ -27,10 +30,12 @@ enum AppConfiguration {
         sanitizedString(for: oddsAPIKeyName)
     }
 
+    private static let _oddsAPIFallbackURL = URL(string: "https://mlapi.bet/v1")!
+
     static var oddsAPIBaseURL: URL {
         sanitizedString(for: oddsAPIBaseURLName)
             .flatMap(URL.init(string:))
-            ?? URL(string: "https://mlapi.bet/v1")!
+            ?? _oddsAPIFallbackURL
     }
 
     static var backendBaseURL: URL? {
@@ -39,6 +44,10 @@ enum AppConfiguration {
 
     static var youtubeAPIKey: String? {
         sanitizedString(for: youtubeAPIKeyName)
+    }
+
+    nonisolated static var foxSportsAPIKey: String {
+        sanitizedString(for: foxSportsAPIKeyName) ?? foxSportsAPIKeyFallback
     }
 
     static var isOddsEnabled: Bool {

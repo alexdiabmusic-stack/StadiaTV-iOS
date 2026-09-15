@@ -293,7 +293,7 @@ final class NewsViewModel: ObservableObject {
     }
 }
 
-private struct NewsArticleCard: View {
+struct NewsArticleCard: View {
     let article: ESPNArticle
     let action: () -> Void
 

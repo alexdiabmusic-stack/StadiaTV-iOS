@@ -49,8 +49,10 @@ actor LiveChannelStore {
     }
 
     private static func empty() -> LiveChannelStore {
-        // Fallback that accepts all writes silently but never reads.
-        try! LiveChannelStore.inMemory()
+        guard let store = try? LiveChannelStore.inMemory() else {
+            fatalError("SQLite in-memory database unavailable — cannot create fallback store")
+        }
+        return store
     }
 
     deinit { sqlite3_close(db) }

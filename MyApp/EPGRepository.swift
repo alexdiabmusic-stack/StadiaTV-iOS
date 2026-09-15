@@ -619,9 +619,7 @@ final class EPGRepository: ObservableObject {
         }
 
         // Sort each channel's programmes by start time, deduplicate overlaps
-        for key in index.keys {
-            index[key] = deduplicate(index[key]!.sorted { $0.start < $1.start })
-        }
+        index = index.mapValues { deduplicate($0.sorted { $0.start < $1.start }) }
 
         programmeIndex = index
     }

@@ -1283,6 +1283,325 @@ struct ESPNFantasyConnectSheet: View {
     }
 }
 
+// MARK: - Player & Playback Settings
+
+struct PlayerPlaybackSettingsView: View {
+    @EnvironmentObject private var prefs: PreferencesStore
+
+    var body: some View {
+        SettingsPage(title: "Player & Playback") {
+            SettingsPanel(title: "STREAM LANGUAGE") {
+                Menu {
+                    ForEach(StreamLanguage.all) { language in
+                        Button { prefs.setDefaultStreamLanguage(language) } label: {
+                            if prefs.isStreamLanguageSelected(language) {
+                                Label(language.name, systemImage: "checkmark")
+                            } else {
+                                Text(language.name)
+                            }
+                        }
+                    }
+                } label: {
+                    SettingsDisclosureRow(title: "Preferred Language", value: defaultStreamLanguageName)
+                }
+            }
+
+            SettingsPanel(title: "SCORES") {
+                SettingsToggleRow(
+                    title: "Spoiler-Free Mode",
+                    isOn: Binding(get: { prefs.spoilerFreeMode }, set: { prefs.setSpoilerFreeMode($0) })
+                )
+                Text("Hides completed-game scores and result headlines.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
+                Divider().overlay(Theme.hairline)
+                SettingsToggleRow(
+                    title: "Live Score Overlay",
+                    isOn: Binding(get: { prefs.showLiveScoreBadge }, set: { prefs.setShowLiveScoreBadge($0) })
+                )
+                Divider().overlay(Theme.hairline)
+                SettingsToggleRow(
+                    title: "Live Score Bar",
+                    isOn: Binding(get: { prefs.showLiveScoreBar }, set: { prefs.setShowLiveScoreBar($0) })
+                )
+                Text("Shows a red accent bar at the top of live match cards.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
+            }
+
+            SettingsPanel(title: "CONTROLS") {
+                Menu {
+                    ForEach([2, 4, 8, 15, 30], id: \.self) { seconds in
+                        Button { prefs.setPlayerPanelTimeoutSeconds(seconds) } label: {
+                            if prefs.playerPanelTimeoutSeconds == seconds {
+                                Label("\(seconds) seconds", systemImage: "checkmark")
+                            } else {
+                                Text("\(seconds) seconds")
+                            }
+                        }
+                    }
+                } label: {
+                    SettingsDisclosureRow(title: "Controls Hide After", value: "\(prefs.playerPanelTimeoutSeconds)s")
+                }
+            }
+        }
+    }
+
+    private var defaultStreamLanguageName: String {
+        let code = prefs.preferredStreamLanguages.first ?? "en"
+        return StreamLanguage.all.first { $0.code == code }?.name ?? "English"
+    }
+}
+
+// MARK: - Live TV & Guide Settings
+
+struct LiveTVGuideSettingsView: View {
+    @EnvironmentObject private var prefs: PreferencesStore
+    @EnvironmentObject private var epgRepository: EPGRepository
+
+    var body: some View {
+        SettingsPage(title: "Live TV & Guide") {
+            SettingsPanel(title: "GUIDE APPEARANCE") {
+                SettingsToggleRow(
+                    title: "Show Channel Numbers",
+                    isOn: Binding(get: { prefs.showChannelNumbers }, set: { prefs.setShowChannelNumbers($0) })
+                )
+                Divider().overlay(Theme.hairline)
+                SettingsToggleRow(
+                    title: "Highlight Current Programme",
+                    isOn: Binding(get: { prefs.epgHighlightCurrentProgramme }, set: { prefs.setEPGHighlightCurrentProgramme($0) })
+                )
+                Divider().overlay(Theme.hairline)
+                Menu {
+                    ForEach([1, 2], id: \.self) { lines in
+                        Button { prefs.setGuideProgrammeTitleLines(lines) } label: {
+                            let label = lines == 1 ? "1 line (Compact)" : "2 lines (Standard)"
+                            if prefs.guideProgrammeTitleLines == lines {
+                                Label(label, systemImage: "checkmark")
+                            } else {
+                                Text(label)
+                            }
+                        }
+                    }
+                } label: {
+                    SettingsDisclosureRow(
+                        title: "Programme Title Lines",
+                        value: prefs.guideProgrammeTitleLines == 1 ? "Compact" : "Standard"
+                    )
+                }
+            }
+
+            SettingsPanel(title: "TIME SCALE") {
+                Menu {
+                    ForEach([30, 60, 90, 120], id: \.self) { minutes in
+                        Button { prefs.setGuideTimeScaleMinutes(minutes) } label: {
+                            let label = minutes < 60 ? "\(minutes) min" : "\(minutes / 60) hour"
+                            if prefs.guideTimeScaleMinutes == minutes {
+                                Label(label, systemImage: "checkmark")
+                            } else {
+                                Text(label)
+                            }
+                        }
+                    }
+                } label: {
+                    SettingsDisclosureRow(title: "Time Window", value: guideTimeLabel)
+                }
+            }
+
+            SettingsPanel(title: "EPG STATUS") {
+                DiagnosticValueRow(title: "Status", value: epgStatusText)
+                Divider().overlay(Theme.hairline)
+                DiagnosticValueRow(title: "Last Updated", value: epgLastUpdatedText)
+                Divider().overlay(Theme.hairline)
+                Button {
+                    Task { await epgRepository.forceRefresh() }
+                } label: {
+                    SettingsDisclosureRow(
+                        title: "Refresh Guide Now",
+                        value: epgRepository.refreshState == .refreshing ? "Updating…" : nil
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(epgRepository.refreshState == .refreshing)
+            }
+        }
+    }
+
+    private var guideTimeLabel: String {
+        let m = prefs.guideTimeScaleMinutes
+        return m < 60 ? "\(m) min" : "\(m / 60) hour"
+    }
+
+    private var epgStatusText: String {
+        switch epgRepository.refreshState {
+        case .idle:       return epgRepository.lastUpdated != nil ? "Ready" : "Not yet updated"
+        case .refreshing: return "Updating…"
+        case .failed(let msg): return "Failed — \(msg)"
+        }
+    }
+
+    private var epgLastUpdatedText: String {
+        guard let date = epgRepository.lastUpdated else { return "Never" }
+        return date.formatted(date: .abbreviated, time: .shortened)
+    }
+}
+
+// MARK: - Appearance Settings
+
+struct AppearanceSettingsView: View {
+    @EnvironmentObject private var prefs: PreferencesStore
+
+    var body: some View {
+        SettingsPage(title: "Appearance") {
+            SettingsPanel(title: "THEME") {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 10) {
+                        ForEach(AppAppearance.allCases) { appearance in
+                            AppearanceThemeCard(
+                                appearance: appearance,
+                                isSelected: prefs.appearance == appearance
+                            ) {
+                                withAnimation(.spring(response: 0.22, dampingFraction: 0.75)) {
+                                    prefs.setAppearance(appearance)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(14)
+            }
+        }
+    }
+}
+
+private struct AppearanceThemeCard: View {
+    let appearance: AppAppearance
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(previewBackground)
+                        .frame(height: 56)
+
+                    VStack(spacing: 5) {
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                            .fill(Color(hex: 0x3B82F6))
+                            .frame(height: 7)
+                            .padding(.horizontal, 10)
+                            .padding(.top, 10)
+                        HStack(spacing: 5) {
+                            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                .fill(previewCard)
+                                .frame(height: 16)
+                            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                                .fill(previewCard)
+                                .frame(height: 16)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.bottom, 8)
+                    }
+                }
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(isSelected ? Theme.accent : Theme.hairline, lineWidth: isSelected ? 1.5 : 0.5)
+                )
+
+                Text(appearance.label)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isSelected ? Theme.accent : Theme.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+        .scaleEffect(isSelected ? 1.03 : 1.0)
+        .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isSelected)
+        .accessibilityLabel(appearance.label)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var previewBackground: Color {
+        switch appearance {
+        case .dark:   return Color(hex: 0x080A0F)
+        case .light:  return Color(hex: 0xF4F5F7)
+        case .system: return Color(UIColor.systemBackground)
+        }
+    }
+
+    private var previewCard: Color {
+        switch appearance {
+        case .dark:   return Color(hex: 0x181C24)
+        case .light:  return Color(hex: 0xE0E2E8)
+        case .system: return Color(UIColor.secondarySystemBackground)
+        }
+    }
+}
+
+// MARK: - System Status View
+
+struct BannerSystemStatusView: View {
+    @EnvironmentObject private var playlists: PlaylistStore
+    @EnvironmentObject private var epgRepository: EPGRepository
+    @EnvironmentObject private var prefs: PreferencesStore
+
+    var body: some View {
+        SettingsPage(title: "System Status") {
+            SettingsPanel(title: "SERVICES") {
+                DiagnosticValueRow(title: "Streams", value: streamsStatus)
+                Divider().overlay(Theme.hairline)
+                DiagnosticValueRow(title: "Guide (EPG)", value: guideStatus)
+                Divider().overlay(Theme.hairline)
+                DiagnosticValueRow(title: "Last Guide Update", value: lastUpdateText)
+                Divider().overlay(Theme.hairline)
+                DiagnosticValueRow(title: "iCloud Sync", value: prefs.cloudSyncEnabled ? "Enabled" : "Disabled")
+            }
+
+            SettingsPanel(title: "PLAYLISTS") {
+                if playlists.playlists.isEmpty {
+                    InfoTextRow("No playlists connected.")
+                } else {
+                    ForEach(Array(playlists.playlists.enumerated()), id: \.element.id) { index, playlist in
+                        DiagnosticValueRow(
+                            title: playlist.name,
+                            value: "\(playlists.channelCount(for: playlist)) channels"
+                        )
+                        if index < playlists.playlists.count - 1 {
+                            Divider().overlay(Theme.hairline)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var streamsStatus: String {
+        let count = playlists.playlists.count
+        if count == 0 { return "No playlists" }
+        let total = playlists.playlists.reduce(0) { $0 + playlists.channelCount(for: $1) }
+        return "\(count) playlist\(count == 1 ? "" : "s") · \(total) channels"
+    }
+
+    private var guideStatus: String {
+        switch epgRepository.refreshState {
+        case .idle:           return epgRepository.lastUpdated != nil ? "Ready" : "Not yet updated"
+        case .refreshing:     return "Updating…"
+        case .failed(let msg): return "Failed — \(msg)"
+        }
+    }
+
+    private var lastUpdateText: String {
+        guard let date = epgRepository.lastUpdated else { return "Never" }
+        return date.formatted(date: .abbreviated, time: .shortened)
+    }
+}
+
 private struct DiagnosticValueRow: View {
     let title: String
     let value: String

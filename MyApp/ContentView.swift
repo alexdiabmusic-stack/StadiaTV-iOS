@@ -163,7 +163,7 @@ struct RootView: View {
             Button("Not Now", role: .cancel) {
                 prefs.markFavoriteTeamNotificationPromptAnswered()
             }
-            Button("Enable Notifications") {
+            Button("Allow Notifications") {
                 Task { await enableFavoriteTeamNotifications() }
             }
         } message: {

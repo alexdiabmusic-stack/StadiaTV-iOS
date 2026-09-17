@@ -12,6 +12,7 @@ struct TVPlayerView: View {
     @EnvironmentObject private var playlistStore: PlaylistStore
     @EnvironmentObject private var entitlements: EntitlementStore
     @EnvironmentObject private var prefs: PreferencesStore
+    @EnvironmentObject private var fantasyStore: FantasyStore
 
     @State private var player: AVPlayer?
     @State private var isPlaying = true
@@ -20,6 +21,8 @@ struct TVPlayerView: View {
     @State private var showMultiscreen = false
     @State private var multiscreenChannelsList: [Channel] = []
     @State private var showPaywall = false
+    @State private var showingFantasySidebar = false
+    @StateObject private var liveTracker = FantasyLiveTrackerEngine.shared
 
     // Live score
     @State private var liveScoreMatch: Match?
@@ -103,6 +106,56 @@ struct TVPlayerView: View {
                 await findAndPollLiveMatch()
             }
         }
+        .overlay(alignment: .trailing) {
+            if showingFantasySidebar {
+                FantasyMatchupSidebarView(
+                    onWatchChannel: { ch in
+                        withAnimation(.spring(duration: 0.3)) { showingFantasySidebar = false }
+                    },
+                    onClose: {
+                        withAnimation(.spring(duration: 0.3)) { showingFantasySidebar = false }
+                    }
+                )
+                .environmentObject(fantasyStore)
+                .transition(.move(edge: .trailing))
+                .zIndex(100)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if liveTracker.showToastAlert, let alert = liveTracker.recentAlert {
+                FantasyRedZoneToastView(
+                    alert: alert,
+                    onWatchChannel: { ch in
+                        liveTracker.dismissCurrentAlert()
+                    },
+                    onDismiss: {
+                        liveTracker.dismissCurrentAlert()
+                    }
+                )
+                .padding(.top, 60)
+                .padding(.trailing, 16)
+                .zIndex(90)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if !showingFantasySidebar && isChromeVisible {
+                FantasyDriveTickerOverlayView(onWatchChannel: { ch in
+                })
+                .padding(.bottom, 85)
+                .zIndex(85)
+            }
+        }
+        .task(id: fantasyStore.playerGames.count) {
+            liveTracker.processLiveGames(
+                playerGames: fantasyStore.playerGames,
+                matchup: fantasyStore.matchup,
+                channels: playlistStore.allChannels
+            )
+            FantasyDriveTickerEngine.shared.updateDriveData(
+                playerGames: fantasyStore.playerGames,
+                matches: fantasyStore.playerGames.compactMap(\.event)
+            )
+        }
         .task(id: playlistStore.allChannels.count) {
             let channels = playlistStore.allChannels
             let current = channel
@@ -174,6 +227,18 @@ struct TVPlayerView: View {
                         .background(.black.opacity(0.5), in: Capsule())
                 }
                 Spacer()
+                if !fantasyStore.playerGames.isEmpty {
+                    Button {
+                        withAnimation(.spring(duration: 0.3)) { showingFantasySidebar.toggle() }
+                    } label: {
+                        Label(Fantasy, systemImage: star.fill)
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 20).padding(.vertical, 12)
+                            .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .buttonStyle(.card)
+                }
                 if canStartMultiscreen {
                     Button { startMultiscreen() } label: {
                         Label("Multiscreen", systemImage: "rectangle.split.2x1.fill")

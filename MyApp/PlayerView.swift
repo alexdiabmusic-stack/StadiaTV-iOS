@@ -156,6 +156,8 @@ struct PlayerView: View {
     @State private var isLandscapeGameCentreVisible = false
     @State private var showPaywall = false
     @State private var showingSourceSelector = false
+    @State private var showingFantasySidebar = false
+    @StateObject private var liveTracker = FantasyLiveTrackerEngine.shared
     #if os(iOS)
     @State private var dismissalDragOffset: CGSize = .zero
     @State private var activeDismissalGesture: PlayerDismissalGestureKind?
@@ -456,6 +458,7 @@ struct PlayerView: View {
                     onGuide: showsLiveTVControls ? { showingGuideFromPlayer = true } : nil,
                     onChannels: zapChannels.count > 1 ? { showingChannelList = true } : nil,
                     onRecent: showsLiveTVControls ? { showingRecents = true } : nil,
+                    onFantasy: { showingFantasySidebar.toggle() },
                     onMore: { showingMore = true }
                 )
                 .padding(16)
@@ -529,6 +532,59 @@ struct PlayerView: View {
                 }
                 showingGuideFromPlayer = false
             })
+        }
+        .overlay(alignment: .trailing) {
+            if showingFantasySidebar {
+                FantasyMatchupSidebarView(
+                    onWatchChannel: { ch in
+                        withAnimation(.spring(duration: 0.3)) { showingFantasySidebar = false }
+                        zapToChannel(ch)
+                    },
+                    onClose: {
+                        withAnimation(.spring(duration: 0.3)) { showingFantasySidebar = false }
+                    }
+                )
+                .environmentObject(fantasyStore)
+                .transition(.move(edge: .trailing))
+                .zIndex(100)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if liveTracker.showToastAlert, let alert = liveTracker.recentAlert {
+                FantasyRedZoneToastView(
+                    alert: alert,
+                    onWatchChannel: { ch in
+                        liveTracker.dismissCurrentAlert()
+                        zapToChannel(ch)
+                    },
+                    onDismiss: {
+                        liveTracker.dismissCurrentAlert()
+                    }
+                )
+                .padding(.top, 60)
+                .padding(.trailing, 16)
+                .zIndex(90)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if !showingFantasySidebar && isChromeVisible {
+                FantasyDriveTickerOverlayView(onWatchChannel: { ch in
+                    zapToChannel(ch)
+                })
+                .padding(.bottom, 85)
+                .zIndex(85)
+            }
+        }
+        .task(id: fantasyStore.playerGames.count) {
+            liveTracker.processLiveGames(
+                playerGames: fantasyStore.playerGames,
+                matchup: fantasyStore.matchup,
+                channels: playlistStore.allChannels
+            )
+            FantasyDriveTickerEngine.shared.updateDriveData(
+                playerGames: fantasyStore.playerGames,
+                matches: fantasyStore.playerGames.compactMap(\.event)
+            )
         }
         .fullScreenCover(item: $multiscreenSession) { session in
             MultiScreenPlayerView(channels: session.channels)
@@ -764,6 +820,21 @@ struct PlayerView: View {
     }
 
     // MARK: Channel zapping
+
+    private func zapToChannel(_ ch: Channel) {
+        if let idx = zapChannels.firstIndex(where: { $0.id == ch.id }) {
+            zapTo(index: idx)
+        } else {
+            dwellTask?.cancel()
+            currentPlayerItem = nil
+            audioGroup = nil
+            subtitleGroup = nil
+            selectedAudioIndex = nil
+            selectedSubtitleIndex = nil
+            currentZapChannel = ch
+            startDwellTimer()
+        }
+    }
 
     private func zapTo(index: Int) {
         guard zapChannels.indices.contains(index), zapChannels[index].id != currentZapChannel.id else { return }
@@ -2491,16 +2562,99 @@ private struct PlayerMultiscreenSession: Identifiable {
     let channels: [Channel]
 }
 
-/// Plays up to four channels at once with one primary audio source.
+/// Layout style for MultiScreen player.
+private enum MultiScreenLayout: String, CaseIterable, Identifiable {
+    case twoVertical
+    case twoHorizontal
+    case pipInset
+    case four
+
+    var id: String { rawValue }
+
+    var capacity: Int {
+        switch self {
+        case .twoVertical, .twoHorizontal, .pipInset:
+            return 2
+        case .four:
+            return 4
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .twoVertical:
+            return "Up/down"
+        case .twoHorizontal:
+            return "Left/right"
+        case .pipInset:
+            return "Picture in Picture"
+        case .four:
+            return "4-up"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .twoVertical:
+            return "rectangle.split.2x1"
+        case .twoHorizontal:
+            return "rectangle.split.1x2"
+        case .pipInset:
+            return "rectangle.inset.filled"
+        case .four:
+            return "rectangle.grid.2x2"
+        }
+    }
+
+    static func defaultLayout(for channelCount: Int) -> MultiScreenLayout {
+        channelCount > 2 ? .four : .pipInset
+    }
+
+    static func options(for channelCount: Int) -> [MultiScreenLayout] {
+        channelCount > 2 ? [.pipInset, .twoVertical, .twoHorizontal, .four] : [.pipInset, .twoVertical, .twoHorizontal]
+    }
+}
+
+/// Alignment position for the PiP overlay inset tile.
+private enum PiPAlignment: String, CaseIterable, Identifiable {
+    case bottomTrailing
+    case bottomLeading
+    case topLeading
+    case topTrailing
+
+    var id: String { rawValue }
+
+    var alignment: Alignment {
+        switch self {
+        case .bottomTrailing: return .bottomTrailing
+        case .bottomLeading: return .bottomLeading
+        case .topLeading: return .topLeading
+        case .topTrailing: return .topTrailing
+        }
+    }
+
+    var next: PiPAlignment {
+        switch self {
+        case .bottomTrailing: return .bottomLeading
+        case .bottomLeading: return .topLeading
+        case .topLeading: return .topTrailing
+        case .topTrailing: return .bottomTrailing
+        }
+    }
+}
+
+/// Plays up to four channels at once with interactive PiP and multi-stream grid layouts.
 struct MultiScreenPlayerView: View {
     let channels: [Channel]
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var watchStore: WatchStore
-    @State private var layout: MultiScreenLayout = .twoVertical
+    @State private var activeChannels: [Channel] = []
+    @State private var layout: MultiScreenLayout = .pipInset
     @State private var primaryChannelID: String?
+    @State private var pipAlignment: PiPAlignment = .bottomTrailing
 
     private var visibleChannels: [Channel] {
-        Array(channels.prefix(layout.capacity))
+        Array(activeChannels.prefix(layout.capacity))
     }
 
     private var activePrimaryID: String? {
@@ -2511,7 +2665,7 @@ struct MultiScreenPlayerView: View {
     }
 
     private var layoutOptions: [MultiScreenLayout] {
-        MultiScreenLayout.options(for: channels.count)
+        MultiScreenLayout.options(for: activeChannels.count)
     }
 
     var body: some View {
@@ -2524,13 +2678,14 @@ struct MultiScreenPlayerView: View {
                 .padding(.top, 10)
         }
         .onAppear {
+            activeChannels = channels
             layout = MultiScreenLayout.defaultLayout(for: channels.count)
             primaryChannelID = channels.first?.id
             for channel in channels {
                 watchStore.recordWatch(channel)
             }
         }
-        .onChange(of: channels.count) { _, newCount in
+        .onChange(of: activeChannels.count) { _, newCount in
             if !MultiScreenLayout.options(for: newCount).contains(layout) {
                 layout = MultiScreenLayout.defaultLayout(for: newCount)
             }
@@ -2547,6 +2702,30 @@ struct MultiScreenPlayerView: View {
                 .textCase(.uppercase)
 
             Spacer()
+
+            if layout == .pipInset {
+                Button {
+                    withAnimation(.spring(duration: 0.3)) {
+                        pipAlignment = pipAlignment.next
+                    }
+                    #if os(iOS)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.2.circlepath.camera")
+                            .font(.subheadline)
+                        Text("Position")
+                            .font(.caption.weight(.bold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .frame(height: 36)
+                    .background(.white.opacity(0.12), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Cycle PiP inset position")
+            }
 
             // Layout buttons — icon-only for quick switching
             HStack(spacing: 4) {
@@ -2590,6 +2769,31 @@ struct MultiScreenPlayerView: View {
                     tile(for: channel)
                 }
             }
+        case .pipInset:
+            GeometryReader { proxy in
+                ZStack(alignment: pipAlignment.alignment) {
+                    if let primary = visibleChannels.first {
+                        tile(for: primary, isPiPInset: false)
+                            .frame(width: proxy.size.width, height: proxy.size.height)
+                    }
+                    if visibleChannels.count > 1 {
+                        let secondary = visibleChannels[1]
+                        let pipWidth = min(proxy.size.width * 0.38, 280)
+                        let pipHeight = pipWidth * (9.0 / 16.0)
+                        tile(for: secondary, isPiPInset: true)
+                            .frame(width: pipWidth, height: pipHeight)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .strokeBorder(secondary.id == activePrimaryID ? Theme.accent : .white.opacity(0.3), lineWidth: 2)
+                            )
+                            .shadow(color: .black.opacity(0.6), radius: 10, x: 0, y: 4)
+                            .padding(16)
+                            .padding(.top, 50)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
+            }
         case .four:
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
@@ -2612,20 +2816,40 @@ struct MultiScreenPlayerView: View {
         }
     }
 
-    private func tile(for channel: Channel) -> some View {
+    private func tile(for channel: Channel, isPiPInset: Bool = false) -> some View {
         let isPrimary = channel.id == activePrimaryID
-        return Button {
-            primaryChannelID = channel.id
-        } label: {
-            StreamTile(channel: channel, isPrimary: isPrimary, showsChrome: true)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
-                .overlay(
+        return StreamTile(
+            channel: channel,
+            isPrimary: isPrimary,
+            showsChrome: true,
+            onToggleAudio: {
+                primaryChannelID = channel.id
+            },
+            onSwap: {
+                swapWithPrimary(channel: channel)
+            }
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
+        .overlay(
+            Group {
+                if !isPiPInset {
                     Rectangle()
                         .strokeBorder(isPrimary ? Theme.accent : Theme.hairline, lineWidth: isPrimary ? 2 : 1)
-                )
+                }
+            }
+        )
+    }
+
+    private func swapWithPrimary(channel: Channel) {
+        guard let index = activeChannels.firstIndex(where: { $0.id == channel.id }), index != 0 else { return }
+        withAnimation(.spring(duration: 0.35)) {
+            activeChannels.swapAt(0, index)
+            primaryChannelID = activeChannels.first?.id
         }
-        .buttonStyle(.plain)
+        #if os(iOS)
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        #endif
     }
 
     private func emptyTile(title: String) -> some View {
@@ -2642,53 +2866,6 @@ struct MultiScreenPlayerView: View {
                 .foregroundStyle(Theme.textSecondary)
             }
             .overlay(Rectangle().strokeBorder(Theme.hairline))
-    }
-}
-
-private enum MultiScreenLayout: String, CaseIterable, Identifiable {
-    case twoVertical
-    case twoHorizontal
-    case four
-
-    var id: String { rawValue }
-
-    var capacity: Int {
-        switch self {
-        case .twoVertical, .twoHorizontal:
-            return 2
-        case .four:
-            return 4
-        }
-    }
-
-    var title: String {
-        switch self {
-        case .twoVertical:
-            return "Up/down"
-        case .twoHorizontal:
-            return "Left/right"
-        case .four:
-            return "4-up"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .twoVertical:
-            return "rectangle.split.2x1"
-        case .twoHorizontal:
-            return "rectangle.split.1x2"
-        case .four:
-            return "rectangle.grid.2x2"
-        }
-    }
-
-    static func defaultLayout(for channelCount: Int) -> MultiScreenLayout {
-        channelCount > 2 ? .four : .twoVertical
-    }
-
-    static func options(for channelCount: Int) -> [MultiScreenLayout] {
-        channelCount > 2 ? [.twoVertical, .twoHorizontal, .four] : [.twoVertical, .twoHorizontal]
     }
 }
 
@@ -2710,6 +2887,8 @@ private struct StreamTile: View {
     var onMetadata: ((StreamRuntimeMetadata) -> Void)? = nil
     var onPlayerItemReady: ((AVPlayerItem) -> Void)? = nil
     var onPiPControllerReady: ((AVPictureInPictureController) -> Void)? = nil
+    var onToggleAudio: (() -> Void)? = nil
+    var onSwap: (() -> Void)? = nil
 
     @State private var player: AVPlayer?
     @State private var failed = false
@@ -2745,16 +2924,34 @@ private struct StreamTile: View {
         .overlay(alignment: .topLeading) {
             if showsChrome {
                 HStack(spacing: 6) {
-                    Circle()
-                        .fill(isPrimary ? Theme.accent : Theme.textSecondary)
-                        .frame(width: 7, height: 7)
-                    Text(isPrimary ? "PRIMARY" : "MUTED")
-                        .font(.caption2.weight(.heavy))
+                    Button {
+                        onToggleAudio?()
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: isPrimary ? "speaker.wave.2.fill" : "speaker.slash.fill")
+                                .font(.caption2)
+                            Text(isPrimary ? "AUDIO LIVE" : "MUTED")
+                                .font(.caption2.weight(.heavy))
+                        }
                         .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(isPrimary ? Theme.accent : .black.opacity(0.62), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    if let onSwap {
+                        Button(action: onSwap) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.white)
+                                .padding(5)
+                                .background(.black.opacity(0.62), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Swap position with main screen")
+                    }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 5)
-                .background(.black.opacity(0.62), in: Capsule())
                 .padding(8)
             }
         }
@@ -3624,6 +3821,7 @@ private struct PlayerControlBar: View {
     let onGuide: (() -> Void)?
     let onChannels: (() -> Void)?
     let onRecent: (() -> Void)?
+    let onFantasy: (() -> Void)?
     let onMore: () -> Void
 
     var body: some View {
@@ -3634,7 +3832,7 @@ private struct PlayerControlBar: View {
             if hasNext {
                 PlayerChromeButton(systemImage: "chevron.down", accessibilityLabel: "Next channel", action: onNext)
             }
-            if (hasPrev || hasNext) && (onGuide != nil || onChannels != nil || onRecent != nil) {
+            if (hasPrev || hasNext) && (onGuide != nil || onChannels != nil || onRecent != nil || onFantasy != nil) {
                 Divider().frame(height: 28).overlay(Theme.hairline)
             }
             if let onGuide {
@@ -3645,6 +3843,9 @@ private struct PlayerControlBar: View {
             }
             if let onRecent {
                 PlayerChromeButton(systemImage: "clock.arrow.circlepath", title: "Recent", accessibilityLabel: "Recent channels", action: onRecent)
+            }
+            if let onFantasy {
+                PlayerChromeButton(systemImage: "star.fill", title: "Fantasy", accessibilityLabel: "Fantasy sidebar", action: onFantasy)
             }
             Spacer()
             PlayerChromeButton(systemImage: "ellipsis", title: "More", accessibilityLabel: "More options", action: onMore)

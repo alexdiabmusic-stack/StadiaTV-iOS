@@ -119,7 +119,7 @@ struct RootView: View {
                 HomeView(switchToFollowing: { selectedTab = .following })
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }
-            Tab("Following", systemImage: "star.circle.fill", value: AppTab.following) {
+            Tab("Following", systemImage: "star.fill", value: AppTab.following) {
                 MatchesView()
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }
@@ -127,7 +127,7 @@ struct RootView: View {
                 LiveView()
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }
-            Tab("Discover", systemImage: "safari.fill", value: AppTab.discover) {
+            Tab("Discover", systemImage: "compass.fill", value: AppTab.discover) {
                 DiscoverView()
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }

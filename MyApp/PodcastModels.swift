@@ -30,12 +30,13 @@ struct PodcastCatalog: Decodable {
         let title: String
         let feedURL: URL
         let imageURL: URL?   // pre-populated from DB catalog; optional
+        let author: String?
         let sport: String
         let tags: [String]
         let language: String
 
         enum CodingKeys: String, CodingKey {
-            case id, title, tags, language, sport
+            case id, title, tags, language, sport, author
             case feedURL = "feed_url"
             case imageURL = "image_url"
         }
@@ -46,9 +47,24 @@ struct PodcastCatalog: Decodable {
             title = try c.decode(String.self, forKey: .title)
             feedURL = try c.decode(URL.self, forKey: .feedURL)
             imageURL = try? c.decode(URL.self, forKey: .imageURL)
+            author = try? c.decode(String.self, forKey: .author)
             sport = try c.decode(String.self, forKey: .sport)
             tags = (try? c.decode([String].self, forKey: .tags)) ?? []
             language = (try? c.decode(String.self, forKey: .language)) ?? "en"
+        }
+
+        func toPodcast(cachedMeta: Podcast? = nil) -> Podcast {
+            let pub = (cachedMeta?.publisher.isEmpty == false ? cachedMeta?.publisher : author) ?? ""
+            return Podcast(
+                id: feedURL.absoluteString,
+                title: (cachedMeta?.title.isEmpty == false ? cachedMeta?.title : title) ?? title,
+                publisher: pub,
+                feedURL: feedURL,
+                artworkURL: imageURL ?? cachedMeta?.artworkURL,
+                podcastDescription: cachedMeta?.podcastDescription ?? "",
+                sport: sport,
+                tags: tags
+            )
         }
     }
 }
@@ -99,6 +115,39 @@ struct Podcast: Identifiable, Hashable, Codable {
     }
 }
 
+// MARK: - HTML Stripper Extension
+
+extension String {
+    var strippingHTML: String {
+        guard !isEmpty else { return "" }
+        var text = self
+        // Normalize break and paragraph tags into clean spacing
+        text = text.replacingOccurrences(of: "<br\\s*/?>", with: " ", options: .regularExpression)
+        text = text.replacingOccurrences(of: "</p>", with: " ", options: .caseInsensitive)
+        text = text.replacingOccurrences(of: "<p[^>]*>", with: "", options: .regularExpression)
+        // Strip remaining HTML tags
+        text = text.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        // Decode common HTML entities
+        text = text.replacingOccurrences(of: "&nbsp;", with: " ")
+        text = text.replacingOccurrences(of: "&amp;", with: "&")
+        text = text.replacingOccurrences(of: "&quot;", with: "\"")
+        text = text.replacingOccurrences(of: "&#39;", with: "'")
+        text = text.replacingOccurrences(of: "&apos;", with: "'")
+        text = text.replacingOccurrences(of: "&lt;", with: "<")
+        text = text.replacingOccurrences(of: "&gt;", with: ">")
+        text = text.replacingOccurrences(of: "&#8217;", with: "'")
+        text = text.replacingOccurrences(of: "&#8216;", with: "'")
+        text = text.replacingOccurrences(of: "&#8220;", with: "\"")
+        text = text.replacingOccurrences(of: "&#8221;", with: "\"")
+        text = text.replacingOccurrences(of: "&#8212;", with: "—")
+        text = text.replacingOccurrences(of: "&#8211;", with: "–")
+        text = text.replacingOccurrences(of: "&#038;", with: "&")
+        // Condense multiple spaces into single space
+        text = text.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 struct PodcastEpisode: Identifiable, Hashable, Codable {
     let id: String
     let podcastID: String       // parent feedURL string
@@ -113,6 +162,14 @@ struct PodcastEpisode: Identifiable, Hashable, Codable {
     var medium: PodcastMedium
 
     var isVideo: Bool { medium == .video }
+
+    var cleanDescription: String { episodeDescription.strippingHTML }
+
+    var formattedPublishedDate: String {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "MMM d, yyyy"
+        return fmt.string(from: publishedAt).uppercased()
+    }
 
     var formattedDuration: String {
         guard duration > 0 else { return "" }
@@ -143,7 +200,7 @@ struct PodcastEpisode: Identifiable, Hashable, Codable {
          publishedAt: Date, feedURL: URL, medium: PodcastMedium = .audio) {
         self.id = id; self.podcastID = podcastID; self.podcastTitle = podcastTitle
         self.podcastArtworkURL = podcastArtworkURL; self.title = title
-        self.episodeDescription = episodeDescription; self.audioURL = audioURL
+        self.episodeDescription = episodeDescription.strippingHTML; self.audioURL = audioURL
         self.duration = duration; self.publishedAt = publishedAt; self.feedURL = feedURL
         self.medium = medium
     }
@@ -155,7 +212,7 @@ struct PodcastEpisode: Identifiable, Hashable, Codable {
         podcastTitle = (try? c.decode(String.self, forKey: .podcastTitle)) ?? ""
         podcastArtworkURL = try? c.decode(URL.self, forKey: .podcastArtworkURL)
         title = try c.decode(String.self, forKey: .title)
-        episodeDescription = (try? c.decode(String.self, forKey: .episodeDescription)) ?? ""
+        episodeDescription = ((try? c.decode(String.self, forKey: .episodeDescription)) ?? "").strippingHTML
         audioURL = try c.decode(URL.self, forKey: .audioURL)
         duration = (try? c.decode(TimeInterval.self, forKey: .duration)) ?? 0
         publishedAt = (try? c.decode(Date.self, forKey: .publishedAt)) ?? Date()

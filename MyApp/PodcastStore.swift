@@ -60,7 +60,13 @@ final class PodcastStore: ObservableObject {
     private var statusObserver: NSKeyValueObservation?
     private var rateObserver: NSKeyValueObservation?
     private var endPlaybackObserver: (any NSObjectProtocol)?
-    private var isAppInBackground = false
+    private var isAppInBackground: Bool {
+        #if os(iOS)
+        return UIApplication.shared.applicationState == .background
+        #else
+        return false
+        #endif
+    }
     private var lastNowPlayingSyncTime: TimeInterval = 0
     private let api = PodcastIndexService.shared
     private let teamResolver = TeamPodcastResolver()
@@ -132,7 +138,7 @@ final class PodcastStore: ObservableObject {
             let key = feed.feedURL.absoluteString
             if podcastMetaCache[key] == nil {
                 podcastMetaCache[key] = Podcast(
-                    id: key, title: feed.title, publisher: "",
+                    id: key, title: feed.title, publisher: feed.author ?? "",
                     feedURL: feed.feedURL, artworkURL: imageURL,
                     podcastDescription: "", sport: feed.sport, tags: feed.tags
                 )
@@ -215,14 +221,25 @@ final class PodcastStore: ObservableObject {
             let episodes = items.compactMap { $0.toEpisode() }
             if !episodes.isEmpty {
                 episodesByFeed[key] = episodes
-                // Enrich podcast metadata if needed
-                if podcastMetaCache[key] == nil, let first = episodes.first {
-                    podcastMetaCache[key] = Podcast(
-                        id: key, title: first.podcastTitle, publisher: "",
-                        feedURL: feedURL, artworkURL: first.podcastArtworkURL,
-                        podcastDescription: "", sport: nil, tags: [],
-                        medium: first.medium
-                    )
+                // Enrich podcast metadata if missing or if artwork is missing
+                let currentCached = podcastMetaCache[key]
+                let foundArt = episodes.first(where: { $0.podcastArtworkURL != nil })?.podcastArtworkURL
+                if let foundArt, (currentCached == nil || currentCached?.artworkURL == nil) {
+                    if let existing = currentCached {
+                        podcastMetaCache[key] = Podcast(
+                            id: key, title: existing.title, publisher: existing.publisher,
+                            feedURL: feedURL, artworkURL: foundArt,
+                            podcastDescription: existing.podcastDescription, sport: existing.sport,
+                            tags: existing.tags, medium: existing.medium
+                        )
+                    } else if let first = episodes.first {
+                        podcastMetaCache[key] = Podcast(
+                            id: key, title: first.podcastTitle, publisher: "",
+                            feedURL: feedURL, artworkURL: foundArt,
+                            podcastDescription: "", sport: nil, tags: [],
+                            medium: first.medium
+                        )
+                    }
                 }
                 return
             }
@@ -233,12 +250,23 @@ final class PodcastStore: ObservableObject {
             let parser = RSSFeedParser(feedURL: feedURL)
             let parsed = parser.parse(data: data)
             episodesByFeed[key] = parsed.episodes
-            if podcastMetaCache[key] == nil {
-                podcastMetaCache[key] = Podcast(
-                    id: key, title: parsed.podcastTitle, publisher: "",
-                    feedURL: feedURL, artworkURL: parsed.artworkURL,
-                    podcastDescription: "", sport: nil, tags: []
-                )
+            let currentCached = podcastMetaCache[key]
+            if currentCached == nil || currentCached?.artworkURL == nil {
+                let resolvedArt = parsed.artworkURL ?? currentCached?.artworkURL
+                if let existing = currentCached {
+                    podcastMetaCache[key] = Podcast(
+                        id: key, title: existing.title.isEmpty ? parsed.podcastTitle : existing.title,
+                        publisher: existing.publisher, feedURL: feedURL,
+                        artworkURL: resolvedArt, podcastDescription: existing.podcastDescription,
+                        sport: existing.sport, tags: existing.tags, medium: existing.medium
+                    )
+                } else {
+                    podcastMetaCache[key] = Podcast(
+                        id: key, title: parsed.podcastTitle, publisher: "",
+                        feedURL: feedURL, artworkURL: resolvedArt,
+                        podcastDescription: "", sport: nil, tags: []
+                    )
+                }
             }
         }
     }
@@ -326,11 +354,9 @@ final class PodcastStore: ObservableObject {
         teardownPlayer()
 
         let item = AVPlayerItem(url: episode.audioURL)
-        // Energy & Radio Optimization: burst-buffer 60 seconds of audio so cellular/Wi-Fi radio sleeps
-        item.preferredForwardBufferDuration = 60
-        item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
-
         player = AVPlayer(playerItem: item)
+        player?.volume = 1.0
+        player?.isMuted = false
         player?.automaticallyWaitsToMinimizeStalling = true
         player?.rate = speed.rawValue
         nowPlaying = episode
@@ -386,6 +412,27 @@ final class PodcastStore: ObservableObject {
         persistState()
     }
 
+    func markUnplayed(_ episode: PodcastEpisode) {
+        playedEpisodeIDs.remove(episode.id)
+        episodeProgress.removeValue(forKey: episode.id)
+        persistState()
+    }
+
+    func remainingTimeFormatted(for episode: PodcastEpisode) -> String? {
+        if isPlayed(episode) { return "Played" }
+        guard episode.duration > 0 else { return nil }
+        let current = (nowPlaying?.id == episode.id) ? currentTime : (episodeProgress[episode.id] ?? 0)
+        guard current > 0 else { return nil }
+        let remaining = max(0, episode.duration - current)
+        let m = Int(remaining) / 60
+        let h = m / 60
+        if h > 0 {
+            return "\(h)h \(m % 60)m left"
+        } else {
+            return "\(max(1, m))m left"
+        }
+    }
+
     func isPlayed(_ episode: PodcastEpisode) -> Bool {
         playedEpisodeIDs.contains(episode.id)
     }
@@ -398,14 +445,13 @@ final class PodcastStore: ObservableObject {
     // MARK: - Audio session
 
     private func configureAudioSession() {
-        // Use longFormAudio route sharing policy so iOS enables hardware audio offloading and low-power background decoding
-        try? AVAudioSession.sharedInstance().setCategory(
-            .playback,
-            mode: .spokenAudio,
-            policy: .longFormAudio,
-            options: [.allowBluetoothHFP, .allowAirPlay]
-        )
-        try? AVAudioSession.sharedInstance().setActive(true)
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .spokenAudio)
+            try session.setActive(true)
+        } catch {
+            print("[PodcastStore] AudioSession setup error: \(error)")
+        }
     }
 
     // MARK: - Player observers & Background Power Optimization
@@ -509,35 +555,25 @@ final class PodcastStore: ObservableObject {
     }
 
     private func handleDidEnterBackground() {
-        isAppInBackground = true
         saveProgress()
-
-        // Disable video tracks in the background so the GPU and hardware video decoder power down
-        setVideoTracksEnabled(false)
-
-        // Switch to low-frequency time observer (30s) to avoid waking the CPU and running MainActor tasks
+        if nowPlaying?.isVideo == true {
+            setVideoTracksEnabled(false)
+        }
         resetTimeObserver(interval: 30.0)
     }
 
     private func handleWillEnterForeground() {
-        isAppInBackground = false
-
-        // Re-enable video tracks if watching a video podcast
         if nowPlaying?.isVideo == true {
             setVideoTracksEnabled(true)
         }
-
-        // Instantly sync UI slider with the player's true current position
         if let t = player?.currentTime().seconds, t.isFinite, t >= 0 {
             currentTime = t
         }
-
-        // Restore high-frequency time observer (0.5s) for smooth scrubber UI
         resetTimeObserver(interval: 0.5)
     }
 
     private func setVideoTracksEnabled(_ enabled: Bool) {
-        guard let tracks = player?.currentItem?.tracks else { return }
+        guard nowPlaying?.isVideo == true, let tracks = player?.currentItem?.tracks else { return }
         for track in tracks where track.assetTrack?.mediaType == .video {
             track.isEnabled = enabled
         }

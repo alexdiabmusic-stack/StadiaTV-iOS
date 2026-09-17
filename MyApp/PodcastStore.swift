@@ -59,6 +59,9 @@ final class PodcastStore: ObservableObject {
     private var timeObserverToken: Any?
     private var statusObserver: NSKeyValueObservation?
     private var rateObserver: NSKeyValueObservation?
+    private var endPlaybackObserver: (any NSObjectProtocol)?
+    private var isAppInBackground = false
+    private var lastNowPlayingSyncTime: TimeInterval = 0
     private let api = PodcastIndexService.shared
     private let teamResolver = TeamPodcastResolver()
 
@@ -73,6 +76,7 @@ final class PodcastStore: ObservableObject {
         loadBundledCatalog()
         setupRemoteCommands()
         prefetchTopArtwork()
+        setupAppLifecycleObservers()
     }
 
     // MARK: - Startup artwork prefetch
@@ -322,7 +326,12 @@ final class PodcastStore: ObservableObject {
         teardownPlayer()
 
         let item = AVPlayerItem(url: episode.audioURL)
+        // Energy & Radio Optimization: burst-buffer 60 seconds of audio so cellular/Wi-Fi radio sleeps
+        item.preferredForwardBufferDuration = 60
+        item.canUseNetworkResourcesForLiveStreamingWhilePaused = false
+
         player = AVPlayer(playerItem: item)
+        player?.automaticallyWaitsToMinimizeStalling = true
         player?.rate = speed.rawValue
         nowPlaying = episode
         totalDuration = episode.duration > 0 ? episode.duration : 0
@@ -389,32 +398,22 @@ final class PodcastStore: ObservableObject {
     // MARK: - Audio session
 
     private func configureAudioSession() {
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio, options: [.allowBluetoothHFP, .allowAirPlay])
+        // Use longFormAudio route sharing policy so iOS enables hardware audio offloading and low-power background decoding
+        try? AVAudioSession.sharedInstance().setCategory(
+            .playback,
+            mode: .spokenAudio,
+            policy: .longFormAudio,
+            options: [.allowBluetoothHFP, .allowAirPlay]
+        )
         try? AVAudioSession.sharedInstance().setActive(true)
     }
 
-    // MARK: - Player observers
+    // MARK: - Player observers & Background Power Optimization
 
     private func setupObservers() {
         guard let player else { return }
 
-        timeObserverToken = player.addPeriodicTimeObserver(
-            forInterval: CMTime(seconds: 0.5, preferredTimescale: 600),
-            queue: .main
-        ) { [weak self] time in
-            guard let self else { return }
-            let t = time.seconds
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                if t.isFinite && t >= 0 {
-                    self.currentTime = t
-                    if let dur = self.player?.currentItem?.duration.seconds, dur.isFinite, dur > 0 {
-                        self.totalDuration = dur
-                    }
-                    self.tickNowPlayingTime(t)
-                }
-            }
-        }
+        resetTimeObserver(interval: isAppInBackground ? 30.0 : 0.5)
 
         statusObserver = player.currentItem?.observe(\.status) { [weak self] item, _ in
             Task { @MainActor [weak self] in
@@ -430,7 +429,11 @@ final class PodcastStore: ObservableObject {
             }
         }
 
-        NotificationCenter.default.addObserver(
+        if let obs = endPlaybackObserver {
+            NotificationCenter.default.removeObserver(obs)
+            endPlaybackObserver = nil
+        }
+        endPlaybackObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: player.currentItem, queue: .main
         ) { [weak self] _ in
@@ -442,10 +445,112 @@ final class PodcastStore: ObservableObject {
         }
     }
 
+    private func resetTimeObserver(interval: TimeInterval) {
+        guard let player else { return }
+        if let token = timeObserverToken {
+            player.removeTimeObserver(token)
+            timeObserverToken = nil
+        }
+
+        timeObserverToken = player.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: interval, preferredTimescale: 600),
+            queue: .main
+        ) { [weak self] time in
+            guard let self else { return }
+            let t = time.seconds
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                guard t.isFinite && t >= 0 else { return }
+
+                if self.isAppInBackground {
+                    // When backgrounded: avoid invalidating SwiftUI state every 500ms since no UI is rendered.
+                    // Instead, save progress periodically to preserve exact state on system termination.
+                    self.saveProgress()
+                    return
+                }
+
+                self.currentTime = t
+                if let dur = self.player?.currentItem?.duration.seconds, dur.isFinite, dur > 0 {
+                    self.totalDuration = dur
+                }
+
+                // Apple Developer Documentation: MPNowPlayingInfoCenter does NOT need continuous updates
+                // on each tick because iOS automatically calculates elapsed time using playbackRate.
+                // Frequent IPC writes wake up the CPU and mediaserverd, drastically draining battery.
+                // We only sync periodically (every 60s) to reconcile minute clock drift.
+                if self.totalDuration > 0 && abs(t - self.lastNowPlayingSyncTime) >= 60.0 {
+                    self.lastNowPlayingSyncTime = t
+                    self.tickNowPlayingTime(t)
+                }
+            }
+        }
+    }
+
+    // MARK: - App Lifecycle Power Management
+
+    private func setupAppLifecycleObservers() {
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handleDidEnterBackground()
+            }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handleWillEnterForeground()
+            }
+        }
+    }
+
+    private func handleDidEnterBackground() {
+        isAppInBackground = true
+        saveProgress()
+
+        // Disable video tracks in the background so the GPU and hardware video decoder power down
+        setVideoTracksEnabled(false)
+
+        // Switch to low-frequency time observer (30s) to avoid waking the CPU and running MainActor tasks
+        resetTimeObserver(interval: 30.0)
+    }
+
+    private func handleWillEnterForeground() {
+        isAppInBackground = false
+
+        // Re-enable video tracks if watching a video podcast
+        if nowPlaying?.isVideo == true {
+            setVideoTracksEnabled(true)
+        }
+
+        // Instantly sync UI slider with the player's true current position
+        if let t = player?.currentTime().seconds, t.isFinite, t >= 0 {
+            currentTime = t
+        }
+
+        // Restore high-frequency time observer (0.5s) for smooth scrubber UI
+        resetTimeObserver(interval: 0.5)
+    }
+
+    private func setVideoTracksEnabled(_ enabled: Bool) {
+        guard let tracks = player?.currentItem?.tracks else { return }
+        for track in tracks where track.assetTrack?.mediaType == .video {
+            track.isEnabled = enabled
+        }
+    }
+
     private func teardownPlayer() {
         if let token = timeObserverToken, let p = player {
             p.removeTimeObserver(token)
             timeObserverToken = nil
+        }
+        if let obs = endPlaybackObserver {
+            NotificationCenter.default.removeObserver(obs)
+            endPlaybackObserver = nil
         }
         statusObserver?.invalidate(); statusObserver = nil
         rateObserver?.invalidate(); rateObserver = nil

@@ -139,8 +139,11 @@ struct SearchView: View {
             }
         }
         .tint(Theme.accent)
-        .task(id: prefs.followedLeagues.map(\.id).joined(separator: ",") + "|" + prefs.favoriteTeams.map(\.id).joined(separator: ",")) {
-            await viewModel.loadBase(leagues: prefs.followedLeagues, favoriteTeams: prefs.favoriteTeams)
+        .task(id: prefs.favoriteTeams.map(\.id).joined(separator: ",")) {
+            // Search indexes every league regardless of what's followed — a team
+            // like the Lions shouldn't be unfindable just because NFL isn't
+            // followed. Following only affects the home/discover/news feeds.
+            await viewModel.loadBase(leagues: League.all, favoriteTeams: prefs.favoriteTeams)
         }
         .task(id: playerSearchKey) {
             guard shouldLoadPlayers else { return }

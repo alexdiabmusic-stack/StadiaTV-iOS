@@ -492,6 +492,29 @@ final class EPGRepository: ObservableObject {
             importDiagnostics.epgProgrammeParseDuration += Date().timeIntervalSince(started)
             mergeProgrammes(parseResult.programmes, into: &programmeIndex)
         }
+        // Custom EPG XML embedded directly in the user's own M3U/Xtream playlist —
+        // matched by tvg-id so it lines up exactly with that playlist's own channel
+        // list, then merged with priority 0 so it wins ties against the generic feeds.
+        for (index, url) in customEPGURLs.enumerated() {
+            guard !Task.isCancelled else {
+                refreshState = .idle
+                importProgress.state = .cancelled
+                return
+            }
+            guard let data = await customEPGData(url: url, index: index) else { continue }
+            let sourceId = "custom-\(index)"
+            let started = Date()
+            let parseResult = await Task.detached(priority: .utility) {
+                EPGXMLParser(sourceId: sourceId, priority: 0).parse(data: data, programmeWindow: programmeWindow)
+            }.value
+            importDiagnostics.epgChannelParseDuration += Date().timeIntervalSince(started)
+            let mapping = matchCustomEPGChannels(parseResult.channels)
+            guard !mapping.isEmpty else { continue }
+            epgToCanonical.merge(mapping) { _, new in new }
+            importProgress.epgChannels += mapping.count
+            mergeProgrammes(parseResult.programmes, into: &programmeIndex)
+        }
+
         finalizeProgrammeIndex(programmeIndex)
         importProgress.programmesRetained = programmeIndex.values.reduce(0) { $0 + $1.count }
 
@@ -536,6 +559,66 @@ final class EPGRepository: ObservableObject {
     private func cachedEPGData(for source: EPGSource) -> Data? {
         let cacheFile = cacheDir.appendingPathComponent("\(source.id).xml")
         return try? Data(contentsOf: cacheFile)
+    }
+
+    /// Downloads (or serves from cache) the XMLTV file a playlist advertises via
+    /// `x-tvg-url` (M3U) or `xmltv.php` (Xtream). Cache filename matches the
+    /// `custom-N.xml` convention `refreshIfNeeded()` checks for staleness.
+    private func customEPGData(url: URL, index: Int) async -> Data? {
+        let cacheFile = cacheDir.appendingPathComponent("custom-\(index).xml")
+        let ttl: TimeInterval = 6 * 3600
+
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: cacheFile.path),
+           let modified = attrs[.modificationDate] as? Date,
+           Date().timeIntervalSince(modified) < ttl,
+           let data = try? Data(contentsOf: cacheFile) {
+            return data
+        }
+
+        do {
+            let downloadStart = Date()
+            let (data, _) = try await session.data(from: url)
+            importDiagnostics.epgDownloadDuration += Date().timeIntervalSince(downloadStart)
+            let decompressed = await Task.detached(priority: .utility) {
+                data.tryGunzip()
+            }.value
+            try decompressed.write(to: cacheFile)
+            return decompressed
+        } catch {
+            return try? Data(contentsOf: cacheFile)
+        }
+    }
+
+    /// Matches a playlist's own XMLTV channel entries to that same playlist's channels
+    /// by tvg-id (the two are issued together by the provider, so this is exact), with
+    /// a normalized display-name fallback for providers whose ids drift between files.
+    private func matchCustomEPGChannels(_ epgChannels: [EPGChannel]) -> [String: String] {
+        guard let normalizer else { return [:] }
+
+        var tvgIdToProvider: [String: String] = [:]
+        var nameToProvider: [String: String] = [:]
+        for channel in currentIPTVChannels {
+            if let tvgId = channel.tvgId, !tvgId.isEmpty {
+                tvgIdToProvider[tvgId.lowercased()] = channel.id
+            }
+            nameToProvider[normalizer.normalize(channel.name).lowercased()] = channel.id
+        }
+
+        var mapping: [String: String] = [:]
+        for epgCh in epgChannels {
+            var providerId = tvgIdToProvider[epgCh.id.lowercased()]
+            if providerId == nil {
+                for displayName in epgCh.displayNames {
+                    if let match = nameToProvider[normalizer.normalize(displayName).lowercased()] {
+                        providerId = match
+                        break
+                    }
+                }
+            }
+            guard let providerId, let canonId = channelToCanonicalMap[providerId] else { continue }
+            mapping[epgCh.id] = canonId
+        }
+        return mapping
     }
 
     // MARK: - EPG Channel Matching

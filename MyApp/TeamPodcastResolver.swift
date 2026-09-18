@@ -47,31 +47,31 @@ actor TeamPodcastResolver {
 
     func podcasts(for team: TeamPodcastSeed) async throws -> [ApplePodcast] {
         if let cached = cache[team.id], Date().timeIntervalSince(cached.0) < cacheLifetime,
-           cached.1.count >= team.minimumTeamSpecificShows { return cached.1 }
+           !cached.1.isEmpty { return cached.1 }
 
         var byFeed: [URL: ApplePodcast] = [:]
-        for term in team.searchTerms.prefix(4) {
+        for term in team.searchTerms {
             var components = URLComponents(string: "https://itunes.apple.com/search")
             components?.queryItems = [
                 .init(name: "term", value: term), .init(name: "media", value: "podcast"),
                 .init(name: "entity", value: "podcast"), .init(name: "limit", value: "50"),
                 .init(name: "country", value: team.countryStorefront)
             ]
-            guard let url = components?.url else { throw TeamPodcastResolverError.invalidURL }
-            let (data, response) = try await session.data(from: url)
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else { continue }
-            let result = try JSONDecoder().decode(ApplePodcastSearchResponse.self, from: data)
+            guard let url = components?.url else { continue }
+            guard let (data, response) = try? await session.data(from: url),
+                  (response as? HTTPURLResponse)?.statusCode == 200,
+                  let result = try? JSONDecoder().decode(ApplePodcastSearchResponse.self, from: data) else {
+                continue
+            }
             for podcast in result.results where podcast.feedUrl != nil {
                 if score(podcast, for: team) >= 70 { byFeed[podcast.feedUrl!] = podcast }
             }
-            if byFeed.count >= team.minimumTeamSpecificShows { break }
         }
         let ranked = byFeed.values.sorted { score($0, for: team) > score($1, for: team) }
-        let selected = Array(ranked.prefix(team.minimumTeamSpecificShows))
-        guard selected.count >= team.minimumTeamSpecificShows else {
-            throw TeamPodcastResolverError.insufficientCoverage(found: selected.count)
+        let selected = Array(ranked.prefix(30))
+        if !selected.isEmpty {
+            cache[team.id] = (Date(), selected)
         }
-        cache[team.id] = (Date(), selected)
         return selected
     }
 

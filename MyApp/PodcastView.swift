@@ -237,6 +237,7 @@ struct PodcastBrowserView: View {
         }
         .navigationBarBackButtonHidden(true)
         .navigationBarHidden(true)
+        .enableSwipeBack()
         .navigationDestination(item: $selectedPodcast) { podcast in
             PodcastDetailView(podcast: podcast)
         }
@@ -794,17 +795,24 @@ struct PodcastDetailView: View {
     @State private var mediumFilter: PodcastMedium? = nil  // nil = show all
     @State private var sortOrder: EpisodeSortOrder = .newest
     @State private var isDescriptionExpanded = false
+    @State private var filterUnplayedOnly = false
 
     private var allEpisodes: [PodcastEpisode] {
-        store.episodesByFeed[podcast.id] ?? []
+        store.episodes(for: podcast)
     }
     private var hasVideoEpisodes: Bool { allEpisodes.contains { $0.isVideo } }
     private var hasAudioEpisodes: Bool { allEpisodes.contains { !$0.isVideo } }
     private var showsMediumFilter: Bool { hasVideoEpisodes && hasAudioEpisodes }
 
     private var filteredEpisodes: [PodcastEpisode] {
-        guard let filter = mediumFilter else { return allEpisodes }
-        return allEpisodes.filter { $0.medium == filter }
+        var list = allEpisodes
+        if let filter = mediumFilter {
+            list = list.filter { $0.medium == filter }
+        }
+        if filterUnplayedOnly {
+            list = list.filter { !store.isPlayed($0) }
+        }
+        return list
     }
 
     private var sortedEpisodes: [PodcastEpisode] {
@@ -827,7 +835,10 @@ struct PodcastDetailView: View {
         return sortedEpisodes
     }
 
-    private var isLoading: Bool { store.loadingFeedIDs.contains(podcast.id) }
+    private var isLoading: Bool {
+        store.loadingFeedIDs.contains(podcast.feedURL.absoluteString) ||
+        store.loadingFeedIDs.contains(podcast.id)
+    }
     private var isSubscribed: Bool { store.isSubscribed(podcast) }
 
     private var headerArtworkURL: URL? {
@@ -881,6 +892,7 @@ struct PodcastDetailView: View {
         }
         .navigationBarBackButtonHidden(true)
         .navigationBarHidden(true)
+        .enableSwipeBack()
         .task {
             await store.fetchArtwork(for: podcast.feedURL)
             await store.loadEpisodes(for: podcast.feedURL)
@@ -964,25 +976,41 @@ struct PodcastDetailView: View {
 
                 episodesHeader
 
-                LazyVStack(spacing: 0) {
-                    ForEach(listEpisodes) { episode in
-                        PodcastEpisodeRow(
-                            episode: episode,
-                            podcastArtworkURL: headerArtworkURL
-                        ) {
-                            if store.nowPlaying?.id == episode.id {
-                                store.togglePlayPause()
-                            } else {
-                                store.play(episode)
+                if listEpisodes.isEmpty && filterUnplayedOnly {
+                    VStack(spacing: 12) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 38))
+                            .foregroundStyle(Theme.accent)
+                        Text("All Caught Up!")
+                            .font(.system(size: 19, weight: .bold))
+                            .foregroundStyle(Theme.textPrimary)
+                        Text("You've listened to all episodes of this show.")
+                            .font(.system(size: 15))
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 36)
+                } else {
+                    LazyVStack(spacing: 0) {
+                        ForEach(listEpisodes) { episode in
+                            PodcastEpisodeRow(
+                                episode: episode,
+                                podcastArtworkURL: headerArtworkURL
+                            ) {
+                                if store.nowPlaying?.id == episode.id {
+                                    store.togglePlayPause()
+                                } else {
+                                    store.play(episode)
+                                }
                             }
+                            Divider().overlay(Theme.hairline)
                         }
-                        Divider().overlay(Theme.hairline)
                     }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
-            .padding(.bottom, store.nowPlaying != nil ? 96 : 36)
+            .padding(.bottom, store.nowPlaying != nil ? 140 : 60)
         }
     }
 
@@ -999,14 +1027,14 @@ struct PodcastDetailView: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(podcast.title)
-                        .font(.system(size: 23, weight: .bold))
+                        .font(.system(size: 26, weight: .bold))
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
 
                     if !categorySubtitle.isEmpty {
                         Text(categorySubtitle)
-                            .font(.system(size: 14, weight: .medium))
+                            .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(Theme.textSecondary)
                             .lineLimit(1)
                     }
@@ -1014,10 +1042,10 @@ struct PodcastDetailView: View {
                     if !sanitizedPodcastDescription.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(sanitizedPodcastDescription)
-                                .font(.system(size: 14))
+                                .font(.system(size: 15))
                                 .foregroundStyle(Theme.textSecondary)
                                 .lineLimit(isDescriptionExpanded ? nil : 3)
-                                .lineSpacing(2)
+                                .lineSpacing(2.5)
 
                             if !isDescriptionExpanded && sanitizedPodcastDescription.count > 100 {
                                 Button {
@@ -1026,7 +1054,7 @@ struct PodcastDetailView: View {
                                     }
                                 } label: {
                                     Text("more")
-                                        .font(.system(size: 14, weight: .semibold))
+                                        .font(.system(size: 15, weight: .semibold))
                                         .foregroundStyle(Theme.accent)
                                 }
                                 .buttonStyle(.plain)
@@ -1046,13 +1074,13 @@ struct PodcastDetailView: View {
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: isSubscribed ? "checkmark" : "plus")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: 14, weight: .bold))
                         Text(isSubscribed ? "Following" : "Follow")
-                            .font(.system(size: 14, weight: .semibold))
+                            .font(.system(size: 15, weight: .semibold))
                     }
                     .foregroundStyle(Theme.textPrimary)
-                    .padding(.horizontal, 16)
-                    .frame(height: 40)
+                    .padding(.horizontal, 18)
+                    .frame(height: 44)
                     .background(isSubscribed ? Theme.surfaceElevated : Color.white.opacity(0.09), in: Capsule())
                     .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
                 }
@@ -1072,14 +1100,15 @@ struct PodcastDetailView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: isCurrentPlaying ? "pause.fill" : "play.fill")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.system(size: 14, weight: .bold))
                             Text(isCurrentPlaying ? "Pause" : (isCurrentPaused ? "Resume" : "Play Latest Episode"))
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: 15, weight: .semibold))
                         }
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 18)
-                        .frame(height: 40)
+                        .padding(.horizontal, 20)
+                        .frame(height: 44)
                         .background(Theme.accent, in: Capsule())
+                        .shadow(color: Theme.accent.opacity(0.35), radius: 8, x: 0, y: 3)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Play latest episode, \(latest.title)")
@@ -1130,28 +1159,28 @@ struct PodcastDetailView: View {
 
         return VStack(alignment: .leading, spacing: 10) {
             Text("LATEST EPISODE")
-                .font(.system(size: 11, weight: .bold))
+                .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(Theme.accent)
-                .tracking(0.5)
+                .tracking(0.6)
 
             Text(episode.title)
-                .font(.system(size: 19, weight: .bold))
+                .font(.system(size: 21, weight: .bold))
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
 
             if !episode.cleanDescription.isEmpty {
                 Text(episode.cleanDescription)
-                    .font(.system(size: 14))
+                    .font(.system(size: 15))
                     .foregroundStyle(Theme.textSecondary)
                     .lineLimit(2)
-                    .lineSpacing(2)
+                    .lineSpacing(2.5)
                     .multilineTextAlignment(.leading)
             }
 
             HStack(alignment: .center) {
                 Text("\(episode.relativeDate) · \(episode.formattedDuration)")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(Theme.textSecondary)
 
                 Spacer()
@@ -1166,7 +1195,7 @@ struct PodcastDetailView: View {
                     ZStack {
                         Circle()
                             .fill(Theme.accent)
-                            .frame(width: 48, height: 48)
+                            .frame(width: 50, height: 50)
                             .shadow(color: Theme.accent.opacity(0.35), radius: 8, x: 0, y: 3)
 
                         if isCurrent && store.isBuffering {
@@ -1174,12 +1203,12 @@ struct PodcastDetailView: View {
                                 .tint(.white)
                         } else {
                             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                .font(.system(size: 18, weight: .bold))
+                                .font(.system(size: 19, weight: .bold))
                                 .foregroundStyle(.white)
                                 .offset(x: isPlaying ? 0 : 1.5)
                         }
                     }
-                    .frame(width: 48, height: 48)
+                    .frame(width: 50, height: 50)
                     .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
@@ -1192,17 +1221,17 @@ struct PodcastDetailView: View {
                         ZStack(alignment: .leading) {
                             Capsule()
                                 .fill(Color.white.opacity(0.12))
-                                .frame(height: 3.5)
+                                .frame(height: 4)
                             Capsule()
                                 .fill(Theme.accent)
-                                .frame(width: max(0, min(geo.size.width, geo.size.width * CGFloat(progress))), height: 3.5)
+                                .frame(width: max(0, min(geo.size.width, geo.size.width * CGFloat(progress))), height: 4)
                         }
                     }
-                    .frame(height: 3.5)
+                    .frame(height: 4)
 
                     if let rem = remainingFormatted {
                         Text(rem)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Theme.textSecondary)
                     }
                 }
@@ -1222,32 +1251,50 @@ struct PodcastDetailView: View {
 
     // MARK: - Episodes Section Header
     private var episodesHeader: some View {
-        HStack {
-            Text("All Episodes")
-                .font(.system(size: 22, weight: .bold))
+        HStack(alignment: .center, spacing: 10) {
+            Text(filterUnplayedOnly ? "Unplayed Episodes" : "All Episodes")
+                .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(Theme.textPrimary)
 
             Spacer()
 
-            Menu {
-                Button {
-                    withAnimation { sortOrder = .newest }
-                } label: {
-                    HStack {
-                        Text("Newest First")
-                        if sortOrder == .newest {
-                            Image(systemName: "checkmark")
-                        }
-                    }
+            // Unplayed filter toggle button
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                    filterUnplayedOnly.toggle()
                 }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: filterUnplayedOnly ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 11, weight: .bold))
+                    Text("Unplayed")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(filterUnplayedOnly ? .white : Theme.textSecondary)
+                .padding(.horizontal, 11)
+                .frame(height: 32)
+                .background(
+                    filterUnplayedOnly ? Theme.accent : Theme.surfaceElevated,
+                    in: Capsule()
+                )
+                .overlay(
+                    Capsule()
+                        .strokeBorder(filterUnplayedOnly ? Theme.accent : Theme.hairline, lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(filterUnplayedOnly ? "Show all episodes" : "Filter unplayed episodes only")
 
-                Button {
-                    withAnimation { sortOrder = .oldest }
-                } label: {
-                    HStack {
-                        Text("Oldest First")
-                        if sortOrder == .oldest {
-                            Image(systemName: "checkmark")
+            Menu {
+                ForEach(EpisodeSortOrder.allCases) { order in
+                    Button {
+                        withAnimation { sortOrder = order }
+                    } label: {
+                        HStack {
+                            Text(order.rawValue)
+                            if sortOrder == order {
+                                Image(systemName: "checkmark")
+                            }
                         }
                     }
                 }
@@ -1316,60 +1363,61 @@ struct PodcastEpisodeRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
             // Left thumbnail
-            PodcastArtwork(url: episode.podcastArtworkURL ?? podcastArtworkURL, size: 58, cornerRadius: 10)
+            PodcastArtwork(url: episode.podcastArtworkURL ?? podcastArtworkURL, size: 64, cornerRadius: 12)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .strokeBorder(Theme.hairline, lineWidth: 0.5)
                 )
 
             // Middle info
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(episode.formattedPublishedDate)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(isCurrent ? Theme.accent : Theme.textTertiary)
 
                 Text(episode.title)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
                 if !episode.cleanDescription.isEmpty {
                     Text(episode.cleanDescription)
-                        .font(.system(size: 13))
+                        .font(.system(size: 14.5))
                         .foregroundStyle(Theme.textSecondary)
                         .lineLimit(2)
+                        .lineSpacing(2.5)
                         .multilineTextAlignment(.leading)
                 }
 
                 HStack(spacing: 8) {
                     if !episode.formattedDuration.isEmpty {
                         Text(episode.formattedDuration)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 13.5, weight: .medium))
                             .foregroundStyle(Theme.textSecondary)
                     }
 
                     if isPlayed {
                         HStack(spacing: 3) {
                             Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 11))
+                                .font(.system(size: 12))
                             Text("Played")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(.system(size: 12, weight: .semibold))
                         }
                         .foregroundStyle(Theme.textTertiary)
                     } else if let rem = store.remainingTimeFormatted(for: episode) {
                         Text("· \(rem)")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.system(size: 13.5, weight: .medium))
                             .foregroundStyle(Theme.accent)
                     }
 
                     if episode.isVideo {
                         Text("VIDEO")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(.system(size: 10, weight: .bold))
                             .foregroundStyle(.white)
-                            .padding(.horizontal, 5)
+                            .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 3))
+                            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 4))
                     }
                 }
                 .padding(.top, 2)
@@ -1385,7 +1433,7 @@ struct PodcastEpisodeRow: View {
                     ZStack {
                         Circle()
                             .fill(isCurrent ? Theme.accent : Theme.surfaceElevated)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 40, height: 40)
                             .overlay(
                                 Circle()
                                     .strokeBorder(isCurrent ? Color.clear : Theme.hairline, lineWidth: 1)
@@ -1394,7 +1442,7 @@ struct PodcastEpisodeRow: View {
                             ProgressView().tint(isCurrent ? .white : Theme.accent)
                         } else {
                             Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                .font(.system(size: 14, weight: .bold))
+                                .font(.system(size: 15, weight: .bold))
                                 .foregroundStyle(isCurrent ? .white : Theme.textPrimary)
                                 .offset(x: isPlaying ? 0 : 1)
                         }
@@ -1919,5 +1967,38 @@ struct PodcastCarousel: View {
         .navigationDestination(item: $selectedPodcast) { podcast in
             PodcastDetailView(podcast: podcast)
         }
+    }
+}
+
+
+// MARK: - Interactive Pop Gesture (Swipe to Dismiss)
+
+extension View {
+    func enableSwipeBack() -> some View {
+        background(EnableSwipeBackHelper())
+    }
+}
+
+private struct EnableSwipeBackHelper: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> SwipeBackViewController {
+        SwipeBackViewController()
+    }
+    func updateUIViewController(_ uiViewController: SwipeBackViewController, context: Context) {}
+}
+
+private class SwipeBackViewController: UIViewController, UIGestureRecognizerDelegate {
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        guard let nav = navigationController else { return }
+        nav.interactivePopGestureRecognizer?.isEnabled = true
+        nav.interactivePopGestureRecognizer?.delegate = self
+    }
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        return (navigationController?.viewControllers.count ?? 0) > 1
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
     }
 }

@@ -209,6 +209,16 @@ final class PodcastStore: ObservableObject {
 
     // MARK: - Episode fetching
 
+    func episodes(for podcast: Podcast) -> [PodcastEpisode] {
+        if let eps = episodesByFeed[podcast.feedURL.absoluteString], !eps.isEmpty {
+            return eps
+        }
+        if let eps = episodesByFeed[podcast.id], !eps.isEmpty {
+            return eps
+        }
+        return []
+    }
+
     func loadEpisodes(for feedURL: URL) async {
         let key = feedURL.absoluteString
         guard !loadingFeedIDs.contains(key) else { return }
@@ -217,7 +227,7 @@ final class PodcastStore: ObservableObject {
 
         // Try PodcastIndex first
         do {
-            let items = try await api.episodes(forFeedURL: feedURL)
+            let items = try await api.episodes(forFeedURL: feedURL, max: 1000)
             let episodes = items.compactMap { $0.toEpisode() }
             if !episodes.isEmpty {
                 episodesByFeed[key] = episodes
@@ -274,12 +284,14 @@ final class PodcastStore: ObservableObject {
     /// Resolve team-specific podcasts by running Apple Search and PodcastMatcher in parallel.
     /// Results are merged (Apple Search first as they are more verified) and deduplicated.
     func resolvePodcasts(for team: FavoriteTeam) async -> [Podcast] {
-        // Both resolvers run concurrently
-        async let matcherResult = PodcastMatcher.shared.findPodcasts(for: team, max: 15)
+        // Run Apple Search, PodcastIndex Search, and PodcastMatcher concurrently
+        async let matcherResult = PodcastMatcher.shared.findPodcasts(for: team, max: 20)
+        async let piSearchResult = api.searchPodcasts(query: team.displayName, max: 30)
 
         var applePodcasts: [Podcast] = []
         let seedID = seedID(for: team)
-        if let seed = teamSeeds[seedID] {
+        let seed = teamSeeds[seedID]
+        if let seed {
             let shows = (try? await teamResolver.podcasts(for: seed)) ?? []
             applePodcasts = shows.compactMap { show -> Podcast? in
                 guard let feedURL = show.feedUrl else { return nil }
@@ -290,17 +302,35 @@ final class PodcastStore: ObservableObject {
                                artworkURL: show.artworkUrl600,
                                podcastDescription: "",
                                sport: seed.sport,
-                               tags: [seed.league.lowercased()])
+                               tags: [seed.league.lowercased(), team.displayName.lowercased()])
             }
         }
 
         let matcherPodcasts = await matcherResult
+        let piFeeds = (try? await piSearchResult) ?? []
+        let teamLower = team.displayName.lowercased()
+        let aliases = seed?.aliases ?? [team.abbreviation]
+        let piPodcasts = piFeeds.filter { feed in
+            let text = (feed.title + " " + (feed.author ?? "") + " " + (feed.description ?? "")).lowercased()
+            return text.contains(teamLower) || aliases.contains { !$0.isEmpty && $0.count >= 3 && text.contains($0.lowercased()) }
+        }.map { $0.toPodcast() }
 
-        // Merge: Apple results lead (curated), matcher fills out the rest
+        // Local catalog feeds matching team
+        let catalogMatches = catalog.filter { feed in
+            feed.tags.contains { $0.lowercased().contains(teamLower) } ||
+            feed.title.localizedCaseInsensitiveContains(teamLower)
+        }.map { $0.toPodcast(cachedMeta: podcastMetaCache[$0.feedURL.absoluteString]) }
+
+        // Merge in order: Apple Search -> Curated Catalog -> PodcastIndex -> Matcher
         var seen = Set<String>()
         var merged: [Podcast] = []
-        for podcast in applePodcasts + matcherPodcasts {
-            if seen.insert(podcast.id).inserted { merged.append(podcast) }
+        for podcast in applePodcasts + catalogMatches + piPodcasts + matcherPodcasts {
+            if seen.insert(podcast.id).inserted {
+                if podcastMetaCache[podcast.id] == nil {
+                    podcastMetaCache[podcast.id] = podcast
+                }
+                merged.append(podcast)
+            }
         }
         return merged
     }

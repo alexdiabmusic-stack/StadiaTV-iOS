@@ -51,7 +51,7 @@ actor PodcastIndexService {
     }
 
     /// Episodes for any RSS feed URL (PodcastIndex proxies the feed).
-    func episodes(forFeedURL url: URL, max: Int = 15) async throws -> [PIEpisode] {
+    func episodes(forFeedURL url: URL, max: Int = 1000) async throws -> [PIEpisode] {
         let r: PIEpisodesResponse = try await get("/episodes/byfeedurl",
             query: ["url": url.absoluteString, "max": "\(max)"])
         return r.items
@@ -151,9 +151,22 @@ final class RSSFeedParser: NSObject, XMLParserDelegate {
             }
         }()
         let date: Date = {
-            guard let raw = currentItem["pubDate"] else { return .distantPast }
+            guard let raw = currentItem["pubDate"]?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+                return .distantPast
+            }
             let fmt = DateFormatter()
-            for f in ["EEE, dd MMM yyyy HH:mm:ss Z", "yyyy-MM-dd'T'HH:mm:ssZ"] {
+            fmt.locale = Locale(identifier: "en_US_POSIX")
+            let formats = [
+                "EEE, dd MMM yyyy HH:mm:ss Z",
+                "EEE, d MMM yyyy HH:mm:ss Z",
+                "EEE, dd MMM yyyy HH:mm:ss zzz",
+                "EEE, d MMM yyyy HH:mm:ss zzz",
+                "EEE, dd MMM yyyy HH:mm:ss z",
+                "EEE, d MMM yyyy HH:mm:ss z",
+                "yyyy-MM-dd'T'HH:mm:ssZ",
+                "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+            ]
+            for f in formats {
                 fmt.dateFormat = f
                 if let d = fmt.date(from: raw) { return d }
             }

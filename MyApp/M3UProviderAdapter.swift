@@ -12,7 +12,7 @@ struct M3UProviderAdapter: LiveProviderAdapter {
     }
 
     func loadGroups() async throws -> [AdapterGroup] {
-        let channels = try await loadChannels()
+        let (_, channels) = try await loadChannels()
         var seen = Set<String>()
         return channels.compactMap { ch -> AdapterGroup? in
             guard let title = ch.groupTitle, !title.isEmpty, !seen.contains(title) else { return nil }
@@ -21,7 +21,7 @@ struct M3UProviderAdapter: LiveProviderAdapter {
         }
     }
 
-    func loadChannels() async throws -> [AdapterChannel] {
+    func loadChannels() async throws -> (epgURL: String?, channels: [AdapterChannel]) {
         guard let urlString = provider.m3uURL, let url = URL(string: urlString),
               let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https" else {
             throw LiveProviderError.missingConfiguration("M3U URL must begin with http:// or https://")
@@ -46,8 +46,9 @@ struct M3UProviderAdapter: LiveProviderAdapter {
     /// Parses raw M3U/M3U8 text into AdapterChannel records.
     /// Runs entirely off the main thread. Extracts tvg-id and tvg-name in addition
     /// to the existing tvg-logo and group-title, enabling reliable EPG matching downstream.
-    static func parseM3U(_ text: String) -> [AdapterChannel] {
+    static func parseM3U(_ text: String) -> (epgURL: String?, channels: [AdapterChannel]) {
         var channels: [AdapterChannel] = []
+        var epgURL: String?
         var pendingName: String?
         var pendingLogo: URL?
         var pendingGroup: String?
@@ -59,7 +60,9 @@ struct M3UProviderAdapter: LiveProviderAdapter {
 
         for rawLine in text.split(whereSeparator: \.isNewline) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("#EXTINF") {
+            if line.hasPrefix("#EXTM3U") {
+                epgURL = attribute("x-tvg-url", in: line)
+            } else if line.hasPrefix("#EXTINF") {
                 pendingLogo    = attribute("tvg-logo",    in: line).flatMap(URL.init(string:))
                 pendingGroup   = attribute("group-title", in: line)
                 pendingTvgID   = attribute("tvg-id",      in: line)
@@ -97,7 +100,7 @@ struct M3UProviderAdapter: LiveProviderAdapter {
                 pendingCatchupSource = nil; pendingCatchupDays = 0; pendingCatchupEnabled = false
             }
         }
-        return channels
+        return (epgURL, channels)
     }
 
     private static func attribute(_ key: String, in line: String) -> String? {

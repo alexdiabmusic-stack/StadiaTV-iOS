@@ -28,7 +28,7 @@ struct XtreamProviderAdapter: LiveProviderAdapter {
         return cats.map { AdapterGroup(id: $0.category_id, title: $0.category_name) }
     }
 
-    func loadChannels() async throws -> [AdapterChannel] {
+    func loadChannels() async throws -> (epgURL: String?, channels: [AdapterChannel]) {
         guard let (base, user, pass) = try baseComponents() else {
             throw LiveProviderError.missingConfiguration("Host or credentials missing")
         }
@@ -58,7 +58,15 @@ struct XtreamProviderAdapter: LiveProviderAdapter {
         hostBase?.path = ""
         let hostString = hostBase?.string ?? (provider.host ?? "")
 
-        return await Task.detached(priority: .userInitiated) {
+        var epgComps = base
+        epgComps.path = "/xmltv.php"
+        epgComps.queryItems = [
+            URLQueryItem(name: "username", value: user),
+            URLQueryItem(name: "password", value: pass)
+        ]
+        let epgURL = epgComps.url?.absoluteString
+
+        let channels = await Task.detached(priority: .userInitiated) {
             streams.map { stream in
                 let urlString  = "\(hostString)/live/\(user)/\(pass)/\(stream.stream_id).m3u8"
                 let groupTitle = stream.category_id.flatMap { categories[$0] }
@@ -76,6 +84,7 @@ struct XtreamProviderAdapter: LiveProviderAdapter {
                 )
             }
         }.value
+        return (epgURL, channels)
     }
 
     func resolveStream(for channel: LiveChannel) async throws -> StreamDescriptor {

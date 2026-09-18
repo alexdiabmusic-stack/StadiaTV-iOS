@@ -94,7 +94,11 @@ final class StreamAvailabilityStore: ObservableObject {
                         var primarySources: [RankedSource] = []
                         var primaryIds = Set<String>()
                         for (canonicalId, join) in er.bestJoinByCanonical {
+                            // See MatchDetailView.rankSources(): a scoped programme only
+                            // confirms the one mirror/feed it names, not the whole canonical group.
+                            let scopedId = join.programme.scopedProviderChannelId
                             for channel in (er.canonicalToChannels[canonicalId] ?? []) {
+                                guard scopedId == nil || scopedId == channel.id else { continue }
                                 guard SourceMatcher.isEligible(channel: channel, for: m) else { continue }
                                 var source = RankedSource(channel: channel, score: 100 + Int(join.titleSimilarity * 50))
                                 source.evidenceCategories = [.guideListsMatch]

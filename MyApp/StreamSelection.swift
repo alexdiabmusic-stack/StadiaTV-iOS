@@ -410,6 +410,26 @@ enum StreamMetadataReader {
         return metadata.hasVideoSize || metadata.codec != nil || metadata.frameRate != nil || metadata.bitrate != nil ? metadata : nil
     }
 
+    /// Fetches the raw HLS playlist text and checks whether it advertises a video
+    /// rendition (`#EXT-X-STREAM-INF` with a `RESOLUTION` attribute). Used to tell a
+    /// genuinely audio-only channel apart from one where AVPlayer silently dropped
+    /// down to an audio-only rendition because it couldn't decode any video variant.
+    /// Returns `nil` when the fetch fails or the response isn't a playlist at all,
+    /// since that's inconclusive rather than evidence either way.
+    static func masterPlaylistAdvertisesVideo(at url: URL) async -> Bool? {
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 8
+            let (data, _) = try await URLSession.shared.data(for: request)
+            guard let text = String(data: data, encoding: .utf8),
+                  text.contains("#EXTM3U") else { return nil }
+            guard text.contains("#EXT-X-STREAM-INF") else { return nil }
+            return text.range(of: "RESOLUTION=", options: .caseInsensitive) != nil
+        } catch {
+            return nil
+        }
+    }
+
     private static func codecName(from description: CMFormatDescription) -> String? {
         let subtype = CMFormatDescriptionGetMediaSubType(description)
         let bytes: [UInt8] = [

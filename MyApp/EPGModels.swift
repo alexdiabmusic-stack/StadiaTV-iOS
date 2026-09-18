@@ -151,6 +151,12 @@ nonisolated struct EPGProgramme: Identifiable, Hashable, Sendable, Codable {
     let id: String
     let epgChannelId: String
     var canonicalChannelId: String?
+    /// When set, this programme's schedule is known to describe one specific raw
+    /// stream within the canonical channel's group, not every stream merged into
+    /// it. Set by tvg-id-matched custom playlist EPG, where the identity is exact;
+    /// nil for generic broadcaster feeds, where the canonical channel as a whole
+    /// (and thus every mirror grouped into it) is assumed to share one schedule.
+    var scopedProviderChannelId: String? = nil
     let title: String
     let subtitle: String?
     let description: String?
@@ -192,6 +198,7 @@ nonisolated struct EPGProgramme: Identifiable, Hashable, Sendable, Codable {
         let delta = TimeInterval(minutes * 60)
         return EPGProgramme(
             id: id, epgChannelId: epgChannelId, canonicalChannelId: canonicalChannelId,
+            scopedProviderChannelId: scopedProviderChannelId,
             title: title, subtitle: subtitle, description: description,
             categories: categories,
             start: start.addingTimeInterval(delta), end: end.addingTimeInterval(delta),

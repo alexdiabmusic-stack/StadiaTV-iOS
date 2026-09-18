@@ -3020,10 +3020,55 @@ private struct StreamTile: View {
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             guard !Task.isCancelled, let item = player.currentItem else { return }
             onPlayerItemReady?(item)
-            if let metadata = await StreamMetadataReader.metadata(from: item) {
-                onMetadata?(metadata)
+
+            // Live HLS can take several seconds to decode a first frame, so retry
+            // rather than giving up after one read — a single 1.5s check reported
+            // no metadata for every stream, not just ones that were actually stuck.
+            var lastMetadata: StreamRuntimeMetadata?
+            for _ in 0..<4 {
+                guard !Task.isCancelled else { return }
+                if let metadata = await StreamMetadataReader.metadata(from: item) {
+                    lastMetadata = metadata
+                    onMetadata?(metadata)
+                    if metadata.hasVideoSize { break }
+                }
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
             }
+
+            await detectVideolessPlayback(item: item, player: player, knownMetadata: lastMetadata)
         }
+    }
+
+    /// Some HLS manifests advertise a video rendition the device or AVPlayer can't
+    /// decode (commonly an HEVC profile/level the hardware decoder rejects on 4K
+    /// feeds); AVPlayer then silently keeps playing the audio-only rendition instead
+    /// of failing outright, so `asset.isPlayable` never reports a problem. Detect
+    /// that case and route it through the same failure path as an outright playback
+    /// error, so Auto mode fails over to a stream that actually renders video.
+    private func detectVideolessPlayback(item: AVPlayerItem, player: AVPlayer, knownMetadata: StreamRuntimeMetadata?) async {
+        guard !failed else { return }
+        let hasVideoTrack = ((try? await item.asset.loadTracks(withMediaType: .video)) ?? []).isEmpty == false
+
+        if hasVideoTrack {
+            if knownMetadata?.hasVideoSize == true { return }
+            // A video track exists but never produced a decodable frame size after
+            // several retries above — give it one last grace window, then bail.
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled, self.player === player, !failed else { return }
+            let isRendering = item.presentationSize.width > 0 && item.presentationSize.height > 0
+            if !isRendering && player.rate > 0 {
+                failed = true
+                onFailure?()
+            }
+            return
+        }
+
+        // No resolved video track. If the manifest itself never advertised a video
+        // rendition either, this is a genuine audio-only channel — leave it alone.
+        guard await StreamMetadataReader.masterPlaylistAdvertisesVideo(at: channel.streamURL) == true,
+              !Task.isCancelled, self.player === player, !failed else { return }
+        failed = true
+        onFailure?()
     }
 
     private func stop() {

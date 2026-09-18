@@ -2114,7 +2114,7 @@ struct MatchDetailView: View {
                     Text(showingAllChannels ? "More Matched Sources" : "Matched Sources")
                         .font(.headline.weight(.bold))
                         .foregroundStyle(Theme.textPrimary)
-                    Text("Only algorithm-detected game streams are shown here.")
+                    Text("Channels confirmed against your guide's live listings for this game.")
                         .font(.caption)
                         .foregroundStyle(Theme.textSecondary)
                 }

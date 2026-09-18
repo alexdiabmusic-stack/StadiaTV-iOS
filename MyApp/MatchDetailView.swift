@@ -222,7 +222,13 @@ struct MatchDetailView: View {
         var primarySources: [RankedSource] = []
         var primaryIds = Set<String>()
         for (canonicalId, join) in bestJoinByCanonical {
+            // A canonical channel can merge several mirrors/feeds that don't actually
+            // share content. A scoped programme (exact tvg-id match from a playlist's
+            // own EPG) only confirms the one stream it names — not every stream
+            // grouped under the same canonical identity.
+            let scopedId = join.programme.scopedProviderChannelId
             for channel in (canonicalToChannels[canonicalId] ?? []) {
+                guard scopedId == nil || scopedId == channel.id else { continue }
                 guard SourceMatcher.isEligible(channel: channel, for: match) else { continue }
                 var source = RankedSource(channel: channel, score: 100 + Int(join.titleSimilarity * 50))
                 source.evidenceCategories = [.guideListsMatch]

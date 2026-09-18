@@ -510,9 +510,18 @@ final class EPGRepository: ObservableObject {
             importDiagnostics.epgChannelParseDuration += Date().timeIntervalSince(started)
             let mapping = matchCustomEPGChannels(parseResult.channels)
             guard !mapping.isEmpty else { continue }
-            epgToCanonical.merge(mapping) { _, new in new }
+            epgToCanonical.merge(mapping.mapValues(\.canonicalChannelId)) { _, new in new }
             importProgress.epgChannels += mapping.count
-            mergeProgrammes(parseResult.programmes, into: &programmeIndex)
+
+            // Scope each programme to the exact raw stream its tvg-id resolved to —
+            // a canonical channel can merge several mirrors/feeds, and this schedule
+            // is only known to apply to the one the playlist's own EPG describes.
+            for var prog in parseResult.programmes {
+                guard prog.isValid, let match = mapping[prog.epgChannelId] else { continue }
+                prog.canonicalChannelId = match.canonicalChannelId
+                prog.scopedProviderChannelId = match.providerChannelId
+                programmeIndex[match.canonicalChannelId, default: []].append(prog)
+            }
         }
 
         finalizeProgrammeIndex(programmeIndex)
@@ -589,10 +598,20 @@ final class EPGRepository: ObservableObject {
         }
     }
 
+    /// A custom-EPG channel resolved to one exact raw stream, plus the canonical
+    /// group it happens to belong to.
+    private struct CustomEPGMatch {
+        let canonicalChannelId: String
+        let providerChannelId: String
+    }
+
     /// Matches a playlist's own XMLTV channel entries to that same playlist's channels
     /// by tvg-id (the two are issued together by the provider, so this is exact), with
     /// a normalized display-name fallback for providers whose ids drift between files.
-    private func matchCustomEPGChannels(_ epgChannels: [EPGChannel]) -> [String: String] {
+    /// Resolves to one specific raw stream rather than the canonical group as a whole,
+    /// since a canonical channel can merge several mirrors that don't share content —
+    /// the caller uses that to scope the matched schedule to just that one stream.
+    private func matchCustomEPGChannels(_ epgChannels: [EPGChannel]) -> [String: CustomEPGMatch] {
         guard let normalizer else { return [:] }
 
         var tvgIdToProvider: [String: String] = [:]
@@ -604,7 +623,7 @@ final class EPGRepository: ObservableObject {
             nameToProvider[normalizer.normalize(channel.name).lowercased()] = channel.id
         }
 
-        var mapping: [String: String] = [:]
+        var mapping: [String: CustomEPGMatch] = [:]
         for epgCh in epgChannels {
             var providerId = tvgIdToProvider[epgCh.id.lowercased()]
             if providerId == nil {
@@ -616,7 +635,7 @@ final class EPGRepository: ObservableObject {
                 }
             }
             guard let providerId, let canonId = channelToCanonicalMap[providerId] else { continue }
-            mapping[epgCh.id] = canonId
+            mapping[epgCh.id] = CustomEPGMatch(canonicalChannelId: canonId, providerChannelId: providerId)
         }
         return mapping
     }

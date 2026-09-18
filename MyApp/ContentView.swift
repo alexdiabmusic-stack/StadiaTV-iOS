@@ -127,7 +127,7 @@ struct RootView: View {
                 LiveView()
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }
-            Tab("Discover", systemImage: "compass.fill", value: AppTab.discover) {
+            Tab("Discover", systemImage: "safari.fill", value: AppTab.discover) {
                 DiscoverView()
                     .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
             }

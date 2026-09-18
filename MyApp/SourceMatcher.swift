@@ -148,7 +148,7 @@ nonisolated enum SourceMatcher {
         guard match.state != .final, programme.isValid,
               programme.start <= match.date.addingTimeInterval(30 * 60),
               programme.end >= match.date.addingTimeInterval(15 * 60) else { return false }
-        let title = [programme.title, programme.subtitle ?? ""].joined(separator: " ")
+        let title = [programme.title, programme.subtitle ?? "", programme.description ?? ""].joined(separator: " ")
         guard !hasStaleOrReplayLabel(title, at: match.date),
               !SportsOntology.isIncompatible(candidate: SportsOntology.classifyFeedFamily(from: title),
                                                with: SportsOntology.feedFamily(for: match.league.path)) else { return false }

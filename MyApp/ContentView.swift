@@ -145,7 +145,12 @@ struct RootView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: podcastStore.nowPlaying != nil)
         .task { updateFavoriteNotificationPrompt() }
         .task { await liveViewModel.load(favoriteTeams: prefs.favoriteTeams) }
-        .task { epgRepository.setupWithChannels(playlistStore.allChannels) }
+        .task(id: playlistStore.playlists) { 
+            epgRepository.setupWithChannels(
+                playlistStore.allChannels,
+                customEPGURLs: playlistStore.playlists.compactMap(\.epgURL).compactMap(URL.init(string:))
+            ) 
+        }
         .task(id: "\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.allChannels.count)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
             await streamStore.scan(
                 matches: liveViewModel.allLive + liveViewModel.startingSoon,
@@ -154,7 +159,10 @@ struct RootView: View {
             )
         }
         .onChange(of: playlistStore.channelsByPlaylist) {
-            epgRepository.setupWithChannels(playlistStore.allChannels)
+            epgRepository.setupWithChannels(
+                playlistStore.allChannels,
+                customEPGURLs: playlistStore.playlists.compactMap(\.epgURL).compactMap(URL.init(string:))
+            )
             Task { await refreshFantasyContexts(force: true) }
         }
         .onChange(of: prefs.favoriteTeams) { updateFavoriteNotificationPrompt() }

@@ -16,6 +16,7 @@ struct LiveProvider: Identifiable, Codable, Sendable, Hashable {
     var name: String
     var kind: LiveProviderKind
     var m3uURL: String?
+    var epgURL: String?
     var host: String?
     var credentialID: UUID
     var addedAt: Date
@@ -27,6 +28,7 @@ struct LiveProvider: Identifiable, Codable, Sendable, Hashable {
         self.name = playlist.name
         self.kind = playlist.kind == .m3u ? .m3u : .xtream
         self.m3uURL = playlist.m3uURL
+        self.epgURL = playlist.epgURL
         self.host = playlist.host
         self.credentialID = playlist.credentialID
         self.addedAt = Date()

@@ -36,9 +36,9 @@ final class LiveChannelRepository {
     /// persists them to the SQLite cache, and returns `[Channel]`.
     /// Concurrent calls for the same provider are coalesced — the second caller
     /// receives the cached value while the first is in flight.
-    func refreshChannels(for playlist: Playlist) async throws -> [Channel] {
+    func refreshChannels(for playlist: Playlist) async throws -> (channels: [Channel], epgURL: String?) {
         if refreshingProviders.contains(playlist.id) {
-            return (await cachedChannels(for: playlist)) ?? []
+            return ((await cachedChannels(for: playlist)) ?? [], nil)
         }
         refreshingProviders.insert(playlist.id)
         defer { refreshingProviders.remove(playlist.id) }
@@ -47,7 +47,7 @@ final class LiveChannelRepository {
         let adapter  = makeAdapter(for: provider)
 
         // Network + parsing happens inside the adapter (off-main via async/await or Task.detached).
-        let adapterChannels = try await adapter.loadChannels()
+        let (epgURL, adapterChannels) = try await adapter.loadChannels()
 
         // ID assignment and model construction — background-threaded.
         let liveChannels: [LiveChannel] = await Task.detached(priority: .userInitiated) {
@@ -74,7 +74,7 @@ final class LiveChannelRepository {
             }
         }
 
-        return liveChannels.map { $0.asChannel(playlistName: playlist.name) }
+        return (liveChannels.map { $0.asChannel(playlistName: playlist.name) }, epgURL)
     }
 
     // MARK: - Single channel lookup

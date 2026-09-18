@@ -85,6 +85,9 @@ final class EPGRepository: ObservableObject {
     private var refreshTask: Task<Void, Never>?
     private var setupTask: Task<Void, Never>?
     private var epgpwPrefetchTasks: [String: Task<Void, Never>] = [:]
+    private var customEPGURLs: [URL] = []
+
+    /// Custom XML url provided by playlists.
     private var epgpwDiagnostics: [String: EPGPWFetchResult] = [:]
     private var isRefreshing = false
     private var importGeneration = UUID()
@@ -127,10 +130,12 @@ final class EPGRepository: ObservableObject {
     }
 
     /// Called when IPTV channels are available. Rebuilds canonical lineup and refreshes EPG if needed.
-    func setupWithChannels(_ channels: [Channel]) {
+    func setupWithChannels(_ channels: [Channel], customEPGURLs: [URL] = []) {
+        self.customEPGURLs = customEPGURLs
         guard !channels.isEmpty else { return }
         let fingerprint = Self.channelFingerprint(channels)
         if fingerprint == lastChannelFingerprint, setupTask != nil || !canonicalChannels.isEmpty {
+            // Keep it updated if we missed it earlier.
             return
         }
         lastChannelFingerprint = fingerprint
@@ -772,6 +777,11 @@ final class EPGRepository: ObservableObject {
         for canonical in canonicalChannels {
             for stream in canonical.allStreams {
                 map[stream.providerChannelId] = canonical.id
+            }
+        }
+        for stream in unresolvedStreams {
+            if stream.tvgId?.isEmpty == false {
+                map[stream.providerChannelId] = stream.id
             }
         }
         channelToCanonicalMap = map

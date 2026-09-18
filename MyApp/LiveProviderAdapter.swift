@@ -49,7 +49,7 @@ struct AdapterGroup: Sendable {
 protocol LiveProviderAdapter: Sendable {
     var provider: LiveProvider { get }
     func loadGroups() async throws -> [AdapterGroup]
-    func loadChannels() async throws -> [AdapterChannel]
+    func loadChannels() async throws -> (epgURL: String?, channels: [AdapterChannel])
     func resolveStream(for channel: LiveChannel) async throws -> StreamDescriptor
 }
 

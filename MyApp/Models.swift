@@ -543,6 +543,7 @@ struct Playlist: Identifiable, Codable, Hashable {
 
     // M3U
     var m3uURL: String?
+    var epgURL: String?
 
     // Xtream
     var host: String?      // e.g. https://example.com:8080
@@ -553,12 +554,13 @@ struct Playlist: Identifiable, Codable, Hashable {
     var password: String?
 
     init(id: UUID = UUID(), name: String, kind: PlaylistKind,
-         m3uURL: String? = nil, host: String? = nil,
+         m3uURL: String? = nil, epgURL: String? = nil, host: String? = nil,
          credentialID: UUID? = nil, username: String? = nil, password: String? = nil) {
         self.id = id
         self.name = name
         self.kind = kind
         self.m3uURL = m3uURL
+        self.epgURL = epgURL
         self.host = host
         self.credentialID = credentialID ?? id
         self.username = username
@@ -566,7 +568,7 @@ struct Playlist: Identifiable, Codable, Hashable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, kind, m3uURL, host, credentialID, username, password
+        case id, name, kind, m3uURL, epgURL, host, credentialID, username, password
     }
 
     init(from decoder: Decoder) throws {
@@ -575,6 +577,7 @@ struct Playlist: Identifiable, Codable, Hashable {
         name = try container.decode(String.self, forKey: .name)
         kind = try container.decode(PlaylistKind.self, forKey: .kind)
         m3uURL = try container.decodeIfPresent(String.self, forKey: .m3uURL)
+        epgURL = try container.decodeIfPresent(String.self, forKey: .epgURL)
         host = try container.decodeIfPresent(String.self, forKey: .host)
         credentialID = try container.decodeIfPresent(UUID.self, forKey: .credentialID) ?? id
         username = try container.decodeIfPresent(String.self, forKey: .username)
@@ -587,12 +590,13 @@ struct Playlist: Identifiable, Codable, Hashable {
         try container.encode(name, forKey: .name)
         try container.encode(kind, forKey: .kind)
         try container.encodeIfPresent(m3uURL, forKey: .m3uURL)
+        try container.encodeIfPresent(epgURL, forKey: .epgURL)
         try container.encodeIfPresent(host, forKey: .host)
         try container.encode(credentialID, forKey: .credentialID)
     }
 
     var sanitizedForPersistence: Playlist {
-        Playlist(id: id, name: name, kind: kind, m3uURL: m3uURL, host: host, credentialID: credentialID)
+        Playlist(id: id, name: name, kind: kind, m3uURL: m3uURL, epgURL: epgURL, host: host, credentialID: credentialID)
     }
 }
 

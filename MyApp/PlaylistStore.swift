@@ -195,8 +195,18 @@ final class PlaylistStore: ObservableObject {
         loadingPlaylistIDs.insert(playlist.id)
         defer { loadingPlaylistIDs.remove(playlist.id) }
         do {
-            let channels = try await repository.refreshChannels(for: playlist)
-            channelsByPlaylist[playlist.id] = channels
+            let result = try await repository.refreshChannels(for: playlist)
+            channelsByPlaylist[playlist.id] = result.channels
+
+            if let parsedEPGURL = result.epgURL, playlist.epgURL != parsedEPGURL {
+                var updated = playlist
+                updated.epgURL = parsedEPGURL
+                // Replace without triggering another refresh to avoid loop
+                if let index = playlists.firstIndex(where: { $0.id == updated.id }) {
+                    playlists[index] = updated.sanitizedForPersistence
+                    persist()
+                }
+            }
         } catch {
             lastError = "\(playlist.name): \(error.localizedDescription)"
         }

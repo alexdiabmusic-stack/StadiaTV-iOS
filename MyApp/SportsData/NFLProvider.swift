@@ -219,10 +219,26 @@ struct NFLClient: Sendable {
         let startWeek = try await week(for: NFLDateFormatter.dayString(from: start))
         let endWeek = try await week(for: NFLDateFormatter.dayString(from: end))
         if startWeek.reference == endWeek.reference { return [startWeek.reference] }
-        let weeks = try await weeks(season: startWeek.seasonValue, seasonType: startWeek.seasonTypeValue).weeks ?? []
-        let low = min(startWeek.weekValue, endWeek.weekValue)
-        let high = max(startWeek.weekValue, endWeek.weekValue)
-        let refs = weeks.filter { $0.weekValue >= low && $0.weekValue <= high }.map(\.reference)
+
+        let lowRef = min(startWeek.reference, endWeek.reference)
+        let highRef = max(startWeek.reference, endWeek.reference)
+
+        // A date range can span a season-type boundary (preseason -> regular season
+        // in September, regular season -> postseason in early-mid January). Week
+        // numbers reset at each boundary, so fetching only the start week's
+        // (season, seasonType) bucket silently drops every week on the other side
+        // of the boundary — e.g. a 14-day scoreboard query spanning that transition
+        // would miss the newly-started segment's games entirely.
+        var segments: [(season: Int, seasonType: String)] = [(startWeek.seasonValue, startWeek.seasonTypeValue)]
+        if endWeek.seasonValue != startWeek.seasonValue || endWeek.seasonTypeValue != startWeek.seasonTypeValue {
+            segments.append((endWeek.seasonValue, endWeek.seasonTypeValue))
+        }
+
+        var refs: [NFLWeekReference] = []
+        for segment in segments {
+            let fetched = (try? await weeks(season: segment.season, seasonType: segment.seasonType).weeks) ?? []
+            refs += fetched.map(\.reference).filter { $0 >= lowRef && $0 <= highRef }
+        }
         return refs.isEmpty ? [startWeek.reference, endWeek.reference] : Array(Set(refs)).sorted()
     }
 

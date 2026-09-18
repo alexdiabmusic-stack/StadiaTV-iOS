@@ -133,7 +133,7 @@ final class EPGRepository: ObservableObject {
     func setupWithChannels(_ channels: [Channel], customEPGURLs: [URL] = []) {
         self.customEPGURLs = customEPGURLs
         guard !channels.isEmpty else { return }
-        let fingerprint = Self.channelFingerprint(channels)
+        let fingerprint = Self.channelFingerprint(channels) + customEPGURLs.map { $0.absoluteString }.joined()
         if fingerprint == lastChannelFingerprint, setupTask != nil || !canonicalChannels.isEmpty {
             // Keep it updated if we missed it earlier.
             return
@@ -423,11 +423,18 @@ final class EPGRepository: ObservableObject {
 
     func refreshIfNeeded() async {
         guard EPGPWSourcePolicy.epgShareFallbackEnabled else { return }
+        
+        var missingCustomSource = false
+        for (i, _) in customEPGURLs.enumerated() {
+            let cacheFile = cacheDir.appendingPathComponent("custom-\(i).xml")
+            if !FileManager.default.fileExists(atPath: cacheFile.path) {
+                missingCustomSource = true
+                break
+            }
+        }
+        
         let staleness: TimeInterval = 6 * 3600
-        // Skip download if the cache is fresh AND the cache file exists on disk.
-        // lastUpdated is loaded synchronously from UserDefaults at init time so this
-        // check is valid even before the async disk-load of programmeIndex completes.
-        if let last = lastUpdated, Date().timeIntervalSince(last) < staleness,
+        if !missingCustomSource, let last = lastUpdated, Date().timeIntervalSince(last) < staleness,
            FileManager.default.fileExists(atPath: programmeCacheURL.path) { return }
         await forceRefresh()
     }
@@ -561,6 +568,14 @@ final class EPGRepository: ObservableObject {
                     aliasToCanon[norm] = curatedCh.key
                     aliasToCanon[alias.lowercased()] = curatedCh.key
                 }
+            }
+        }
+
+        // Also build a lookup for unresolved streams using their tvg-id!
+        for stream in unresolvedStreams {
+            guard let epgId = stream.tvgId?.lowercased(), !epgId.isEmpty else { continue }
+            if aliasToCanon[epgId] == nil {
+                aliasToCanon[epgId] = stream.id
             }
         }
 

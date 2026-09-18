@@ -1093,7 +1093,10 @@ struct SportsProviderRouteConfiguration: Sendable {
             (leagueKey(forLegacyPath: "baseball/mlb"),                         [.mlb, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
             (leagueKey(forLegacyPath: "basketball/nba"),                       [.nba, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
             (leagueKey(forLegacyPath: "football/nfl"),                         [.nfl, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
-            (leagueKey(forLegacyPath: "basketball/wnba"),                      [.appleSports, .cbsSports, .yahooSports, .espn]),
+            // Yahoo doesn't cover WNBA at all (YahooSportsEndpoint.supportedLeaguePaths is
+            // college-football only) — Fox Sports does (FoxSportsEndpoint slug "wnba"),
+            // so it replaces Yahoo as the real non-Apple fallback here.
+            (leagueKey(forLegacyPath: "basketball/wnba"),                      [.appleSports, .foxSports, .cbsSports, .espn]),
             (leagueKey(forLegacyPath: "football/college-football"),            [.appleSports, .cbsSports, .yahooSports, .espn]),
             (leagueKey(forLegacyPath: "basketball/mens-college-basketball"),   [.appleSports, .cbsSports, .espn]),
             (leagueKey(forLegacyPath: "basketball/womens-college-basketball"), [.appleSports, .cbsSports, .espn]),
@@ -1112,12 +1115,15 @@ struct SportsProviderRouteConfiguration: Sendable {
         // Player stats: first-party APIs own player databases for big 4.
         // Yahoo leads college football (richer stats); CBS leads college basketball.
         // Apple covers match-level stats for soccer, racing, golf, tennis.
+        // Note: this same array also backs .teamStats below. Fox doesn't conform to
+        // PlayerStatsProvider so it's a no-op there, but it does conform to
+        // TeamStatsProvider, so listing it here gets picked up for .teamStats.
         let playerStatsOverrides: [(String, [SportsDataProviderID])] = [
             (leagueKey(forLegacyPath: "hockey/nhl"),                           [.nhl, .appleSports, .cbsSports, .foxSports, .yahooSports, .espn]),
             (leagueKey(forLegacyPath: "baseball/mlb"),                         [.mlb, .appleSports, .cbsSports, .foxSports, .yahooSports, .espn]),
             (leagueKey(forLegacyPath: "basketball/nba"),                       [.nba, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
             (leagueKey(forLegacyPath: "football/nfl"),                         [.nfl, .appleSports, .cbsSports, .yahooSports, .foxSports, .espn]),
-            (leagueKey(forLegacyPath: "basketball/wnba"),                      [.appleSports, .cbsSports, .yahooSports, .espn]),
+            (leagueKey(forLegacyPath: "basketball/wnba"),                      [.appleSports, .foxSports, .cbsSports, .espn]),
             (leagueKey(forLegacyPath: "football/college-football"),            [.yahooSports, .cbsSports, .appleSports, .espn]),
             (leagueKey(forLegacyPath: "basketball/mens-college-basketball"),   [.cbsSports, .appleSports, .espn]),
             (leagueKey(forLegacyPath: "basketball/womens-college-basketball"), [.cbsSports, .appleSports, .espn]),
@@ -1141,7 +1147,19 @@ struct SportsProviderRouteConfiguration: Sendable {
             (leagueKey(forLegacyPath: "football/nfl"),   [.nfl, .appleSports, .cbsSports, .espn]),
         ]
 
+        // WNBA has no first-party provider, and its general "applePrimaryLeagues" route
+        // below only covers appleBaselineCapabilities — .rosters and .playByPlay aren't
+        // in that list, so without an explicit route here they silently fall to the
+        // hardcoded ESPN-only default even though FoxSportsProvider already implements
+        // both (RosterProvider, PlayByPlayProvider) and declares WNBA support.
+        let wnbaLeagueID = leagueKey(forLegacyPath: "basketball/wnba")
+        let wnbaGapOverrides: [ProviderRoute] = [
+            ProviderRoute(leagueID: wnbaLeagueID, capability: .rosters, providers: [.foxSports, .espn]),
+            ProviderRoute(leagueID: wnbaLeagueID, capability: .playByPlay, providers: [.foxSports, .espn]),
+        ]
+
         var routes: [ProviderRoute] = standingsOverrides.map { ProviderRoute(leagueID: $0, capability: .standings, providers: $1) }
+        routes += wnbaGapOverrides
         routes += soccerLeaguePaths.map { ProviderRoute(leagueID: leagueKey(forLegacyPath: $0), capability: .standings, providers: [.appleSports, .cbsSports, .yahooSports, .foxSports, .espn]) }
 
         routes += playerStatsOverrides.map { ProviderRoute(leagueID: $0, capability: .playerStats, providers: $1) }
@@ -2233,21 +2251,17 @@ struct SportsRepository: Sendable {
         guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.liveScores, league.path) }
         var failures: [String] = []
         var fallbacks: [SportsDataProviderID] = []
-        var lastEmptyResult: (games: [BannerGame], providerID: SportsDataProviderID, latency: TimeInterval)?
         for provider in providers {
             let start = Date()
             do {
                 let games = try await provider.liveScores(for: league)
                 let latency = Date().timeIntervalSince(start)
                 await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
-                guard !games.isEmpty else {
-                    // Primary returned empty — remember it and try the next provider so we
-                    // always get the richest available result rather than silently suppressing
-                    // a fallback that may have data (e.g. ESPN when Apple Sports has none).
-                    lastEmptyResult = (games, provider.metadata.id, latency)
-                    fallbacks.append(provider.metadata.id)
-                    continue
-                }
+                // An empty result is a legitimate answer ("nothing live right now"), not a
+                // signal to keep falling through the chain — for sparse-schedule leagues
+                // (NFL, WNBA) it's the *normal* result most of the time. Treating it as
+                // "try the next provider" meant every empty check burned through the whole
+                // waterfall down to the rate-limited ESPN fallback on nearly every poll.
                 await cache.store(games, for: key, ttl: SportsDataCache.defaultTTL(for: .liveScores, containsLiveGames: games.contains { $0.status == .live }))
                 await recordDiagnostics(league: league, capability: .liveScores, currentProvider: provider.metadata.id, latency: latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
                 return games
@@ -2256,12 +2270,6 @@ struct SportsRepository: Sendable {
                 await router.healthMonitor.recordFailure(providerID: provider.metadata.id, error: error)
                 fallbacks.append(provider.metadata.id)
             }
-        }
-        // All providers exhausted — return the last empty success if we got one, otherwise throw.
-        if let empty = lastEmptyResult {
-            await cache.store(empty.games, for: key, ttl: SportsDataCache.defaultTTL(for: .liveScores, containsLiveGames: false))
-            await recordDiagnostics(league: league, capability: .liveScores, currentProvider: empty.providerID, latency: empty.latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
-            return empty.games
         }
         throw SportsDataError.unavailable
     }
@@ -2439,18 +2447,16 @@ struct SportsRepository: Sendable {
         guard !providers.isEmpty else { throw SportsDataError.noProviderAvailable(.schedule, league.path) }
         var failures: [String] = []
         var fallbacks: [SportsDataProviderID] = []
-        var lastEmptyResult: (schedule: BannerSchedule, providerID: SportsDataProviderID, latency: TimeInterval)?
         for provider in providers {
             let start = Date()
             do {
                 let schedule = try await provider.schedule(for: league, range: range)
                 let latency = Date().timeIntervalSince(start)
                 await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
-                guard !schedule.games.isEmpty else {
-                    lastEmptyResult = (schedule, provider.metadata.id, latency)
-                    fallbacks.append(provider.metadata.id)
-                    continue
-                }
+                // See requestScores: an empty schedule is a legitimate answer (off-season,
+                // bye week) for sparse-schedule leagues like NFL/WNBA, not a data gap to
+                // route around. Treating it as one meant every off-season poll burned
+                // through the whole waterfall down to the rate-limited ESPN fallback.
                 let ttl = SportsDataCache.defaultTTL(for: .schedule, containsLiveGames: schedule.games.contains { $0.status == .live })
                 await cache.store(schedule, for: key, ttl: ttl)
                 await SportsDataDiskCache.shared.store(schedule, for: key, ttl: SportsDataCache.defaultTTL(for: .schedule, containsLiveGames: false))
@@ -2461,12 +2467,6 @@ struct SportsRepository: Sendable {
                 await router.healthMonitor.recordFailure(providerID: provider.metadata.id, error: error)
                 fallbacks.append(provider.metadata.id)
             }
-        }
-        if let empty = lastEmptyResult {
-            await cache.store(empty.schedule, for: key, ttl: SportsDataCache.defaultTTL(for: .schedule, containsLiveGames: false))
-            await SportsDataDiskCache.shared.store(empty.schedule, for: key, ttl: SportsDataCache.defaultTTL(for: .schedule, containsLiveGames: false))
-            await recordDiagnostics(league: league, capability: .schedule, currentProvider: empty.providerID, latency: empty.latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
-            return empty.schedule
         }
         throw SportsDataError.unavailable
     }

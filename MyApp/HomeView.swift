@@ -1803,7 +1803,6 @@ final class HomeViewModel: ObservableObject {
         // Await the final snapshot and reset to a clean baseline for the schedule phase.
         // The callbacks above have already populated the UI incrementally.
         let liveSnapshot = await liveSnapshotTask
-        let firstError = liveSnapshot.failures.first
         // Include pastStartToday so games that started but still show as scheduled are
         // present in allMatches — they can appear in Live Now via the featured-IDs special
         // case and will be correctly matched to featured picks.
@@ -1819,9 +1818,11 @@ final class HomeViewModel: ObservableObject {
         }
 
         isLoading = false
-        if matchesByLeague.isEmpty {
-            errorMessage = firstError ?? "No live or upcoming games were returned for today."
-        }
+        // Don't surface the blocking error state yet: this is only the fast "live or
+        // starting soon" pass, and finding nothing here is the ordinary outcome most
+        // hours of most days (no live games) — it says nothing about whether the
+        // slower 7-day/season schedule fetches below, still in flight, will succeed.
+        // Showing "Try Again" at this point flashed on effectively every quiet moment.
 
         let sevenDaySchedules = await sevenDaySchedulesTask
         for (leagueID, matches) in sevenDaySchedules where !matches.isEmpty {
@@ -1880,6 +1881,13 @@ final class HomeViewModel: ObservableObject {
             lastLoadedLeagueIDs = discoveryLeagueIDs
             lastLoadedFavoriteSignature = favoriteSignature
             lastLoadedAt = Date()
+        } else if !Task.isCancelled {
+            // Live-or-soon, 7-day, and season-long schedule fetches all came back
+            // empty across every league in the catalog — that's not a single bad
+            // league, it's total data unavailability (almost always a connectivity
+            // issue), so don't blame whichever league's error happened to lose the
+            // concurrency race in the first pass.
+            errorMessage = "Couldn't load sports data. Check your connection and try again."
         }
     }
 

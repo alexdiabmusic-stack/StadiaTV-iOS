@@ -819,10 +819,21 @@ actor ProviderHealthMonitor {
     private var snapshots: [SportsDataProviderID: SportsProviderHealthSnapshot] = [:]
     private let failureCooldownThreshold: Int
     private let cooldownDuration: TimeInterval
+    // A provider whose successful responses are empty for several *different* leagues
+    // within a short window isn't reporting a quiet day — no realistic day has zero
+    // games across the entire catalog at once — it means the response shape broke
+    // silently upstream (e.g. a schema change) and every request "succeeds" with
+    // nothing in it. Track that streak per provider so we can force a cooldown and let
+    // the caller's waterfall reach a fallback, instead of trusting empty forever.
+    private var recentEmptySuccessTimestamps: [SportsDataProviderID: [Date]] = [:]
+    private let emptyStreakThreshold: Int
+    private let emptyStreakWindow: TimeInterval
 
-    init(failureCooldownThreshold: Int = 3, cooldownDuration: TimeInterval = 60) {
+    init(failureCooldownThreshold: Int = 3, cooldownDuration: TimeInterval = 60, emptyStreakThreshold: Int = 5, emptyStreakWindow: TimeInterval = 20) {
         self.failureCooldownThreshold = failureCooldownThreshold
         self.cooldownDuration = cooldownDuration
+        self.emptyStreakThreshold = emptyStreakThreshold
+        self.emptyStreakWindow = emptyStreakWindow
     }
 
     func snapshot(for providerID: SportsDataProviderID) -> SportsProviderHealthSnapshot {
@@ -837,7 +848,7 @@ actor ProviderHealthMonitor {
         return true
     }
 
-    func recordSuccess(providerID: SportsDataProviderID, latency: TimeInterval, at now: Date = Date()) {
+    func recordSuccess(providerID: SportsDataProviderID, latency: TimeInterval, isEmptyResult: Bool = false, at now: Date = Date()) {
         var snapshot = snapshots[providerID] ?? SportsProviderHealthSnapshot.healthySnapshot
         snapshot.state = SportsProviderHealthState.healthy
         snapshot.lastSuccessAt = now
@@ -850,6 +861,21 @@ actor ProviderHealthMonitor {
         } else {
             snapshot.averageLatency = latency
         }
+
+        if isEmptyResult {
+            var timestamps = (recentEmptySuccessTimestamps[providerID] ?? []).filter { now.timeIntervalSince($0) < emptyStreakWindow }
+            timestamps.append(now)
+            if timestamps.count >= emptyStreakThreshold {
+                snapshot.state = SportsProviderHealthState.unavailable
+                snapshot.cooldownUntil = now.addingTimeInterval(cooldownDuration)
+                snapshot.lastErrorDescription = "Empty results across \(timestamps.count) leagues within \(Int(emptyStreakWindow))s — likely a broken response shape, not an empty schedule"
+                timestamps = []
+            }
+            recentEmptySuccessTimestamps[providerID] = timestamps
+        } else {
+            recentEmptySuccessTimestamps[providerID] = []
+        }
+
         snapshots[providerID] = snapshot
     }
 
@@ -2256,7 +2282,7 @@ struct SportsRepository: Sendable {
             do {
                 let games = try await provider.liveScores(for: league)
                 let latency = Date().timeIntervalSince(start)
-                await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
+                await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency, isEmptyResult: games.isEmpty)
                 // An empty result is a legitimate answer ("nothing live right now"), not a
                 // signal to keep falling through the chain — for sparse-schedule leagues
                 // (NFL, WNBA) it's the *normal* result most of the time. Treating it as
@@ -2452,7 +2478,7 @@ struct SportsRepository: Sendable {
             do {
                 let schedule = try await provider.schedule(for: league, range: range)
                 let latency = Date().timeIntervalSince(start)
-                await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency)
+                await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency, isEmptyResult: schedule.games.isEmpty)
                 // See requestScores: an empty schedule is a legitimate answer (off-season,
                 // bye week) for sparse-schedule leagues like NFL/WNBA, not a data gap to
                 // route around. Treating it as one meant every off-season poll burned

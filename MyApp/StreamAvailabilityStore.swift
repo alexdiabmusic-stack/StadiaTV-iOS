@@ -22,6 +22,19 @@ final class StreamAvailabilityStore: ObservableObject {
     /// a stale concurrent scan cannot overwrite results from a newer one.
     private var scanGeneration: Int = 0
 
+    /// Debounced entry point for `.task(id:)`-driven callers, whose id includes
+    /// `EPGRepository.lastUpdated`. That timestamp is bumped not just by a real full/custom
+    /// EPG merge but also by every tiny single-channel EPG.pw background prefetch — each of
+    /// which would otherwise cancel and restart this same O(matches × channels) scan. Waiting
+    /// briefly lets a burst of rapid triggers collapse into a single scan: SwiftUI's
+    /// `.task(id:)` cancels the previous task (aborting this sleep) whenever the id changes
+    /// again before the delay elapses, so only the last trigger in a burst actually scans.
+    func scanDebounced(matches: [Match], channels: [Channel], epgRepository: EPGRepository, delay: Duration = .milliseconds(400)) async {
+        try? await Task.sleep(for: delay)
+        guard !Task.isCancelled else { return }
+        await scan(matches: matches, channels: channels, epgRepository: epgRepository)
+    }
+
     /// Scans `matches` against `channels` using EPG-first matching: the guide is queried for each
     /// match first, then all team/event-named channels are appended as backups.
     /// Results are cached in `sourcesByMatchId` so detail views display instantly.

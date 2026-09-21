@@ -450,51 +450,19 @@ final class EPGRepository: ObservableObject {
         let activeCategoryIds = Set(canonicalChannels.map(\.categoryId))
         let sources = EPGSourceRegistry.sources(for: activeCategoryIds)
 
-        var allEPGChannels: [EPGChannel] = []
         let now = Date()
         // Keep 14h of past data so the guide shows programmes from midnight today
         let programmeWindow = now.addingTimeInterval(-14 * 3600)...now.addingTimeInterval(36 * 3600)
 
-        for source in sources {
-            guard !Task.isCancelled else {
-                refreshState = .idle
-                importProgress.state = .cancelled
-                return
-            }
-            guard let data = await epgData(for: source) else { continue }
-            let started = Date()
-            let result = await Task.detached(priority: .utility) {
-                EPGXMLParser(sourceId: source.id, priority: source.priority)
-                    .parse(data: data, channelsOnly: true)
-            }.value
-            importDiagnostics.epgChannelParseDuration += Date().timeIntervalSince(started)
-            allEPGChannels.append(contentsOf: result.channels)
-        }
-
-        // Match EPG channels to canonical channels
-        matchEPGChannels(allEPGChannels)
-        let wantedEPGIds = Set(epgToCanonical.keys)
-        importProgress.epgChannels = wantedEPGIds.count
-
         var programmeIndex = self.programmeIndex
-        for source in sources {
-            guard !Task.isCancelled else {
-                refreshState = .idle
-                importProgress.state = .cancelled
-                return
-            }
-            guard let data = cachedEPGData(for: source), !wantedEPGIds.isEmpty else { continue }
-            let started = Date()
-            let parseResult = await Task.detached(priority: .utility) {
-                EPGXMLParser(sourceId: source.id, priority: source.priority)
-                    .parse(data: data, allowedChannelIds: wantedEPGIds, programmeWindow: programmeWindow)
-            }.value
-            importDiagnostics.epgProgrammeParseDuration += Date().timeIntervalSince(started)
-            mergeProgrammes(parseResult.programmes, into: &programmeIndex)
-        }
-        // Custom EPG XML embedded directly in the user's own M3U/Xtream playlist —
-        // matched by tvg-id so it lines up exactly with that playlist's own channel
-        // list, then merged with priority 0 so it wins ties against the generic feeds.
+
+        // Custom EPG XML embedded directly in the user's own M3U/Xtream playlist is
+        // matched by tvg-id against that playlist's own channel list, and doesn't
+        // depend on the generic epgshare01 feeds below at all. Run and publish it
+        // FIRST — a user's own playlist should confirm against live matches right
+        // away, not wait behind up to 4 unrelated generic broadcaster feeds that
+        // still need to download and parse.
+        var customChannelMappings: [String: CustomEPGMatch] = [:]
         for (index, url) in customEPGURLs.enumerated() {
             guard !Task.isCancelled else {
                 refreshState = .idle
@@ -510,6 +478,7 @@ final class EPGRepository: ObservableObject {
             importDiagnostics.epgChannelParseDuration += Date().timeIntervalSince(started)
             let mapping = matchCustomEPGChannels(parseResult.channels)
             guard !mapping.isEmpty else { continue }
+            customChannelMappings.merge(mapping) { _, new in new }
             epgToCanonical.merge(mapping.mapValues(\.canonicalChannelId)) { _, new in new }
             importProgress.epgChannels += mapping.count
 
@@ -522,6 +491,82 @@ final class EPGRepository: ObservableObject {
                 prog.scopedProviderChannelId = match.providerChannelId
                 programmeIndex[match.canonicalChannelId, default: []].append(prog)
             }
+        }
+
+        if !customChannelMappings.isEmpty {
+            // Early partial publish: the user's own playlist EPG is ready and merged —
+            // surface it now instead of waiting on the slower generic feeds below.
+            finalizeProgrammeIndex(programmeIndex)
+            importProgress.programmesRetained = programmeIndex.values.reduce(0) { $0 + $1.count }
+            lastUpdated = Date()
+            persistState()
+            objectWillChange.send()
+        }
+
+        // Generic epgshare01 broadcaster feeds — fetched and parsed in parallel since
+        // each source is fully independent; this used to be a serial loop that summed
+        // every source's network+parse time instead of running them concurrently.
+        var allEPGChannels: [EPGChannel] = []
+        await withTaskGroup(of: (source: EPGSource, channels: [EPGChannel], duration: TimeInterval)?.self) { group in
+            for source in sources {
+                group.addTask { [weak self] in
+                    guard let self, let data = await self.epgData(for: source) else { return nil }
+                    let started = Date()
+                    let result = await Task.detached(priority: .utility) {
+                        EPGXMLParser(sourceId: source.id, priority: source.priority)
+                            .parse(data: data, channelsOnly: true)
+                    }.value
+                    return (source, result.channels, Date().timeIntervalSince(started))
+                }
+            }
+            for await result in group {
+                guard let result else { continue }
+                importDiagnostics.epgChannelParseDuration += result.duration
+                allEPGChannels.append(contentsOf: result.channels)
+            }
+        }
+        guard !Task.isCancelled else {
+            refreshState = .idle
+            importProgress.state = .cancelled
+            return
+        }
+
+        // Match EPG channels to canonical channels
+        matchEPGChannels(allEPGChannels)
+        // matchEPGChannels replaces epgToCanonical wholesale — reapply the custom
+        // playlist's mapping on top so it keeps winning ties against generic feeds.
+        if !customChannelMappings.isEmpty {
+            epgToCanonical.merge(customChannelMappings.mapValues(\.canonicalChannelId)) { _, new in new }
+        }
+        let wantedEPGIds = Set(epgToCanonical.keys)
+        // epgToCanonical already includes the custom mapping merged in above, so this
+        // count covers both generic and custom channels without double-counting.
+        importProgress.epgChannels = wantedEPGIds.count
+
+        if !wantedEPGIds.isEmpty {
+            await withTaskGroup(of: (programmes: [EPGProgramme], duration: TimeInterval)?.self) { group in
+                for source in sources {
+                    group.addTask { [weak self] in
+                        guard let self, let data = await self.cachedEPGData(for: source) else { return nil }
+                        let started = Date()
+                        let parseResult = await Task.detached(priority: .utility) {
+                            EPGXMLParser(sourceId: source.id, priority: source.priority)
+                                .parse(data: data, allowedChannelIds: wantedEPGIds, programmeWindow: programmeWindow)
+                        }.value
+                        return (parseResult.programmes, Date().timeIntervalSince(started))
+                    }
+                }
+                for await result in group {
+                    guard let result else { continue }
+                    importDiagnostics.epgProgrammeParseDuration += result.duration
+                    mergeProgrammes(result.programmes, into: &programmeIndex)
+                }
+            }
+        }
+        guard !Task.isCancelled else {
+            refreshState = .idle
+            importProgress.state = .cancelled
+            return
         }
 
         finalizeProgrammeIndex(programmeIndex)

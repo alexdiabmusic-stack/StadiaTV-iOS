@@ -64,7 +64,7 @@ struct MatchesView: View {
         .tint(Theme.accent)
         .task(id: loadKey) { await loadAll() }
         .task(id: streamScanKey) {
-            await streamStore.scan(
+            await streamStore.scanDebounced(
                 matches: viewModel.allFollowedMatches + viewModel.matches,
                 channels: playlists.allChannels,
                 epgRepository: epgRepository

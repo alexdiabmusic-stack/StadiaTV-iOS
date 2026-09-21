@@ -152,7 +152,7 @@ struct RootView: View {
             ) 
         }
         .task(id: "\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.allChannels.count)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
-            await streamStore.scan(
+            await streamStore.scanDebounced(
                 matches: liveViewModel.allLive + liveViewModel.startingSoon,
                 channels: playlistStore.allChannels,
                 epgRepository: epgRepository

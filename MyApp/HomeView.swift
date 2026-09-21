@@ -1825,7 +1825,7 @@ final class HomeViewModel: ObservableObject {
         // Showing "Try Again" at this point flashed on effectively every quiet moment.
 
         let sevenDaySchedules = await sevenDaySchedulesTask
-        for (leagueID, matches) in sevenDaySchedules where !matches.isEmpty {
+        for (leagueID, matches, _) in sevenDaySchedules where !matches.isEmpty {
             if Task.isCancelled { break }
             matchesByLeague[leagueID] = mergeMatches((matchesByLeague[leagueID] ?? []) + matches)
         }
@@ -1834,7 +1834,7 @@ final class HomeViewModel: ObservableObject {
         }
 
         let favoriteSeasonSchedules = await favoriteSeasonSchedulesTask
-        for (leagueID, matches) in favoriteSeasonSchedules where !matches.isEmpty {
+        for (leagueID, matches, _) in favoriteSeasonSchedules where !matches.isEmpty {
             if Task.isCancelled { break }
             matchesByLeague[leagueID] = mergeMatches((matchesByLeague[leagueID] ?? []) + matches)
         }
@@ -1884,18 +1884,30 @@ final class HomeViewModel: ObservableObject {
         } else if !Task.isCancelled {
             // Live-or-soon, 7-day, and season-long schedule fetches all came back
             // empty across every league in the catalog — that's not a single bad
-            // league, it's total data unavailability (almost always a connectivity
-            // issue), so don't blame whichever league's error happened to lose the
-            // concurrency race in the first pass.
-            errorMessage = "Couldn't load sports data. Check your connection and try again."
+            // league, it's total data unavailability. Surface the real failure
+            // reason(s) instead of a generic "check your connection" message so a
+            // provider/routing bug doesn't masquerade as a network problem.
+            let distinctFailures = orderedUnique(
+                liveSnapshot.failures
+                    + sevenDaySchedules.compactMap(\.failure)
+                    + favoriteSeasonSchedules.compactMap(\.failure)
+            )
+            errorMessage = distinctFailures.isEmpty
+                ? "Couldn't load sports data. Check your connection and try again."
+                : "Couldn't load sports data: \(distinctFailures.prefix(3).joined(separator: "; "))"
         }
     }
 
-    private nonisolated func loadSchedules(for leagues: [League], days: Int, maxConcurrentLoads: Int) async -> [(String, [Match])] {
+    private func orderedUnique(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.filter { seen.insert($0).inserted }
+    }
+
+    private nonisolated func loadSchedules(for leagues: [League], days: Int, maxConcurrentLoads: Int) async -> [(leagueID: String, matches: [Match], failure: String?)] {
         guard !leagues.isEmpty else { return [] }
-        return await withTaskGroup(of: (String, [Match]).self) { group in
+        return await withTaskGroup(of: (leagueID: String, matches: [Match], failure: String?).self) { group in
             let maxActiveLoads = max(1, maxConcurrentLoads)
-            var results: [(String, [Match])] = []
+            var results: [(leagueID: String, matches: [Match], failure: String?)] = []
             var nextLeagueIndex = 0
 
             func enqueueNextLeague() {
@@ -1903,12 +1915,16 @@ final class HomeViewModel: ObservableObject {
                 let league = leagues[nextLeagueIndex]
                 nextLeagueIndex += 1
                 group.addTask {
-                    let matches = (try? await SportsRepository.shared.legacyScoreboards(
-                        for: league,
-                        starting: Date(),
-                        days: days
-                    )) ?? []
-                    return (league.id, matches)
+                    do {
+                        let matches = try await SportsRepository.shared.legacyScoreboards(
+                            for: league,
+                            starting: Date(),
+                            days: days
+                        )
+                        return (league.id, matches, nil)
+                    } catch {
+                        return (league.id, [], "\(league.name): \(error.localizedDescription)")
+                    }
                 }
             }
 

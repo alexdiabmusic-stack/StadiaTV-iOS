@@ -25,7 +25,35 @@ nonisolated struct ProviderChannelIdentity: Sendable {
     )
     private static let noise: Set<String> = ["backup", "bk", "bckp", "vip", "raw"]
 
+    // Identity is a pure function of `name` — it's rebuilt from scratch on every scan
+    // across many matches (rank/isEligible/teamNameBackups all construct it per channel,
+    // per match), so the same channel name gets parsed by the same regexes repeatedly
+    // within a single scan and across every subsequent scan. Memoize by name behind a
+    // lock so every call site benefits without threading a cache through each signature.
+    private static let cacheLock = NSLock()
+    nonisolated(unsafe) private static var cache: [String: ProviderChannelIdentity] = [:]
+
+    private static func cached(for name: String) -> ProviderChannelIdentity? {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        return cache[name]
+    }
+
+    private static func store(_ identity: ProviderChannelIdentity, for name: String) {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
+        // Safety valve against unbounded growth across a long session with many
+        // playlist edits — distinct channel names should realistically stay far below
+        // this, so hitting it just means a full-session cold start, not a bug.
+        if cache.count > 8000 { cache.removeAll(keepingCapacity: true) }
+        cache[name] = identity
+    }
+
     init(_ name: String) {
+        if let cached = Self.cached(for: name) {
+            self = cached
+            return
+        }
         var value = name
         var hint: String?
         if let match = Self.prefix.firstMatch(in: value, range: NSRange(value.startIndex..., in: value)),
@@ -63,6 +91,7 @@ nonisolated struct ProviderChannelIdentity: Sendable {
             break
         }
         tokens = words
+        Self.store(self, for: name)
     }
 
     /// Text tokenization keeps sport labels and participant words, unlike provider cleanup.

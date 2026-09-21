@@ -22,6 +22,10 @@ final class StreamAvailabilityStore: ObservableObject {
     /// a stale concurrent scan cannot overwrite results from a newer one.
     private var scanGeneration: Int = 0
 
+    /// Wall-clock time this store last actually attempted a scan (debounced or forced).
+    /// Used by `scanDebounced` to bound worst-case staleness — see below.
+    private var lastScanAttemptAt: Date?
+
     /// Debounced entry point for `.task(id:)`-driven callers, whose id includes
     /// `EPGRepository.lastUpdated`. That timestamp is bumped not just by a real full/custom
     /// EPG merge but also by every tiny single-channel EPG.pw background prefetch — each of
@@ -29,9 +33,22 @@ final class StreamAvailabilityStore: ObservableObject {
     /// briefly lets a burst of rapid triggers collapse into a single scan: SwiftUI's
     /// `.task(id:)` cancels the previous task (aborting this sleep) whenever the id changes
     /// again before the delay elapses, so only the last trigger in a burst actually scans.
-    func scanDebounced(matches: [Match], channels: [Channel], epgRepository: EPGRepository, delay: Duration = .milliseconds(400)) async {
-        try? await Task.sleep(for: delay)
-        guard !Task.isCancelled else { return }
+    ///
+    /// A *continuous* trickle of triggers (e.g. many EPG.pw single-channel prefetches
+    /// completing in quick succession while a scan is in progress) would otherwise starve
+    /// this forever — every call gets cancelled by the next one before its own delay ever
+    /// elapses, so `scan()` never runs. Guard against that: if it's already been at least
+    /// `delay` since the last attempt, skip the wait and scan immediately instead of queuing
+    /// behind a delay that this trigger might never survive. This bounds worst-case latency
+    /// to roughly `delay` even under a sustained burst, while still collapsing an isolated
+    /// burst into a single scan once it settles.
+    func scanDebounced(matches: [Match], channels: [Channel], epgRepository: EPGRepository, delaySeconds: TimeInterval = 0.4) async {
+        let elapsed = lastScanAttemptAt.map { Date().timeIntervalSince($0) } ?? .infinity
+        if elapsed < delaySeconds {
+            try? await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+        }
+        lastScanAttemptAt = Date()
         await scan(matches: matches, channels: channels, epgRepository: epgRepository)
     }
 

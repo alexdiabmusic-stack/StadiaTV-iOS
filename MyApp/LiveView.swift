@@ -718,7 +718,13 @@ final class LiveViewModel: ObservableObject {
     private var refreshClientCount = 0
 
     func load(favoriteTeams: [FavoriteTeam], force: Bool = false) async {
-        if !force, let last = lastLoaded, Date().timeIntervalSince(last) < cacheLifetime { return }
+        // Don't honor the cache window when we currently have nothing to show — an empty
+        // result from a bad fetch (or from checking before anything went live yet) would
+        // otherwise sit there un-refreshed for the full cache window every time this tab
+        // reappears, even while other screens querying the same data already have real
+        // matches.
+        let hasData = !allLive.isEmpty
+        if !force, hasData, let last = lastLoaded, Date().timeIntervalSince(last) < cacheLifetime { return }
         guard !isLoading else { return }
         isLoading = true
 

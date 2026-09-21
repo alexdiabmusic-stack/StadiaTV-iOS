@@ -1887,14 +1887,29 @@ final class HomeViewModel: ObservableObject {
             // league, it's total data unavailability. Surface the real failure
             // reason(s) instead of a generic "check your connection" message so a
             // provider/routing bug doesn't masquerade as a network problem.
+            //
+            // Thrown errors only cover leagues with no valid provider route at all
+            // (e.g. CFL). A provider that's silently succeeding with empty results
+            // for every league (the thing the ProviderHealthMonitor circuit breaker
+            // is meant to catch) never throws, so it wouldn't show up here — check
+            // its health snapshot directly so a tripped/degraded provider isn't
+            // invisible just because it didn't throw.
             let distinctFailures = orderedUnique(
                 liveSnapshot.failures
                     + sevenDaySchedules.compactMap(\.failure)
                     + favoriteSeasonSchedules.compactMap(\.failure)
             )
-            errorMessage = distinctFailures.isEmpty
+            var unhealthyProviders: [String] = []
+            for providerID: SportsDataProviderID in [.appleSports, .espn] {
+                let snapshot = await SportsRepository.shared.providerHealthSnapshot(for: providerID)
+                guard snapshot.state != .healthy else { continue }
+                let detail = snapshot.lastErrorDescription ?? "\(snapshot.state)"
+                unhealthyProviders.append("\(providerID.rawValue) is \(snapshot.state) (\(detail))")
+            }
+            let parts = distinctFailures.prefix(3) + unhealthyProviders
+            errorMessage = parts.isEmpty
                 ? "Couldn't load sports data. Check your connection and try again."
-                : "Couldn't load sports data: \(distinctFailures.prefix(3).joined(separator: "; "))"
+                : "Couldn't load sports data: \(parts.joined(separator: "; "))"
         }
     }
 

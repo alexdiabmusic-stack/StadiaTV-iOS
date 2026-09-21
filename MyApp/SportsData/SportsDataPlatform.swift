@@ -848,21 +848,39 @@ actor ProviderHealthMonitor {
         return true
     }
 
-    func recordSuccess(providerID: SportsDataProviderID, latency: TimeInterval, isEmptyResult: Bool = false, at now: Date = Date()) {
+    /// Returns the provider's resulting health state after recording this success. Callers
+    /// that got an empty result should treat anything other than `.healthy` as untrustworthy
+    /// and fall back to the next provider in their own chain — updating health here only
+    /// changes *future* `providers(for:)` lookups, it doesn't undo a response already in hand.
+    @discardableResult
+    func recordSuccess(providerID: SportsDataProviderID, latency: TimeInterval, isEmptyResult: Bool = false, at now: Date = Date()) -> SportsProviderHealthState {
         var snapshot = snapshots[providerID] ?? SportsProviderHealthSnapshot.healthySnapshot
-        snapshot.state = SportsProviderHealthState.healthy
         snapshot.lastSuccessAt = now
         snapshot.recentSuccesses += 1
-        snapshot.recentFailures = 0
-        snapshot.cooldownUntil = nil
-        snapshot.lastErrorDescription = nil
         if let average = snapshot.averageLatency {
             snapshot.averageLatency = (average * 0.8) + (latency * 0.2)
         } else {
             snapshot.averageLatency = latency
         }
 
-        if isEmptyResult {
+        if !isEmptyResult {
+            // A genuinely non-empty success is real evidence of recovery — clear any
+            // existing cooldown/streak immediately, empty-streak or failure-based alike.
+            snapshot.state = SportsProviderHealthState.healthy
+            snapshot.recentFailures = 0
+            snapshot.cooldownUntil = nil
+            snapshot.lastErrorDescription = nil
+            recentEmptySuccessTimestamps[providerID] = []
+        } else {
+            // Empty success: don't let this alone clear a cooldown that was just set by an
+            // earlier call in the same streak — otherwise every subsequent empty result
+            // resets the state back to "healthy" before the streak can ever be observed by
+            // a caller, and the circuit never actually opens for the leagues still in flight.
+            if snapshot.state != SportsProviderHealthState.unavailable {
+                snapshot.state = SportsProviderHealthState.healthy
+                snapshot.recentFailures = 0
+                snapshot.lastErrorDescription = nil
+            }
             var timestamps = (recentEmptySuccessTimestamps[providerID] ?? []).filter { now.timeIntervalSince($0) < emptyStreakWindow }
             timestamps.append(now)
             if timestamps.count >= emptyStreakThreshold {
@@ -872,11 +890,10 @@ actor ProviderHealthMonitor {
                 timestamps = []
             }
             recentEmptySuccessTimestamps[providerID] = timestamps
-        } else {
-            recentEmptySuccessTimestamps[providerID] = []
         }
 
         snapshots[providerID] = snapshot
+        return snapshot.state
     }
 
     func recordFailure(providerID: SportsDataProviderID, error: Error, at now: Date = Date()) {
@@ -2282,12 +2299,20 @@ struct SportsRepository: Sendable {
             do {
                 let games = try await provider.liveScores(for: league)
                 let latency = Date().timeIntervalSince(start)
-                await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency, isEmptyResult: games.isEmpty)
+                let resultingHealth = await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency, isEmptyResult: games.isEmpty)
                 // An empty result is a legitimate answer ("nothing live right now"), not a
                 // signal to keep falling through the chain — for sparse-schedule leagues
                 // (NFL, WNBA) it's the *normal* result most of the time. Treating it as
                 // "try the next provider" meant every empty check burned through the whole
                 // waterfall down to the rate-limited ESPN fallback on nearly every poll.
+                // But if this same empty result just tripped (or is still inside) the
+                // provider's empty-streak circuit breaker, it's not a trustworthy "nothing
+                // live" answer — it's a broken response shape — so fall through instead.
+                if games.isEmpty && resultingHealth != .healthy {
+                    failures.append("\(provider.metadata.name): empty result while provider is \(resultingHealth)")
+                    fallbacks.append(provider.metadata.id)
+                    continue
+                }
                 await cache.store(games, for: key, ttl: SportsDataCache.defaultTTL(for: .liveScores, containsLiveGames: games.contains { $0.status == .live }))
                 await recordDiagnostics(league: league, capability: .liveScores, currentProvider: provider.metadata.id, latency: latency, cacheHit: false, fallbacks: fallbacks, failures: failures)
                 return games
@@ -2478,11 +2503,18 @@ struct SportsRepository: Sendable {
             do {
                 let schedule = try await provider.schedule(for: league, range: range)
                 let latency = Date().timeIntervalSince(start)
-                await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency, isEmptyResult: schedule.games.isEmpty)
+                let resultingHealth = await router.healthMonitor.recordSuccess(providerID: provider.metadata.id, latency: latency, isEmptyResult: schedule.games.isEmpty)
                 // See requestScores: an empty schedule is a legitimate answer (off-season,
                 // bye week) for sparse-schedule leagues like NFL/WNBA, not a data gap to
                 // route around. Treating it as one meant every off-season poll burned
-                // through the whole waterfall down to the rate-limited ESPN fallback.
+                // through the whole waterfall down to the rate-limited ESPN fallback. But
+                // if this empty result is part of (or just tripped) the provider's
+                // empty-streak circuit breaker, fall through instead of trusting it.
+                if schedule.games.isEmpty && resultingHealth != .healthy {
+                    failures.append("\(provider.metadata.name): empty schedule while provider is \(resultingHealth)")
+                    fallbacks.append(provider.metadata.id)
+                    continue
+                }
                 let ttl = SportsDataCache.defaultTTL(for: .schedule, containsLiveGames: schedule.games.contains { $0.status == .live })
                 await cache.store(schedule, for: key, ttl: ttl)
                 await SportsDataDiskCache.shared.store(schedule, for: key, ttl: SportsDataCache.defaultTTL(for: .schedule, containsLiveGames: false))

@@ -1,0 +1,1 @@
+../../../MyApp/NFL/API/NFLClientConfiguration.swift

@@ -1,0 +1,1 @@
+../../../MyApp/NFL/DTO/NFLWeeklyResponse.swift

@@ -217,8 +217,13 @@ actor HLSRecorder {
     // MARK: - Storage check
 
     private func checkStorage(near url: URL) throws {
+        #if os(tvOS)
+        let vals = try? url.resourceValues(forKeys: [.volumeAvailableCapacityKey])
+        let available = vals?.volumeAvailableCapacity.map(Int64.init) ?? Int64.max
+        #else
         let vals = try? url.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
         let available = vals?.volumeAvailableCapacityForImportantUsage ?? Int64.max
+        #endif
         if available < Self.minimumFreeBytes { throw RecorderError.storageFull }
     }
 }

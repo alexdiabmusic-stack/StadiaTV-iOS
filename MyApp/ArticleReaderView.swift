@@ -19,7 +19,7 @@ enum ReaderAppearance: String, CaseIterable {
     }
     var chipBackground: Color {
         switch self {
-        case .automatic: return Color(.systemBackground)
+        case .automatic: return Color.reader_systemBackground
         case .light:     return Color(red: 0.98, green: 0.97, blue: 0.96)
         case .dark:      return Color(red: 0.09, green: 0.09, blue: 0.10)
         case .sepia:     return Color(red: 0.97, green: 0.93, blue: 0.84)
@@ -78,7 +78,7 @@ struct ArticleReaderView: View {
 
     private var readerBackground: Color {
         switch appearance {
-        case .automatic: return Color(.systemBackground)
+        case .automatic: return Color.reader_systemBackground
         case .light:     return Color(red: 0.98, green: 0.97, blue: 0.96)
         case .dark:      return Color(red: 0.09, green: 0.09, blue: 0.10)
         case .sepia:     return Color(red: 0.97, green: 0.93, blue: 0.84)
@@ -192,7 +192,8 @@ struct ArticleReaderView: View {
             }
         }
         .overlay(alignment: .top) { progressBar }
-        .navigationBarTitleDisplayMode(.inline)
+        .inlineNavigationTitle()
+        #if !os(tvOS)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 if let url = article.url {
@@ -203,6 +204,7 @@ struct ArticleReaderView: View {
                 }
             }
         }
+        #endif
         .sheet(isPresented: $showingReaderSettings) {
             ReaderSettingsSheet(
                 sizeStep: $sizeStep,
@@ -219,10 +221,12 @@ struct ArticleReaderView: View {
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
         }
+        #if !os(tvOS)
         .sheet(item: $safariItem) { item in
             SafariSheet(url: item.url)
                 .ignoresSafeArea()
         }
+        #endif
         .preferredColorScheme(preferredScheme)
         .tint(Theme.accent)
         .task { await loadBody() }
@@ -254,7 +258,7 @@ struct ArticleReaderView: View {
                     if case .success(let image) = phase {
                         image.resizable().scaledToFill()
                     } else {
-                        Color(.systemGray5)
+                        Color.reader_systemGray5
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -511,6 +515,9 @@ struct ReaderSettingsSheet: View {
                             }
                             .buttonStyle(.plain)
 
+                            #if os(tvOS)
+                            Text("Text size \(sizeStep)")
+                            #else
                             Slider(
                                 value: Binding(
                                     get: { Double(sizeStep) },
@@ -519,6 +526,7 @@ struct ReaderSettingsSheet: View {
                                 in: 1...10, step: 1
                             )
                             .tint(Theme.accent)
+                            #endif
 
                             Button { sizeStep = min(10, sizeStep + 1) } label: {
                                 Text("A")
@@ -601,7 +609,7 @@ struct ReaderSettingsSheet: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .foregroundStyle(selected ? .white : .primary)
-                .background(selected ? Theme.accent : Color(.secondarySystemFill), in: Capsule())
+                .background(selected ? Theme.accent : Color.reader_secondarySystemFill, in: Capsule())
         }
         .buttonStyle(.plain)
     }
@@ -659,5 +667,35 @@ private extension ESPNArticle {
         if text.contains("analysis") { return "ANALYSIS" }
         if text.contains("rumor") || text.contains("rumour") { return "RUMOUR" }
         return nil
+    }
+}
+
+private extension Color {
+    static var reader_systemBackground: Color {
+        #if os(tvOS)
+        Theme.background
+        #else
+        Color(.systemBackground)
+        #endif
+    }
+}
+
+private extension Color {
+    static var reader_systemGray5: Color {
+        #if os(tvOS)
+        Theme.surfaceElevated
+        #else
+        Color(.systemGray5)
+        #endif
+    }
+}
+
+private extension Color {
+    static var reader_secondarySystemFill: Color {
+        #if os(tvOS)
+        Theme.surface
+        #else
+        Color(.secondarySystemFill)
+        #endif
     }
 }

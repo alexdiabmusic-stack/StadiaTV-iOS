@@ -43,21 +43,21 @@ actor ESPNSportsPlayerPoolCache {
 }
 
 struct ESPNSportsDataProvider: BannerSportsDataProvider {
-    private let service: ESPNService
     private let cache: ESPNSportsPlayerPoolCache
     private let session: URLSession
 
-    init(service: ESPNService = ESPNService(), cache: ESPNSportsPlayerPoolCache = .shared) {
-        self.service = service
+    init(cache: ESPNSportsPlayerPoolCache = .shared) {
         self.cache = cache
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 12
-        config.httpAdditionalHeaders = ESPNService.apiHeaders
         self.session = URLSession(configuration: config)
     }
 
     func currentPlayers(for sport: FantasySport) async throws -> [BannerFantasyAvailablePlayer] {
-        try await cache.players(for: sport) {
+        if sport == .nhl { return try await NHLFantasyAdapter().currentPlayers(for: sport) }
+        if sport == .mlb { return try await MLBFantasyAdapter().currentPlayers(for: sport) }
+        if sport == .nba { return try await NBAFantasyAdapter().currentPlayers(for: sport) }
+        return try await cache.players(for: sport) {
             try await loadESPNPlayers(for: sport)
         }
     }

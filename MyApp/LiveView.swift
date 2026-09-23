@@ -22,7 +22,9 @@ struct LiveView: View {
             content
                 .background(Theme.background.ignoresSafeArea())
                 .navigationTitle("Live")
-                .navigationBarTitleDisplayMode(.large)
+                #if !os(tvOS)
+            .navigationBarTitleDisplayMode(.large)
+            #endif
                 .toolbarBackground(Theme.background, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
                 .toolbar {
@@ -173,7 +175,9 @@ struct LiveView: View {
 
     private func sportNavChip(_ sport: SportGroup?, label: String) -> some View {
         Button {
+            #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
             withAnimation(.snappy) { selectedSport = sport }
         } label: {
             HStack(spacing: 4) {
@@ -205,7 +209,9 @@ struct LiveView: View {
 
     private func filterChip(_ f: LiveFilter) -> some View {
         Button {
+            #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
             withAnimation(.snappy) { filter = f }
         } label: {
             HStack(spacing: 5) {
@@ -527,12 +533,16 @@ struct LiveMatchCard: View {
             Button("Hide", systemImage: "eye.slash", role: .destructive) { onHide() }
         }
         .sheet(isPresented: $showingQuickStream) {
+            #if os(tvOS)
+            TVMatchDetailView(match: match)
+            #else
             QuickStreamSheet(
                 match: match,
                 sources: streamStore.topRanked(for: match.id)
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+            #endif
         }
     }
 

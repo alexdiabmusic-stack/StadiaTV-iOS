@@ -30,7 +30,9 @@ struct WelcomeView: View {
         }
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
+        #if !os(tvOS)
         .statusBarHidden(false)
+        #endif
         .onAppear {
             withAnimation(.easeOut(duration: 0.6).delay(0.3)) {
                 contentOpacity = 1

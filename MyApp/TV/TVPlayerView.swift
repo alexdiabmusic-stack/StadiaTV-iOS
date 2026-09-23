@@ -231,7 +231,7 @@ struct TVPlayerView: View {
                     Button {
                         withAnimation(.spring(duration: 0.3)) { showingFantasySidebar.toggle() }
                     } label: {
-                        Label(Fantasy, systemImage: star.fill)
+                        Label("Fantasy", systemImage: "star.fill")
                             .font(.headline.weight(.semibold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 20).padding(.vertical, 12)

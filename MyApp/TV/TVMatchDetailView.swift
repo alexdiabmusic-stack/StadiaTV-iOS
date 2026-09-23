@@ -14,6 +14,92 @@ struct TVMatchDetailView: View {
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
+            if match.league.path == "hockey/nhl" {
+                NHLGameCenterView(match: match) {
+                    if !rankedSources.isEmpty {
+                        TVShelfRow(title: "Stream Sources", systemImage: "play.tv.fill") {
+                            ForEach(rankedSources) { source in
+                                TVSourceTile(channel: source.channel, score: source.score,
+                                             subtitle: source.epgProgramme?.title,
+                                             evidenceCategories: source.evidenceCategories) {
+                                    playingChannel = source.channel
+                                }
+                            }
+                        }
+                    } else if !playlistStore.playlists.isEmpty {
+                        noSourcesNote
+                    }
+                    if !matchNews.isEmpty { newsSection }
+                }
+            } else if match.league.path == "baseball/mlb" {
+                MLBGameCenterView(match: match) {
+                    if !rankedSources.isEmpty {
+                        TVShelfRow(title: "Stream Sources", systemImage: "play.tv.fill") {
+                            ForEach(rankedSources) { source in
+                                TVSourceTile(channel: source.channel, score: source.score,
+                                             subtitle: source.epgProgramme?.title,
+                                             evidenceCategories: source.evidenceCategories) {
+                                    playingChannel = source.channel
+                                }
+                            }
+                        }
+                    } else if !playlistStore.playlists.isEmpty {
+                        noSourcesNote
+                    }
+                    if !matchNews.isEmpty { newsSection }
+                }
+            } else if match.league.path == "football/nfl" {
+                NFLGameCenterView(match: match) {
+                    if !rankedSources.isEmpty {
+                        TVShelfRow(title: "Stream Sources", systemImage: "play.tv.fill") {
+                            ForEach(rankedSources) { source in
+                                TVSourceTile(channel: source.channel, score: source.score,
+                                             subtitle: source.epgProgramme?.title,
+                                             evidenceCategories: source.evidenceCategories) {
+                                    playingChannel = source.channel
+                                }
+                            }
+                        }
+                    } else if !playlistStore.playlists.isEmpty {
+                        noSourcesNote
+                    }
+                    if !matchNews.isEmpty { newsSection }
+                }
+            } else if match.league.path == "racing/f1" {
+                F1RaceCentreView(match: match) {
+                    if !rankedSources.isEmpty {
+                        TVShelfRow(title: "Stream Sources", systemImage: "play.tv.fill") {
+                            ForEach(rankedSources) { source in
+                                TVSourceTile(channel: source.channel, score: source.score,
+                                             subtitle: source.epgProgramme?.title,
+                                             evidenceCategories: source.evidenceCategories) {
+                                    playingChannel = source.channel
+                                }
+                            }
+                        }
+                    } else if !playlistStore.playlists.isEmpty {
+                        noSourcesNote
+                    }
+                    if !matchNews.isEmpty { newsSection }
+                }
+            } else if match.league.path == "basketball/nba" {
+                NBAGameCenterView(match: match) {
+                    if !rankedSources.isEmpty {
+                        TVShelfRow(title: "Stream Sources", systemImage: "play.tv.fill") {
+                            ForEach(rankedSources) { source in
+                                TVSourceTile(channel: source.channel, score: source.score,
+                                             subtitle: source.epgProgramme?.title,
+                                             evidenceCategories: source.evidenceCategories) {
+                                    playingChannel = source.channel
+                                }
+                            }
+                        }
+                    } else if !playlistStore.playlists.isEmpty {
+                        noSourcesNote
+                    }
+                    if !matchNews.isEmpty { newsSection }
+                }
+            } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 40) {
                     matchHero
@@ -40,6 +126,7 @@ struct TVMatchDetailView: View {
                 }
                 .padding(.horizontal, 48)
                 .padding(.vertical, 48)
+            }
             }
         }
         .navigationTitle(match.shortName)

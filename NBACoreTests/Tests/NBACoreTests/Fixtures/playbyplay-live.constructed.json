@@ -1,0 +1,79 @@
+{
+  "game": {
+    "gameId": "0022500500",
+    "actions": [
+      {
+        "actionNumber": 1, "orderNumber": 1, "actionId": 1, "period": 1, "clock": "PT12M00.00S",
+        "actionType": "period", "subType": "start", "description": "Period Start",
+        "teamId": null, "teamTricode": null
+      },
+      {
+        "actionNumber": 2, "orderNumber": 2, "actionId": 2, "period": 1, "clock": "PT11M42.00S",
+        "actionType": "2pt", "subType": "Layup", "shotResult": "Made",
+        "teamId": 1610612747, "teamTricode": "LAL", "personId": 2544, "playerName": "James", "playerNameI": "L. James",
+        "isFieldGoal": true, "shotDistance": 1, "xLegacy": 0, "yLegacy": 8,
+        "scoreHome": 2, "scoreAway": 0,
+        "description": "James 1' Layup (2 PTS)", "videoAvailable": true
+      },
+      {
+        "actionNumber": 3, "orderNumber": 3, "actionId": 3, "period": 1, "clock": "PT11M20.00S",
+        "actionType": "3pt", "subType": "Pullup Jump shot", "shotResult": "Made",
+        "teamId": 1610612738, "teamTricode": "BOS", "personId": 1628369, "playerName": "Tatum", "playerNameI": "J. Tatum",
+        "isFieldGoal": true, "shotDistance": 26, "xLegacy": 120, "yLegacy": 230,
+        "scoreHome": 2, "scoreAway": 3,
+        "assistPlayerNameInitial": null,
+        "description": "Tatum 26' 3PT Pullup Jump Shot (3 PTS)", "videoAvailable": true
+      },
+      {
+        "actionNumber": 4, "orderNumber": 4, "actionId": 4, "period": 1, "clock": "PT10M55.00S",
+        "actionType": "3pt", "subType": "Step Back Jump shot", "shotResult": "Missed",
+        "teamId": 1610612747, "teamTricode": "LAL", "personId": 203076, "playerName": "Davis", "playerNameI": "A. Davis",
+        "isFieldGoal": true, "shotDistance": 25, "xLegacy": -200, "yLegacy": 150,
+        "description": "MISS Davis 25' 3PT Step Back Jump Shot", "videoAvailable": false
+      },
+      {
+        "actionNumber": 5, "orderNumber": 5, "actionId": 5, "period": 1, "clock": "PT10M52.00S",
+        "actionType": "rebound", "subType": "defensive",
+        "teamId": 1610612738, "teamTricode": "BOS", "personId": 1628369, "playerName": "Tatum", "playerNameI": "J. Tatum",
+        "description": "Tatum REBOUND (Off:0 Def:1)"
+      },
+      {
+        "actionNumber": 6, "orderNumber": 6, "actionId": 6, "period": 1, "clock": "PT10M30.00S",
+        "actionType": "turnover", "subType": "bad pass",
+        "teamId": 1610612738, "teamTricode": "BOS", "personId": 1628369, "playerName": "Tatum", "playerNameI": "J. Tatum",
+        "stealPlayerName": "James",
+        "description": "Tatum Bad Pass Turnover (P1.T1)"
+      },
+      {
+        "actionNumber": 7, "orderNumber": 7, "actionId": 7, "period": 1, "clock": "PT10M10.00S",
+        "actionType": "foul", "subType": "shooting",
+        "teamId": 1610612738, "teamTricode": "BOS", "personId": 1627759, "playerName": "Brown", "playerNameI": "J. Brown",
+        "description": "Brown S.FOUL (1 PF) (Foster)"
+      },
+      {
+        "actionNumber": 8, "orderNumber": 8, "actionId": 8, "period": 1, "clock": "PT10M10.00S",
+        "actionType": "freethrow", "subType": "1 of 2",
+        "teamId": 1610612747, "teamTricode": "LAL", "personId": 2544, "playerName": "James", "playerNameI": "L. James",
+        "description": "James Free Throw 1 of 2 (5 PTS)"
+      },
+      {
+        "actionNumber": 9, "orderNumber": 9, "actionId": 9, "period": 1, "clock": "PT08M00.00S",
+        "actionType": "substitution", "subType": "out",
+        "teamId": 1610612738, "teamTricode": "BOS", "personId": 1627759, "playerName": "Brown",
+        "description": "SUB: Brown FOR Holiday"
+      },
+      {
+        "actionNumber": 10, "orderNumber": 10, "actionId": 10, "period": 1, "clock": "PT00M00.00S",
+        "actionType": "period", "subType": "end", "description": "Period End"
+      },
+      {
+        "actionNumber": 11, "orderNumber": 11, "actionId": 11, "period": 3, "clock": "PT05M12.00S",
+        "actionType": "2pt", "subType": "Dunk", "shotResult": "Made", "blockPlayerName": null,
+        "teamId": 1610612747, "teamTricode": "LAL", "personId": 203076, "playerName": "Davis", "playerNameI": "A. Davis",
+        "isFieldGoal": true, "shotDistance": 0, "xLegacy": 0, "yLegacy": 0,
+        "scoreHome": 78, "scoreAway": 81,
+        "description": "Davis 0' Dunk (18 PTS)", "videoAvailable": true
+      }
+    ]
+  }
+}

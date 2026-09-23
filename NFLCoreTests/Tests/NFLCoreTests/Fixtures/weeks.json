@@ -1,0 +1,339 @@
+{
+  "weeks": [
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 18,
+      "byeTeams": [],
+      "dateBegin": "2027-01-06",
+      "dateEnd": "2027-01-13",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 17,
+      "byeTeams": [],
+      "dateBegin": "2026-12-30",
+      "dateEnd": "2027-01-06",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 16,
+      "byeTeams": [],
+      "dateBegin": "2026-12-23",
+      "dateEnd": "2026-12-30",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 15,
+      "byeTeams": [],
+      "dateBegin": "2026-12-16",
+      "dateEnd": "2026-12-23",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 14,
+      "byeTeams": [
+        {
+          "id": "10403800-517c-7b8c-65a3-c61b95d86123",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/AZ",
+          "fullName": "Arizona Cardinals"
+        },
+        {
+          "id": "10401200-a308-98ca-ad5f-95df2fefea68",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/DAL",
+          "fullName": "Dallas Cowboys"
+        }
+      ],
+      "dateBegin": "2026-12-09",
+      "dateEnd": "2026-12-16",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 13,
+      "byeTeams": [
+        {
+          "id": "10400325-48de-3d6a-be29-8f829437f4c8",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BAL",
+          "fullName": "Baltimore Ravens"
+        },
+        {
+          "id": "10402200-2ea3-84c3-e627-6a6b3b39d56d",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/IND",
+          "fullName": "Indianapolis Colts"
+        },
+        {
+          "id": "10402520-96bf-e9f2-4f68-8521ca896060",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/LV",
+          "fullName": "Las Vegas Raiders"
+        },
+        {
+          "id": "10403430-1bc3-42c4-c7d8-39f38aed5f12",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/NYJ",
+          "fullName": "New York Jets"
+        }
+      ],
+      "dateBegin": "2026-12-02",
+      "dateEnd": "2026-12-09",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 12,
+      "byeTeams": [],
+      "dateBegin": "2026-11-25",
+      "dateEnd": "2026-12-02",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 11,
+      "byeTeams": [
+        {
+          "id": "10400200-f401-4e53-5175-0974e4f16cf7",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/ATL",
+          "fullName": "Atlanta Falcons"
+        },
+        {
+          "id": "10401050-5e38-b907-1be1-55b91b19c057",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/CLE",
+          "fullName": "Cleveland Browns"
+        },
+        {
+          "id": "10401800-ab22-323d-721a-cee4713c4c2d",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/GB",
+          "fullName": "Green Bay Packers"
+        },
+        {
+          "id": "10402510-8931-0d5f-9815-79bb79649a65",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/LA",
+          "fullName": "Los Angeles Rams"
+        },
+        {
+          "id": "10403200-69ab-9ea6-5af5-e240fbc08bea",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/NE",
+          "fullName": "New England Patriots"
+        },
+        {
+          "id": "10404600-adcd-28ac-5826-b4d95ec2a228",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/SEA",
+          "fullName": "Seattle Seahawks"
+        }
+      ],
+      "dateBegin": "2026-11-18",
+      "dateEnd": "2026-11-25",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 10,
+      "byeTeams": [
+        {
+          "id": "10400810-db30-43d6-221c-620006f3ca19",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/CHI",
+          "fullName": "Chicago Bears"
+        },
+        {
+          "id": "10401400-b89b-96e5-55d1-caa7e18de3d8",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/DEN",
+          "fullName": "Denver Broncos"
+        },
+        {
+          "id": "10403700-b939-3cbd-3d16-24d4d6742fa2",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/PHI",
+          "fullName": "Philadelphia Eagles"
+        },
+        {
+          "id": "10404900-d59e-b449-ef75-961e09ca027e",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/TB",
+          "fullName": "Tampa Bay Buccaneers"
+        }
+      ],
+      "dateBegin": "2026-11-11",
+      "dateEnd": "2026-11-18",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 9,
+      "byeTeams": [
+        {
+          "id": "10403900-8251-6892-d81c-4348525c2d47",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/PIT",
+          "fullName": "Pittsburgh Steelers"
+        },
+        {
+          "id": "10402100-447f-396e-8149-0a434ffb2f23",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/TEN",
+          "fullName": "Tennessee Titans"
+        }
+      ],
+      "dateBegin": "2026-11-04",
+      "dateEnd": "2026-11-11",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 8,
+      "byeTeams": [
+        {
+          "id": "10402120-b0bc-693d-098a-803014096eb0",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/HOU",
+          "fullName": "Houston Texans"
+        },
+        {
+          "id": "10403300-f235-cf9b-6d3a-2f182be48dd1",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/NO",
+          "fullName": "New Orleans Saints"
+        },
+        {
+          "id": "10403410-997c-9c75-256b-3b012f468bd0",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/NYG",
+          "fullName": "New York Giants"
+        },
+        {
+          "id": "10404500-e7cb-7fce-3f10-4eeb269bd179",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/SF",
+          "fullName": "San Francisco 49ers"
+        }
+      ],
+      "dateBegin": "2026-10-28",
+      "dateEnd": "2026-11-04",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 7,
+      "byeTeams": [
+        {
+          "id": "10400610-c40e-a673-1743-2ce2a5d5d731",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BUF",
+          "fullName": "Buffalo Bills"
+        },
+        {
+          "id": "10402250-89fe-7b86-ef98-9062cd354256",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/JAX",
+          "fullName": "Jacksonville Jaguars"
+        },
+        {
+          "id": "10404400-3b35-073f-197e-194bb8240723",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/LAC",
+          "fullName": "Los Angeles Chargers"
+        },
+        {
+          "id": "10405110-ec3c-669e-2614-db3dc1736e95",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/WAS",
+          "fullName": "Washington Commanders"
+        }
+      ],
+      "dateBegin": "2026-10-21",
+      "dateEnd": "2026-10-28",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 6,
+      "byeTeams": [
+        {
+          "id": "10400920-57c1-7656-e77e-1af3d900483e",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/CIN",
+          "fullName": "Cincinnati Bengals"
+        },
+        {
+          "id": "10401540-f97c-2d19-6fcd-fac6490a48b7",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/DET",
+          "fullName": "Detroit Lions"
+        },
+        {
+          "id": "10402700-1662-d8ad-f45c-0b0ea460d045",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/MIA",
+          "fullName": "Miami Dolphins"
+        },
+        {
+          "id": "10403000-5851-f9d5-da45-78365a05b6b0",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/MIN",
+          "fullName": "Minnesota Vikings"
+        }
+      ],
+      "dateBegin": "2026-10-14",
+      "dateEnd": "2026-10-21",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 5,
+      "byeTeams": [
+        {
+          "id": "10400750-259b-33ac-eee3-a3852e83cd1f",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/CAR",
+          "fullName": "Carolina Panthers"
+        },
+        {
+          "id": "10402310-a47e-10ea-7442-16b633633637",
+          "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/KC",
+          "fullName": "Kansas City Chiefs"
+        }
+      ],
+      "dateBegin": "2026-10-07",
+      "dateEnd": "2026-10-14",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 4,
+      "byeTeams": [],
+      "dateBegin": "2026-09-30",
+      "dateEnd": "2026-10-07",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 3,
+      "byeTeams": [],
+      "dateBegin": "2026-09-23",
+      "dateEnd": "2026-09-30",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 2,
+      "byeTeams": [],
+      "dateBegin": "2026-09-15",
+      "dateEnd": "2026-09-23",
+      "weekType": "REG"
+    },
+    {
+      "season": 2026,
+      "seasonType": "REG",
+      "week": 1,
+      "byeTeams": [],
+      "dateBegin": "2026-09-02",
+      "dateEnd": "2026-09-16",
+      "weekType": "REG"
+    }
+  ],
+  "pagination": {
+    "limit": 20,
+    "token": null
+  }
+}

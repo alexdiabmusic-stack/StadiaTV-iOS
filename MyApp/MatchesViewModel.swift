@@ -15,6 +15,7 @@ final class MatchesViewModel: ObservableObject {
 
     private let sportsRepository = SportsRepository.shared
     private var refreshTask: Task<Void, Never>?
+    private var scoreLoadGeneration = UUID()
     private var lastFollowingArgs: (leagues: [League], favorites: [FavoriteTeam])?
 
     var liveMatches: [Match] { matches.filter { $0.state == .live } }
@@ -30,15 +31,20 @@ final class MatchesViewModel: ObservableObject {
     }
 
     func load() async {
+        let generation = UUID()
+        scoreLoadGeneration = generation
+        let league = selectedLeague
         isLoading = matches.isEmpty
         errorMessage = nil
+        defer { if generation == scoreLoadGeneration { isLoading = false } }
         do {
-            let result = try await sportsRepository.legacyScoreboard(for: selectedLeague)
+            let result = try await sportsRepository.legacyScoreboard(for: league)
+            guard generation == scoreLoadGeneration, league == selectedLeague, !Task.isCancelled else { return }
             matches = result
         } catch {
+            guard generation == scoreLoadGeneration, league == selectedLeague, !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
         }
-        isLoading = false
     }
 
     /// Loads the personalized Following feed. Team favorites are matched by exact
@@ -186,7 +192,7 @@ final class MatchesViewModel: ObservableObject {
 
     private func fixtureKey(for match: Match) -> String {
         let calendar = Calendar.current
-        let day = ESPNService.dateFormatter.string(from: match.date)
+        let day = NHLDate.day(match.date)
         let teams = [match.home.displayName.lowercased(), match.away.displayName.lowercased()].sorted().joined(separator: "-")
         let minuteBucket = calendar.component(.hour, from: match.date) * 60 + calendar.component(.minute, from: match.date)
         return "\(match.league.id)-\(day)-\(minuteBucket)-\(teams)"

@@ -932,9 +932,11 @@ struct PodcastDetailView: View {
                           systemImage: isSubscribed ? "checkmark" : "plus")
                 }
 
-                ShareLink(item: podcast.feedURL) {
+                #if !os(tvOS)
+ShareLink(item: podcast.feedURL) {
                     Label("Share Show", systemImage: "square.and.arrow.up")
                 }
+                    #endif
 
                 Button {
                     Task {
@@ -1468,9 +1470,11 @@ struct PodcastEpisodeRow: View {
                         }
                     }
 
-                    ShareLink(item: episode.audioURL) {
+                    #if !os(tvOS)
+ShareLink(item: episode.audioURL) {
                         Label("Share Episode", systemImage: "square.and.arrow.up")
                     }
+                    #endif
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 15, weight: .semibold))
@@ -1672,7 +1676,7 @@ struct PodcastPlayerSheet: View {
                     Text("Nothing playing").foregroundStyle(Theme.textSecondary)
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { dismiss() } label: {
@@ -1751,6 +1755,9 @@ struct PodcastPlayerSheet: View {
     @ViewBuilder
     private func scrubber(_ episode: PodcastEpisode) -> some View {
         VStack(spacing: 6) {
+            #if os(tvOS)
+            ProgressView(value: store.currentTime, total: max(store.totalDuration, 1))
+            #else
             Slider(
                 value: Binding(
                     get: { store.totalDuration > 0 ? store.currentTime / store.totalDuration : 0 },
@@ -1758,6 +1765,7 @@ struct PodcastPlayerSheet: View {
                 )
             )
             .tint(Theme.accent)
+            #endif
             HStack {
                 Text(formatTime(store.currentTime))
                     .font(.caption.monospacedDigit())
@@ -1989,9 +1997,11 @@ private struct EnableSwipeBackHelper: UIViewControllerRepresentable {
 private class SwipeBackViewController: UIViewController, UIGestureRecognizerDelegate {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        #if !os(tvOS)
         guard let nav = navigationController else { return }
         nav.interactivePopGestureRecognizer?.isEnabled = true
         nav.interactivePopGestureRecognizer?.delegate = self
+        #endif
     }
 
     func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {

@@ -37,7 +37,7 @@ struct PlaylistsSettingsView: View {
                                     delete: { delete(playlist) }
                                 )
                             }
-                            .swipeActions {
+                            .platformRowActions {
                                 Button(role: .destructive) { delete(playlist) } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -47,7 +47,7 @@ struct PlaylistsSettingsView: View {
                     }
                 }
             }
-            .listStyle(.insetGrouped)
+            .platformGroupedList()
             .hidesScrollContentBackground()
         }
         .navigationTitle("Playlists")
@@ -148,7 +148,7 @@ struct PlaylistDetailSettingsView: View {
                     }
                 }
             }
-            .listStyle(.insetGrouped)
+            .platformGroupedList()
             .hidesScrollContentBackground()
         }
         .navigationTitle(currentPlaylist.name)
@@ -303,10 +303,12 @@ struct NotificationsCalendarSettingsView: View {
             .opacity(prefs.matchNotificationsEnabled ? 1 : 0.42)
 
             SettingsPanel(title: "CALENDAR") {
+                #if !os(tvOS)
                 Button { Task { await exportFollowedGamesToCalendar() } } label: {
                     SettingsDisclosureRow(title: "Calendar Sync", value: calendarValue)
                 }
                 .disabled(isExportingCalendar)
+                #endif
                 if let calendarExportMessage {
                     Text(calendarExportMessage)
                         .font(.footnote)
@@ -361,6 +363,7 @@ struct NotificationsCalendarSettingsView: View {
     }
 
     private func exportFollowedGamesToCalendar() async {
+        #if !os(tvOS)
         guard !isExportingCalendar else { return }
         isExportingCalendar = true
         defer { isExportingCalendar = false }
@@ -371,6 +374,7 @@ struct NotificationsCalendarSettingsView: View {
         } catch {
             calendarExportMessage = error.localizedDescription
         }
+        #endif
     }
 
     private func loadFollowedMatches() async -> [Match] {
@@ -442,11 +446,13 @@ struct SavedArticlesSettingsView: View {
                             Button("Remove Saved Article", systemImage: "bookmark.slash", role: .destructive) {
                                 articleLibrary.unsave(article)
                             }
+                            #if !os(tvOS)
                             if let url = article.url {
                                 ShareLink(item: url) {
                                     Label("Share", systemImage: "square.and.arrow.up")
                                 }
                             }
+                            #endif
                         }
                         if saved.id != articleLibrary.savedArticles.last?.id {
                             Divider().overlay(Theme.hairline)
@@ -624,7 +630,7 @@ struct WatchHistorySettingsView: View {
                                 .foregroundStyle(Theme.textSecondary)
                         }
                         .padding(14)
-                        .swipeActions(edge: .trailing) {
+                        .platformRowActions {
                             Button(role: .destructive) {
                                 watchStore.removeFromHistory(entry)
                             } label: {
@@ -1253,7 +1259,7 @@ struct ESPNFantasyConnectSheet: View {
                         }
                     }
                 }
-                .scrollContentBackground(.hidden)
+                .hidesScrollContentBackground()
             }
             .navigationTitle("ESPN Fantasy")
             .toolbar {
@@ -1531,7 +1537,12 @@ private struct AppearanceThemeCard: View {
         switch appearance {
         case .dark:   return Color(hex: 0x080A0F)
         case .light:  return Color(hex: 0xF4F5F7)
-        case .system: return Color(UIColor.systemBackground)
+        case .system:
+            #if os(tvOS)
+            return Theme.background
+            #else
+            return Color(UIColor.systemBackground)
+            #endif
         }
     }
 
@@ -1539,7 +1550,12 @@ private struct AppearanceThemeCard: View {
         switch appearance {
         case .dark:   return Color(hex: 0x181C24)
         case .light:  return Color(hex: 0xE0E2E8)
-        case .system: return Color(UIColor.secondarySystemBackground)
+        case .system:
+            #if os(tvOS)
+            return Theme.surfaceElevated
+            #else
+            return Color(UIColor.secondarySystemBackground)
+            #endif
         }
     }
 }
@@ -1635,7 +1651,9 @@ private struct LegalDocumentText: View {
             .font(.callout)
             .foregroundStyle(Theme.textPrimary)
             .lineSpacing(5)
+            #if !os(tvOS)
             .textSelection(.enabled)
+            #endif
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
     }

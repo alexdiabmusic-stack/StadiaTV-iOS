@@ -1,0 +1,81 @@
+{
+  "game": {
+    "gameId": "0022500501",
+    "gameCode": "20260116/GSWDEN",
+    "gameStatus": 3,
+    "gameStatusText": "Final/OT",
+    "period": 5,
+    "regulationPeriods": 4,
+    "gameClock": "PT00M00.00S",
+    "gameTimeUTC": "2026-01-16T02:00:00Z",
+    "attendance": 19520,
+    "arena": {
+      "arenaName": "Chase Center",
+      "arenaCity": "San Francisco",
+      "arenaState": "CA",
+      "arenaCountry": "US",
+      "arenaTimezone": "America/Los_Angeles"
+    },
+    "officials": [],
+    "homeTeam": {
+      "teamId": 1610612744,
+      "teamCity": "Golden State",
+      "teamName": "Warriors",
+      "teamTricode": "GSW",
+      "wins": 20,
+      "losses": 20,
+      "score": 128,
+      "timeoutsRemaining": 0,
+      "inBonus": "0",
+      "periods": [
+        { "period": 1, "periodType": "REGULAR", "score": 30 },
+        { "period": 2, "periodType": "REGULAR", "score": 28 },
+        { "period": 3, "periodType": "REGULAR", "score": 26 },
+        { "period": 4, "periodType": "REGULAR", "score": 32 },
+        { "period": 5, "periodType": "OVERTIME", "score": 12 }
+      ],
+      "players": [
+        {
+          "personId": 201939, "firstName": "Stephen", "familyName": "Curry", "nameI": "S. Curry",
+          "jerseyNum": "30", "position": "G", "order": 1, "starter": "1", "oncourt": "0", "played": "1",
+          "statistics": {
+            "minutes": "PT41M10.00S", "points": 38, "reboundsTotal": 5, "assists": 9, "steals": 3, "blocks": 0,
+            "turnovers": 4, "foulsPersonal": 3, "plusMinusPoints": 10,
+            "fieldGoalsMade": 13, "fieldGoalsAttempted": 24, "threePointersMade": 7, "threePointersAttempted": 14,
+            "freeThrowsMade": 5, "freeThrowsAttempted": 5
+          }
+        }
+      ]
+    },
+    "awayTeam": {
+      "teamId": 1610612743,
+      "teamCity": "Denver",
+      "teamName": "Nuggets",
+      "teamTricode": "DEN",
+      "wins": 26,
+      "losses": 14,
+      "score": 124,
+      "timeoutsRemaining": 1,
+      "inBonus": "0",
+      "periods": [
+        { "period": 1, "periodType": "REGULAR", "score": 28 },
+        { "period": 2, "periodType": "REGULAR", "score": 30 },
+        { "period": 3, "periodType": "REGULAR", "score": 24 },
+        { "period": 4, "periodType": "REGULAR", "score": 32 },
+        { "period": 5, "periodType": "OVERTIME", "score": 10 }
+      ],
+      "players": [
+        {
+          "personId": 203999, "firstName": "Nikola", "familyName": "Jokic", "nameI": "N. Jokic",
+          "jerseyNum": "15", "position": "C", "order": 1, "starter": "1", "oncourt": "0", "played": "1",
+          "statistics": {
+            "minutes": "PT44M02.00S", "points": 33, "reboundsTotal": 15, "assists": 11, "steals": 1, "blocks": 1,
+            "turnovers": 5, "foulsPersonal": 4, "plusMinusPoints": -4,
+            "fieldGoalsMade": 12, "fieldGoalsAttempted": 22, "threePointersMade": 1, "threePointersAttempted": 3,
+            "freeThrowsMade": 8, "freeThrowsAttempted": 10
+          }
+        }
+      ]
+    }
+  }
+}

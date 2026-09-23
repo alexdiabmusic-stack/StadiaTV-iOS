@@ -1,0 +1,39 @@
+{
+  "leagueSchedule": {
+    "seasonYear": "2025-26",
+    "gameDates": [
+      {
+        "gameDate": "01/15/2026 00:00:00",
+        "games": [
+          {
+            "gameId": "0022500500",
+            "gameCode": "20260115/LALBOS",
+            "gameStatus": 3,
+            "gameStatusText": "Final",
+            "period": 4,
+            "regulationPeriods": 4,
+            "gameDateTimeUTC": "2026-01-15T19:30:00Z",
+            "homeTeam": { "teamId": 1610612747, "teamCity": "Los Angeles", "teamName": "Lakers", "teamTricode": "LAL", "wins": 24, "losses": 16, "score": 110 },
+            "awayTeam": { "teamId": 1610612738, "teamCity": "Boston", "teamName": "Celtics", "teamTricode": "BOS", "wins": 28, "losses": 12, "score": 104 }
+          }
+        ]
+      },
+      {
+        "gameDate": "01/16/2026 00:00:00",
+        "games": [
+          {
+            "gameId": "0022500501",
+            "gameCode": "20260116/GSWDEN",
+            "gameStatus": 1,
+            "gameStatusText": "7:00 pm ET",
+            "period": 0,
+            "regulationPeriods": 4,
+            "gameDateTimeUTC": "2026-01-17T00:00:00Z",
+            "homeTeam": { "teamId": 1610612744, "teamCity": "Golden State", "teamName": "Warriors", "teamTricode": "GSW", "wins": 20, "losses": 20 },
+            "awayTeam": { "teamId": 1610612743, "teamCity": "Denver", "teamName": "Nuggets", "teamTricode": "DEN", "wins": 26, "losses": 14 }
+          }
+        ]
+      }
+    ]
+  }
+}

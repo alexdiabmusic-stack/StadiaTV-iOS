@@ -1,0 +1,12 @@
+{
+  "resultSets": [
+    {
+      "name": "CommonTeamRoster",
+      "headers": ["TeamID", "SEASON", "PLAYER_ID", "PLAYER", "NUM", "POSITION", "HEIGHT", "WEIGHT", "AGE", "EXP", "SCHOOL"],
+      "rowSet": [
+        [1610612747, "2025-26", 2544, "LeBron James", "23", "F", "6-9", "250", "41", "22", "St. Vincent-St. Mary HS (OH)"],
+        [1610612747, "2025-26", 203076, "Anthony Davis", "3", "C", "6-10", "253", "32", "13", "Kentucky"]
+      ]
+    }
+  ]
+}

@@ -59,10 +59,7 @@ struct TVFollowingView: View {
             LazyVStack(alignment: .leading, spacing: 48) {
                 entitySelectorRow
 
-                if selectedEntityID == "fantasy" {
-                    TVFantasyDashboardSection()
-                        .padding(.horizontal, 48)
-                } else {
+                Group {
                     sportsSummaryRow
                         .padding(.horizontal, 48)
 

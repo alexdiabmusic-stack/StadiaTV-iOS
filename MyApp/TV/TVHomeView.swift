@@ -35,7 +35,7 @@ struct TVHomeView: View {
             viewModel.startAutoRefresh()
         }
         .onDisappear { viewModel.stopAutoRefresh() }
-        .fullScreenCover(item: $selectedChannel) { TVPlayerView(channel: $0) }
+        .fullScreenCover(item: $selectedChannel) { TVPlayerView(channel: $0, initialMatch: nil) }
     }
 
     private var loadKey: String {

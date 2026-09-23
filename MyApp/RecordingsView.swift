@@ -55,7 +55,7 @@ struct RecordingsView: View {
                 Section("Recording Now") {
                     ForEach(recordingNow) { job in
                         RecordingJobRow(job: job)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            .platformRowActions {
                                 Button("Stop", role: .destructive) {
                                     recordingService.cancel(id: job.id)
                                 }
@@ -68,7 +68,7 @@ struct RecordingsView: View {
                 Section("Scheduled") {
                     ForEach(scheduled) { job in
                         RecordingJobRow(job: job)
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            .platformRowActions {
                                 Button("Cancel", role: .destructive) {
                                     recordingService.cancel(id: job.id)
                                 }
@@ -83,7 +83,7 @@ struct RecordingsView: View {
                         RecordingJobRow(job: job)
                             .contentShape(Rectangle())
                             .onTapGesture { Task { await play(job) } }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            .platformRowActions {
                                 Button("Delete", role: .destructive) {
                                     recordingService.delete(id: job.id)
                                 }
@@ -99,7 +99,7 @@ struct RecordingsView: View {
                             .onTapGesture {
                                 if job.state == .partial { Task { await play(job) } }
                             }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            .platformRowActions {
                                 Button("Delete", role: .destructive) {
                                     recordingService.delete(id: job.id)
                                 }
@@ -108,8 +108,8 @@ struct RecordingsView: View {
                 }
             }
         }
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden)
+        .platformGroupedList()
+        .hidesScrollContentBackground()
         .background(Theme.background.ignoresSafeArea())
     }
 
@@ -335,7 +335,7 @@ struct RecordingScheduleSheet: View {
                 }
             }
             .navigationTitle("Schedule Recording")
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

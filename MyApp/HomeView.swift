@@ -66,7 +66,9 @@ struct HomeView: View {
                 Theme.background.ignoresSafeArea()
                 mainContent
             }
+            #if !os(tvOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar { toolbarContent }
             .toolbarBackground(Theme.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -1899,14 +1901,7 @@ final class HomeViewModel: ObservableObject {
                     + sevenDaySchedules.compactMap(\.failure)
                     + favoriteSeasonSchedules.compactMap(\.failure)
             )
-            var unhealthyProviders: [String] = []
-            for providerID: SportsDataProviderID in [.appleSports, .espn] {
-                let snapshot = await SportsRepository.shared.providerHealthSnapshot(for: providerID)
-                guard snapshot.state != .healthy else { continue }
-                let detail = snapshot.lastErrorDescription ?? "\(snapshot.state)"
-                unhealthyProviders.append("\(providerID.rawValue) is \(snapshot.state) (\(detail))")
-            }
-            let parts = distinctFailures.prefix(3) + unhealthyProviders
+            let parts = Array(distinctFailures.prefix(3))
             errorMessage = parts.isEmpty
                 ? "Couldn't load sports data. Check your connection and try again."
                 : "Couldn't load sports data: \(parts.joined(separator: "; "))"

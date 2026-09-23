@@ -1,0 +1,1 @@
+../../../MyApp/NFL/Models/NFLGameState.swift

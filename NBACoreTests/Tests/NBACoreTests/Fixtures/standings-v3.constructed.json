@@ -1,0 +1,14 @@
+{
+  "resultSets": [
+    {
+      "name": "Standings",
+      "headers": ["TeamID", "TeamCity", "TeamName", "TeamAbbreviation", "Conference", "WINS", "LOSSES", "WinPCT",
+                  "ConferenceGamesBack", "strCurrentStreak", "PointsPG", "OppPointsPG", "DiffPointsPG",
+                  "DivisionRank", "PlayoffRank", "L10"],
+      "rowSet": [
+        [1610612738, "Boston", "Celtics", "BOS", "East", 28, 12, "0.700", "-", "W4", 118.2, 108.9, 9.3, "1", "1", "8-2"],
+        [1610612747, "Los Angeles", "Lakers", "LAL", "West", 24, 16, "0.600", "3.5", "L1", 114.6, 111.2, 3.4, "2", "3", "6-4"]
+      ]
+    }
+  ]
+}

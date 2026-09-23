@@ -101,7 +101,9 @@ struct FavoriteEntitiesView: View {
                         withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
                             store.toggleFavorite(teamID: team.id)
                         }
+                        #if !os(tvOS)
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
                     }
                     Divider().background(Theme.hairline).padding(.leading, 56)
                 }
@@ -130,7 +132,9 @@ struct FavoriteEntitiesView: View {
                             withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
                                 store.toggleFavorite(teamID: team.id)
                             }
+                            #if !os(tvOS)
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
                         }
                     }
                 }

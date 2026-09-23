@@ -217,6 +217,9 @@ struct StandingsGroupCard: View {
     let league: League
     var highlightTeamID: String? = nil
 
+    private var participantTitle: String { league.path == "racing/f1" ? (group.id == "f1-drivers" ? "Driver" : "Constructor") : "Team" }
+    private var participantCountLabel: String { league.path == "racing/f1" ? (group.id == "f1-drivers" ? "drivers" : "constructors") : "teams" }
+
     private var columns: [StandingsCol] { StandingsCol.columns(for: league) }
 
     private var sortedRows: [StandingRow] {
@@ -230,7 +233,7 @@ struct StandingsGroupCard: View {
                     Text(group.name.uppercased())
                         .font(.footnote.weight(.heavy))
                         .foregroundStyle(Theme.textPrimary)
-                    Text("\(group.rows.count) teams")
+                    Text("\(group.rows.count) \(participantCountLabel)")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(Theme.textSecondary)
                 }
@@ -242,7 +245,7 @@ struct StandingsGroupCard: View {
 
             HStack(spacing: 4) {
                 Text("#").frame(width: 24, alignment: .center)
-                Text("Team").frame(maxWidth: .infinity, alignment: .leading)
+                Text(participantTitle).frame(maxWidth: .infinity, alignment: .leading)
                 ForEach(columns, id: \.self) { col in
                     Text(col.header(for: league))
                         .lineLimit(1)

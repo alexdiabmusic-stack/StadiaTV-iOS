@@ -27,6 +27,12 @@ struct StandingRow: Identifiable, Hashable {
     let gamesPlayed: String?
     let goalDiff: String?       // soccer GD / basketball point differential
 
+    var divisionRank: String? = nil
+    var leagueRank: String? = nil
+    var wildCardRank: String? = nil
+    var wildCardGamesBack: String? = nil
+    var lastTen: String? = nil
+
     var id: String { teamID }
 }
 

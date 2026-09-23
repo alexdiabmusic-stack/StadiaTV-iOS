@@ -7,6 +7,8 @@ enum Theme {
     static let surface          = dynamic(dark: 0x12151C, light: 0xFFFFFF)
     static let surfaceElevated  = dynamic(dark: 0x181C24, light: 0xE8EAEF)
     static let accent           = Color(hex: 0x3B82F6)
+    static let accessibleAccent = dynamic(dark: 0x60A5FA, light: 0x1D4ED8)
+    static let actionFill       = Color(hex: 0x1D4ED8)
     static let live             = Color(hex: 0xFF4D5E)
     static let starting         = Color(hex: 0xF5B942)
     static let upcoming         = Color(hex: 0x31C978)
@@ -43,6 +45,24 @@ extension Color {
 }
 
 extension View {
+    @ViewBuilder
+    func platformRowActions<Actions: View>(@ViewBuilder _ actions: () -> Actions) -> some View {
+        #if os(tvOS)
+        contextMenu(menuItems: actions)
+        #else
+        swipeActions(edge: .trailing, allowsFullSwipe: true, content: actions)
+        #endif
+    }
+
+    @ViewBuilder
+    func platformGroupedList() -> some View {
+        #if os(tvOS)
+        listStyle(.plain)
+        #else
+        listStyle(.insetGrouped)
+        #endif
+    }
+
     func hidesScrollContentBackground() -> some View {
         #if os(tvOS)
         self

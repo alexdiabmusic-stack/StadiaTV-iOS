@@ -485,11 +485,15 @@ struct BannerFantasyCreateLeagueFlow: View {
                             }
                             .onChange(of: selectedSport) { _, newSport in rosterConfiguration = .standard(for: newSport) }
                             TextField(selectedMode == .personalTeam ? "Team name" : "League name", text: $leagueName)
+                                #if !os(tvOS)
                                 .textFieldStyle(.roundedBorder)
+                                #endif
                             TextField("Your team name", text: $teamName)
+                                #if !os(tvOS)
                                 .textFieldStyle(.roundedBorder)
+                                #endif
                             if selectedMode == .simulatedLeague {
-                                Stepper("\(maxTeams) teams", value: $maxTeams, in: 4...20, step: 2)
+                                FantasyPlatformStepper("\(maxTeams) teams", value: $maxTeams, in: 4...20, step: 2)
                                 Picker("Visibility", selection: $visibility) {
                                     ForEach(BannerFantasyVisibility.allCases) { Text($0.displayName).tag($0) }
                                 }
@@ -519,7 +523,7 @@ struct BannerFantasyCreateLeagueFlow: View {
 
                         setupCard(title: "Roster", systemImage: "person.3.fill") {
                             ForEach(FantasySportConfiguration.configuration(for: selectedSport).eligiblePositions) { slot in
-                                Stepper("\(slot.displayAbbreviation)  \(rosterConfiguration.slotCounts[slot] ?? 0)", value: Binding(
+                                FantasyPlatformStepper("\(slot.displayAbbreviation)  \(rosterConfiguration.slotCounts[slot] ?? 0)", value: Binding(
                                     get: { rosterConfiguration.slotCounts[slot] ?? 0 },
                                     set: { rosterConfiguration.slotCounts[slot] = $0 }
                                 ), in: 0...10)
@@ -527,8 +531,18 @@ struct BannerFantasyCreateLeagueFlow: View {
                         }
 
                         setupCard(title: "Draft", systemImage: "rectangle.grid.2x2") {
+                            #if os(tvOS)
+                            Text(draftDate.formatted(date: .abbreviated, time: .shortened))
+                            HStack {
+                                Button("Previous day") { draftDate.addTimeInterval(-86400) }
+                                Button("Next day") { draftDate.addTimeInterval(86400) }
+                                Button("15 minutes earlier") { draftDate.addTimeInterval(-900) }
+                                Button("15 minutes later") { draftDate.addTimeInterval(900) }
+                            }
+                            #else
                             DatePicker("Draft time", selection: $draftDate)
-                            Stepper("\(pickTimer) second pick timer", value: $pickTimer, in: 30...300, step: 15)
+                            #endif
+                            FantasyPlatformStepper("\(pickTimer) second pick timer", value: $pickTimer, in: 30...300, step: 15)
                         }
 
                         if selectedMode == .simulatedLeague {
@@ -536,7 +550,7 @@ struct BannerFantasyCreateLeagueFlow: View {
                                 Picker("Waivers", selection: $waiverType) {
                                     ForEach(BannerFantasyWaiverSettings.WaiverType.allCases) { Text($0.rawValue.capitalized).tag($0) }
                                 }
-                                Stepper("\(playoffTeams) playoff teams", value: $playoffTeams, in: 2...12, step: 2)
+                                FantasyPlatformStepper("\(playoffTeams) playoff teams", value: $playoffTeams, in: 2...12, step: 2)
                             }
                         }
 
@@ -694,8 +708,14 @@ struct BannerFantasyDraftRoomView: View {
                                     .font(.caption.weight(.bold).monospacedDigit())
                                     .foregroundStyle(Theme.accent)
                             }
+                            #if os(tvOS)
+                            FantasyPlatformStepper("Minimum points", value: Binding(
+                                get: { Int(minimumPoints) }, set: { minimumPoints = Double($0) }
+                            ), in: 0...500, step: 10)
+                            #else
                             Slider(value: $minimumPoints, in: 0...500, step: 10)
                                 .tint(Theme.accent)
+                            #endif
                         }
                     }
                     .padding(12)
@@ -711,7 +731,7 @@ struct BannerFantasyDraftRoomView: View {
                         .listRowBackground(Color.clear)
                     }
                     .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
+                    .hidesScrollContentBackground()
                 }
             }
             .navigationTitle("Draft Room")
@@ -919,5 +939,34 @@ private struct BannerFantasyDisclosureRow: View {
                 .foregroundStyle(Theme.textTertiary)
         }
         .padding(14)
+    }
+}
+
+private struct FantasyPlatformStepper: View {
+    let title: String
+    @Binding var value: Int
+    let bounds: ClosedRange<Int>
+    let step: Int
+    init(_ title: String, value: Binding<Int>, in bounds: ClosedRange<Int>, step: Int = 1) {
+        self.title = title
+        self._value = value
+        self.bounds = bounds
+        self.step = step
+    }
+    var body: some View {
+        #if os(tvOS)
+        HStack {
+            Text(title)
+            Spacer()
+            Button { value = max(bounds.lowerBound, value - step) } label: {
+                Image(systemName: "minus")
+            }.disabled(value <= bounds.lowerBound).accessibilityLabel("Decrease " + title)
+            Button { value = min(bounds.upperBound, value + step) } label: {
+                Image(systemName: "plus")
+            }.disabled(value >= bounds.upperBound).accessibilityLabel("Increase " + title)
+        }
+        #else
+        Stepper(title, value: $value, in: bounds, step: step)
+        #endif
     }
 }

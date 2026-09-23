@@ -1046,7 +1046,9 @@ private struct GolfPlayersTab: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             TextField("Search golfers", text: $query)
+                #if !os(tvOS)
                 .textFieldStyle(.roundedBorder)
+                #endif
             if filteredEntries.isEmpty {
                 GameCentreEmptyState(systemImage: "person.3.sequence", message: data.leaderboard.isEmpty ? "Tournament field is not available yet." : "No golfers match that search.")
             } else {

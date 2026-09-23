@@ -1,0 +1,50 @@
+[
+  {
+    "phase": "SCHEDULED",
+    "seasonType": "PRE"
+  },
+  {
+    "phase": "SCHEDULED",
+    "seasonType": "REG"
+  },
+  {
+    "phase": "SCHEDULED",
+    "seasonType": "POST"
+  },
+  {
+    "phase": "PREGAME",
+    "seasonType": "REG"
+  },
+  {
+    "phase": "INGAME",
+    "seasonType": "REG"
+  },
+  {
+    "phase": "HALFTIME",
+    "seasonType": "REG"
+  },
+  {
+    "phase": "FINAL",
+    "seasonType": "REG"
+  },
+  {
+    "phase": "DELAYED",
+    "seasonType": "REG"
+  },
+  {
+    "phase": "SUSPENDED",
+    "seasonType": "REG"
+  },
+  {
+    "phase": "POSTPONED",
+    "seasonType": "REG"
+  },
+  {
+    "phase": "CANCELLED",
+    "seasonType": "REG"
+  },
+  {
+    "phase": "UNKNOWN_FUTURE",
+    "seasonType": "REG"
+  }
+]

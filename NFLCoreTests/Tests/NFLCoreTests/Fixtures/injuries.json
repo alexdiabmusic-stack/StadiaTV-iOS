@@ -1,0 +1,776 @@
+{
+  "injuries": [
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400200-f401-4e53-5175-0974e4f16cf7",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/ATL",
+        "fullName": "Atlanta Falcons"
+      },
+      "person": {
+        "id": "3200464c-4f75-8060-5a6d-d3aabc3c32e2",
+        "firstName": "Leonard",
+        "commonFirstName": "Leonard",
+        "lastName": "Floyd",
+        "displayName": "Leonard Floyd",
+        "gsisId": "00-0033072",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/hmojdd6skft3sfhs59ma"
+      },
+      "injuries": [],
+      "injuryStatus": null,
+      "practices": [
+        "Not injury related - resting player"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-05",
+          "status": "DIDNOT"
+        }
+      ],
+      "practiceStatus": "DIDNOT",
+      "position": "DE"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400200-f401-4e53-5175-0974e4f16cf7",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/ATL",
+        "fullName": "Atlanta Falcons"
+      },
+      "person": {
+        "id": "32004845-4c25-6639-ebe9-aca7398e1c11",
+        "firstName": "DeMarcco",
+        "commonFirstName": "DeMarcco",
+        "lastName": "Hellams",
+        "displayName": "DeMarcco Hellams",
+        "gsisId": "00-0038628",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/qg0hfg5iv3zc6hn07dzt"
+      },
+      "injuries": [
+        "Hamstring"
+      ],
+      "injuryStatus": "OUT",
+      "practices": [
+        "Hamstring"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-03",
+          "status": "DIDNOT"
+        },
+        {
+          "date": "2025-09-04",
+          "status": "DIDNOT"
+        },
+        {
+          "date": "2025-09-05",
+          "status": "DIDNOT"
+        }
+      ],
+      "practiceStatus": "DIDNOT",
+      "position": "S"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400200-f401-4e53-5175-0974e4f16cf7",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/ATL",
+        "fullName": "Atlanta Falcons"
+      },
+      "person": {
+        "id": "32004d41-5456-5555-1827-0d5d5e928f5d",
+        "firstName": "Jacob",
+        "commonFirstName": "Jake",
+        "lastName": "Matthews",
+        "displayName": "Jake Matthews",
+        "gsisId": "00-0031279",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/hoifz7uqrpjm5g2mlyaa"
+      },
+      "injuries": [],
+      "injuryStatus": null,
+      "practices": [
+        "Not injury related - resting player"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-05",
+          "status": "LIMITED"
+        }
+      ],
+      "practiceStatus": "LIMITED",
+      "position": "T"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400200-f401-4e53-5175-0974e4f16cf7",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/ATL",
+        "fullName": "Atlanta Falcons"
+      },
+      "person": {
+        "id": "32004d43-4341-7118-745c-2c9756292bc8",
+        "firstName": "Raymond",
+        "commonFirstName": "Ray-Ray",
+        "lastName": "McCloud",
+        "displayName": "Ray-Ray McCloud",
+        "gsisId": "00-0034407",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/nvwn3sdihyyd2itjt7vy"
+      },
+      "injuries": [],
+      "injuryStatus": null,
+      "practices": [
+        "Not injury related - resting player"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-04",
+          "status": "LIMITED"
+        }
+      ],
+      "practiceStatus": "LIMITED",
+      "position": "WR"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400200-f401-4e53-5175-0974e4f16cf7",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/ATL",
+        "fullName": "Atlanta Falcons"
+      },
+      "person": {
+        "id": "32004d4f-4f07-6900-2883-f3ddae0181d4",
+        "firstName": "Darnell",
+        "commonFirstName": "Darnell",
+        "lastName": "Mooney",
+        "displayName": "Darnell Mooney",
+        "gsisId": "00-0036309",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/eaejonwaflt9drrs9ika"
+      },
+      "injuries": [
+        "Shoulder"
+      ],
+      "injuryStatus": "QUESTIONABLE",
+      "practices": [
+        "Shoulder"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-03",
+          "status": "LIMITED"
+        },
+        {
+          "date": "2025-09-04",
+          "status": "LIMITED"
+        },
+        {
+          "date": "2025-09-05",
+          "status": "LIMITED"
+        }
+      ],
+      "practiceStatus": "LIMITED",
+      "position": "WR"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400200-f401-4e53-5175-0974e4f16cf7",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/ATL",
+        "fullName": "Atlanta Falcons"
+      },
+      "person": {
+        "id": "32004e45-4c48-6278-b09f-28c95c4bf3c2",
+        "firstName": "Jack",
+        "commonFirstName": "Jack",
+        "lastName": "Nelson",
+        "displayName": "Jack Nelson",
+        "gsisId": "00-0040224",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/lfq3fxdznxmhx59npsyt"
+      },
+      "injuries": [
+        "Calf"
+      ],
+      "injuryStatus": "OUT",
+      "practices": [
+        "Calf"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-03",
+          "status": "DIDNOT"
+        },
+        {
+          "date": "2025-09-04",
+          "status": "DIDNOT"
+        },
+        {
+          "date": "2025-09-05",
+          "status": "DIDNOT"
+        }
+      ],
+      "practiceStatus": "DIDNOT",
+      "position": "T"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400200-f401-4e53-5175-0974e4f16cf7",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/ATL",
+        "fullName": "Atlanta Falcons"
+      },
+      "person": {
+        "id": "32004f4e-5916-4481-9c60-dd4f4e644838",
+        "firstName": "Ebuka",
+        "commonFirstName": "David",
+        "lastName": "Onyemata",
+        "displayName": "David Onyemata",
+        "gsisId": "00-0033051",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/tl0jr4mxarpbmvu3tho9"
+      },
+      "injuries": [],
+      "injuryStatus": null,
+      "practices": [
+        "Not injury related - resting player"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-05",
+          "status": "DIDNOT"
+        }
+      ],
+      "practiceStatus": "DIDNOT",
+      "position": "DT"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400200-f401-4e53-5175-0974e4f16cf7",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/ATL",
+        "fullName": "Atlanta Falcons"
+      },
+      "person": {
+        "id": "32005048-4967-2138-705f-d3b4ab36a39f",
+        "firstName": "Clark",
+        "commonFirstName": "Clark",
+        "lastName": "Phillips",
+        "displayName": "Clark Phillips III",
+        "gsisId": "00-0038568",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/vbeop7m7ptjwtlm3cgqh"
+      },
+      "injuries": [],
+      "injuryStatus": null,
+      "practices": [
+        "Rib"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-03",
+          "status": "LIMITED"
+        },
+        {
+          "date": "2025-09-04",
+          "status": "LIMITED"
+        },
+        {
+          "date": "2025-09-05",
+          "status": "FULL"
+        }
+      ],
+      "practiceStatus": "FULL",
+      "position": "CB"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400200-f401-4e53-5175-0974e4f16cf7",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/ATL",
+        "fullName": "Atlanta Falcons"
+      },
+      "person": {
+        "id": "32005445-5227-2956-3d70-15eacafe6b00",
+        "firstName": "Aundell",
+        "commonFirstName": "A.J.",
+        "lastName": "Terrell",
+        "displayName": "A.J. Terrell",
+        "gsisId": "00-0036285",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/plww5syeocezywkpgpmg"
+      },
+      "injuries": [],
+      "injuryStatus": null,
+      "practices": [
+        "Not injury related - resting player"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-04",
+          "status": "LIMITED"
+        }
+      ],
+      "practiceStatus": "LIMITED",
+      "position": "CB"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400325-48de-3d6a-be29-8f829437f4c8",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BAL",
+        "fullName": "Baltimore Ravens"
+      },
+      "person": {
+        "id": "3200414c-4529-1426-87b5-71774446f980",
+        "firstName": "Jaire",
+        "commonFirstName": "Jaire",
+        "lastName": "Alexander",
+        "displayName": "Jaire Alexander",
+        "gsisId": "00-0034728",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/niwxzo2rjy1uuo3aehac"
+      },
+      "injuries": [],
+      "injuryStatus": null,
+      "practices": [
+        "Knee"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-03",
+          "status": "LIMITED"
+        },
+        {
+          "date": "2025-09-04",
+          "status": "FULL"
+        },
+        {
+          "date": "2025-09-05",
+          "status": "FULL"
+        }
+      ],
+      "practiceStatus": "FULL",
+      "position": "CB"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400325-48de-3d6a-be29-8f829437f4c8",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BAL",
+        "fullName": "Baltimore Ravens"
+      },
+      "person": {
+        "id": "32004641-4128-5512-32d8-b85043c109b6",
+        "firstName": "Daniel",
+        "commonFirstName": "Daniel",
+        "lastName": "Faalele",
+        "displayName": "Daniel Faalele",
+        "gsisId": "00-0038118",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/kwwlwjresostl9pd7yvz"
+      },
+      "injuries": [],
+      "injuryStatus": null,
+      "practices": [
+        "Illness"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-03",
+          "status": "LIMITED"
+        },
+        {
+          "date": "2025-09-04",
+          "status": "FULL"
+        },
+        {
+          "date": "2025-09-05",
+          "status": "FULL"
+        }
+      ],
+      "practiceStatus": "FULL",
+      "position": "G"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400325-48de-3d6a-be29-8f829437f4c8",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BAL",
+        "fullName": "Baltimore Ravens"
+      },
+      "person": {
+        "id": "32004c49-4b08-8990-7695-dc4768035012",
+        "firstName": "Isaiah",
+        "commonFirstName": "Isaiah",
+        "lastName": "Likely",
+        "displayName": "Isaiah Likely",
+        "gsisId": "00-0037838",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/b1pahldt9ixp9lssxi2d"
+      },
+      "injuries": [
+        "Foot"
+      ],
+      "injuryStatus": "OUT",
+      "practices": [
+        "Foot"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-03",
+          "status": "DIDNOT"
+        },
+        {
+          "date": "2025-09-04",
+          "status": "DIDNOT"
+        },
+        {
+          "date": "2025-09-05",
+          "status": "DIDNOT"
+        }
+      ],
+      "practiceStatus": "DIDNOT",
+      "position": "TE"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400325-48de-3d6a-be29-8f829437f4c8",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BAL",
+        "fullName": "Baltimore Ravens"
+      },
+      "person": {
+        "id": "32005249-4301-2529-9196-f7af1fec131c",
+        "firstName": "Patrick",
+        "commonFirstName": "Patrick",
+        "lastName": "Ricard",
+        "displayName": "Patrick Ricard",
+        "gsisId": "00-0033376",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/nm7ezh46zd5bdxaxz6a9"
+      },
+      "injuries": [
+        "Calf"
+      ],
+      "injuryStatus": "OUT",
+      "practices": [
+        "Calf"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-03",
+          "status": "DIDNOT"
+        },
+        {
+          "date": "2025-09-04",
+          "status": "DIDNOT"
+        },
+        {
+          "date": "2025-09-05",
+          "status": "DIDNOT"
+        }
+      ],
+      "practiceStatus": "DIDNOT",
+      "position": "FB"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400610-c40e-a673-1743-2ce2a5d5d731",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BUF",
+        "fullName": "Buffalo Bills"
+      },
+      "person": {
+        "id": "32004241-5355-5802-e27b-153ecc1a567e",
+        "firstName": "Tyler",
+        "commonFirstName": "Tyler",
+        "lastName": "Bass",
+        "displayName": "Tyler Bass",
+        "gsisId": "00-0036162",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/rwidgp7jp8vxhssi7und"
+      },
+      "injuries": [
+        "Hip",
+        "Groin"
+      ],
+      "injuryStatus": "OUT",
+      "practices": [
+        "Hip",
+        "Groin"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-03",
+          "status": "LIMITED"
+        },
+        {
+          "date": "2025-09-04",
+          "status": "DIDNOT"
+        },
+        {
+          "date": "2025-09-05",
+          "status": "DIDNOT"
+        }
+      ],
+      "practiceStatus": "DIDNOT",
+      "position": "K"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400610-c40e-a673-1743-2ce2a5d5d731",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BUF",
+        "fullName": "Buffalo Bills"
+      },
+      "person": {
+        "id": "32004245-4e03-6336-12b7-d48d86b2de58",
+        "firstName": "Christian",
+        "commonFirstName": "Christian",
+        "lastName": "Benford",
+        "displayName": "Christian Benford",
+        "gsisId": "00-0037288",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/kxucquiz77lhp8rn1nni"
+      },
+      "injuries": [],
+      "injuryStatus": null,
+      "practices": [
+        "Groin"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-03",
+          "status": "LIMITED"
+        },
+        {
+          "date": "2025-09-04",
+          "status": "FULL"
+        },
+        {
+          "date": "2025-09-05",
+          "status": "FULL"
+        }
+      ],
+      "practiceStatus": "FULL",
+      "position": "CB"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400610-c40e-a673-1743-2ce2a5d5d731",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BUF",
+        "fullName": "Buffalo Bills"
+      },
+      "person": {
+        "id": "32004341-5264-4270-5a2f-d6f27bdca523",
+        "firstName": "DeWayne",
+        "commonFirstName": "DeWayne",
+        "lastName": "Carter",
+        "displayName": "DeWayne Carter",
+        "gsisId": "00-0039873",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/somthlvcx5v20nqmu85n"
+      },
+      "injuries": [],
+      "injuryStatus": null,
+      "practices": [
+        "Achilles"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-03",
+          "status": "DIDNOT"
+        },
+        {
+          "date": "2025-09-04",
+          "status": "DIDNOT"
+        }
+      ],
+      "practiceStatus": "DIDNOT",
+      "position": "DT"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400610-c40e-a673-1743-2ce2a5d5d731",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BUF",
+        "fullName": "Buffalo Bills"
+      },
+      "person": {
+        "id": "3200434f-4c29-5571-54fa-77236b775ae1",
+        "firstName": "Keon",
+        "commonFirstName": "Keon",
+        "lastName": "Coleman",
+        "displayName": "Keon Coleman",
+        "gsisId": "00-0039901",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/cm7g87waetksjouyjgvg"
+      },
+      "injuries": [],
+      "injuryStatus": null,
+      "practices": [
+        "Groin"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-03",
+          "status": "LIMITED"
+        },
+        {
+          "date": "2025-09-04",
+          "status": "LIMITED"
+        },
+        {
+          "date": "2025-09-05",
+          "status": "FULL"
+        }
+      ],
+      "practiceStatus": "FULL",
+      "position": "WR"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400610-c40e-a673-1743-2ce2a5d5d731",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BUF",
+        "fullName": "Buffalo Bills"
+      },
+      "person": {
+        "id": "32004d4f-4f27-9723-3c75-0e082bc200c9",
+        "firstName": "Elijah",
+        "commonFirstName": "Elijah",
+        "lastName": "Moore",
+        "displayName": "Elijah Moore",
+        "gsisId": "00-0036980",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/wax90oyx9vs0x9j4nt5n"
+      },
+      "injuries": [],
+      "injuryStatus": null,
+      "practices": [
+        "Not injury related - personal matter"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-04",
+          "status": "DIDNOT"
+        },
+        {
+          "date": "2025-09-05",
+          "status": "FULL"
+        }
+      ],
+      "practiceStatus": "FULL",
+      "position": "WR"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400610-c40e-a673-1743-2ce2a5d5d731",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BUF",
+        "fullName": "Buffalo Bills"
+      },
+      "person": {
+        "id": "32005348-4110-7427-f34a-bb0aa1d8e556",
+        "firstName": "Khalil",
+        "commonFirstName": "Khalil",
+        "lastName": "Shakir",
+        "displayName": "Khalil Shakir",
+        "gsisId": "00-0037261",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/syvp3hficobwcsim3i9v"
+      },
+      "injuries": [],
+      "injuryStatus": null,
+      "practices": [
+        "Ankle"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-03",
+          "status": "FULL"
+        },
+        {
+          "date": "2025-09-04",
+          "status": "FULL"
+        },
+        {
+          "date": "2025-09-05",
+          "status": "FULL"
+        }
+      ],
+      "practiceStatus": "FULL",
+      "position": "WR"
+    },
+    {
+      "season": 2025,
+      "seasonType": "REG",
+      "week": 1,
+      "team": {
+        "id": "10400610-c40e-a673-1743-2ce2a5d5d731",
+        "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BUF",
+        "fullName": "Buffalo Bills"
+      },
+      "person": {
+        "id": "32005748-4954-7699-8d1e-4952613e94ee",
+        "firstName": "Tre'Davious",
+        "commonFirstName": "Tre'Davious",
+        "lastName": "White",
+        "displayName": "Tre'Davious White",
+        "gsisId": "00-0033884",
+        "headshot": "https://static.www.nfl.com/image/upload/{formatInstructions}/league/uxwbh1qimnyieywlu6ic"
+      },
+      "injuries": [
+        "Groin"
+      ],
+      "injuryStatus": "DOUBTFUL",
+      "practices": [
+        "Groin"
+      ],
+      "practiceDays": [
+        {
+          "date": "2025-09-03",
+          "status": "DIDNOT"
+        },
+        {
+          "date": "2025-09-04",
+          "status": "DIDNOT"
+        },
+        {
+          "date": "2025-09-05",
+          "status": "DIDNOT"
+        }
+      ],
+      "practiceStatus": "DIDNOT",
+      "position": "CB"
+    }
+  ],
+  "pagination": {
+    "limit": 20,
+    "token": "wiIyAQAAABQ="
+  }
+}

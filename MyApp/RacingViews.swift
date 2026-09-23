@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// Game-center style section for racing leagues: every entrant in the current
-/// event, synced from ESPN and grouped by constructor/team.
+/// Game-center style section for racing leagues: configured drivers, grouped by constructor/team.
 struct RacersSection: View {
     let league: League
     @State private var racers: [Racer] = []

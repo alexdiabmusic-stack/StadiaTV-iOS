@@ -1,0 +1,742 @@
+{
+  "teams": [
+    {
+      "id": "10408600-77a1-8b0f-8f54-99b7e0a7d1b2",
+      "season": 2025,
+      "abbreviation": "AFC",
+      "fullName": "AFC Pro Bowl Team",
+      "teamType": "PRO",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/APR",
+      "divisionFullName": null,
+      "league": "National Football League",
+      "location": "AFC",
+      "nickName": "AFC",
+      "venues": []
+    },
+    {
+      "id": "10403800-517c-7b8c-65a3-c61b95d86123",
+      "season": 2025,
+      "abbreviation": "ARI",
+      "fullName": "Arizona Cardinals",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/AZ",
+      "divisionFullName": "NFC West",
+      "league": "National Football League",
+      "location": "Arizona",
+      "nickName": "Cardinals",
+      "venues": [
+        {
+          "id": "00081907-ad83-307e-8d26-209df8e6df50",
+          "name": "State Farm Stadium",
+          "city": "Glendale",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10400200-f401-4e53-5175-0974e4f16cf7",
+      "season": 2025,
+      "abbreviation": "ATL",
+      "fullName": "Atlanta Falcons",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/ATL",
+      "divisionFullName": "NFC South",
+      "league": "National Football League",
+      "location": "Atlanta",
+      "nickName": "Falcons",
+      "venues": [
+        {
+          "id": "00082076-29a1-1a41-96a5-14b0d14d1317",
+          "name": "Mercedes-Benz Stadium",
+          "city": "Atlanta",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10400325-48de-3d6a-be29-8f829437f4c8",
+      "season": 2025,
+      "abbreviation": "BAL",
+      "fullName": "Baltimore Ravens",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BAL",
+      "divisionFullName": "AFC North",
+      "league": "National Football League",
+      "location": "Baltimore",
+      "nickName": "Ravens",
+      "venues": [
+        {
+          "id": "00083695-126e-1517-91fe-aab634a526ea",
+          "name": "M&T Bank Stadium",
+          "city": "Baltimore",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10400610-c40e-a673-1743-2ce2a5d5d731",
+      "season": 2025,
+      "abbreviation": "BUF",
+      "fullName": "Buffalo Bills",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BUF",
+      "divisionFullName": "AFC East",
+      "league": "National Football League",
+      "location": "Buffalo",
+      "nickName": "Bills",
+      "venues": [
+        {
+          "id": "00083770-6add-eaf7-4975-0fb66a44b335",
+          "name": "Highmark Stadium",
+          "city": "Orchard Park",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10400750-259b-33ac-eee3-a3852e83cd1f",
+      "season": 2025,
+      "abbreviation": "CAR",
+      "fullName": "Carolina Panthers",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/CAR",
+      "divisionFullName": "NFC South",
+      "league": "National Football League",
+      "location": "Carolina",
+      "nickName": "Panthers",
+      "venues": [
+        {
+          "id": "00081769-78fe-4172-a6d6-395cf0141069",
+          "name": "Bank of America Stadium",
+          "city": "Charlotte",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10400810-db30-43d6-221c-620006f3ca19",
+      "season": 2025,
+      "abbreviation": "CHI",
+      "fullName": "Chicago Bears",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/CHI",
+      "divisionFullName": "NFC North",
+      "league": "National Football League",
+      "location": "Chicago",
+      "nickName": "Bears",
+      "venues": [
+        {
+          "id": "00084620-af4a-a315-44ad-cdc562bfc3ad",
+          "name": "Soldier Field",
+          "city": "Chicago",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10400920-57c1-7656-e77e-1af3d900483e",
+      "season": 2025,
+      "abbreviation": "CIN",
+      "fullName": "Cincinnati Bengals",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/CIN",
+      "divisionFullName": "AFC North",
+      "league": "National Football League",
+      "location": "Cincinnati",
+      "nickName": "Bengals",
+      "venues": [
+        {
+          "id": "00083530-fc9f-2795-83d8-308b54d591fe",
+          "name": "Paycor Stadium",
+          "city": "Cincinnati",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10401050-5e38-b907-1be1-55b91b19c057",
+      "season": 2025,
+      "abbreviation": "CLE",
+      "fullName": "Cleveland Browns",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/CLE",
+      "divisionFullName": "AFC North",
+      "league": "National Football League",
+      "location": "Cleveland",
+      "nickName": "Browns",
+      "venues": [
+        {
+          "id": "00081048-4259-348c-7701-2fa3c98bcd53",
+          "name": "Huntington Bank Field",
+          "city": "Cleveland",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10401200-a308-98ca-ad5f-95df2fefea68",
+      "season": 2025,
+      "abbreviation": "DAL",
+      "fullName": "Dallas Cowboys",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/DAL",
+      "divisionFullName": "NFC East",
+      "league": "National Football League",
+      "location": "Dallas",
+      "nickName": "Cowboys",
+      "venues": [
+        {
+          "id": "00084948-addf-5f39-b283-02455f77c178",
+          "name": "AT&T Stadium",
+          "city": "Arlington",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10401400-b89b-96e5-55d1-caa7e18de3d8",
+      "season": 2025,
+      "abbreviation": "DEN",
+      "fullName": "Denver Broncos",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/DEN",
+      "divisionFullName": "AFC West",
+      "league": "National Football League",
+      "location": "Denver",
+      "nickName": "Broncos",
+      "venues": [
+        {
+          "id": "00085786-61c2-c519-196f-576acb0dcd5f",
+          "name": "Empower Field at Mile High",
+          "city": "Denver",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10401540-f97c-2d19-6fcd-fac6490a48b7",
+      "season": 2025,
+      "abbreviation": "DET",
+      "fullName": "Detroit Lions",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/DET",
+      "divisionFullName": "NFC North",
+      "league": "National Football League",
+      "location": "Detroit",
+      "nickName": "Lions",
+      "venues": [
+        {
+          "id": "00082026-23fe-63b7-7d18-43cec01cfcfb",
+          "name": "Ford Field",
+          "city": "Detroit",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10401800-ab22-323d-721a-cee4713c4c2d",
+      "season": 2025,
+      "abbreviation": "GB",
+      "fullName": "Green Bay Packers",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/GB",
+      "divisionFullName": "NFC North",
+      "league": "National Football League",
+      "location": "Green Bay",
+      "nickName": "Packers",
+      "venues": [
+        {
+          "id": "00082606-f7cb-15ed-a40a-f85cfda3ecdd",
+          "name": "Lambeau Field",
+          "city": "Green Bay",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10402120-b0bc-693d-098a-803014096eb0",
+      "season": 2025,
+      "abbreviation": "HOU",
+      "fullName": "Houston Texans",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/HOU",
+      "divisionFullName": "AFC South",
+      "league": "National Football League",
+      "location": "Houston",
+      "nickName": "Texans",
+      "venues": [
+        {
+          "id": "00083698-a263-8c18-f063-4dc45196bfef",
+          "name": "Reliant Stadium",
+          "city": "Houston",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10402200-2ea3-84c3-e627-6a6b3b39d56d",
+      "season": 2025,
+      "abbreviation": "IND",
+      "fullName": "Indianapolis Colts",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/IND",
+      "divisionFullName": "AFC South",
+      "league": "National Football League",
+      "location": "Indianapolis",
+      "nickName": "Colts",
+      "venues": [
+        {
+          "id": "00082878-4c6e-d80a-0da7-6f8355c339c2",
+          "name": "Lucas Oil Stadium",
+          "city": "Indianapolis",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10402250-89fe-7b86-ef98-9062cd354256",
+      "season": 2025,
+      "abbreviation": "JAX",
+      "fullName": "Jacksonville Jaguars",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/JAX",
+      "divisionFullName": "AFC South",
+      "league": "National Football League",
+      "location": "Jacksonville",
+      "nickName": "Jaguars",
+      "venues": [
+        {
+          "id": "00082049-e1c5-6172-a084-094f2c34a377",
+          "name": "EverBank Stadium",
+          "city": "Jacksonville",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10402310-a47e-10ea-7442-16b633633637",
+      "season": 2025,
+      "abbreviation": "KC",
+      "fullName": "Kansas City Chiefs",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/KC",
+      "divisionFullName": "AFC West",
+      "league": "National Football League",
+      "location": "Kansas City",
+      "nickName": "Chiefs",
+      "venues": [
+        {
+          "id": "00081552-5c92-a7d0-fa55-fc0bb887fb88",
+          "name": "Arrowhead Stadium",
+          "city": "Kansas City",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10402520-96bf-e9f2-4f68-8521ca896060",
+      "season": 2025,
+      "abbreviation": "LV",
+      "fullName": "Las Vegas Raiders",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/LV",
+      "divisionFullName": "AFC West",
+      "league": "National Football League",
+      "location": "Las Vegas",
+      "nickName": "Raiders",
+      "venues": [
+        {
+          "id": "00081510-8d44-0c8b-d478-07ace72fbbef",
+          "name": "Allegiant Stadium",
+          "city": "Paradise",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10404400-3b35-073f-197e-194bb8240723",
+      "season": 2025,
+      "abbreviation": "LAC",
+      "fullName": "Los Angeles Chargers",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/LAC",
+      "divisionFullName": "AFC West",
+      "league": "National Football League",
+      "location": "Los Angeles",
+      "nickName": "Chargers",
+      "venues": [
+        {
+          "id": "00083005-73cf-76e4-0b7c-b1a83f72b2c5",
+          "name": "SoFi Stadium",
+          "city": "Inglewood",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10402510-8931-0d5f-9815-79bb79649a65",
+      "season": 2025,
+      "abbreviation": "LAR",
+      "fullName": "Los Angeles Rams",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/LA",
+      "divisionFullName": "NFC West",
+      "league": "National Football League",
+      "location": "Los Angeles",
+      "nickName": "Rams",
+      "venues": [
+        {
+          "id": "00083005-73cf-76e4-0b7c-b1a83f72b2c5",
+          "name": "SoFi Stadium",
+          "city": "Inglewood",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10402700-1662-d8ad-f45c-0b0ea460d045",
+      "season": 2025,
+      "abbreviation": "MIA",
+      "fullName": "Miami Dolphins",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/MIA",
+      "divisionFullName": "AFC East",
+      "league": "National Football League",
+      "location": "Miami",
+      "nickName": "Dolphins",
+      "venues": [
+        {
+          "id": "00082475-4308-d8ae-8935-f685fe5d20f2",
+          "name": "Hard Rock Stadium",
+          "city": "Opa Locka",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10403000-5851-f9d5-da45-78365a05b6b0",
+      "season": 2025,
+      "abbreviation": "MIN",
+      "fullName": "Minnesota Vikings",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/MIN",
+      "divisionFullName": "NFC North",
+      "league": "National Football League",
+      "location": "Minnesota",
+      "nickName": "Vikings",
+      "venues": [
+        {
+          "id": "00081652-d8a8-d698-5b3f-31487c6624f7",
+          "name": "U.S. Bank Stadium",
+          "city": "Minneapolis",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10403200-69ab-9ea6-5af5-e240fbc08bea",
+      "season": 2025,
+      "abbreviation": "NE",
+      "fullName": "New England Patriots",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/NE",
+      "divisionFullName": "AFC East",
+      "league": "National Football League",
+      "location": "New England",
+      "nickName": "Patriots",
+      "venues": [
+        {
+          "id": "00081065-961a-76b2-de6a-b6da2602a129",
+          "name": "Gillette Stadium",
+          "city": "Foxborough",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10403300-f235-cf9b-6d3a-2f182be48dd1",
+      "season": 2025,
+      "abbreviation": "NO",
+      "fullName": "New Orleans Saints",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/NO",
+      "divisionFullName": "NFC South",
+      "league": "National Football League",
+      "location": "New Orleans",
+      "nickName": "Saints",
+      "venues": [
+        {
+          "id": "00082870-94c7-53ad-b2bf-a1d334cf1512",
+          "name": "Caesars Superdome",
+          "city": "New Orleans",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10403410-997c-9c75-256b-3b012f468bd0",
+      "season": 2025,
+      "abbreviation": "NYG",
+      "fullName": "New York Giants",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/NYG",
+      "divisionFullName": "NFC East",
+      "league": "National Football League",
+      "location": "New York",
+      "nickName": "Giants",
+      "venues": [
+        {
+          "id": "00083757-62dd-de21-f672-4d0ca5ad5a9e",
+          "name": "MetLife Stadium",
+          "city": "East Rutherford",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10403430-1bc3-42c4-c7d8-39f38aed5f12",
+      "season": 2025,
+      "abbreviation": "NYJ",
+      "fullName": "New York Jets",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/NYJ",
+      "divisionFullName": "AFC East",
+      "league": "National Football League",
+      "location": "New York",
+      "nickName": "Jets",
+      "venues": [
+        {
+          "id": "00083757-62dd-de21-f672-4d0ca5ad5a9e",
+          "name": "MetLife Stadium",
+          "city": "East Rutherford",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10408700-5035-ce5c-b3dd-20413011bc6a",
+      "season": 2025,
+      "abbreviation": "NFC",
+      "fullName": "NFC Pro Bowl Team",
+      "teamType": "PRO",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/NPR",
+      "divisionFullName": null,
+      "league": "National Football League",
+      "location": "NFC",
+      "nickName": "NFC",
+      "venues": []
+    },
+    {
+      "id": "10403700-b939-3cbd-3d16-24d4d6742fa2",
+      "season": 2025,
+      "abbreviation": "PHI",
+      "fullName": "Philadelphia Eagles",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/PHI",
+      "divisionFullName": "NFC East",
+      "league": "National Football League",
+      "location": "Philadelphia",
+      "nickName": "Eagles",
+      "venues": [
+        {
+          "id": "00082769-1a91-621b-0c2d-27234c215dc0",
+          "name": "Lincoln Financial Field",
+          "city": "Philadelphia",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10403900-8251-6892-d81c-4348525c2d47",
+      "season": 2025,
+      "abbreviation": "PIT",
+      "fullName": "Pittsburgh Steelers",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/PIT",
+      "divisionFullName": "AFC North",
+      "league": "National Football League",
+      "location": "Pittsburgh",
+      "nickName": "Steelers",
+      "venues": [
+        {
+          "id": "00085411-4ecf-6807-abb8-f9309b0cf6b0",
+          "name": "Acrisure Stadium",
+          "city": "Pittsburgh",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10404500-e7cb-7fce-3f10-4eeb269bd179",
+      "season": 2025,
+      "abbreviation": "SF",
+      "fullName": "San Francisco 49ers",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/SF",
+      "divisionFullName": "NFC West",
+      "league": "National Football League",
+      "location": "San Francisco",
+      "nickName": "49ers",
+      "venues": [
+        {
+          "id": "00082099-57dc-7d8f-dbdb-9a693342cda6",
+          "name": "Levi's\u00ae Stadium",
+          "city": "Santa Clara",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10404600-adcd-28ac-5826-b4d95ec2a228",
+      "season": 2025,
+      "abbreviation": "SEA",
+      "fullName": "Seattle Seahawks",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/SEA",
+      "divisionFullName": "NFC West",
+      "league": "National Football League",
+      "location": "Seattle",
+      "nickName": "Seahawks",
+      "venues": [
+        {
+          "id": "00085315-d5b8-18a5-6c08-f91cd9144cb5",
+          "name": "Lumen Field",
+          "city": "Seattle",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10404900-d59e-b449-ef75-961e09ca027e",
+      "season": 2025,
+      "abbreviation": "TB",
+      "fullName": "Tampa Bay Buccaneers",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/TB",
+      "divisionFullName": "NFC South",
+      "league": "National Football League",
+      "location": "Tampa Bay",
+      "nickName": "Buccaneers",
+      "venues": [
+        {
+          "id": "00083697-451e-88a5-6695-aa32961fba3a",
+          "name": "Raymond James Stadium",
+          "city": "Tampa",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10402100-447f-396e-8149-0a434ffb2f23",
+      "season": 2025,
+      "abbreviation": "TEN",
+      "fullName": "Tennessee Titans",
+      "teamType": "TEAM",
+      "conferenceAbbr": "AFC",
+      "conferenceFullName": "American Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/TEN",
+      "divisionFullName": "AFC South",
+      "league": "National Football League",
+      "location": "Tennessee",
+      "nickName": "Titans",
+      "venues": [
+        {
+          "id": "00082350-52f3-e11f-8c49-0193cb89e66f",
+          "name": "Nissan Stadium",
+          "city": "Nashville",
+          "country": "USA"
+        }
+      ]
+    },
+    {
+      "id": "10405110-ec3c-669e-2614-db3dc1736e95",
+      "season": 2025,
+      "abbreviation": "WAS",
+      "fullName": "Washington Commanders",
+      "teamType": "TEAM",
+      "conferenceAbbr": "NFC",
+      "conferenceFullName": "National Football Conference",
+      "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/WAS",
+      "divisionFullName": "NFC East",
+      "league": "National Football League",
+      "location": "Washington",
+      "nickName": "Commanders",
+      "venues": [
+        {
+          "id": "00082389-5f81-bc7b-7280-78260ea1be2a",
+          "name": "Northwest Stadium",
+          "city": "Landover",
+          "country": "USA"
+        }
+      ]
+    }
+  ],
+  "pagination": {
+    "limit": 40,
+    "token": null
+  }
+}

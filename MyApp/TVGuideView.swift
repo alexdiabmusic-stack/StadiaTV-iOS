@@ -169,7 +169,9 @@ struct TVGuideView: View {
                 Spacer()
 
                 Button {
+                    #if !os(tvOS)
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
                     showingFilters = true
                 } label: {
                     Image(systemName: "slider.horizontal.3")
@@ -258,7 +260,9 @@ struct TVGuideView: View {
                     .multilineTextAlignment(.center)
             }
             Button("Get Started") {
+                #if !os(tvOS)
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                #endif
                 showingBuildGuide = true
             }
             .buttonStyle(.borderedProminent)
@@ -296,7 +300,9 @@ struct GuideModeControl: View {
     private func modeButton(_ target: GuideMode, label: String) -> some View {
         let selected = mode == target
         return Button {
+            #if !os(tvOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
             withAnimation(.snappy) { onSelect(target) }
         } label: {
             Text(label)
@@ -745,7 +751,9 @@ private struct JumpToNowOverlayView: View {
                     HStack {
                         Spacer()
                         Button {
+                            #if !os(tvOS)
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
                             onJump()
                         } label: {
                             HStack(spacing: 5) {
@@ -1395,7 +1403,9 @@ struct BuildGuideSheet: View {
                             name: cat.name,
                             isSelected: selectedCategoryIds.contains(cat.id)
                         ) {
+                            #if !os(tvOS)
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            #endif
                             if selectedCategoryIds.contains(cat.id) {
                                 selectedCategoryIds.remove(cat.id)
                             } else {
@@ -1410,7 +1420,9 @@ struct BuildGuideSheet: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Build Your Guide")
+        #if !os(tvOS)
         .navigationBarTitleDisplayMode(.large)
+        #endif
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
@@ -1446,7 +1458,9 @@ struct BuildGuideSheet: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Select Channels")
+        #if !os(tvOS)
         .navigationBarTitleDisplayMode(.large)
+        #endif
         .searchable(text: $searchText, prompt: "Search channels")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -1495,9 +1509,9 @@ struct BuildGuideSheet: View {
                 }
             }
         }
-        .listStyle(.insetGrouped)
+        .platformGroupedList()
         .hidesScrollContentBackground()
-        .scrollContentBackground(.hidden)
+        .hidesScrollContentBackground()
     }
 
     private var confirmBar: some View {
@@ -1509,7 +1523,9 @@ struct BuildGuideSheet: View {
                     .foregroundStyle(Theme.textSecondary)
                 Spacer()
                 Button("View My Guide") {
+                    #if !os(tvOS)
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    #endif
                     guideStore.setChannels(localSelectedIDs)
                     guideStore.markConfigured()
                     guideStore.setGuideMode(.myGuide)
@@ -1697,9 +1713,9 @@ struct GuideFilterSheet: View {
                     .buttonStyle(.plain)
                 }
             }
-            .listStyle(.insetGrouped)
+            .platformGroupedList()
             .hidesScrollContentBackground()
-            .scrollContentBackground(.hidden)
+            .hidesScrollContentBackground()
             .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Filters")
             .inlineNavigationTitle()
@@ -1760,6 +1776,12 @@ struct EPGOffsetSheet: View {
                             .contentTransition(.numericText())
                     }
 
+                    #if os(tvOS)
+                    HStack {
+                        Button("Back 15 minutes") { offsetMinutes = max(-720, offsetMinutes - 15) }
+                        Button("Forward 15 minutes") { offsetMinutes = min(720, offsetMinutes + 15) }
+                    }
+                    #else
                     Stepper(value: $offsetMinutes, in: -720...720, step: 15) {
                         Text("Adjust in 15-minute steps")
                             .font(.callout)
@@ -1767,6 +1789,7 @@ struct EPGOffsetSheet: View {
                     }
                     .padding(.horizontal, 20)
 
+                    #endif
                     Text("Positive offset: your stream is ahead of the EPG listing.\nNegative offset: your stream is behind the EPG listing.")
                         .font(.caption)
                         .foregroundStyle(Theme.textTertiary)

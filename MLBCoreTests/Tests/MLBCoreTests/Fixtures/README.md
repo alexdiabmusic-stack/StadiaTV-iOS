@@ -1,0 +1,1 @@
+final.json and schedule.json are captured from MLB StatsAPI on 2026-09-21: game 744834 and schedule 2024-06-01. Other files are explicitly derived offline edge-case variations of those recorded schemas. Doubleheader test IDs and fixture runner names are synthetic test-only identities. Network/lifecycle tests use these local responses and URLProtocol; no unit test contacts MLB.

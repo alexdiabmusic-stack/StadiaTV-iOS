@@ -1,6 +1,8 @@
 import Combine
 import SwiftUI
+#if canImport(WebKit)
 import WebKit
+#endif
 
 // MARK: - Recent Sports Highlights
 
@@ -471,7 +473,9 @@ struct YouTubePlayerSheet: View {
             YouTubeEmbedView(videoId: item.videoId)
                 .ignoresSafeArea(edges: .bottom)
                 .navigationTitle(item.title)
+                #if !os(tvOS)
                 .navigationBarTitleDisplayMode(.inline)
+                #endif
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Done") { dismiss() }
@@ -483,6 +487,7 @@ struct YouTubePlayerSheet: View {
 
 // MARK: - Embedded player
 
+#if canImport(WebKit) && canImport(UIKit)
 struct YouTubeEmbedView: UIViewRepresentable {
     let videoId: String
 
@@ -498,3 +503,13 @@ struct YouTubeEmbedView: UIViewRepresentable {
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
 }
+
+#else
+struct YouTubeEmbedView: View {
+    let videoId: String
+    var body: some View {
+        ContentUnavailableView("Watch on YouTube", systemImage: "play.rectangle",
+            description: Text("Open this video in the YouTube app on a supported device."))
+    }
+}
+#endif

@@ -95,6 +95,42 @@ struct MatchDetailView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             Theme.background.ignoresSafeArea()
+            if match.league.path == "hockey/nhl" {
+                NHLGameCenterView(match: match) {
+                    if match.state != .final { sourcesSection }
+                    fantasySection
+                    picksSection
+                    matchNewsSection
+                }
+            } else if match.league.path == "baseball/mlb" {
+                MLBGameCenterView(match: match) {
+                    if match.state != .final { sourcesSection }
+                    fantasySection
+                    picksSection
+                    matchNewsSection
+                }
+            } else if match.league.path == "football/nfl" {
+                NFLGameCenterView(match: match) {
+                    if match.state != .final { sourcesSection }
+                    fantasySection
+                    picksSection
+                    matchNewsSection
+                }
+            } else if match.league.path == "racing/f1" {
+                F1RaceCentreView(match: match) {
+                    if match.state != .final { sourcesSection }
+                    fantasySection
+                    picksSection
+                    matchNewsSection
+                }
+            } else if match.league.path == "basketball/nba" {
+                NBAGameCenterView(match: match) {
+                    if match.state != .final { sourcesSection }
+                    fantasySection
+                    picksSection
+                    matchNewsSection
+                }
+            } else {
             ScrollView {
                 VStack(spacing: 16) {
                     eventHeader
@@ -130,6 +166,8 @@ struct MatchDetailView: View {
                 }
                 .padding(16)
                 .padding(.bottom, isPickingMultiscreen ? 92 : 24)
+            }
+
             }
 
             if isPickingMultiscreen {
@@ -264,6 +302,7 @@ struct MatchDetailView: View {
 
     /// Loads boxscore stats once, then keeps polling while the game is live.
     private func loadGameSummary() async {
+        guard !["hockey/nhl", "baseball/mlb", "racing/f1", "football/nfl", "basketball/nba"].contains(match.league.path) else { return }
         gameSummary = nil
         gameCenterTab = .players
         didAttemptGameSummaryLoad = false
@@ -729,7 +768,7 @@ struct MatchDetailView: View {
         if let summary = gameSummary, match.state != .pre, !summary.plays.isEmpty {
             if entitlements.isPremium {
                 if match.league.group == .baseball {
-                    MLBPlayByPlayView(plays: summary.plays, match: match)
+                    LegacyBaseballPlayByPlayView(plays: summary.plays, match: match)
                 } else {
                     PlayByPlaySectionView(plays: summary.plays, match: match)
                 }
@@ -737,7 +776,7 @@ struct MatchDetailView: View {
                 ZStack {
                     Group {
                         if match.league.group == .baseball {
-                            MLBPlayByPlayView(plays: Array(summary.plays.prefix(6)), match: match)
+                            LegacyBaseballPlayByPlayView(plays: Array(summary.plays.prefix(6)), match: match)
                         } else {
                             PlayByPlaySectionView(plays: Array(summary.plays.prefix(4)), match: match)
                         }
@@ -3092,7 +3131,7 @@ private func groupMLBPlays(_ plays: [PlayByPlayEntry]) -> [MLBHalfInningGroup] {
     return groups
 }
 
-private struct MLBPlayByPlayView: View {
+private struct LegacyBaseballPlayByPlayView: View {
     let plays: [PlayByPlayEntry]
     let match: Match
 

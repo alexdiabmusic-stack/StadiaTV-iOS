@@ -517,11 +517,13 @@ private struct ArticleContextActions: View {
         Button(action: onToggleSaved) {
             Label(isSaved ? "Remove Saved Article" : "Save Article", systemImage: isSaved ? "bookmark.slash" : "bookmark")
         }
+        #if !os(tvOS)
         if let url = article.url {
             ShareLink(item: url) {
                 Label("Share", systemImage: "square.and.arrow.up")
             }
         }
+        #endif
         Button(action: onHide) { Label("Hide stories like this", systemImage: "eye.slash") }
         Button(action: onMute) { Label("Mute this source", systemImage: "speaker.slash") }
     }

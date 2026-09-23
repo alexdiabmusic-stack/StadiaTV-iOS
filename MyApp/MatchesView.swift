@@ -43,7 +43,9 @@ struct MatchesView: View {
                 content
             }
             .navigationTitle("Following")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            #endif
             .toolbarBackground(Theme.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
@@ -287,7 +289,9 @@ struct MatchesView: View {
         title: String, logoURL: URL?, isSelected: Bool, action: @escaping () -> Void
     ) -> some View {
         Button {
+            #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
             action()
         } label: {
             HStack(spacing: 5) {
@@ -976,7 +980,9 @@ private struct FollowingFullScheduleView: View {
             }
         }
         .navigationTitle("Full Schedule")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbarBackground(Theme.background, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
     }
@@ -1091,12 +1097,13 @@ private struct FollowingEventRow: View {
         .accessibilityLabel(accessibilityText)
         .accessibilityHint("Opens \(isRacing ? "Event" : "Game") Centre")
         .sheet(isPresented: $showingQuickStream) {
-            QuickStreamSheet(
-                match: match,
-                sources: streamStore.topRanked(for: match.id)
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
+            #if os(tvOS)
+            TVMatchDetailView(match: match)
+            #else
+            QuickStreamSheet(match: match, sources: streamStore.topRanked(for: match.id))
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+            #endif
         }
     }
 

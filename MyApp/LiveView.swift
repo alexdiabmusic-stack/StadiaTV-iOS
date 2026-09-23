@@ -22,7 +22,9 @@ struct LiveView: View {
             content
                 .background(Theme.background.ignoresSafeArea())
                 .navigationTitle("Live")
-                .navigationBarTitleDisplayMode(.large)
+                #if !os(tvOS)
+            .navigationBarTitleDisplayMode(.large)
+            #endif
                 .toolbarBackground(Theme.background, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
                 .toolbar {
@@ -173,7 +175,9 @@ struct LiveView: View {
 
     private func sportNavChip(_ sport: SportGroup?, label: String) -> some View {
         Button {
+            #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
             withAnimation(.snappy) { selectedSport = sport }
         } label: {
             HStack(spacing: 4) {
@@ -205,7 +209,9 @@ struct LiveView: View {
 
     private func filterChip(_ f: LiveFilter) -> some View {
         Button {
+            #if os(iOS)
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            #endif
             withAnimation(.snappy) { filter = f }
         } label: {
             HStack(spacing: 5) {
@@ -527,12 +533,16 @@ struct LiveMatchCard: View {
             Button("Hide", systemImage: "eye.slash", role: .destructive) { onHide() }
         }
         .sheet(isPresented: $showingQuickStream) {
+            #if os(tvOS)
+            TVMatchDetailView(match: match)
+            #else
             QuickStreamSheet(
                 match: match,
                 sources: streamStore.topRanked(for: match.id)
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
+            #endif
         }
     }
 
@@ -718,7 +728,13 @@ final class LiveViewModel: ObservableObject {
     private var refreshClientCount = 0
 
     func load(favoriteTeams: [FavoriteTeam], force: Bool = false) async {
-        if !force, let last = lastLoaded, Date().timeIntervalSince(last) < cacheLifetime { return }
+        // Don't honor the cache window when we currently have nothing to show — an empty
+        // result from a bad fetch (or from checking before anything went live yet) would
+        // otherwise sit there un-refreshed for the full cache window every time this tab
+        // reappears, even while other screens querying the same data already have real
+        // matches.
+        let hasData = !allLive.isEmpty
+        if !force, hasData, let last = lastLoaded, Date().timeIntervalSince(last) < cacheLifetime { return }
         guard !isLoading else { return }
         isLoading = true
 

@@ -17,7 +17,9 @@ struct FantasyDashboardView: View {
             content
         }
         .navigationTitle("Fantasy")
+        #if !os(tvOS)
         .navigationBarTitleDisplayMode(.large)
+        #endif
         .fullScreenCover(item: $playingChannel) { PlayerView(channel: $0) }
         .sheet(isPresented: $showingConnect) {
             SleeperConnectSheet(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)

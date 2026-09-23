@@ -98,7 +98,9 @@ struct SportsSelectionView: View {
                 _ = expandedSportIDs.insert(sport.id)
             }
         }
+        #if !os(tvOS)
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
     }
 
     private func toggleShowAll(_ sport: CatalogSport) {
@@ -205,7 +207,9 @@ private struct LeagueExpansionDrawer: View {
                         withAnimation(.easeInOut(duration: 0.18)) {
                             store.toggleLeague(league, inSport: sport)
                         }
+                        #if !os(tvOS)
                         UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        #endif
                     }
                 }
             }

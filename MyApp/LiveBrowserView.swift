@@ -65,7 +65,7 @@ struct LiveBrowserView: View {
                                    count: group.channelIDs.count)
                     }
                     .listRowBackground(Theme.surface)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    .platformGroupActions {
                         Button(role: .destructive) {
                             customGroups.deleteGroup(group.id)
                         } label: {
@@ -165,7 +165,7 @@ struct LiveBrowserView: View {
                         }
                         .listRowBackground(groupPrefs.isHidden(group.id)
                                            ? Theme.surface.opacity(0.5) : Theme.surface)
-                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        .platformGroupActions {
                             Button {
                                 groupPrefs.setHidden(!groupPrefs.isHidden(group.id), for: group.id)
                             } label: {
@@ -256,5 +256,15 @@ struct BrowserRow: View {
                 .foregroundStyle(Theme.textSecondary)
         }
         .padding(.vertical, 4)
+    }
+}
+
+private extension View {
+    @ViewBuilder func platformGroupActions<Actions: View>(@ViewBuilder actions: () -> Actions) -> some View {
+        #if os(tvOS)
+        contextMenu(menuItems: actions)
+        #else
+        swipeActions(edge: .trailing, allowsFullSwipe: false, content: actions)
+        #endif
     }
 }

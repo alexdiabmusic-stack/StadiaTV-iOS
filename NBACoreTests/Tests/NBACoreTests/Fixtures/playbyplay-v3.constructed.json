@@ -1,0 +1,18 @@
+{
+  "resultSets": [
+    {
+      "name": "PlayByPlay",
+      "headers": ["actionNumber", "orderNumber", "actionId", "period", "clock", "actionType", "subType", "shotResult",
+                  "teamId", "teamTricode", "personId", "playerName", "playerNameI", "isFieldGoal", "shotDistance",
+                  "xLegacy", "yLegacy", "scoreHome", "scoreAway", "description", "videoAvailable"],
+      "rowSet": [
+        [1, 1, 1, 1, "PT12M00.00S", "period", "start", null,
+         null, null, null, null, null, false, null,
+         null, null, null, null, "Period Start", false],
+        [2, 2, 2, 1, "PT11M42.00S", "2pt", "Layup", "Made",
+         1610612747, "LAL", 2544, "James", "L. James", true, 1,
+         0, 8, 2, 0, "James 1' Layup (2 PTS)", true]
+      ]
+    }
+  ]
+}

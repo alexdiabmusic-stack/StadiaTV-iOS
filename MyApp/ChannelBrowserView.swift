@@ -151,7 +151,9 @@ struct ChannelBrowserView: View {
                     ForEach(displayChannels) { channel in
                         channelRow(channel)
                             .listRowBackground(Theme.surface)
+                            #if !os(tvOS)
                             .listRowSeparatorTint(Theme.hairline)
+                            #endif
                     }
                 }
                 .listStyle(.plain)
@@ -363,7 +365,9 @@ struct AddToGroupSheet: View {
                             }
                         }
                         .listRowBackground(Theme.surface)
+                        #if !os(tvOS)
                         .listRowSeparatorTint(Theme.hairline)
+                        #endif
                     }
                 }
                 .listStyle(.plain)
@@ -447,7 +451,9 @@ struct ChannelInfoSheet: View {
             Text(value)
                 .font(.subheadline)
                 .foregroundStyle(Theme.textPrimary)
+                #if !os(tvOS)
                 .textSelection(.enabled)
+                #endif
         }
         .padding(.vertical, 2)
     }

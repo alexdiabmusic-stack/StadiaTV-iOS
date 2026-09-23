@@ -1,0 +1,2799 @@
+{
+  "season": 2025,
+  "seasonType": "REG",
+  "weeks": [
+    {
+      "week": 1,
+      "standings": [
+        {
+          "team": {
+            "id": "10403800-517c-7b8c-65a3-c61b95d86123",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/AZ",
+            "fullName": "Arizona Cardinals"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 1,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 5,
+            "points": {
+              "for": 20,
+              "against": 13
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 2,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 20,
+              "against": 13
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 20,
+              "against": 13
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 20,
+              "against": 13
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10400200-f401-4e53-5175-0974e4f16cf7",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/ATL",
+            "fullName": "Atlanta Falcons"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 1,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 14,
+            "points": {
+              "for": 20,
+              "against": 23
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 4,
+            "points": {
+              "for": 20,
+              "against": 23
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 20,
+              "against": 23
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 20,
+              "against": 23
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 20,
+              "against": 23
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10400325-48de-3d6a-be29-8f829437f4c8",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BAL",
+            "fullName": "Baltimore Ravens"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 1,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 10,
+            "points": {
+              "for": 40,
+              "against": 41
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 3,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 40,
+              "against": 41
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 40,
+              "against": 41
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 40,
+              "against": 41
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10400610-c40e-a673-1743-2ce2a5d5d731",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/BUF",
+            "fullName": "Buffalo Bills"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 1,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 3,
+            "points": {
+              "for": 41,
+              "against": 40
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 1,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 41,
+              "against": 40
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 41,
+              "against": 40
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 41,
+              "against": 40
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10400750-259b-33ac-eee3-a3852e83cd1f",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/CAR",
+            "fullName": "Carolina Panthers"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 9,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 2,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 10,
+              "against": 26
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 10,
+              "against": 26
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 10,
+              "against": 26
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10400810-db30-43d6-221c-620006f3ca19",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/CHI",
+            "fullName": "Chicago Bears"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 1,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 10,
+            "points": {
+              "for": 24,
+              "against": 27
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 3,
+            "points": {
+              "for": 24,
+              "against": 27
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 24,
+              "against": 27
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 24,
+              "against": 27
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 24,
+              "against": 27
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10400920-57c1-7656-e77e-1af3d900483e",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/CIN",
+            "fullName": "Cincinnati Bengals"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 1,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 4,
+            "points": {
+              "for": 17,
+              "against": 16
+            }
+          },
+          "division": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 1,
+            "points": {
+              "for": 17,
+              "against": 16
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 17,
+              "against": 16
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 17,
+              "against": 16
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 17,
+              "against": 16
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10401050-5e38-b907-1be1-55b91b19c057",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/CLE",
+            "fullName": "Cleveland Browns"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 1,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 11,
+            "points": {
+              "for": 16,
+              "against": 17
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 4,
+            "points": {
+              "for": 16,
+              "against": 17
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 16,
+              "against": 17
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 16,
+              "against": 17
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 16,
+              "against": 17
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10401200-a308-98ca-ad5f-95df2fefea68",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/DAL",
+            "fullName": "Dallas Cowboys"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 1,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 12,
+            "points": {
+              "for": 20,
+              "against": 24
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 3,
+            "points": {
+              "for": 20,
+              "against": 24
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 20,
+              "against": 24
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 20,
+              "against": 24
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 20,
+              "against": 24
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10401400-b89b-96e5-55d1-caa7e18de3d8",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/DEN",
+            "fullName": "Denver Broncos"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 1,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 5,
+            "points": {
+              "for": 20,
+              "against": 12
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 2,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 20,
+              "against": 12
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 20,
+              "against": 12
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 20,
+              "against": 12
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10401540-f97c-2d19-6fcd-fac6490a48b7",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/DET",
+            "fullName": "Detroit Lions"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 16,
+            "points": {
+              "for": 13,
+              "against": 27
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 4,
+            "points": {
+              "for": 13,
+              "against": 27
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 13,
+              "against": 27
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 13,
+              "against": 27
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 13,
+              "against": 27
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10401800-ab22-323d-721a-cee4713c4c2d",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/GB",
+            "fullName": "Green Bay Packers"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 1,
+            "points": {
+              "for": 27,
+              "against": 13
+            }
+          },
+          "division": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 1,
+            "points": {
+              "for": 27,
+              "against": 13
+            }
+          },
+          "home": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 27,
+              "against": 13
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 27,
+              "against": 13
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 27,
+              "against": 13
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10402120-b0bc-693d-098a-803014096eb0",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/HOU",
+            "fullName": "Houston Texans"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 1,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 9,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 3,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 9,
+              "against": 14
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 9,
+              "against": 14
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 9,
+              "against": 14
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10402200-2ea3-84c3-e627-6a6b3b39d56d",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/IND",
+            "fullName": "Indianapolis Colts"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 1,
+            "points": {
+              "for": 33,
+              "against": 8
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 1,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 33,
+              "against": 8
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 33,
+              "against": 8
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 33,
+              "against": 8
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10402250-89fe-7b86-ef98-9062cd354256",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/JAX",
+            "fullName": "Jacksonville Jaguars"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 8,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 2,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 26,
+              "against": 10
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 26,
+              "against": 10
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 26,
+              "against": 10
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10402310-a47e-10ea-7442-16b633633637",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/KC",
+            "fullName": "Kansas City Chiefs"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 1,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 13,
+            "points": {
+              "for": 21,
+              "against": 27
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 4,
+            "points": {
+              "for": 21,
+              "against": 27
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 21,
+              "against": 27
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 21,
+              "against": 27
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 21,
+              "against": 27
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10402520-96bf-e9f2-4f68-8521ca896060",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/LV",
+            "fullName": "Las Vegas Raiders"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 1,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 6,
+            "points": {
+              "for": 20,
+              "against": 13
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 3,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 20,
+              "against": 13
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 20,
+              "against": 13
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 20,
+              "against": 13
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10404400-3b35-073f-197e-194bb8240723",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/LAC",
+            "fullName": "Los Angeles Chargers"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 1,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 2,
+            "points": {
+              "for": 27,
+              "against": 21
+            }
+          },
+          "division": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 1,
+            "points": {
+              "for": 27,
+              "against": 21
+            }
+          },
+          "home": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 27,
+              "against": 21
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 27,
+              "against": 21
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 27,
+              "against": 21
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10402510-8931-0d5f-9815-79bb79649a65",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/LA",
+            "fullName": "Los Angeles Rams"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 1,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 8,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 3,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 14,
+              "against": 9
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 14,
+              "against": 9
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 14,
+              "against": 9
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10402700-1662-d8ad-f45c-0b0ea460d045",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/MIA",
+            "fullName": "Miami Dolphins"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 16,
+            "points": {
+              "for": 8,
+              "against": 33
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 4,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 8,
+              "against": 33
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 8,
+              "against": 33
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 8,
+              "against": 33
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10403000-5851-f9d5-da45-78365a05b6b0",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/MIN",
+            "fullName": "Minnesota Vikings"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 1,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 7,
+            "points": {
+              "for": 27,
+              "against": 24
+            }
+          },
+          "division": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 2,
+            "points": {
+              "for": 27,
+              "against": 24
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 27,
+              "against": 24
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 27,
+              "against": 24
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 27,
+              "against": 24
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10403200-69ab-9ea6-5af5-e240fbc08bea",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/NE",
+            "fullName": "New England Patriots"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 1,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 14,
+            "points": {
+              "for": 13,
+              "against": 20
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 3,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 13,
+              "against": 20
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 13,
+              "against": 20
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 13,
+              "against": 20
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10403300-f235-cf9b-6d3a-2f182be48dd1",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/NO",
+            "fullName": "New Orleans Saints"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 1,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 13,
+            "points": {
+              "for": 13,
+              "against": 20
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 3,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 13,
+              "against": 20
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 13,
+              "against": 20
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 13,
+              "against": 20
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10403410-997c-9c75-256b-3b012f468bd0",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/NYG",
+            "fullName": "New York Giants"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 15,
+            "points": {
+              "for": 6,
+              "against": 21
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 4,
+            "points": {
+              "for": 6,
+              "against": 21
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 6,
+              "against": 21
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 6,
+              "against": 21
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 6,
+              "against": 21
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10403430-1bc3-42c4-c7d8-39f38aed5f12",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/NYJ",
+            "fullName": "New York Jets"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 1,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 12,
+            "points": {
+              "for": 32,
+              "against": 34
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 2,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 32,
+              "against": 34
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 32,
+              "against": 34
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 32,
+              "against": 34
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10403700-b939-3cbd-3d16-24d4d6742fa2",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/PHI",
+            "fullName": "Philadelphia Eagles"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 1,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 6,
+            "points": {
+              "for": 24,
+              "against": 20
+            }
+          },
+          "division": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 2,
+            "points": {
+              "for": 24,
+              "against": 20
+            }
+          },
+          "home": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 24,
+              "against": 20
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 24,
+              "against": 20
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 24,
+              "against": 20
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10403900-8251-6892-d81c-4348525c2d47",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/PIT",
+            "fullName": "Pittsburgh Steelers"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 1,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 7,
+            "points": {
+              "for": 34,
+              "against": 32
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 2,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 34,
+              "against": 32
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 34,
+              "against": 32
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 34,
+              "against": 32
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10404500-e7cb-7fce-3f10-4eeb269bd179",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/SF",
+            "fullName": "San Francisco 49ers"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 1,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 4,
+            "points": {
+              "for": 17,
+              "against": 13
+            }
+          },
+          "division": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 1,
+            "points": {
+              "for": 17,
+              "against": 13
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 17,
+              "against": 13
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 17,
+              "against": 13
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 17,
+              "against": 13
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10404600-adcd-28ac-5826-b4d95ec2a228",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/SEA",
+            "fullName": "Seattle Seahawks"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 1,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 11,
+            "points": {
+              "for": 13,
+              "against": 17
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 4,
+            "points": {
+              "for": 13,
+              "against": 17
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 13,
+              "against": 17
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 13,
+              "against": 17
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 13,
+              "against": 17
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10404900-d59e-b449-ef75-961e09ca027e",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/TB",
+            "fullName": "Tampa Bay Buccaneers"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 1,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 3,
+            "points": {
+              "for": 23,
+              "against": 20
+            }
+          },
+          "division": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 1,
+            "points": {
+              "for": 23,
+              "against": 20
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 23,
+              "against": 20
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 23,
+              "against": 20
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 23,
+              "against": 20
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10402100-447f-396e-8149-0a434ffb2f23",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/TEN",
+            "fullName": "Tennessee Titans"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 1,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "rank": 15,
+            "points": {
+              "for": 12,
+              "against": 20
+            }
+          },
+          "division": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 4,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "home": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          },
+          "last5": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 12,
+              "against": 20
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 12,
+              "against": 20
+            },
+            "streak": {
+              "type": "L",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 1,
+            "ties": 0,
+            "points": {
+              "for": 12,
+              "against": 20
+            }
+          }
+        },
+        {
+          "team": {
+            "id": "10405110-ec3c-669e-2614-db3dc1736e95",
+            "currentLogo": "https://static.www.nfl.com/{formatInstructions}/league/api/clubs/logos/WAS",
+            "fullName": "Washington Commanders"
+          },
+          "clinched": {
+            "bye": false,
+            "division": false,
+            "eliminated": false,
+            "homeField": false,
+            "playoff": false,
+            "wildCard": false
+          },
+          "closeGames": {
+            "wins": 0,
+            "losses": 0,
+            "ties": 0
+          },
+          "conference": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 2,
+            "points": {
+              "for": 21,
+              "against": 6
+            }
+          },
+          "division": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "rank": 1,
+            "points": {
+              "for": 21,
+              "against": 6
+            }
+          },
+          "home": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 21,
+              "against": 6
+            }
+          },
+          "last5": {
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 21,
+              "against": 6
+            }
+          },
+          "overall": {
+            "games": 1,
+            "wins": 1,
+            "winPct": 1.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 21,
+              "against": 6
+            },
+            "streak": {
+              "type": "W",
+              "length": 1
+            }
+          },
+          "road": {
+            "wins": 0,
+            "winPct": 0.0,
+            "losses": 0,
+            "ties": 0,
+            "points": {
+              "for": 0,
+              "against": 0
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "pagination": {
+    "limit": 40,
+    "token": null
+  }
+}

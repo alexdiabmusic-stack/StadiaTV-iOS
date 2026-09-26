@@ -48,7 +48,7 @@ nonisolated enum NBAGameMapper {
     }
 
     static func game(_ raw: NBAValue) -> BasketballGame? {
-        guard let idString = raw["gameId"].string, let id = NBAProviderGameID(idString),
+        guard let idString = raw["gameId"].string, let id = BasketballGameID.validated(idString, league: .nba),
               let home = team(raw["homeTeam"]), let away = team(raw["awayTeam"]) else { return nil }
         let start = NBASeason.parse(raw["gameTimeUTC"].string) ?? NBASeason.parse(raw["gameDateTimeUTC"].string) ?? NBASeason.parse(raw["gameDateUTC"].string) ?? Date.distantFuture
         return BasketballGame(id: id, gameCode: raw["gameCode"].string, start: start, away: away, home: home,

@@ -169,6 +169,8 @@ struct FeaturedEventPick: Identifiable, Hashable {
             return Self.mlbTeamAbbreviations[key]
         case "basketball/nba":
             return Self.nbaTeamAbbreviations[key]
+        case "basketball/wnba":
+            return Self.wnbaTeamAbbreviations[key]
         case "football/nfl":
             return Self.nflTeamAbbreviations[key]
         case "hockey/nhl":
@@ -223,6 +225,14 @@ struct FeaturedEventPick: Identifiable, Hashable {
         "phoenix suns": "PHX", "portland trail blazers": "POR", "sacramento kings": "SAC",
         "san antonio spurs": "SAS", "toronto raptors": "TOR", "utah jazz": "UTA",
         "washington wizards": "WAS"
+    ]
+
+    private static let wnbaTeamAbbreviations: [String: String] = [
+        "atlanta dream": "ATL", "chicago sky": "CHI", "connecticut sun": "CONN",
+        "dallas wings": "DAL", "golden state valkyries": "GSV", "indiana fever": "IND",
+        "las vegas aces": "LV", "los angeles sparks": "LAS", "minnesota lynx": "MIN",
+        "new york liberty": "NY", "phoenix mercury": "PHX", "portland fire": "POR",
+        "seattle storm": "SEA", "toronto tempo": "TOR", "washington mystics": "WAS"
     ]
 
     private static let nflTeamAbbreviations: [String: String] = [

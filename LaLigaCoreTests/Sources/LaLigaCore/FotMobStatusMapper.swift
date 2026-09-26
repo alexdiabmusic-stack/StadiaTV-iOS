@@ -1,0 +1,1 @@
+../../../MyApp/FotMob/Mapping/FotMobStatusMapper.swift

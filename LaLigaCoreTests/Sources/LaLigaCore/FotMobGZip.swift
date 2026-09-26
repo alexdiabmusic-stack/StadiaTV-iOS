@@ -1,0 +1,1 @@
+../../../MyApp/FotMob/API/FotMobGZip.swift

@@ -1,0 +1,35 @@
+{
+  "game": {
+    "gameId": "1022600052",
+    "gameCode": "20260712/LVASEA",
+    "gameStatus": 3,
+    "gameStatusText": "Final/OT",
+    "period": 5,
+    "regulationPeriods": 4,
+    "gameClock": "PT00M00.00S",
+    "gameTimeUTC": "2026-07-12T02:00:00Z",
+    "attendance": 12500,
+    "arena": { "arenaName": "Michelob ULTRA Arena", "arenaCity": "Las Vegas", "arenaState": "NV", "arenaCountry": "US", "arenaTimezone": "America/Los_Angeles" },
+    "officials": [],
+    "homeTeam": {
+      "teamId": 1611661323, "teamCity": "Las Vegas", "teamName": "Aces", "teamTricode": "LVA",
+      "wins": 17, "losses": 7, "score": 96, "timeoutsRemaining": 0, "inBonus": "0",
+      "periods": [
+        { "period": 1, "periodType": "REGULAR", "score": 20 }, { "period": 2, "periodType": "REGULAR", "score": 22 },
+        { "period": 3, "periodType": "REGULAR", "score": 24 }, { "period": 4, "periodType": "REGULAR", "score": 21 },
+        { "period": 5, "periodType": "OVERTIME", "score": 9 }
+      ],
+      "players": []
+    },
+    "awayTeam": {
+      "teamId": 1611661325, "teamCity": "Seattle", "teamName": "Storm", "teamTricode": "SEA",
+      "wins": 15, "losses": 9, "score": 93, "timeoutsRemaining": 1, "inBonus": "0",
+      "periods": [
+        { "period": 1, "periodType": "REGULAR", "score": 18 }, { "period": 2, "periodType": "REGULAR", "score": 25 },
+        { "period": 3, "periodType": "REGULAR", "score": 22 }, { "period": 4, "periodType": "REGULAR", "score": 22 },
+        { "period": 5, "periodType": "OVERTIME", "score": 6 }
+      ],
+      "players": []
+    }
+  }
+}

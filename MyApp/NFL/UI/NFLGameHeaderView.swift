@@ -34,7 +34,7 @@ struct NFLGameHeaderView: View {
         }
         return game.statusText.uppercased()
     }
-    private func team(_ team: NFLTeamState) -> some View {
+    private func team(_ team: FootballTeamState) -> some View {
         NavigationLink {
             TeamRosterView(league: League(name: "NFL", shortName: "NFL", path: "football/nfl", group: .football), teamID: team.id, teamName: team.name)
         } label: {
@@ -43,42 +43,5 @@ struct NFLGameHeaderView: View {
                 Text(team.abbreviation).font(.headline)
             }.frame(maxWidth: .infinity, minHeight: 44)
         }.buttonStyle(.plain).accessibilityLabel("\(team.name). Team roster")
-    }
-}
-struct NFLFieldView: View {
-    let position: NFLFieldPosition
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(position.text).font(.headline)
-            if let yards = position.yardsToGoal {
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 6).fill(Color.green.opacity(0.18))
-                        HStack { ForEach(0..<11, id: \.self) { _ in Rectangle().fill(.secondary.opacity(0.5)).frame(width: 1); Spacer(minLength: 0) } }.padding(.horizontal, 10)
-                        Image(systemName: "american.football.fill").foregroundStyle(Theme.textPrimary)
-                            .offset(x: max(0, (geometry.size.width - 24) * Double(100 - yards) / 100))
-                    }
-                }.frame(height: 48).accessibilityLabel("Ball at \(position.text), \(yards) yards to goal")
-            }
-        }
-    }
-}
-struct NFLQuarterScoreView: View {
-    let game: NFLGameState
-    private var quarters: [String] {
-        Set(game.home.quarters.keys).union(game.away.quarters.keys).filter { key in
-            !key.hasPrefix("ot") || (game.home.quarters[key] ?? 0) > 0 || (game.away.quarters[key] ?? 0) > 0 || game.quarter?.contains("OVERTIME") == true
-        }.sorted { rank($0) < rank($1) }
-    }
-    private func rank(_ key: String) -> Int { key.hasPrefix("q") ? Int(key.dropFirst()) ?? 0 : 4 + (Int(key.dropFirst(2)) ?? 1) }
-    var body: some View {
-        ScrollView(.horizontal) {
-            Grid(alignment: .trailing, horizontalSpacing: 18, verticalSpacing: 10) {
-                GridRow { Text("Team"); ForEach(quarters, id: \.self) { Text($0.uppercased()) }; Text("T").bold() }
-                ForEach([game.away, game.home]) { team in
-                    GridRow { Text(team.abbreviation).bold(); ForEach(quarters, id: \.self) { Text(team.quarters[$0].map(String.init) ?? "–") }; Text(team.score.map(String.init) ?? "–").bold() }
-                }
-            }.font(.subheadline).monospacedDigit().padding(.vertical, 8)
-        }
     }
 }

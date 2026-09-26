@@ -1,0 +1,318 @@
+[
+  {
+    "ID": 20,
+    "name": "Blue Bombers",
+    "region_label": "WINNIPEG",
+    "abbreviation": "WPG",
+    "team_zone": "western",
+    "time_zone": "CST",
+    "primary_color": "001C51",
+    "accent_color": "FFFFFF",
+    "text_color": "FFFFFF",
+    "team_order": 5,
+    "office_location": {
+      "street1": "315 Chancellor Matheson Road",
+      "street2": null,
+      "city": "Winnipeg",
+      "prov_state": "Manitoba",
+      "prov_state_text": null,
+      "country": "Canada",
+      "country_text": null,
+      "postal_code": "R3T1Z2"
+    },
+    "clubname": "Winnipeg Football Club",
+    "default_venue_id": 20,
+    "genius": {
+      "id": 110380,
+      "error": null,
+      "messages": [],
+      "last_update": "2023-06-26T18:34:17Z"
+    },
+    "metadata": {
+      "created_at": "2023-06-06T17:39:33Z",
+      "revision_at": "2025-05-27T18:35:26Z",
+      "revision": 5
+    }
+  },
+  {
+    "ID": 19,
+    "name": "Argonauts",
+    "region_label": "TORONTO",
+    "abbreviation": "TOR",
+    "team_zone": "eastern",
+    "time_zone": "EST",
+    "primary_color": "FFFFFF",
+    "accent_color": "5E8Eb5",
+    "text_color": "031E3D",
+    "team_order": 3,
+    "office_location": {
+      "street1": "170 Princes' Blvd",
+      "street2": null,
+      "city": "Toronto",
+      "prov_state": "Ontario",
+      "prov_state_text": null,
+      "country": "Canada",
+      "country_text": null,
+      "postal_code": "M6K 3C3"
+    },
+    "default_venue_id": 36,
+    "clubname": "TORONTO ARGONAUTS FOOTBALL CLUB",
+    "genius": {
+      "id": 122345,
+      "error": null,
+      "messages": [],
+      "last_update": "2023-06-08T12:10:35Z"
+    },
+    "metadata": {
+      "created_at": "2023-06-06T17:39:33Z",
+      "revision_at": "2025-12-29T18:34:41Z",
+      "revision": 8
+    }
+  },
+  {
+    "ID": 17,
+    "name": "Roughriders",
+    "region_label": "SASKATCHEWAN",
+    "abbreviation": "SSK",
+    "team_zone": "western",
+    "time_zone": "MST",
+    "primary_color": "026241",
+    "accent_color": "000000",
+    "text_color": "FFFFFF",
+    "team_order": 6,
+    "office_location": {
+      "street1": "1734 Elphinstone St.",
+      "street2": null,
+      "city": "Regina",
+      "prov_state": "Saskatchewan",
+      "prov_state_text": null,
+      "country": "Canada",
+      "country_text": null,
+      "postal_code": "S4T1K!",
+      "county": null
+    },
+    "default_venue_id": 17,
+    "clubname": "Saskatchewan Roughrider Football Club Inc.",
+    "genius": {
+      "id": 106752,
+      "error": null,
+      "messages": [],
+      "last_update": "2023-06-07T15:39:49Z"
+    },
+    "metadata": {
+      "created_at": "2023-06-06T17:39:32Z",
+      "revision_at": "2023-12-14T13:41:25Z",
+      "revision": 9
+    }
+  },
+  {
+    "ID": 13,
+    "name": "REDBLACKS",
+    "region_label": "OTTAWA",
+    "abbreviation": "OTT",
+    "team_zone": "eastern",
+    "time_zone": "EST",
+    "primary_color": "231F20",
+    "accent_color": "B5152D",
+    "text_color": "FFFFFF",
+    "team_order": 2,
+    "office_location": {
+      "street1": "1015 Bank Street",
+      "street2": null,
+      "city": "Ottawa",
+      "prov_state": "Ontario",
+      "prov_state_text": null,
+      "country": "Canada",
+      "country_text": null,
+      "postal_code": "K1S 3W7"
+    },
+    "default_venue_id": 13,
+    "clubname": "THE OTTAWA REDBLACKS",
+    "genius": {
+      "id": 88019,
+      "error": null,
+      "messages": [],
+      "last_update": "2023-06-13T14:21:24Z"
+    },
+    "metadata": {
+      "created_at": "2023-06-06T17:39:31Z",
+      "revision_at": "2026-08-24T21:10:10Z",
+      "revision": 10
+    }
+  },
+  {
+    "ID": 11,
+    "name": "Alouettes",
+    "region_label": "MONTREAL",
+    "abbreviation": "MTL",
+    "team_zone": "eastern",
+    "time_zone": "EST",
+    "primary_color": "0F1F4D",
+    "accent_color": "FFFFFF",
+    "text_color": "FFFFFF",
+    "team_order": 1,
+    "office_location": {
+      "street1": "4545 avenue Pierre-De Coubertin",
+      "street2": null,
+      "city": "Montreal",
+      "prov_state": "Quebec",
+      "prov_state_text": null,
+      "country": "Canada",
+      "country_text": null,
+      "postal_code": "H1V0B2"
+    },
+    "default_venue_id": 11,
+    "clubname": "Montreal Alouettes Football Club",
+    "genius": {
+      "id": 86680,
+      "error": null,
+      "messages": [],
+      "last_update": "2023-06-22T20:10:32Z"
+    },
+    "metadata": {
+      "created_at": "2023-06-06T17:39:31Z",
+      "revision_at": "2024-12-04T17:44:27Z",
+      "revision": 6
+    }
+  },
+  {
+    "ID": 8,
+    "name": "Tiger-Cats",
+    "region_label": "HAMILTON",
+    "abbreviation": "HAM",
+    "team_zone": "eastern",
+    "time_zone": "EST",
+    "primary_color": "FFFFFF",
+    "accent_color": "F8BB2F",
+    "text_color": "231F20",
+    "team_order": 4,
+    "office_location": {
+      "street1": "64 Melrose Avenue N",
+      "street2": null,
+      "city": "Hamilton",
+      "prov_state": "Ontario",
+      "prov_state_text": null,
+      "country": "Canada",
+      "country_text": null,
+      "postal_code": "L8L 8C1"
+    },
+    "clubname": "Hamilton Sports Group Partnership",
+    "default_venue_id": 8,
+    "genius": {
+      "id": 83579,
+      "error": null,
+      "messages": [],
+      "last_update": "2023-06-09T14:17:22Z"
+    },
+    "metadata": {
+      "created_at": "2023-06-06T17:39:30Z",
+      "revision_at": "2026-01-20T19:58:02Z",
+      "revision": 9
+    }
+  },
+  {
+    "ID": 7,
+    "name": "Elks",
+    "region_label": "EDMONTON",
+    "abbreviation": "EDM",
+    "team_zone": "western",
+    "time_zone": "MST",
+    "primary_color": "2A5234",
+    "accent_color": "FFB81C",
+    "text_color": "FFFFFF",
+    "team_order": 8,
+    "office_location": {
+      "street1": "11000 Stadium Rd NW",
+      "street2": null,
+      "city": "Edmonton",
+      "prov_state": "Alberta",
+      "prov_state_text": null,
+      "country": "Canada",
+      "country_text": null,
+      "postal_code": "T5H4E2"
+    },
+    "default_venue_id": 7,
+    "clubname": "Edmonton Elks",
+    "genius": {
+      "id": 114347,
+      "error": null,
+      "messages": [],
+      "last_update": "2023-06-19T13:36:12Z"
+    },
+    "metadata": {
+      "created_at": "2023-06-06T17:39:29Z",
+      "revision_at": "2025-05-07T13:40:50Z",
+      "revision": 12
+    }
+  },
+  {
+    "ID": 6,
+    "name": "Stampeders",
+    "region_label": "CALGARY",
+    "abbreviation": "CGY",
+    "team_zone": "western",
+    "time_zone": "MST",
+    "primary_color": "E51937",
+    "accent_color": "000000",
+    "text_color": "FFFFFF",
+    "team_order": 7,
+    "office_location": {
+      "street1": "1817 Crowchild Trail NW",
+      "street2": null,
+      "city": "Calgary",
+      "prov_state": "Alberta",
+      "prov_state_text": null,
+      "country": "Canada",
+      "country_text": null,
+      "postal_code": "T2M 4R6"
+    },
+    "default_venue_id": 6,
+    "clubname": "Calgary Stampeder 2012 LP",
+    "genius": {
+      "id": 112939,
+      "error": null,
+      "messages": [],
+      "last_update": "2023-06-07T15:52:38Z"
+    },
+    "metadata": {
+      "created_at": "2023-06-06T17:39:29Z",
+      "revision_at": "2026-02-04T21:29:43Z",
+      "revision": 9
+    }
+  },
+  {
+    "ID": 1,
+    "name": "Lions",
+    "region_label": "B.C.",
+    "abbreviation": "BC",
+    "team_zone": "western",
+    "time_zone": "PST",
+    "primary_color": "F15623",
+    "accent_color": "000000",
+    "text_color": "000000",
+    "team_order": 9,
+    "office_location": {
+      "street1": "10605 City Parkway",
+      "street2": null,
+      "city": "Surrey",
+      "prov_state": "British Columbia",
+      "prov_state_text": null,
+      "country": "Canada",
+      "country_text": null,
+      "postal_code": "V3T4C8"
+    },
+    "default_venue_id": 1,
+    "clubname": "BC Lions Football Limited Partnership",
+    "genius": {
+      "id": 93775,
+      "error": null,
+      "messages": [],
+      "last_update": "2023-06-07T15:28:24Z"
+    },
+    "metadata": {
+      "created_at": "2023-06-06T17:39:26Z",
+      "revision_at": "2023-06-07T15:28:24Z",
+      "revision": 3
+    }
+  }
+]

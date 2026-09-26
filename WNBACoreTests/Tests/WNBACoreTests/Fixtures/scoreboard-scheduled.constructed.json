@@ -1,0 +1,20 @@
+{
+  "scoreboard": {
+    "gameDate": "2026-07-11",
+    "games": [
+      {
+        "gameId": "1022600051",
+        "gameCode": "20260711/NYLLVA",
+        "gameStatus": 1,
+        "gameStatusText": "7:00 pm ET",
+        "period": 0,
+        "regulationPeriods": 4,
+        "gameClock": "",
+        "gameTimeUTC": "2026-07-11T23:00:00Z",
+        "homeTeam": { "teamId": 1611661321, "teamCity": "New York", "teamName": "Liberty", "teamTricode": "NYL", "wins": 20, "losses": 3, "score": null, "timeoutsRemaining": null, "inBonus": null, "periods": [] },
+        "awayTeam": { "teamId": 1611661323, "teamCity": "Las Vegas", "teamName": "Aces", "teamTricode": "LVA", "wins": 16, "losses": 7, "score": null, "timeoutsRemaining": null, "inBonus": null, "periods": [] },
+        "gameLeaders": { "homeLeaders": null, "awayLeaders": null }
+      }
+    ]
+  }
+}

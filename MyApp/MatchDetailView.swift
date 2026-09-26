@@ -14,16 +14,9 @@ struct MatchDetailView: View {
     @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
     @EnvironmentObject private var epgRepository: EPGRepository
     @EnvironmentObject private var streamStore: StreamAvailabilityStore
-    @State private var showingAllChannels = false
+    @State private var isShowingMoreSources = false
     @State private var spoilerRevealed = false
     @State private var playbackContext: MatchPlaybackContext?
-    @State private var isPickingMultiscreen = false
-    @State private var multiscreenSlots: [MultiscreenSlot] = []
-    @State private var liveMatchesForMultiscreen: [LiveGameOption] = []
-    @State private var isLoadingLiveGames = false
-    @State private var multiscreenShowAllSports = false
-    @State private var multiscreenSportFilter: SportGroup? = nil
-    @State private var multiscreenSession: MultiscreenSession?
     @State private var gameSummary: GameSummary?
     @State private var isLoadingGameSummary = false
     @State private var didAttemptGameSummaryLoad = false
@@ -36,7 +29,6 @@ struct MatchDetailView: View {
     // instead of inside every body evaluation.
     @State private var rankedSources: [RankedSource] = []
     @State private var isRankingSources = true
-    @State private var channelQuery = ""
     @State private var selectedGameCenterTeam: GameCenterTeam = .away
     @State private var rosterPreviewByTeamID: [String: [RosterAthlete]] = [:]
     @State private var selectedRosterPosition: String?
@@ -57,20 +49,6 @@ struct MatchDetailView: View {
 
     private var gameCentreArchetype: GameCentreArchetype { GameCentreArchetype(match: match) }
 
-    private var filteredMatchedSources: [RankedSource] {
-        guard showingAllChannels else { return Array(rankedSources.prefix(3)) }
-        let trimmed = channelQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return rankedSources }
-        return rankedSources.filter {
-            ($0.channel.name + " " + ($0.channel.group ?? "") + " " + $0.channel.playlistName)
-                .localizedCaseInsensitiveContains(trimmed)
-        }
-    }
-
-    private var displayedChannels: [Channel] {
-        filteredMatchedSources.map(\.channel)
-    }
-
     private var selectedTeamID: String? {
         (selectedGameCenterTeam == .away ? match.away : match.home).teamID
     }
@@ -88,44 +66,74 @@ struct MatchDetailView: View {
         availableGameCenterTabs.contains(gameCenterTab) ? gameCenterTab : .players
     }
 
-    private var selectedMultiscreenChannels: [Channel] {
-        multiscreenSlots.compactMap { $0.channel }
-    }
-
     var body: some View {
         ZStack(alignment: .bottom) {
             Theme.background.ignoresSafeArea()
             if match.league.path == "hockey/nhl" {
-                NHLGameCenterView(match: match) {
-                    if match.state != .final { sourcesSection }
+                NHLGameCenterView(match: match, watchContent: { if match.state != .final { sourcesSection } }) {
                     fantasySection
                     picksSection
                     matchNewsSection
                 }
             } else if match.league.path == "baseball/mlb" {
-                MLBGameCenterView(match: match) {
-                    if match.state != .final { sourcesSection }
+                MLBGameCenterView(match: match, watchContent: { if match.state != .final { sourcesSection } }) {
                     fantasySection
                     picksSection
                     matchNewsSection
                 }
             } else if match.league.path == "football/nfl" {
-                NFLGameCenterView(match: match) {
-                    if match.state != .final { sourcesSection }
+                NFLGameCenterView(match: match, watchContent: { if match.state != .final { sourcesSection } }) {
+                    fantasySection
+                    picksSection
+                    matchNewsSection
+                }
+            } else if match.league.path == "football/cfl" {
+                CFLGameCenterView(match: match, watchContent: { if match.state != .final { sourcesSection } }) {
                     fantasySection
                     picksSection
                     matchNewsSection
                 }
             } else if match.league.path == "racing/f1" {
-                F1RaceCentreView(match: match) {
-                    if match.state != .final { sourcesSection }
+                F1RaceCentreView(match: match, watchContent: { if match.state != .final { sourcesSection } }) {
                     fantasySection
                     picksSection
                     matchNewsSection
                 }
             } else if match.league.path == "basketball/nba" {
-                NBAGameCenterView(match: match) {
-                    if match.state != .final { sourcesSection }
+                BasketballGameCenterView(match: match, config: .nba, providerID: .nba, service: NBAGameCenterService(), cache: .nba,
+                    watchContent: { if match.state != .final { sourcesSection } }) {
+                    fantasySection
+                    picksSection
+                    matchNewsSection
+                }
+            } else if match.league.path == "basketball/wnba" {
+                BasketballGameCenterView(match: match, config: .wnba, providerID: .wnba, service: WNBAGameCenterService(), cache: .wnba,
+                    watchContent: { if match.state != .final { sourcesSection } }) {
+                    fantasySection
+                    picksSection
+                    matchNewsSection
+                }
+            } else if match.league.path == "soccer/eng.1" {
+                SoccerGameCentreView(match: match, leaguePath: "soccer/eng.1", providerID: .epl, providerDisplayName: "Premier League",
+                    service: EPLGameCentreService(), cache: .epl, pollingPolicy: .epl, seed: EPLLegacyMapper.seed(from:),
+                    watchContent: { if match.state != .final { sourcesSection } }) {
+                    fantasySection
+                    picksSection
+                    matchNewsSection
+                }
+            } else if match.league.path == "soccer/usa.1" {
+                SoccerGameCentreView(match: match, leaguePath: "soccer/usa.1", providerID: .mls, providerDisplayName: "MLS",
+                    service: MLSGameCentreService(), cache: .mls, pollingPolicy: .mls, seed: MLSLegacyMapper.seed(from:),
+                    watchContent: { if match.state != .final { sourcesSection } }) {
+                    fantasySection
+                    picksSection
+                    matchNewsSection
+                }
+            } else if match.league.path == "soccer/esp.1" {
+                SoccerGameCentreView(match: match, leaguePath: "soccer/esp.1", providerID: .laliga, providerDisplayName: "La Liga",
+                    service: LaLigaGameCentreService(officialSource: LaLigaProvider.shared), cache: .laliga, pollingPolicy: .laliga, availableTabs: [.overview, .timeline, .lineups, .stats, .commentary, .shots],
+                    seed: LaLigaLegacyMapper.seed(from:),
+                    watchContent: { if match.state != .final { sourcesSection } }) {
                     fantasySection
                     picksSection
                     matchNewsSection
@@ -134,6 +142,9 @@ struct MatchDetailView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     eventHeader
+                    if match.state != .final && (!playlists.allChannels.isEmpty || !watchLinks.isEmpty) {
+                        sourcesSection
+                    }
                     if gameCentreArchetype.usesHeadToHeadParticipantUI {
                         fantasySection
                         picksSection
@@ -142,9 +153,6 @@ struct MatchDetailView: View {
                     if match.state == .final {
                         highlightsSection
                         scoringSummarySection
-                    }
-                    if match.state != .final && (!playlists.allChannels.isEmpty || !watchLinks.isEmpty) {
-                        sourcesSection
                     }
                     GameCentreContainerView(
                         match: match,
@@ -165,21 +173,14 @@ struct MatchDetailView: View {
                     matchNewsSection
                 }
                 .padding(16)
-                .padding(.bottom, isPickingMultiscreen ? 92 : 24)
+                .padding(.bottom, 24)
             }
 
-            }
-
-            if isPickingMultiscreen {
-                multiscreenFooter
             }
         }
         .navigationTitle(match.league.name)
         .fullScreenCover(item: $playbackContext) { context in
             PlayerView(context: context, showsLiveTVControls: false)
-        }
-        .fullScreenCover(item: $multiscreenSession) { session in
-            MultiScreenPlayerView(channels: session.channels)
         }
         .sheet(isPresented: $showPaywall) {
             PaywallView()
@@ -205,6 +206,14 @@ struct MatchDetailView: View {
         }
         .task(id: "\(match.id)-\(playlists.allChannels.count)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
             await rankSources()
+        }
+        // A launch-time or Following-tab background scan can finish confirming this match's
+        // streams after this view already ran rankSources() from a cold cache — pick that up
+        // immediately instead of waiting for one of the .task id's own inputs to change.
+        .onChange(of: streamStore.sourcesByMatchId[match.id]) { _, updated in
+            guard let updated, !updated.isEmpty else { return }
+            rankedSources = updated
+            isRankingSources = false
         }
         .navigationDestination(item: $presentedMatchArticle) { article in
             ArticleReaderView(article: article)
@@ -302,7 +311,7 @@ struct MatchDetailView: View {
 
     /// Loads boxscore stats once, then keeps polling while the game is live.
     private func loadGameSummary() async {
-        guard !["hockey/nhl", "baseball/mlb", "racing/f1", "football/nfl", "basketball/nba"].contains(match.league.path) else { return }
+        guard !["hockey/nhl", "baseball/mlb", "racing/f1", "football/nfl", "football/cfl", "basketball/nba", "basketball/wnba"].contains(match.league.path) else { return }
         gameSummary = nil
         gameCenterTab = .players
         didAttemptGameSummaryLoad = false
@@ -1714,566 +1723,101 @@ struct MatchDetailView: View {
 
     private var sourcesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sourcesHeader
-
-            if let top = rankedSources.first, !isPickingMultiscreen {
-                Button { handleSourceTap(top.channel) } label: {
-                    Label(
-                        match.state == .live ? "Watch on \(top.channel.name)" : "Stream \(top.channel.name) when live",
-                        systemImage: "play.fill"
-                    )
-                    .font(.subheadline.weight(.bold))
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(match.state == .live ? Theme.live : Theme.accent)
-
-                if !isRankingSources && rankedSources.filter(\.isConfirmed).isEmpty {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
-                        Text("No confirmed stream found — channels below matched on broadcast rights only. Browse manually if they don't work.")
-                            .font(.caption)
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.orange.opacity(0.25)))
-                }
-            }
-
-            if playlists.allChannels.count >= 2 && !isPickingMultiscreen {
-                splitScreenButton
-            }
-
-            if isPickingMultiscreen {
-                multiscreenPickerContent
-            } else if playlists.allChannels.isEmpty {
-                noPlaylistWatchOptions
-            } else if showingAllChannels {
-                channelSearchField
-                if filteredMatchedSources.isEmpty {
-                    Text("No matched sources fit that search.")
-                        .font(.callout)
-                        .foregroundStyle(Theme.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(14)
-                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-                } else {
-                    LazyVStack(spacing: 12) {
-                        ForEach(filteredMatchedSources) { source in
-                            SourceRow(name: source.channel.name,
-                                      subtitle: source.epgProgramme?.title ?? source.channel.group ?? source.channel.playlistName,
-                                      logoURL: source.channel.logoURL,
-                                      score: source.score,
-                                      evidenceCategories: source.evidenceCategories,
-                                      isPicking: false,
-                                      isSelected: false) {
-                                handleSourceTap(source.channel)
-                            }
-                        }
-                    }
+            if playlists.allChannels.isEmpty {
+                if !watchLinks.isEmpty {
+                    Text("Where to Watch")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(Theme.textPrimary)
+                    noPlaylistWatchOptions
                 }
             } else if isRankingSources && rankedSources.isEmpty {
                 HStack(spacing: 10) {
                     ProgressView().tint(Theme.accent)
-                    Text("Matching your channels to this game…")
+                    Text("Finding your stream…")
                         .font(.callout)
                         .foregroundStyle(Theme.textSecondary)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(20)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-            } else if rankedSources.isEmpty {
-                emptyMatches
+            } else if let top = rankedSources.first {
+                Button { handleSourceTap(top.channel) } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label(
+                            match.state == .live ? "Watch on \(top.channel.name)" : "Watch \(top.channel.name) when live",
+                            systemImage: "play.fill"
+                        )
+                        .font(.subheadline.weight(.bold))
+                        Text(top.isConfirmed ? (top.epgProgramme?.title ?? "Confirmed match") : "Possible match")
+                            .font(.caption)
+                            .opacity(0.85)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(match.state == .live ? Theme.live : Theme.accent)
+
+                if rankedSources.count > 1 {
+                    Button {
+                        isShowingMoreSources = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "ellipsis.circle.fill")
+                                .foregroundStyle(Theme.accent)
+                            Text("More streams")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(Theme.textPrimary)
+                            Spacer()
+                            Text("\(rankedSources.count - 1)+")
+                                .font(.caption.weight(.bold).monospacedDigit())
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        .padding(12)
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                    }
+                    .buttonStyle(.plain)
+                }
             } else {
-                LazyVStack(spacing: 12) {
-                    ForEach(filteredMatchedSources) { source in
-                        SourceRow(name: source.channel.name,
-                                  subtitle: source.epgProgramme?.title ?? source.channel.group ?? source.channel.playlistName,
-                                  logoURL: source.channel.logoURL,
-                                  score: source.score,
-                                  evidenceCategories: source.evidenceCategories,
-                                  isPicking: false,
-                                  isSelected: false) {
-                            handleSourceTap(source.channel)
-                        }
-                    }
-                    if rankedSources.count > 3 {
-                        Button {
-                            withAnimation { showingAllChannels = true }
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "ellipsis.circle.fill")
-                                    .foregroundStyle(Theme.accent)
-                                Text("More sources")
-                                    .font(.subheadline.weight(.bold))
-                                    .foregroundStyle(Theme.textPrimary)
-                                Spacer()
-                                Text("\(rankedSources.count - 3)+")
-                                    .font(.caption.weight(.bold).monospacedDigit())
-                                    .foregroundStyle(Theme.textSecondary)
-                            }
-                            .padding(12)
-                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: Multiscreen game picker
-
-    @ViewBuilder private var multiscreenPickerContent: some View {
-        // Slot 1: This game
-        multiscreenGameSlot(
-            label: "\(match.shortName) — This Game",
-            leagueShortName: match.league.shortName,
-            sources: Array(rankedSources.prefix(3)),
-            matchID: match.id,
-            canRemove: false
-        )
-
-        // Additional live games section
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
-                Circle().fill(Theme.live).frame(width: 7, height: 7)
-                Text("Add Live Games")
-                    .font(.headline.weight(.bold))
-                    .foregroundStyle(Theme.textPrimary)
-                Spacer()
-                Text("\(multiscreenSlots.count)/4 slots")
-                    .font(.caption.weight(.bold).monospacedDigit())
-                    .foregroundStyle(Theme.textSecondary)
-            }
-
-            Picker("Sport filter", selection: $multiscreenShowAllSports) {
-                Text("My Favorites").tag(false)
-                Text("All Sports").tag(true)
-            }
-            .pickerStyle(.segmented)
-            .onChange(of: multiscreenShowAllSports) { _, _ in
-                liveMatchesForMultiscreen = []
-                multiscreenSportFilter = nil
-                Task { await loadLiveGamesForMultiscreen() }
-            }
-
-            if isLoadingLiveGames {
-                HStack(spacing: 10) {
-                    ProgressView().tint(Theme.accent)
-                    Text("Finding live games in your leagues…")
-                        .font(.callout)
-                        .foregroundStyle(Theme.textSecondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(16)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-            } else if liveMatchesForMultiscreen.isEmpty {
-                Text("No other live games found right now.")
+                Text("No matching stream in your playlist")
                     .font(.callout)
                     .foregroundStyle(Theme.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
                     .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-            } else {
-                // Sport filter chips
-                let availableSports = SportGroup.allCases.filter { sport in
-                    liveMatchesForMultiscreen.contains { $0.match.league.group == sport }
-                }
-                if availableSports.count > 1 {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            multiscreenSportChip(title: "All", systemImage: "sportscourt", sport: nil)
-                            ForEach(availableSports) { sport in
-                                multiscreenSportChip(title: sport.rawValue, systemImage: sport.systemImage, sport: sport)
-                            }
-                        }
-                    }
-                }
-
-                let filtered = multiscreenSportFilter == nil
-                    ? liveMatchesForMultiscreen
-                    : liveMatchesForMultiscreen.filter { $0.match.league.group == multiscreenSportFilter }
-
-                if filtered.isEmpty {
-                    Text("No live games for this sport right now.")
-                        .font(.callout)
-                        .foregroundStyle(Theme.textSecondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(14)
-                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-                } else {
-                    LazyVStack(spacing: 10) {
-                        ForEach(filtered) { option in
-                            let isAdded = multiscreenSlots.contains { $0.matchID == option.match.id }
-                            multiscreenLiveGameCard(option: option, isAdded: isAdded)
-                        }
-                    }
-                }
             }
         }
+        .sheet(isPresented: $isShowingMoreSources) { moreSourcesSheet }
     }
 
-    private func multiscreenGameSlot(label: String, leagueShortName: String, sources: [RankedSource], matchID: String, canRemove: Bool) -> some View {
-        let selectedChannelID = multiscreenSlots.first { $0.matchID == matchID }?.channel?.id
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(label)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(1)
-                    Text(leagueShortName)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(Theme.textSecondary)
+    private var moreSourcesSheet: some View {
+        NavigationStack {
+            List(rankedSources) { source in
+                SourceRow(name: source.channel.name,
+                          subtitle: source.epgProgramme?.title ?? source.channel.group ?? source.channel.playlistName,
+                          logoURL: source.channel.logoURL,
+                          score: source.score,
+                          evidenceCategories: source.evidenceCategories,
+                          isPicking: false,
+                          isSelected: false) {
+                    isShowingMoreSources = false
+                    handleSourceTap(source.channel)
                 }
-                Spacer()
-                if canRemove {
-                    Button {
-                        withAnimation(.snappy) {
-                            multiscreenSlots.removeAll { $0.matchID == matchID }
-                        }
-                        #if os(iOS)
-                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        #endif
-                    } label: {
-                        Image(systemName: "minus.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(Theme.live)
-                    }
-                    .buttonStyle(.plain)
-                }
+                .listRowBackground(Theme.surface)
             }
-
-            if sources.isEmpty {
-                Text("No matching sources found for this game.")
-                    .font(.caption)
-                    .foregroundStyle(Theme.textSecondary)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(sources) { source in
-                            let isSelected = selectedChannelID == source.channel.id
-                            Button {
-                                multiscreenSelectChannel(source.channel, forMatchID: matchID)
-                            } label: {
-                                Text(source.channel.name)
-                                    .font(.caption.weight(.semibold))
-                                    .lineLimit(1)
-                                    .foregroundStyle(isSelected ? .white : Theme.textPrimary)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 7)
-                                    .background(isSelected ? Theme.accent : Theme.surfaceElevated, in: Capsule())
-                                    .overlay(Capsule().strokeBorder(isSelected ? Theme.accent : Theme.hairline))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-        }
-        .padding(12)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .strokeBorder(selectedChannelID != nil ? Theme.accent.opacity(0.45) : Theme.hairline))
-    }
-
-    @ViewBuilder private func multiscreenLiveGameCard(option: LiveGameOption, isAdded: Bool) -> some View {
-        let canAddMore = multiscreenSlots.count < 4
-        let selectedChannelID = multiscreenSlots.first { $0.matchID == option.match.id }?.channel?.id
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 10) {
-                // MatchRow-style match info
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 6) {
-                        Text(option.match.league.shortName)
-                            .font(.caption2.weight(.heavy))
-                            .foregroundStyle(Theme.textSecondary)
-                        Spacer(minLength: 0)
-                        Label(option.match.statusDetail, systemImage: "dot.radiowaves.left.and.right")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                            .padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(Theme.live, in: Capsule())
-                    }
-                    VStack(spacing: 8) {
-                        multiscreenTeamRow(option.match.away)
-                        multiscreenTeamRow(option.match.home)
-                    }
-                }
-
-                Button {
-                    withAnimation(.snappy) { toggleMultiscreenLiveGame(option) }
-                    #if os(iOS)
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    #endif
-                } label: {
-                    Image(systemName: isAdded ? "minus.circle.fill" : "plus.circle.fill")
-                        .font(.title2)
-                        .foregroundStyle(isAdded ? Theme.live : (canAddMore ? Theme.accent : Theme.textSecondary.opacity(0.4)))
-                }
-                .buttonStyle(.plain)
-                .disabled(!isAdded && !canAddMore)
-                .padding(.top, 2)
-            }
-            .padding(14)
-
-            if isAdded {
-                Divider().overlay(Theme.hairline).padding(.horizontal, 14)
-                if option.topSources.isEmpty {
-                    Text("No matching sources found.")
-                        .font(.caption)
-                        .foregroundStyle(Theme.textSecondary)
-                        .padding(14)
-                } else {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(option.topSources) { source in
-                                let isSelected = selectedChannelID == source.channel.id
-                                Button {
-                                    multiscreenSelectChannel(source.channel, forMatchID: option.match.id)
-                                } label: {
-                                    Text(source.channel.name)
-                                        .font(.caption.weight(.semibold))
-                                        .lineLimit(1)
-                                        .foregroundStyle(isSelected ? .white : Theme.textPrimary)
-                                        .padding(.horizontal, 12).padding(.vertical, 7)
-                                        .background(isSelected ? Theme.accent : Theme.surfaceElevated, in: Capsule())
-                                        .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Theme.hairline))
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                    }
-                    .padding(.vertical, 10)
-                }
-            }
-        }
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .strokeBorder(isAdded ? Theme.accent.opacity(0.45) : Theme.hairline))
-    }
-
-    private func multiscreenTeamRow(_ team: TeamSide) -> some View {
-        HStack(spacing: 10) {
-            TeamLogo(url: team.logoURL, size: 28)
-            Text(team.shortName)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.textPrimary)
-                .lineLimit(1)
-            Spacer()
-            if let score = team.score {
-                Text(score)
-                    .font(.subheadline.weight(.bold).monospacedDigit())
-                    .foregroundStyle(team.isWinner ? Theme.textPrimary : Theme.textSecondary)
-            }
-        }
-    }
-
-    private func multiscreenSportChip(title: String, systemImage: String, sport: SportGroup?) -> some View {
-        let isSelected = multiscreenSportFilter == sport
-        return Button {
-            withAnimation(.snappy) { multiscreenSportFilter = sport }
-        } label: {
-            Label(title, systemImage: systemImage)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(isSelected ? .white : Theme.textSecondary)
-                .padding(.horizontal, 12).padding(.vertical, 8)
-                .background(isSelected ? Theme.accent : Theme.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(isSelected ? Theme.accent : Theme.hairline))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func multiscreenSelectChannel(_ channel: Channel, forMatchID matchID: String) {
-        if let idx = multiscreenSlots.firstIndex(where: { $0.matchID == matchID }) {
-            multiscreenSlots[idx].channel = channel
-        }
-        #if os(iOS)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        #endif
-    }
-
-    private func toggleMultiscreenLiveGame(_ option: LiveGameOption) {
-        if let idx = multiscreenSlots.firstIndex(where: { $0.matchID == option.match.id }) {
-            multiscreenSlots.remove(at: idx)
-        } else {
-            guard multiscreenSlots.count < 4 else { return }
-            multiscreenSlots.append(MultiscreenSlot(
-                matchID: option.match.id,
-                matchShortName: option.match.shortName,
-                channel: option.topSources.first?.channel
-            ))
-        }
-    }
-
-    private var channelSearchField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(Theme.textSecondary)
-            TextField("Search channels", text: $channelQuery)
-                .foregroundStyle(Theme.textPrimary)
-                .autocorrectionDisabled()
-            if !channelQuery.isEmpty {
-                Button {
-                    channelQuery = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(Theme.textSecondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(10)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-    }
-
-    private var sourcesHeader: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                if playlists.allChannels.isEmpty {
-                    // No playlist connected: nothing to "match", so point the
-                    // viewer to where the game officially streams instead.
-                    Text("Where to Watch")
-                        .font(.headline.weight(.bold))
-                        .foregroundStyle(Theme.textPrimary)
-                    if !watchLinks.isEmpty {
-                        Text("Tap a broadcaster to open their live stream.")
-                            .font(.caption)
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-                } else {
-                    Text(showingAllChannels ? "More Matched Sources" : "Matched Sources")
-                        .font(.headline.weight(.bold))
-                        .foregroundStyle(Theme.textPrimary)
-                    Text("Channels confirmed against your guide's live listings for this game.")
-                        .font(.caption)
-                        .foregroundStyle(Theme.textSecondary)
-                }
-            }
-            Spacer()
-            if !playlists.allChannels.isEmpty && rankedSources.count > 3 {
-                Button(showingAllChannels ? "Top" : "More") {
-                    withAnimation {
-                        showingAllChannels.toggle()
-                        channelQuery = ""
-                        resetMultiscreenSelection()
-                    }
-                }
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(Theme.accent)
-            }
-        }
-    }
-
-    /// Prominent entry point into multiscreen so split screen is easy to find.
-    private var splitScreenButton: some View {
-        Button {
-            toggleMultiscreenPicking()
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "rectangle.split.2x1.fill")
-                    .font(.headline)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Split Screen")
-                        .font(.subheadline.weight(.bold))
-                    Text("Watch up to 4 sources at once")
-                        .font(.caption2.weight(.semibold))
-                        .opacity(0.85)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.bold))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Start split screen selection")
-    }
-
-    private var multiscreenFooter: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
-                Label("\(multiscreenSlots.count) game\(multiscreenSlots.count == 1 ? "" : "s")", systemImage: "rectangle.grid.2x2")
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(Theme.textPrimary)
-                Text(canStartMultiscreen ? "Tap Watch to begin" : "Select a source for each game")
-                    .font(.caption)
-                    .foregroundStyle(Theme.textSecondary)
-                Spacer()
-            }
-
-            HStack(spacing: 10) {
-                Button("Cancel") {
-                    withAnimation { resetMultiscreenSelection() }
-                }
-                .font(.headline)
-                .foregroundStyle(Theme.textSecondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 13)
-                .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-                Button {
-                    startMultiscreen()
-                } label: {
-                    Label("Watch", systemImage: "play.fill")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                }
-                .foregroundStyle(.white)
-                .background(canStartMultiscreen ? Theme.accent : Theme.accent.opacity(0.36),
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .disabled(!canStartMultiscreen)
-            }
-        }
-        .padding(12)
-        .background(.black.opacity(0.88), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
-        .padding(.horizontal, 16)
-        .padding(.bottom, 10)
-    }
-
-    private var canStartMultiscreen: Bool {
-        selectedMultiscreenChannels.count >= 2
-    }
-
-    private func toggleMultiscreenPicking() {
-        guard entitlements.isPremium else {
-            showPaywall = true
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Theme.background)
+            .navigationTitle("Matched Streams")
             #if os(iOS)
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            .navigationBarTitleDisplayMode(.inline)
             #endif
-            return
-        }
-        withAnimation {
-            if isPickingMultiscreen {
-                resetMultiscreenSelection()
-            } else {
-                isPickingMultiscreen = true
-                multiscreenSportFilter = nil
-                multiscreenSlots = [MultiscreenSlot(
-                    matchID: match.id,
-                    matchShortName: match.shortName,
-                    channel: rankedSources.first?.channel
-                )]
-                Task { await loadLiveGamesForMultiscreen() }
+            .toolbar {
+                ToolbarItem {
+                    Button("Done") { isShowingMoreSources = false }
+                }
             }
         }
     }
@@ -2283,64 +1827,6 @@ struct MatchDetailView: View {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         #endif
         playbackContext = MatchPlaybackContext(match: match, channel: channel, rankedSources: rankedSources)
-    }
-
-    private func startMultiscreen() {
-        let channels = Array(selectedMultiscreenChannels.prefix(4))
-        guard channels.count >= 2 else { return }
-        multiscreenSession = MultiscreenSession(channels: channels)
-        resetMultiscreenSelection()
-    }
-
-    private func resetMultiscreenSelection() {
-        isPickingMultiscreen = false
-        multiscreenSlots = []
-        liveMatchesForMultiscreen = []
-    }
-
-    private func loadLiveGamesForMultiscreen() async {
-        guard !isLoadingLiveGames else { return }
-        isLoadingLiveGames = true
-        defer { isLoadingLiveGames = false }
-
-        let leagues = multiscreenShowAllSports ? League.all : prefs.followedLeagues
-        let allChannels = playlists.allChannels
-        let preferredLanguages = prefs.preferredStreamLanguages
-        let currentMatchID = match.id
-
-        // Phase 1: fetch all league scoreboards in parallel
-        var liveMatches: [Match] = []
-        await withTaskGroup(of: [Match].self) { group in
-            for league in leagues {
-                group.addTask {
-                    guard let matches = try? await SportsRepository.shared.legacyScoreboard(for: league) else { return [] }
-                    return Array(matches.filter { $0.state == .live && $0.id != currentMatchID }.prefix(2))
-                }
-            }
-            for await matches in group {
-                liveMatches.append(contentsOf: matches)
-            }
-        }
-
-        guard !Task.isCancelled else { return }
-
-        // Phase 2: rank channels for every live match in parallel
-        var options: [LiveGameOption] = []
-        await withTaskGroup(of: LiveGameOption.self) { group in
-            for liveMatch in liveMatches {
-                group.addTask {
-                    let ranked = await Task.detached(priority: .background) {
-                        SourceMatcher.rank(match: liveMatch, channels: allChannels, preferredLanguages: preferredLanguages)
-                    }.value
-                    return LiveGameOption(match: liveMatch, topSources: Array(ranked.prefix(3)))
-                }
-            }
-            for await option in group {
-                options.append(option)
-            }
-        }
-
-        liveMatchesForMultiscreen = options
     }
 
     /// Broadcasters carrying this game, each linking out to where it streams.
@@ -2395,22 +1881,6 @@ struct MatchDetailView: View {
                 .font(.callout)
                 .foregroundStyle(Theme.textSecondary)
                 .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(20)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-    }
-
-    private var emptyMatches: some View {
-        VStack(spacing: 8) {
-            Text("No channels matched this game automatically.")
-                .font(.callout)
-                .foregroundStyle(Theme.textSecondary)
-                .multilineTextAlignment(.center)
-            Button("Browse all channels") { withAnimation { showingAllChannels = true } }
-                .font(.subheadline.weight(.semibold))
-                .tint(Theme.accent)
         }
         .frame(maxWidth: .infinity)
         .padding(20)
@@ -2500,24 +1970,6 @@ private struct WatchLink: Identifiable {
     let url: URL
 }
 
-private struct MultiscreenSlot: Identifiable {
-    let id = UUID()
-    let matchID: String
-    let matchShortName: String
-    var channel: Channel?
-}
-
-private struct LiveGameOption: Identifiable {
-    let id: String
-    let match: Match
-    let topSources: [RankedSource]
-
-    nonisolated init(match: Match, topSources: [RankedSource]) {
-        self.id = match.id
-        self.match = match
-        self.topSources = topSources
-    }
-}
 
 private enum GameCenterTeam: String, Hashable {
     case away
@@ -2673,11 +2125,6 @@ private struct MatchStandingPreviewRow: View {
         if streak.hasPrefix("l") { return Theme.live }
         return Theme.textSecondary
     }
-}
-
-private struct MultiscreenSession: Identifiable {
-    let id = UUID()
-    let channels: [Channel]
 }
 
 // MARK: - Source row

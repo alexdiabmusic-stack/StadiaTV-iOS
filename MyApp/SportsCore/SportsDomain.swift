@@ -10,7 +10,12 @@ enum SportsDataProviderID: String, Codable, CaseIterable, Hashable, Sendable {
     case f1
     case mlb
     case nba
+    case wnba
     case nfl
+    case cfl
+    case epl
+    case mls
+    case laliga
     case cbsSports
     case yahooSports
     case foxSports

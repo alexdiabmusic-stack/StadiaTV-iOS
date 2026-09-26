@@ -19,7 +19,7 @@ nonisolated struct NFLPlayerStatistics: Identifiable, Equatable, Sendable {
 nonisolated enum NFLStatisticsMapper {
     /// GSIS stat IDs carried in current Shield play.stats. Core totals are regression-tested
     /// against the NFL-supplied 2025 DAL/PHI gamebook, not inferred from descriptions.
-    static func players(_ plays: [NFLPlay]) -> [NFLPlayerStatistics] {
+    static func players(_ plays: [FootballPlay]) -> [NFLPlayerStatistics] {
         var values: [String: NFLPlayerStatistics] = [:]
         for stat in plays.flatMap(\.participants) {
             guard let id = stat.id, let team = stat.teamID, let code = stat.rawStatType else { continue }

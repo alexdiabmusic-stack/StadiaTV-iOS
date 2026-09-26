@@ -114,7 +114,7 @@ struct NBAAPIClientRoutingTests {
 
 @Suite("NBAGameCenterService")
 struct NBAGameCenterServiceTests {
-    private let id = NBAProviderGameID(unchecked: "0022500500")
+    private let id = BasketballGameID(league: .nba, providerID: "0022500500")
 
     @Test func foreignCDNPlayResponseIsRejected() async throws {
         var client = FakeNBAAPIClient()

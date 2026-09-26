@@ -6,7 +6,7 @@ struct NFLBoxScoreView: View {
     private var players: [NFLPlayerStatistics] { NFLStatisticsMapper.players(game.plays).filter { $0.teamID == (home ? game.home.id : game.away.id) } }
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            NFLQuarterScoreView(game: game)
+            FootballQuarterScoreView(home: game.home, away: game.away, overtimeActive: game.quarter?.contains("OVERTIME") == true)
             Picker("Team", selection: $home) { Text(game.away.abbreviation).tag(false); Text(game.home.abbreviation).tag(true) }.pickerStyle(.segmented)
             section("Passing", players.filter { $0.passingAttempts > 0 }) { "\($0.completions)/\($0.passingAttempts) • \($0.passingYards.map(String.init) ?? "–") YDS • \($0.passingTouchdowns) TD • \($0.interceptions) INT" }
             section("Rushing", players.filter { $0.carries > 0 || $0.rushingYards != 0 }) { "\($0.carries) CAR • \($0.rushingYards.map(String.init) ?? "–") YDS • \($0.rushingTouchdowns) TD" }

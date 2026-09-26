@@ -1,0 +1,39 @@
+{
+  "leagueSchedule": {
+    "seasonYear": "2026",
+    "gameDates": [
+      {
+        "gameDate": "07/10/2026 00:00:00",
+        "games": [
+          {
+            "gameId": "1022600050",
+            "gameCode": "20260710/CHIWAS",
+            "gameStatus": 3,
+            "gameStatusText": "Final",
+            "period": 4,
+            "regulationPeriods": 4,
+            "gameDateTimeUTC": "2026-07-10T23:00:00Z",
+            "homeTeam": { "teamId": 1611661317, "teamCity": "Chicago", "teamName": "Sky", "teamTricode": "CHI", "wins": 14, "losses": 9, "score": 91 },
+            "awayTeam": { "teamId": 1611661319, "teamCity": "Washington", "teamName": "Mystics", "teamTricode": "WAS", "wins": 12, "losses": 11, "score": 98 }
+          }
+        ]
+      },
+      {
+        "gameDate": "07/11/2026 00:00:00",
+        "games": [
+          {
+            "gameId": "1022600051",
+            "gameCode": "20260711/NYLLVA",
+            "gameStatus": 1,
+            "gameStatusText": "7:00 pm ET",
+            "period": 0,
+            "regulationPeriods": 4,
+            "gameDateTimeUTC": "2026-07-11T23:00:00Z",
+            "homeTeam": { "teamId": 1611661321, "teamCity": "New York", "teamName": "Liberty", "teamTricode": "NYL", "wins": 20, "losses": 3 },
+            "awayTeam": { "teamId": 1611661323, "teamCity": "Las Vegas", "teamName": "Aces", "teamTricode": "LVA", "wins": 16, "losses": 7 }
+          }
+        ]
+      }
+    ]
+  }
+}

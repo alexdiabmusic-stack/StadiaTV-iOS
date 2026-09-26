@@ -1,0 +1,1 @@
+../../../MyApp/Soccer/Services/SoccerPollingPolicy.swift

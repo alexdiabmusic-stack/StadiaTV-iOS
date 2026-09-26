@@ -93,7 +93,10 @@ struct SkySportsNewsProvider: SportsNewsProvider {
 
         guard !collected.isEmpty else { throw SportsDataError.unsupportedCapability(.newsMetadata) }
 
-        // For mixed feeds (feedID 12040), classify and filter to requested league
+        // For mixed feeds (feedID 12040), classify and filter to requested league.
+        // Sky's main feed is dominated by soccer; unclassified articles are far more
+        // likely to be un-tagged soccer content than genuine coverage of the requested
+        // league, so only keep articles that explicitly classify to it.
         let filtered: [BannerNewsArticle]
         if feedIDs.contains(12040) && feedIDs.count == 1 {
             filtered = collected.filter { article in
@@ -102,7 +105,7 @@ struct SkySportsNewsProvider: SportsNewsProvider {
                     description: article.description,
                     tags: []
                 )
-                return cid == nil || cid == targetLeagueID
+                return cid == targetLeagueID
             }
         } else {
             filtered = collected

@@ -1,0 +1,70 @@
+{
+  "scoreboard": {
+    "gameDate": "2026-07-10",
+    "games": [
+      {
+        "gameId": "1022600050",
+        "gameCode": "20260710/CHIWAS",
+        "gameStatus": 2,
+        "gameStatusText": "Q1 4:37",
+        "period": 1,
+        "regulationPeriods": 4,
+        "gameClock": "PT04M37.00S",
+        "gameTimeUTC": "2026-07-10T23:00:00Z",
+        "gameLabel": "",
+        "gameSubLabel": "",
+        "gameSubtype": "",
+        "seriesGameNumber": "",
+        "seriesText": "",
+        "attendance": 10387,
+        "arena": {
+          "arenaName": "Wintrust Arena",
+          "arenaCity": "Chicago",
+          "arenaState": "IL",
+          "arenaCountry": "US",
+          "arenaTimezone": "America/Chicago"
+        },
+        "officials": [
+          { "personId": 501, "name": "Simone Jelks", "jerseyNum": "12", "assignment": "Crew Chief" }
+        ],
+        "homeTeam": {
+          "teamId": 1611661317,
+          "teamCity": "Chicago",
+          "teamName": "Sky",
+          "teamTricode": "CHI",
+          "teamSlug": "sky",
+          "wins": 14,
+          "losses": 9,
+          "score": 16,
+          "timeoutsRemaining": 4,
+          "inBonus": "0",
+          "periods": [
+            { "period": 1, "periodType": "REGULAR", "score": 16 }
+          ]
+        },
+        "awayTeam": {
+          "teamId": 1611661319,
+          "teamCity": "Washington",
+          "teamName": "Mystics",
+          "teamTricode": "WAS",
+          "teamSlug": "mystics",
+          "wins": 12,
+          "losses": 11,
+          "score": 14,
+          "timeoutsRemaining": 4,
+          "inBonus": "0",
+          "periods": [
+            { "period": 1, "periodType": "REGULAR", "score": 14 }
+          ]
+        },
+        "gameLeaders": {
+          "homeLeaders": { "personId": 1000, "name": "A. Reese", "teamTricode": "CHI", "points": 6, "rebounds": 3, "assists": 1 },
+          "awayLeaders": { "personId": 2000, "name": "K. Mitchell", "teamTricode": "WAS", "points": 8, "rebounds": 1, "assists": 2 }
+        },
+        "homeTvBroadcasters": [ { "broadcasterDisplay": "NBC Sports Chicago" } ],
+        "awayTvBroadcasters": [ { "broadcasterDisplay": "Monumental Sports Network" } ],
+        "nationalBroadcasters": []
+      }
+    ]
+  }
+}

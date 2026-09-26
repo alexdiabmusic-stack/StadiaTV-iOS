@@ -15,107 +15,59 @@ struct TVMatchDetailView: View {
         ZStack {
             Theme.background.ignoresSafeArea()
             if match.league.path == "hockey/nhl" {
-                NHLGameCenterView(match: match) {
-                    if !rankedSources.isEmpty {
-                        TVShelfRow(title: "Stream Sources", systemImage: "play.tv.fill") {
-                            ForEach(rankedSources) { source in
-                                TVSourceTile(channel: source.channel, score: source.score,
-                                             subtitle: source.epgProgramme?.title,
-                                             evidenceCategories: source.evidenceCategories) {
-                                    playingChannel = source.channel
-                                }
-                            }
-                        }
-                    } else if !playlistStore.playlists.isEmpty {
-                        noSourcesNote
-                    }
+                NHLGameCenterView(match: match, watchContent: { streamSourcesShelf }) {
                     if !matchNews.isEmpty { newsSection }
                 }
             } else if match.league.path == "baseball/mlb" {
-                MLBGameCenterView(match: match) {
-                    if !rankedSources.isEmpty {
-                        TVShelfRow(title: "Stream Sources", systemImage: "play.tv.fill") {
-                            ForEach(rankedSources) { source in
-                                TVSourceTile(channel: source.channel, score: source.score,
-                                             subtitle: source.epgProgramme?.title,
-                                             evidenceCategories: source.evidenceCategories) {
-                                    playingChannel = source.channel
-                                }
-                            }
-                        }
-                    } else if !playlistStore.playlists.isEmpty {
-                        noSourcesNote
-                    }
+                MLBGameCenterView(match: match, watchContent: { streamSourcesShelf }) {
                     if !matchNews.isEmpty { newsSection }
                 }
             } else if match.league.path == "football/nfl" {
-                NFLGameCenterView(match: match) {
-                    if !rankedSources.isEmpty {
-                        TVShelfRow(title: "Stream Sources", systemImage: "play.tv.fill") {
-                            ForEach(rankedSources) { source in
-                                TVSourceTile(channel: source.channel, score: source.score,
-                                             subtitle: source.epgProgramme?.title,
-                                             evidenceCategories: source.evidenceCategories) {
-                                    playingChannel = source.channel
-                                }
-                            }
-                        }
-                    } else if !playlistStore.playlists.isEmpty {
-                        noSourcesNote
-                    }
+                NFLGameCenterView(match: match, watchContent: { streamSourcesShelf }) {
+                    if !matchNews.isEmpty { newsSection }
+                }
+            } else if match.league.path == "football/cfl" {
+                CFLGameCenterView(match: match, watchContent: { streamSourcesShelf }) {
                     if !matchNews.isEmpty { newsSection }
                 }
             } else if match.league.path == "racing/f1" {
-                F1RaceCentreView(match: match) {
-                    if !rankedSources.isEmpty {
-                        TVShelfRow(title: "Stream Sources", systemImage: "play.tv.fill") {
-                            ForEach(rankedSources) { source in
-                                TVSourceTile(channel: source.channel, score: source.score,
-                                             subtitle: source.epgProgramme?.title,
-                                             evidenceCategories: source.evidenceCategories) {
-                                    playingChannel = source.channel
-                                }
-                            }
-                        }
-                    } else if !playlistStore.playlists.isEmpty {
-                        noSourcesNote
-                    }
+                F1RaceCentreView(match: match, watchContent: { streamSourcesShelf }) {
                     if !matchNews.isEmpty { newsSection }
                 }
             } else if match.league.path == "basketball/nba" {
-                NBAGameCenterView(match: match) {
-                    if !rankedSources.isEmpty {
-                        TVShelfRow(title: "Stream Sources", systemImage: "play.tv.fill") {
-                            ForEach(rankedSources) { source in
-                                TVSourceTile(channel: source.channel, score: source.score,
-                                             subtitle: source.epgProgramme?.title,
-                                             evidenceCategories: source.evidenceCategories) {
-                                    playingChannel = source.channel
-                                }
-                            }
-                        }
-                    } else if !playlistStore.playlists.isEmpty {
-                        noSourcesNote
-                    }
+                BasketballGameCenterView(match: match, config: .nba, providerID: .nba, service: NBAGameCenterService(), cache: .nba,
+                    watchContent: { streamSourcesShelf }) {
+                    if !matchNews.isEmpty { newsSection }
+                }
+            } else if match.league.path == "basketball/wnba" {
+                BasketballGameCenterView(match: match, config: .wnba, providerID: .wnba, service: WNBAGameCenterService(), cache: .wnba,
+                    watchContent: { streamSourcesShelf }) {
+                    if !matchNews.isEmpty { newsSection }
+                }
+            } else if match.league.path == "soccer/eng.1" {
+                SoccerGameCentreView(match: match, leaguePath: "soccer/eng.1", providerID: .epl, providerDisplayName: "Premier League",
+                    service: EPLGameCentreService(), cache: .epl, pollingPolicy: .epl, seed: EPLLegacyMapper.seed(from:),
+                    watchContent: { streamSourcesShelf }) {
+                    if !matchNews.isEmpty { newsSection }
+                }
+            } else if match.league.path == "soccer/usa.1" {
+                SoccerGameCentreView(match: match, leaguePath: "soccer/usa.1", providerID: .mls, providerDisplayName: "MLS",
+                    service: MLSGameCentreService(), cache: .mls, pollingPolicy: .mls, seed: MLSLegacyMapper.seed(from:),
+                    watchContent: { streamSourcesShelf }) {
+                    if !matchNews.isEmpty { newsSection }
+                }
+            } else if match.league.path == "soccer/esp.1" {
+                SoccerGameCentreView(match: match, leaguePath: "soccer/esp.1", providerID: .laliga, providerDisplayName: "La Liga",
+                    service: LaLigaGameCentreService(officialSource: LaLigaProvider.shared), cache: .laliga, pollingPolicy: .laliga, availableTabs: [.overview, .timeline, .lineups, .stats, .commentary, .shots],
+                    seed: LaLigaLegacyMapper.seed(from:),
+                    watchContent: { streamSourcesShelf }) {
                     if !matchNews.isEmpty { newsSection }
                 }
             } else {
             ScrollView {
                 VStack(alignment: .leading, spacing: 40) {
                     matchHero
-                    if !rankedSources.isEmpty {
-                        TVShelfRow(title: "Stream Sources", systemImage: "play.tv.fill") {
-                            ForEach(rankedSources) { source in
-                                TVSourceTile(channel: source.channel, score: source.score,
-                                             subtitle: source.epgProgramme?.title,
-                                             evidenceCategories: source.evidenceCategories) {
-                                    playingChannel = source.channel
-                                }
-                            }
-                        }
-                    } else if !playlistStore.playlists.isEmpty {
-                        noSourcesNote
-                    }
+                    streamSourcesShelf
                     if !match.broadcasts.isEmpty {
                         broadcastsSection
                     }
@@ -132,6 +84,12 @@ struct TVMatchDetailView: View {
         .navigationTitle(match.shortName)
         .task(id: "\(match.id)-\(playlistStore.allChannels.count)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
             await rankSources()
+        }
+        // A launch-time or Following-tab background scan can finish confirming this match's
+        // streams after this view already ran rankSources() from a cold cache.
+        .onChange(of: streamStore.sourcesByMatchId[match.id]) { _, updated in
+            guard let updated, !updated.isEmpty else { return }
+            rankedSources = updated
         }
         .task(id: match.id) {
             matchNews = (try? await SportsRepository.shared.legacyNews(for: match.league, limit: 6)) ?? []
@@ -259,6 +217,24 @@ struct TVMatchDetailView: View {
             }
         }
         .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Stream sources
+
+    @ViewBuilder private var streamSourcesShelf: some View {
+        if !rankedSources.isEmpty {
+            TVShelfRow(title: "Stream Sources", systemImage: "play.tv.fill") {
+                ForEach(rankedSources) { source in
+                    TVSourceTile(channel: source.channel, score: source.score,
+                                 subtitle: source.epgProgramme?.title,
+                                 evidenceCategories: source.evidenceCategories) {
+                        playingChannel = source.channel
+                    }
+                }
+            }
+        } else if !playlistStore.playlists.isEmpty {
+            noSourcesNote
+        }
     }
 
     // MARK: - No sources note

@@ -1,0 +1,29 @@
+{
+  "homeTeam": {
+    "id": "43",
+    "name": "Manchester City",
+    "shortName": "Man City",
+    "goals": [
+      {"goalType": "Bicycle Kick", "period": "SecondHalf", "time": "70", "playerId": "223094", "timestamp": "20260920T153000+0100"}
+    ],
+    "cards": [
+      {"type": "Orange", "period": "SecondHalf", "time": "75", "playerId": "171314", "timestamp": "20260920T153500+0100"}
+    ],
+    "subs": [
+      {"period": "SecondHalf", "playerOnId": "106921", "playerOffId": "204936", "time": "60", "timestamp": "20260920T152200+0100"},
+      {"period": "SecondHalf", "playerOnId": "437730", "playerOffId": "215379", "time": "60", "timestamp": "20260920T152200+0100"}
+    ]
+  },
+  "awayTeam": {
+    "id": "56",
+    "name": "Sunderland",
+    "shortName": "Sunderland",
+    "goals": [
+      {"goalType": "Goal", "period": "FirstHalf", "time": "12", "playerId": "441264", "timestamp": "20260920T141229+0100"}
+    ],
+    "cards": [
+      {"type": "Yellow", "period": "FirstHalf", "time": "8", "playerId": "638411", "timestamp": "20260920T140902+0100"}
+    ],
+    "subs": []
+  }
+}

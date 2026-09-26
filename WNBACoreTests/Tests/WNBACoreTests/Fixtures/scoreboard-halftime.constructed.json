@@ -1,0 +1,28 @@
+{
+  "scoreboard": {
+    "gameDate": "2026-07-10",
+    "games": [
+      {
+        "gameId": "1022600050",
+        "gameCode": "20260710/CHIWAS",
+        "gameStatus": 2,
+        "gameStatusText": "Halftime",
+        "period": 2,
+        "regulationPeriods": 4,
+        "gameClock": "PT00M00.00S",
+        "gameTimeUTC": "2026-07-10T23:00:00Z",
+        "homeTeam": {
+          "teamId": 1611661317, "teamCity": "Chicago", "teamName": "Sky", "teamTricode": "CHI", "wins": 14, "losses": 9,
+          "score": 46, "timeoutsRemaining": 3, "inBonus": "0",
+          "periods": [ { "period": 1, "periodType": "REGULAR", "score": 24 }, { "period": 2, "periodType": "REGULAR", "score": 22 } ]
+        },
+        "awayTeam": {
+          "teamId": 1611661319, "teamCity": "Washington", "teamName": "Mystics", "teamTricode": "WAS", "wins": 12, "losses": 11,
+          "score": 41, "timeoutsRemaining": 4, "inBonus": "0",
+          "periods": [ { "period": 1, "periodType": "REGULAR", "score": 20 }, { "period": 2, "periodType": "REGULAR", "score": 21 } ]
+        },
+        "gameLeaders": { "homeLeaders": null, "awayLeaders": null }
+      }
+    ]
+  }
+}

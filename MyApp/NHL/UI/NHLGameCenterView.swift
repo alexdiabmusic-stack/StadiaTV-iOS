@@ -1,7 +1,8 @@
 import SwiftUI
 
-struct NHLGameCenterView<RelatedContent: View>: View {
+struct NHLGameCenterView<WatchContent: View, RelatedContent: View>: View {
     let match: Match
+    @ViewBuilder let watchContent: () -> WatchContent
     @ViewBuilder let relatedContent: () -> RelatedContent
     @State private var model = NHLGameCenterViewModel()
     @Environment(\.scenePhase) private var scenePhase
@@ -31,6 +32,7 @@ struct NHLGameCenterView<RelatedContent: View>: View {
                         if model.errors.isEmpty { ProgressView("Loading Game Centre") }
                     }.frame(maxWidth: .infinity).padding(24).background(Theme.surface)
                 }
+                watchContent()
                 ScrollView(.horizontal) {
                     HStack(spacing: 8) {
                         ForEach(NHLGameTab.allCases) { tab in

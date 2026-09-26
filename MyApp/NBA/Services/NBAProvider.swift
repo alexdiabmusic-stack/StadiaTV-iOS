@@ -43,7 +43,7 @@ actor NBAProvider: NativeSportsProvider {
     }
 
     @MainActor private static func matches(_ raw: [NBAValue]) -> [Match] {
-        let matches = NBAGameMapper.games(raw).map(NBALegacyMapper.match)
+        let matches = NBAGameMapper.games(raw).map { BasketballLegacyMapper.match($0, config: .nba) }
         return Dictionary(matches.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new }).values.sorted { $0.date < $1.date }
     }
 
@@ -114,7 +114,7 @@ actor NBAProvider: NativeSportsProvider {
             let athletes = response.players.compactMap { row -> RosterAthlete? in
                 guard let id = row.field("PLAYER_ID").int else { return nil }
                 let name = row.field("PLAYER").string ?? "Unknown player"
-                return NBALegacyMapper.athlete(id: id, name: name, jersey: row.field("NUM").string, position: row.field("POSITION").string,
+                return BasketballLegacyMapper.athlete(id: id, name: name, jersey: row.field("NUM").string, position: row.field("POSITION").string, config: .nba,
                     height: row.field("HEIGHT").string, weight: row.field("WEIGHT").string, age: row.field("AGE").int,
                     experienceYears: row.field("EXP").string.flatMap { Int($0) }, college: row.field("SCHOOL").string)
             }
@@ -138,7 +138,7 @@ actor NBAProvider: NativeSportsProvider {
         guard let season = response.seasonTotalsRegularSeason.last else { throw NBAAPIError.invalidResponse }
         let values = season.sorted { $0.key < $1.key }.compactMap { key, value -> StatValue? in
             guard let text = value.string else { return nil }
-            return StatValue(label: key, displayName: NBAPlayDescriptionBuilder.humanize(key), value: text)
+            return StatValue(label: key, displayName: BasketballPlayDescriptionBuilder.humanize(key), value: text)
         }
         let result = AthleteOverview(statlineLabel: "Season", stats: values, headlineStats: Array(values.prefix(4)), news: [])
         personCache[id] = (Date(), result)

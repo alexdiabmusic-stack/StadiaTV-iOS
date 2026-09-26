@@ -1,0 +1,1 @@
+../../../MyApp/Basketball/Domain/BasketballLeagueConfiguration.swift

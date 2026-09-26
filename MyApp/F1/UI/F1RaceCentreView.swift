@@ -1,7 +1,8 @@
 import SwiftUI
 
-struct F1RaceCentreView<RelatedContent: View>: View {
+struct F1RaceCentreView<WatchContent: View, RelatedContent: View>: View {
     let match: Match
+    @ViewBuilder let watchContent: () -> WatchContent
     @ViewBuilder let relatedContent: () -> RelatedContent
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var preferences: PreferencesStore
@@ -44,6 +45,7 @@ struct F1RaceCentreView<RelatedContent: View>: View {
                     }.padding().frame(maxWidth: .infinity).background(Theme.surface)
                 }
                 NavigationLink("Calendar & results") { F1CalendarView() }.font(.caption).frame(minHeight: 44)
+                watchContent()
                 ScrollView(.horizontal) {
                     HStack {
                         ForEach(tabs, id: \.self) { item in
@@ -154,5 +156,17 @@ struct F1RaceCentreView<RelatedContent: View>: View {
                 }.padding().frame(maxWidth: 1000).frame(maxWidth: .infinity)
             }
         }
+    }
+}
+
+extension F1RaceCentreView where WatchContent == EmptyView {
+    /// Convenience for call sites (e.g. F1CalendarView's session picker) that don't
+    /// have a watch section to show — no launch-time or Game Centre stream matching there.
+    /// Declared in an extension so the compiler-synthesized memberwise initializer
+    /// (used by MatchDetailView/TVMatchDetailView, which do pass watchContent) still exists.
+    init(match: Match, @ViewBuilder relatedContent: @escaping () -> RelatedContent) {
+        self.match = match
+        self.watchContent = { EmptyView() }
+        self.relatedContent = relatedContent
     }
 }

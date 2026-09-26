@@ -1,0 +1,1 @@
+../../../MyApp/LaLiga/Reconciliation/LaLigaFotMobTeamAliases.swift

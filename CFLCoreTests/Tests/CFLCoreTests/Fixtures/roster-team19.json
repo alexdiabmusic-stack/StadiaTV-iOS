@@ -1,0 +1,204 @@
+{
+  "ID": 8,
+  "team_id": 19,
+  "name": "Argonauts",
+  "rosterplayers": [
+    {
+      "ID": 27083,
+      "player_id": 186412,
+      "firstname": "Yam",
+      "lastname": "Banks",
+      "jersey_no": 46,
+      "birthdate": "2002-03-19",
+      "height_ft": 5,
+      "height_in": 11,
+      "weight_lbs": 210,
+      "college_id": 373,
+      "college": "Mississippi",
+      "position": "DB",
+      "return_from_injury_date": null,
+      "return_to_practice_date": null,
+      "state": "practice_roster",
+      "available_roster": false,
+      "no_set": false,
+      "team_id": [
+        19
+      ],
+      "teams": [
+        "TOR"
+      ],
+      "roster_counter": "countable",
+      "files": [],
+      "metadata": {
+        "created_at": "2026-09-10T13:07:23Z",
+        "revision_at": "2026-09-15T21:07:10Z",
+        "revision": 2
+      }
+    },
+    {
+      "ID": 27082,
+      "player_id": 186411,
+      "firstname": "Monkell",
+      "lastname": "Goodwine",
+      "jersey_no": 78,
+      "birthdate": "2003-04-01",
+      "height_ft": 6,
+      "height_in": 4,
+      "weight_lbs": 290,
+      "college_id": 582,
+      "college": "South Carolina",
+      "position": "DL",
+      "return_from_injury_date": null,
+      "return_to_practice_date": null,
+      "state": "practice_roster",
+      "available_roster": false,
+      "no_set": false,
+      "team_id": [
+        19
+      ],
+      "teams": [
+        "TOR"
+      ],
+      "roster_counter": "countable",
+      "files": [],
+      "metadata": {
+        "created_at": "2026-09-09T18:50:04Z",
+        "revision_at": "2026-09-15T21:07:10Z",
+        "revision": 2
+      }
+    },
+    {
+      "ID": 27001,
+      "player_id": 186323,
+      "firstname": "Cameron",
+      "lastname": "Porter",
+      "jersey_no": 38,
+      "birthdate": "2002-04-13",
+      "height_ft": 5,
+      "height_in": 11,
+      "weight_lbs": 205,
+      "college_id": 458,
+      "college": "Northwestern",
+      "position": "RB",
+      "return_from_injury_date": null,
+      "return_to_practice_date": null,
+      "state": "practice_roster",
+      "available_roster": false,
+      "no_set": false,
+      "team_id": [
+        19
+      ],
+      "teams": [
+        "TOR"
+      ],
+      "roster_counter": "countable",
+      "files": [],
+      "metadata": {
+        "created_at": "2026-08-12T13:08:36Z",
+        "revision_at": "2026-09-09T21:03:40Z",
+        "revision": 2
+      }
+    },
+    {
+      "ID": 26927,
+      "player_id": 186248,
+      "firstname": "Dathan",
+      "lastname": "Hickey",
+      "jersey_no": 37,
+      "birthdate": "2000-03-27",
+      "height_ft": 6,
+      "height_in": 1,
+      "weight_lbs": 200,
+      "college_id": 780,
+      "college": "Youngstown State",
+      "position": "DB",
+      "return_from_injury_date": null,
+      "return_to_practice_date": null,
+      "state": "game_roster",
+      "available_roster": true,
+      "no_set": false,
+      "team_id": [
+        19
+      ],
+      "teams": [
+        "TOR"
+      ],
+      "roster_counter": "countable",
+      "files": [],
+      "metadata": {
+        "created_at": "2026-06-05T18:27:11Z",
+        "revision_at": "2026-09-21T21:02:42Z",
+        "revision": 5
+      }
+    },
+    {
+      "ID": 26918,
+      "player_id": 186239,
+      "firstname": "Michael",
+      "lastname": "Buckley",
+      "jersey_no": 84,
+      "birthdate": "2002-07-26",
+      "height_ft": 6,
+      "height_in": 0,
+      "weight_lbs": 179,
+      "college_id": 419,
+      "college": "New Mexico",
+      "position": "WR",
+      "return_from_injury_date": null,
+      "return_to_practice_date": null,
+      "state": "practice_roster",
+      "available_roster": false,
+      "no_set": false,
+      "team_id": [
+        19
+      ],
+      "teams": [
+        "TOR"
+      ],
+      "roster_counter": "countable",
+      "files": [],
+      "metadata": {
+        "created_at": "2026-05-31T15:58:22Z",
+        "revision_at": "2026-06-04T21:04:45Z",
+        "revision": 2
+      }
+    },
+    {
+      "ID": 26770,
+      "player_id": 183971,
+      "firstname": "Frank",
+      "lastname": "VREUGDENHIL",
+      "jersey_no": 56,
+      "birthdate": "2001-01-21",
+      "height_ft": 6,
+      "height_in": 3,
+      "weight_lbs": 321,
+      "college_id": 338,
+      "college": "McMaster",
+      "position": "OL",
+      "return_from_injury_date": null,
+      "return_to_practice_date": null,
+      "state": "game_roster",
+      "available_roster": true,
+      "no_set": false,
+      "team_id": [
+        19
+      ],
+      "teams": [
+        "TOR"
+      ],
+      "roster_counter": "countable",
+      "files": [],
+      "metadata": {
+        "created_at": "2026-04-29T02:20:48Z",
+        "revision_at": "2026-07-22T21:03:28Z",
+        "revision": 8
+      }
+    }
+  ],
+  "metadata": {
+    "created_at": "2023-06-06T17:39:33Z",
+    "revision_at": "2026-09-24T21:19:01Z",
+    "revision": 2014
+  }
+}

@@ -1,7 +1,8 @@
 import SwiftUI
 
-struct NFLGameCenterView<RelatedContent: View>: View {
+struct NFLGameCenterView<WatchContent: View, RelatedContent: View>: View {
     let match: Match
+    @ViewBuilder let watchContent: () -> WatchContent
     @ViewBuilder let relatedContent: () -> RelatedContent
     @State private var model = NFLGameCenterViewModel()
     @State private var revision = 0
@@ -21,6 +22,7 @@ struct NFLGameCenterView<RelatedContent: View>: View {
             VStack(spacing: 0) {
                 if let game { NFLGameHeaderView(game: game) }
                 else { VStack(spacing: 12) { Text(match.shortName).font(.title2.bold()); Text(match.statusDetail); if model.error == nil { ProgressView("Loading Game Centre") } }.padding().frame(maxWidth: .infinity).background(Theme.surface) }
+                watchContent()
                 ScrollView(.horizontal) {
                     HStack { ForEach(["Overview", "Plays", "Box Score", "Stats"], id: \.self) { tab in
                         Button(tab) { model.tab = tab }.buttonStyle(.bordered).tint(model.tab == tab ? Theme.accessibleAccent : .secondary).frame(minHeight: 44)
@@ -81,14 +83,14 @@ struct NFLGameCenterView<RelatedContent: View>: View {
     private func overview(_ game: NFLGameState) -> some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("\(String(game.week.season)) • \(game.week.seasonType == .preseason ? "Preseason" : game.week.seasonType == .postseason ? "Postseason" : "Regular season") • Week \(game.week.week)").font(.subheadline).foregroundStyle(.secondary)
-            NFLQuarterScoreView(game: game)
-            if game.status == .live, let field = game.field { NFLFieldView(position: field) }
+            FootballQuarterScoreView(home: game.home, away: game.away, overtimeActive: game.quarter?.contains("OVERTIME") == true)
+            if game.status == .live, let field = game.field { FootballFieldView(position: field) }
             if let drive = game.currentDrive {
                 Text("Current drive").font(.title3.bold())
                 Text([drive.playCount.map { "\($0) plays" }, drive.yards.map { "\($0) yards" }, drive.timeOfPossession].compactMap { $0 }.joined(separator: " • "))
             }
             let scoring = game.plays.filter(\.scoring).suffix(4)
-            if !scoring.isEmpty { Text("Recent scoring").font(.title3.bold()); ForEach(scoring.reversed()) { NFLPlayRow(play: $0) } }
+            if !scoring.isEmpty { Text("Recent scoring").font(.title3.bold()); ForEach(scoring.reversed()) { FootballPlayRow(play: $0) } }
             if let venue = game.venue { Label(venue, systemImage: "mappin.and.ellipse") }
             if let weather = game.weather { Label(weather, systemImage: "cloud.sun") }
         }.padding()

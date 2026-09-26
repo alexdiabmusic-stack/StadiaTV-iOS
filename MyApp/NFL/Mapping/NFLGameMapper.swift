@@ -1,7 +1,7 @@
 import Foundation
 
 nonisolated enum NFLGameMapper {
-    static func status(_ raw: String?, quarter: String? = nil) -> NFLGameStatus {
+    static func status(_ raw: String?, quarter: String? = nil) -> FootballGameStatus {
         if ["HALFTIME", "HALF_TIME", "END_OF_HALF"].contains(quarter?.uppercased() ?? ""), !["FINAL", "END_OF_GAME"].contains(raw?.uppercased() ?? "") { return .halftime }
         return switch raw?.uppercased().replacingOccurrences(of: "-", with: "_").replacingOccurrences(of: " ", with: "_") {
         case "SCHEDULED": .scheduled
@@ -22,25 +22,26 @@ nonisolated enum NFLGameMapper {
         guard let url = URL(string: path), url.scheme == "https" else { return nil }
         return url
     }
-    static func team(_ raw: NFLValue, summary: NFLValue = .null, metadata: NFLValue = .null) -> NFLTeamState? {
+    static func team(_ raw: NFLValue, summary: NFLValue = .null, metadata: NFLValue = .null) -> FootballTeamState? {
         guard let id = raw["id"].string ?? summary["teamId"].string else { return nil }
         let abbreviation = metadata["abbreviation"].string ?? raw["abbreviation"].string ?? raw["currentLogo"].string?.split(separator: "/").last.map(String.init) ?? "NFL"
-        return NFLTeamState(id: id, name: raw["fullName"].string ?? metadata["fullName"].string ?? abbreviation, abbreviation: abbreviation,
+        return FootballTeamState(id: id, name: raw["fullName"].string ?? metadata["fullName"].string ?? abbreviation, abbreviation: abbreviation,
             logo: image(raw["currentLogo"].string ?? metadata["currentLogo"].string), score: summary["score"]["total"].int,
             quarters: summary["score"].object.compactMapValues(\.int).filter { $0.key != "total" }, possession: summary["hasPossession"].bool == true)
     }
-    static func field(_ text: String?, possession: NFLTeamState?, home: NFLTeamState, away: NFLTeamState) -> NFLFieldPosition? {
+    static func field(_ text: String?, possession: FootballTeamState?, home: FootballTeamState, away: FootballTeamState, fieldLength: Int = 100) -> FootballFieldPosition? {
         guard let text, !text.isEmpty else { return nil }
         let parts = text.split(separator: " ")
-        let yard = parts.last.flatMap { Int($0) }.flatMap { (0...50).contains($0) ? $0 : nil }
+        let midfield = fieldLength / 2
+        let yard = parts.last.flatMap { Int($0) }.flatMap { (0...midfield).contains($0) ? $0 : nil }
         let side = parts.count > 1 ? String(parts[0]) : nil
         var toGoal: Int?
         if let yard, let possession {
-            if side == possession.abbreviation { toGoal = 100 - yard }
+            if side == possession.abbreviation { toGoal = fieldLength - yard }
             else if side == home.abbreviation || side == away.abbreviation { toGoal = yard }
-            else if side == nil && yard == 50 { toGoal = 50 }
+            else if side == nil && yard == midfield { toGoal = midfield }
         }
-        return NFLFieldPosition(text: text, sideAbbreviation: side, yard: yard, yardsToGoal: toGoal)
+        return FootballFieldPosition(text: text, sideAbbreviation: side, yard: yard, yardsToGoal: toGoal)
     }
     static func game(_ raw: NFLValue, metadata: [String: NFLValue] = [:], players: [String: String] = [:], now: Date = Date()) -> NFLGameState? {
         guard let id = raw["id"].string, let season = raw["season"].int, let week = raw["week"].int,

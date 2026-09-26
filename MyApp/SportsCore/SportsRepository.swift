@@ -10,7 +10,7 @@ nonisolated struct SportsLiveMatchSnapshot: Sendable {
 nonisolated struct SportsRepository: Sendable {
     static let shared = SportsRepository()
     private let providers: [String: any NativeSportsProvider]
-    init(providers: [any NativeSportsProvider] = [NHLProvider(), MLBProvider(), F1Provider(), NFLProvider(), NBAProvider()]) {
+    init(providers: [any NativeSportsProvider] = [NHLProvider(), MLBProvider(), F1Provider(), NFLProvider(), CFLProvider(), NBAProvider(), WNBAProvider(), EPLProvider(), MLSProvider(), LaLigaProvider()]) {
         self.providers = Dictionary(providers.map { ($0.leaguePath, $0) }, uniquingKeysWith: { _, new in new })
     }
     private func provider(_ league: League, _ capability: SportsDataCapability) throws -> any NativeSportsProvider {
@@ -59,10 +59,10 @@ nonisolated struct SportsRepository: Sendable {
            let game = MLBGameMapper.feed(feed) {
             return await MLBLegacyMapper.match(game, line: MLBGameMapper.line(feed.live["linescore"], players: MLBGameMapper.players(feed.data["players"])))
         }
-        if match.league.path == "basketball/nba", let id = NBAProviderGameID(match.id),
-           let response = try? await NBAAPIClient.shared.boxScore(gameID: id.rawValue), response.gameID == id.rawValue,
+        if match.league.path == "basketball/nba", let id = BasketballGameID.validated(match.id, league: .nba),
+           let response = try? await NBAAPIClient.shared.boxScore(gameID: id.providerID), response.gameID == id.providerID,
            let game = NBAGameMapper.boxScore(response) {
-            return await NBALegacyMapper.match(game)
+            return await BasketballLegacyMapper.match(game, config: .nba)
         }
         guard match.league.path == "hockey/nhl", let id = Int(match.id),
               let dto = try? await NHLAPIClient.shared.landing(gameID: id), dto.id == id,
@@ -105,7 +105,7 @@ nonisolated struct SportsRepository: Sendable {
     func playerStats(for league: League, playerIDs: Set<BannerEntityID>, range: SportsDateRange?) async throws -> [BannerPlayerStat] {
         var output: [BannerPlayerStat] = []
         for id in playerIDs {
-            let provider: SportsDataProviderID = league.path == "football/nfl" ? .nfl : league.path == "racing/f1" ? .f1 : league.path == "baseball/mlb" ? .mlb : league.path == "basketball/nba" ? .nba : .nhl
+            let provider: SportsDataProviderID = league.path == "football/nfl" ? .nfl : league.path == "football/cfl" ? .cfl : league.path == "racing/f1" ? .f1 : league.path == "baseball/mlb" ? .mlb : league.path == "basketball/nba" ? .nba : league.path == "basketball/wnba" ? .wnba : .nhl
             guard let rawID = SportsIdentityResolver.providerID(from: id, provider: provider) else { throw SportsDataError.invalidResponse }
             let overview = try await legacyAthleteOverview(for: league, athleteID: rawID)
             output.append(BannerPlayerStat(id: id, playerID: id, playerDisplayName: nil, teamAbbreviation: nil, headshotURL: nil,

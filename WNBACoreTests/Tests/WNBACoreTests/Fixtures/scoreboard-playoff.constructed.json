@@ -1,0 +1,25 @@
+{
+  "scoreboard": {
+    "gameDate": "2026-10-02",
+    "games": [
+      {
+        "gameId": "1042600012",
+        "gameCode": "20261002/LVANYL",
+        "gameStatus": 1,
+        "gameStatusText": "8:00 pm ET",
+        "period": 0,
+        "regulationPeriods": 4,
+        "gameClock": "",
+        "gameTimeUTC": "2026-10-03T00:00:00Z",
+        "gameLabel": "WNBA Finals",
+        "gameSubLabel": "Game 3",
+        "gameSubtype": "Playoffs",
+        "seriesGameNumber": "3",
+        "seriesText": "Series tied 1-1",
+        "homeTeam": { "teamId": 1611661323, "teamCity": "Las Vegas", "teamName": "Aces", "teamTricode": "LVA", "wins": 30, "losses": 10, "score": null, "timeoutsRemaining": null, "inBonus": null, "periods": [] },
+        "awayTeam": { "teamId": 1611661321, "teamCity": "New York", "teamName": "Liberty", "teamTricode": "NYL", "wins": 32, "losses": 8, "score": null, "timeoutsRemaining": null, "inBonus": null, "periods": [] },
+        "gameLeaders": { "homeLeaders": null, "awayLeaders": null }
+      }
+    ]
+  }
+}

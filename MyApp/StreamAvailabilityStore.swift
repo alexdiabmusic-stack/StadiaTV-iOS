@@ -18,9 +18,16 @@ final class StreamAvailabilityStore: ObservableObject {
     /// Read by MatchDetailView for an instant display on open — no re-scan needed.
     @Published private(set) var sourcesByMatchId: [String: [RankedSource]] = [:]
 
-    /// Monotonically-increasing generation counter. Incremented at the start of every scan so
-    /// a stale concurrent scan cannot overwrite results from a newer one.
-    private var scanGeneration: Int = 0
+    /// Monotonically-increasing generation counter, incremented at the start of every scan.
+    private var nextGeneration: Int = 0
+
+    /// The generation of the scan that most recently claimed each match ID. Stamped for every
+    /// match a scan evaluates *before* that scan's async work starts, so that two overlapping
+    /// scans over different (possibly non-disjoint) match sets — e.g. RootView's live-match scan
+    /// and MatchesView's followed-match scan — each only write results for the match IDs they
+    /// still hold the latest claim on. Without this, a scan that started earlier but finishes
+    /// later would silently drop the other scan's results for any match ID it didn't cover.
+    private var generationByMatchId: [String: Int] = [:]
 
     /// Wall-clock time this store last actually attempted a scan (debounced or forced).
     /// Used by `scanDebounced` to bound worst-case staleness — see below.
@@ -63,12 +70,14 @@ final class StreamAvailabilityStore: ObservableObject {
             countByMatchId = countByMatchId.filter { !finalIds.contains($0.key) }
             confirmedCountByMatchId = confirmedCountByMatchId.filter { !finalIds.contains($0.key) }
             sourcesByMatchId = sourcesByMatchId.filter { !finalIds.contains($0.key) }
+            generationByMatchId = generationByMatchId.filter { !finalIds.contains($0.key) }
         }
 
         guard !nonFinal.isEmpty else { return }
 
-        scanGeneration += 1
-        let myGeneration = scanGeneration
+        nextGeneration += 1
+        let myGeneration = nextGeneration
+        for match in nonFinal { generationByMatchId[match.id] = myGeneration }
 
         var freshCounts: [String: Int] = Dictionary(uniqueKeysWithValues: nonFinal.map { ($0.id, 0) })
         var freshConfirmedCounts: [String: Int] = Dictionary(uniqueKeysWithValues: nonFinal.map { ($0.id, 0) })
@@ -151,19 +160,26 @@ final class StreamAvailabilityStore: ObservableObject {
             }
         }
 
-        guard myGeneration == scanGeneration else { return }
+        // Only write results for match IDs this scan still holds the latest claim on — a
+        // newer overlapping scan may have already re-claimed some of these IDs while this
+        // scan's async work was in flight, in which case its results must win instead.
+        let winningIds = Set(nonFinal.map(\.id)).filter { generationByMatchId[$0] == myGeneration }
+        guard !winningIds.isEmpty else { return }
 
-        let evaluatedIds = Set(nonFinal.map(\.id))
-        var mergedCounts = countByMatchId.filter { !evaluatedIds.contains($0.key) }
-        mergedCounts.merge(freshCounts) { _, new in new }
+        var mergedCounts = countByMatchId
+        var mergedConfirmed = confirmedCountByMatchId
+        var mergedSources = sourcesByMatchId
+        for id in winningIds {
+            mergedCounts[id] = freshCounts[id] ?? 0
+            mergedConfirmed[id] = freshConfirmedCounts[id] ?? 0
+            if let sources = freshSources[id] {
+                mergedSources[id] = sources
+            } else {
+                mergedSources.removeValue(forKey: id)
+            }
+        }
         countByMatchId = mergedCounts
-
-        var mergedConfirmed = confirmedCountByMatchId.filter { !evaluatedIds.contains($0.key) }
-        mergedConfirmed.merge(freshConfirmedCounts) { _, new in new }
         confirmedCountByMatchId = mergedConfirmed
-
-        var mergedSources = sourcesByMatchId.filter { !evaluatedIds.contains($0.key) }
-        mergedSources.merge(freshSources) { _, new in new }
         sourcesByMatchId = mergedSources
     }
 

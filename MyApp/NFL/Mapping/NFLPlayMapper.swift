@@ -1,10 +1,10 @@
 import Foundation
 
 nonisolated enum NFLPlayMapper {
-    static func drives(_ raw: NFLValue, gameID: String) -> [NFLDrive] {
-        let values = raw.array.compactMap { value -> NFLDrive? in
+    static func drives(_ raw: NFLValue, gameID: String) -> [FootballGameDrive] {
+        let values = raw.array.compactMap { value -> FootballGameDrive? in
             guard let sequence = value["sequence"].int else { return nil }
-            return NFLDrive(id: "\(gameID):drive:\(sequence)", sequence: sequence, teamID: value["teamId"].string,
+            return FootballGameDrive(id: "\(gameID):drive:\(sequence)", sequence: sequence, teamID: value["teamId"].string,
                 startQuarter: value["startedQuarter"].int, endQuarter: value["endedQuarter"].int,
                 startClock: value["startedClock"].string, endClock: value["endedClock"].string,
                 startField: value["startedYardLine"].string, endField: value["endedYardLine"].string,
@@ -13,9 +13,9 @@ nonisolated enum NFLPlayMapper {
         }
         return Dictionary(values.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new }).values.sorted { $0.sequence < $1.sequence }
     }
-    static func plays(_ raw: NFLValue, gameID: String, drives: [NFLDrive], players: [String: String] = [:]) -> [NFLPlay] {
+    static func plays(_ raw: NFLValue, gameID: String, drives: [FootballGameDrive], players: [String: String] = [:]) -> [FootballPlay] {
         // Rebuild from the authoritative snapshot, including deletions and corrected identities.
-        var result: [String: NFLPlay] = [:]
+        var result: [String: FootballPlay] = [:]
         for value in raw.array {
             guard let sourceID = value["playId"].string else { continue }
             let id = "\(gameID):play:\(sourceID)"
@@ -24,24 +24,24 @@ nonisolated enum NFLPlayMapper {
             let rawType = value["playType"].string ?? "UNKNOWN"
             let scoring = value["playScored"].bool == true
             var seenStats = Set<String>()
-            let participants = value["stats"].array.compactMap { stat -> NFLPlayParticipant? in
+            let participants = value["stats"].array.compactMap { stat -> FootballPlayParticipant? in
                 if let statID = stat["playStatId"].string, !seenStats.insert(statID).inserted { return nil }
-                return NFLPlayParticipant(id: stat["personId"].string, name: players[stat["personId"].string ?? ""] ?? stat["gsisPlayerName"].string ?? "Unknown player",
+                return FootballPlayParticipant(id: stat["personId"].string, name: players[stat["personId"].string ?? ""] ?? stat["gsisPlayerName"].string ?? "Unknown player",
                     teamID: stat["teamId"].string, rawStatType: stat["statType"].int, yards: stat["yards"].int)
             }
             let drive = value["driveSequence"].int
-            result[id] = NFLPlay(id: id, sequence: value["playSequenceNumber"].double ?? value["playId"].double ?? 0,
+            result[id] = FootballPlay(id: id, sequence: value["playSequenceNumber"].double ?? value["playId"].double ?? 0,
                 driveSequence: drive, quarter: value["quarter"].int, clock: value["clockTime"].string,
                 down: value["down"].int, distance: value["yardsRemaining"].int, goalToGo: value["playIsGoalToGo"].bool == true,
                 field: value["yardLine"].string, type: resolvedType(rawType, scoring: value["scoringPlayType"].string, text: text, participants: participants),
                 text: text.trimmingCharacters(in: .whitespacesAndNewlines), yards: value["yardsGained"].int,
                 scoring: scoring, turnover: participants.contains { [9, 19, 59, 60].contains($0.rawStatType ?? -1) },
                 penalty: rawType == "PENALTY" || text.localizedCaseInsensitiveContains("PENALTY"),
-                teamID: value["scoringTeamId"].string ?? drives.first { $0.sequence == drive }?.teamID, participants: participants)
+                teamID: value["scoringTeamId"].string ?? drives.first { $0.sequence == drive }?.teamID, participants: participants, totalDowns: 4)
         }
         return result.values.sorted { $0.sequence == $1.sequence ? $0.id < $1.id : $0.sequence < $1.sequence }
     }
-    static func resolvedType(_ raw: String, scoring: String?, text: String, participants: [NFLPlayParticipant]) -> NFLPlayType {
+    static func resolvedType(_ raw: String, scoring: String?, text: String, participants: [FootballPlayParticipant]) -> FootballPlayType {
         if scoring == "TOUCHDOWN" || scoring == "SAFETY" { return type(raw, scoring: scoring, text: text) }
         let codes = Set(participants.compactMap(\.rawStatType))
         if raw == "FIELD_GOAL", !codes.isDisjoint(with: [69, 71]) { return .fieldGoalMissed }
@@ -51,7 +51,7 @@ nonisolated enum NFLPlayMapper {
         if raw == "PASS", codes.contains(14) { return .passIncomplete }
         return type(raw, scoring: scoring, text: text)
     }
-    static func type(_ raw: String, scoring: String?, text: String) -> NFLPlayType {
+    static func type(_ raw: String, scoring: String?, text: String) -> FootballPlayType {
         if scoring == "TOUCHDOWN" { return .touchdown }
         if scoring == "SAFETY" { return .safety }
         switch raw {

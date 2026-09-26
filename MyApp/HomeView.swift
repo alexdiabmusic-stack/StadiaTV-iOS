@@ -43,6 +43,9 @@ struct HomeView: View {
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
     @EnvironmentObject private var launchCoordinator: StartupCoordinator
+    @EnvironmentObject private var playlistStore: PlaylistStore
+    @EnvironmentObject private var epgRepository: EPGRepository
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
     @StateObject private var viewModel = HomeViewModel()
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -94,6 +97,17 @@ struct HomeView: View {
         // markAppShellReady() is idempotent — safe to call multiple times.
         .onChange(of: viewModel.isLoading) { _, isLoading in
             if !isLoading { launchCoordinator.markAppShellReady() }
+        }
+        // Match favourite-team games against the playlist/EPG from the moment the loading
+        // screen appears — not just live/starting-soon matches (RootView's scan) — so a
+        // favourite's stream is already linked by the time the user opens the game from Home.
+        // Re-fires whenever the favourite-team lists, channel count or EPG guide change.
+        .task(id: favoriteStreamScanKey) {
+            await streamStore.scanDebounced(
+                matches: favoriteStreamMatches,
+                channels: playlistStore.allChannels,
+                epgRepository: epgRepository
+            )
         }
         // PRIMARY reveal trigger: begin the staggered section rise the moment the
         // logo starts moving. Content builds upward while the logo is in flight.
@@ -170,6 +184,23 @@ struct HomeView: View {
                 force: true
             )
         }
+    }
+
+    /// Favourite-team live, today's and near-term upcoming matches, deduplicated — the set the
+    /// launch-time stream scan covers. Bounded to a handful of upcoming games so this doesn't
+    /// grow into a full-schedule scan.
+    private var favoriteStreamMatches: [Match] {
+        var seen = Set<String>()
+        var result: [Match] = []
+        for match in viewModel.favoriteTeamLiveMatches + viewModel.favoriteTeamMatchesToday + viewModel.favoriteTeamUpcoming.prefix(8) {
+            if seen.insert(match.id).inserted { result.append(match) }
+        }
+        return result
+    }
+
+    private var favoriteStreamScanKey: String {
+        let ids = favoriteStreamMatches.map(\.id).sorted().joined(separator: ",")
+        return "\(ids)-\(playlistStore.allChannels.count)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))"
     }
 
     private var loadPreferencesKey: String {
@@ -1703,6 +1734,12 @@ final class HomeViewModel: ObservableObject {
     private let cacheLifetime: TimeInterval = 120
     // Shorter cache window while live games are in progress so state stays current
     private let cacheLifetimeLive: TimeInterval = 25
+    // matchesByLeague is never wiped wholesale (see load()) so matches don't
+    // vanish from the home screen when a reload happens to run mid-session.
+    // Only matches that are unambiguously over and old enough to be irrelevant
+    // to "recently finished" are dropped, so the cache doesn't grow forever
+    // over a long-lived app process.
+    private let finishedMatchRetention: TimeInterval = 2 * 24 * 3600
 
     private var demandScoreCache: [String: Int] = [:]
 
@@ -1755,7 +1792,11 @@ final class HomeViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         demandScoreCache.removeAll(keepingCapacity: true)
-        matchesByLeague.removeAll(keepingCapacity: true)
+        // matchesByLeague is intentionally NOT cleared here — it's the running,
+        // merged cache of every match synced since the app opened. Each phase
+        // below upserts into it so previously-synced matches never disappear
+        // from the home screen just because a reload ran (e.g. after returning
+        // from a match's Game Centre).
         defer {
             isLoadInFlight = false
             isLoading = false
@@ -1802,20 +1843,22 @@ final class HomeViewModel: ObservableObject {
         async let sevenDaySchedulesTask = loadSchedules(for: p2Leagues, days: 7, maxConcurrentLoads: 8)
         async let favoriteSeasonSchedulesTask = loadSchedules(for: p3Leagues, days: 365, maxConcurrentLoads: 6)
 
-        // Await the final snapshot and reset to a clean baseline for the schedule phase.
-        // The callbacks above have already populated the UI incrementally.
+        // Await the final snapshot and merge it in as the authoritative
+        // live/starting-soon/next baseline. The callbacks above have already
+        // populated the UI incrementally — merge rather than replace so any
+        // previously-loaded 7-day/season schedule data (from this or an
+        // earlier load cycle) is preserved instead of discarded.
         let liveSnapshot = await liveSnapshotTask
         // Include pastStartToday so games that started but still show as scheduled are
         // present in allMatches — they can appear in Live Now via the featured-IDs special
         // case and will be correctly matched to featured picks.
-        matchesByLeague.removeAll(keepingCapacity: true)
         for match in liveSnapshot.live + liveSnapshot.startingSoon + liveSnapshot.next + liveSnapshot.pastStartToday {
             matchesByLeague[match.league.id, default: []].append(match)
         }
+        for key in matchesByLeague.keys {
+            matchesByLeague[key] = mergeMatches(matchesByLeague[key] ?? [])
+        }
         if !matchesByLeague.isEmpty {
-            for key in matchesByLeague.keys {
-                matchesByLeague[key] = mergeMatches(matchesByLeague[key] ?? [])
-            }
             rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
         }
 
@@ -2013,10 +2056,14 @@ final class HomeViewModel: ObservableObject {
 
     private func mergeMatches(_ matches: [Match]) -> [Match] {
         // Pass 1: deduplicate by exact ID, preferring the highest-quality state.
+        // On a tie, the later entry wins (>=) rather than the first-seen one —
+        // matchesByLeague now accumulates across load() cycles instead of being
+        // wiped, so a freshly-fetched update (e.g. a live match's latest score)
+        // must be able to overwrite an older entry of the same quality tier.
         var bestByID: [String: Match] = [:]
         for match in matches {
             if let existing = bestByID[match.id] {
-                if matchQuality(match) > matchQuality(existing) {
+                if matchQuality(match) >= matchQuality(existing) {
                     bestByID[match.id] = match
                 }
             } else {
@@ -2030,14 +2077,17 @@ final class HomeViewModel: ObservableObject {
         for match in bestByID.values {
             let key = fuzzyMatchKey(match)
             if let existing = bestByFuzzyKey[key] {
-                if matchQuality(match) > matchQuality(existing) {
+                if matchQuality(match) >= matchQuality(existing) {
                     bestByFuzzyKey[key] = match
                 }
             } else {
                 bestByFuzzyKey[key] = match
             }
         }
-        return bestByFuzzyKey.values.sorted { $0.date < $1.date }
+        let retentionCutoff = Date().addingTimeInterval(-finishedMatchRetention)
+        return bestByFuzzyKey.values
+            .filter { !($0.state == .final && $0.date < retentionCutoff) }
+            .sorted { $0.date < $1.date }
     }
 
     private func fuzzyMatchKey(_ match: Match) -> String {

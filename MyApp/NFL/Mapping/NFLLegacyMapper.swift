@@ -3,7 +3,7 @@ import Foundation
 nonisolated enum NFLLegacyMapper {
     @MainActor static func match(_ game: NFLGameState) -> Match {
         let league = League(name: "NFL", shortName: "NFL", path: "football/nfl", group: .football)
-        func side(_ team: NFLTeamState) -> TeamSide {
+        func side(_ team: FootballTeamState) -> TeamSide {
             TeamSide(displayName: team.name, shortName: team.abbreviation, abbreviation: team.abbreviation, logoURL: team.logo,
                 score: team.score.map(String.init), record: nil, isWinner: game.status == .final && (team.score ?? -1) > (team.id == game.home.id ? game.away.score ?? -1 : game.home.score ?? -1),
                 teamID: team.id, canonicalIDString: "team:league.football-nfl:nfl:\(team.id)")

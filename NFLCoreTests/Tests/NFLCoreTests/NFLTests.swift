@@ -96,7 +96,7 @@ import Testing
     @Test func recordedPlayCategories() throws {
         let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("Fixtures/representative-plays.json")
         let cases = try JSONDecoder().decode([NFLValue].self, from: Data(contentsOf: url))
-        let expected: [String: NFLPlayType] = ["rush": .run, "pass": .pass, "incomplete": .passIncomplete, "sack": .sack,
+        let expected: [String: FootballPlayType] = ["rush": .run, "pass": .pass, "incomplete": .passIncomplete, "sack": .sack,
             "punt": .punt, "kickoff": .kickoff, "touchdown": .touchdown, "field_goal": .fieldGoal,
             "missed_field_goal": .fieldGoalMissed, "extra_point": .extraPoint, "two_point": .twoPoint,
             "interception": .interception, "fumble_lost": .fumble, "fumble_retained": .fumble,

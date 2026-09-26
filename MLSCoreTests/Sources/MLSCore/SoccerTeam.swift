@@ -1,0 +1,1 @@
+../../../MyApp/Soccer/Domain/SoccerTeam.swift

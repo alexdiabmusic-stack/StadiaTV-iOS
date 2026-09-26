@@ -1,0 +1,1 @@
+../../../MyApp/LaLiga/API/LaLigaClient.swift

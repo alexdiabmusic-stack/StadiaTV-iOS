@@ -97,6 +97,8 @@ struct League: Identifiable, Hashable {
                keywords: ["premier league", "epl", "english", "soccer", "football"]),
         League(name: "MLS", shortName: "MLS", path: "soccer/usa.1", group: .soccer,
                keywords: ["mls", "major league soccer", "soccer"]),
+        League(name: "La Liga", shortName: "La Liga", path: "soccer/esp.1", group: .soccer,
+               keywords: ["la liga", "laliga", "spanish", "soccer", "football"]),
         League(name: "Formula 1", shortName: "F1", path: "racing/f1", group: .racing,
                keywords: ["f1", "formula 1", "formula one", "grand prix"]),
         League(name: "PGA Tour", shortName: "PGA", path: "golf/pga", group: .golf,

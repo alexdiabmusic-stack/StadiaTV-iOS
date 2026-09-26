@@ -1,0 +1,35 @@
+{
+  "game": {
+    "gameId": "1022600053",
+    "gameCode": "20260715/NYLCHI",
+    "gameStatus": 3,
+    "gameStatusText": "Final/2OT",
+    "period": 6,
+    "regulationPeriods": 4,
+    "gameClock": "PT00M00.00S",
+    "gameTimeUTC": "2026-07-15T23:00:00Z",
+    "attendance": 9800,
+    "arena": { "arenaName": "Barclays Center", "arenaCity": "Brooklyn", "arenaState": "NY", "arenaCountry": "US", "arenaTimezone": "America/New_York" },
+    "officials": [],
+    "homeTeam": {
+      "teamId": 1611661321, "teamCity": "New York", "teamName": "Liberty", "teamTricode": "NYL",
+      "wins": 21, "losses": 3, "score": 110, "timeoutsRemaining": 0, "inBonus": "0",
+      "periods": [
+        { "period": 1, "periodType": "REGULAR", "score": 24 }, { "period": 2, "periodType": "REGULAR", "score": 20 },
+        { "period": 3, "periodType": "REGULAR", "score": 26 }, { "period": 4, "periodType": "REGULAR", "score": 22 },
+        { "period": 5, "periodType": "OVERTIME", "score": 9 }, { "period": 6, "periodType": "OVERTIME", "score": 9 }
+      ],
+      "players": []
+    },
+    "awayTeam": {
+      "teamId": 1611661317, "teamCity": "Chicago", "teamName": "Sky", "teamTricode": "CHI",
+      "wins": 14, "losses": 10, "score": 106, "timeoutsRemaining": 0, "inBonus": "0",
+      "periods": [
+        { "period": 1, "periodType": "REGULAR", "score": 22 }, { "period": 2, "periodType": "REGULAR", "score": 24 },
+        { "period": 3, "periodType": "REGULAR", "score": 20 }, { "period": 4, "periodType": "REGULAR", "score": 26 },
+        { "period": 5, "periodType": "OVERTIME", "score": 8 }, { "period": 6, "periodType": "OVERTIME", "score": 6 }
+      ],
+      "players": []
+    }
+  }
+}

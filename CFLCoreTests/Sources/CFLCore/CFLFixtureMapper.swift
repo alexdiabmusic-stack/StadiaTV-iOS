@@ -1,0 +1,1 @@
+../../../MyApp/CFL/Mapping/CFLFixtureMapper.swift

@@ -1,0 +1,71 @@
+{
+  "game": {
+    "gameId": "1022600050",
+    "gameCode": "20260710/CHIWAS",
+    "gameStatus": 2,
+    "gameStatusText": "Q4 0:29.8",
+    "period": 4,
+    "regulationPeriods": 4,
+    "gameClock": "PT00M29.80S",
+    "gameTimeUTC": "2026-07-10T23:00:00Z",
+    "attendance": 10387,
+    "arena": { "arenaName": "Wintrust Arena", "arenaCity": "Chicago", "arenaState": "IL", "arenaCountry": "US", "arenaTimezone": "America/Chicago" },
+    "officials": [ { "personId": 501, "name": "Simone Jelks", "jerseyNum": "12", "assignment": "Crew Chief" } ],
+    "homeTeam": {
+      "teamId": 1611661317, "teamCity": "Chicago", "teamName": "Sky", "teamTricode": "CHI",
+      "wins": 14, "losses": 9, "score": 91, "timeoutsRemaining": 1, "inBonus": "1",
+      "periods": [
+        { "period": 1, "periodType": "REGULAR", "score": 16 }, { "period": 2, "periodType": "REGULAR", "score": 18 },
+        { "period": 3, "periodType": "REGULAR", "score": 26 }, { "period": 4, "periodType": "REGULAR", "score": 31 }
+      ],
+      "players": [
+        {
+          "personId": 1000, "firstName": "Angel", "familyName": "Reese", "nameI": "A. Reese",
+          "jerseyNum": "5", "position": "F", "order": 1, "starter": "1", "oncourt": "1", "played": "1",
+          "statistics": {
+            "minutes": "PT34M10.00S", "points": 22, "reboundsTotal": 14, "assists": 3, "steals": 2, "blocks": 1,
+            "turnovers": 3, "foulsPersonal": 2, "plusMinusPoints": -4,
+            "fieldGoalsMade": 9, "fieldGoalsAttempted": 17, "threePointersMade": 0, "threePointersAttempted": 1,
+            "freeThrowsMade": 4, "freeThrowsAttempted": 6
+          }
+        },
+        {
+          "personId": 1001, "firstName": "Kamilla", "familyName": "Cardoso", "nameI": "K. Cardoso",
+          "jerseyNum": "50", "position": "C", "order": 2, "starter": "1", "oncourt": "0", "played": "1",
+          "statistics": {
+            "minutes": "PT26M02.00S", "points": 11, "reboundsTotal": 8, "assists": 1, "steals": 0, "blocks": 2,
+            "turnovers": 2, "foulsPersonal": 4, "plusMinusPoints": -2,
+            "fieldGoalsMade": 5, "fieldGoalsAttempted": 9, "threePointersMade": 0, "threePointersAttempted": 0,
+            "freeThrowsMade": 1, "freeThrowsAttempted": 2
+          }
+        },
+        {
+          "personId": 1002, "firstName": "Bench", "familyName": "Guard", "nameI": "B. Guard",
+          "jerseyNum": "9", "position": "G", "order": 9, "starter": "0", "oncourt": "0", "played": "0",
+          "status": "INACTIVE", "notPlayingReason": "INACTIVE_INJURY", "notPlayingDescription": "Ankle",
+          "statistics": { "minutes": "PT00M00.00S" }
+        }
+      ]
+    },
+    "awayTeam": {
+      "teamId": 1611661319, "teamCity": "Washington", "teamName": "Mystics", "teamTricode": "WAS",
+      "wins": 12, "losses": 11, "score": 98, "timeoutsRemaining": 2, "inBonus": "0",
+      "periods": [
+        { "period": 1, "periodType": "REGULAR", "score": 31 }, { "period": 2, "periodType": "REGULAR", "score": 21 },
+        { "period": 3, "periodType": "REGULAR", "score": 27 }, { "period": 4, "periodType": "REGULAR", "score": 19 }
+      ],
+      "players": [
+        {
+          "personId": 2000, "firstName": "Kiki", "familyName": "Mitchell", "nameI": "K. Mitchell",
+          "jerseyNum": "1", "position": "G", "order": 1, "starter": "1", "oncourt": "1", "played": "1",
+          "statistics": {
+            "minutes": "PT36M40.00S", "points": 28, "reboundsTotal": 5, "assists": 6, "steals": 1, "blocks": 0,
+            "turnovers": 4, "foulsPersonal": 1, "plusMinusPoints": 9,
+            "fieldGoalsMade": 10, "fieldGoalsAttempted": 21, "threePointersMade": 4, "threePointersAttempted": 10,
+            "freeThrowsMade": 4, "freeThrowsAttempted": 4
+          }
+        }
+      ]
+    }
+  }
+}

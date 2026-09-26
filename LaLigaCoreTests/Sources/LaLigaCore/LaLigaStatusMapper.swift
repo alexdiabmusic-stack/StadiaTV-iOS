@@ -1,0 +1,1 @@
+../../../MyApp/LaLiga/Mapping/LaLigaStatusMapper.swift

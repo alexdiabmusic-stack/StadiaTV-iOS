@@ -1,0 +1,63 @@
+import Foundation
+
+nonisolated enum StatDetailsQuery {
+    static let operation = PGAQuery(operationName: "StatDetails", document: """
+    query StatDetails($tourCode: TourCode!, $statId: String!, $year: Int, $eventQuery: StatDetailEventQuery) {
+      statDetails(tourCode: $tourCode, statId: $statId, year: $year, eventQuery: $eventQuery) {
+        __typename
+        tourCode
+        year
+        displaySeason
+        statId
+        statType
+        tournamentPills {
+          tournamentId
+          displayName
+        }
+        yearPills {
+          year
+          displaySeason
+        }
+        statTitle
+        statDescription
+        tourAvg
+        lastProcessed
+        statHeaders
+        statCategories {
+          category
+          displayName
+          subCategories {
+            displayName
+            stats {
+              statId
+              statTitle
+            }
+          }
+        }
+        rows {
+          ... on StatDetailsPlayer {
+            __typename
+            playerId
+            playerName
+            country
+            countryFlag
+            rank
+            rankDiff
+            rankChangeTendency
+            stats {
+              statName
+              statValue
+              color
+            }
+          }
+          ... on StatDetailTourAvg {
+            __typename
+            displayName
+            value
+          }
+        }
+        sponsorLogo
+      }
+    }
+    """)
+}

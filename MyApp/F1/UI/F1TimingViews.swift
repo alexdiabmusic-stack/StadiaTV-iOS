@@ -39,7 +39,9 @@ struct F1DriverTimingRow: View {
             HStack(alignment: .firstTextBaseline) {
                 if let colour = timing.driver.colour.flatMap({ UInt($0, radix: 16) }) { Capsule().fill(Color(hex: colour)).frame(width: 3, height: 20).accessibilityHidden(true) }
                 Text(timing.position.map { "P\($0)" } ?? "–").font(.title3.bold()).frame(minWidth: 38, alignment: .leading)
+                F1HeadshotView(driver: timing.driver, size: 28)
                 Text(timing.driver.tla).font(.headline)
+                F1TeamLogoView(team: timing.driver.team, size: 16)
                 Text(timing.driver.team).font(.caption).foregroundStyle(.secondary)
                 Spacer(minLength: 4)
                 Text(type.isRace ? (timing.position == 1 ? "LEADER" : timing.gap ?? "–") : timing.bestLap ?? "–").font(.headline).monospacedDigit()

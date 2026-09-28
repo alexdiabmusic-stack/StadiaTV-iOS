@@ -34,6 +34,10 @@ struct TVMatchDetailView: View {
                 F1RaceCentreView(match: match, watchContent: { streamSourcesShelf }) {
                     if !matchNews.isEmpty { newsSection }
                 }
+            } else if match.league.path == "golf/pga" {
+                GolfTournamentCentreView(match: match, watchContent: { streamSourcesShelf }) {
+                    if !matchNews.isEmpty { newsSection }
+                }
             } else if match.league.path == "basketball/nba" {
                 BasketballGameCenterView(match: match, config: .nba, providerID: .nba, service: NBAGameCenterService(), cache: .nba,
                     watchContent: { streamSourcesShelf }) {

@@ -49,8 +49,9 @@ actor CFLProvider: NativeSportsProvider {
             raw.values.compactMap { team -> Team? in
                 guard let id = team["ID"].string else { return nil }
                 let abbreviation = team["abbreviation"].string ?? "CFL"
+                let logoURL = TeamLogoAssetResolver.assetURL(leaguePath: "football/cfl", abbreviation: abbreviation)
                 return Team(id: id, displayName: team["clubname"].string ?? abbreviation, shortDisplayName: abbreviation,
-                    abbreviation: abbreviation, logoURL: nil, canonicalIDString: "team:league.football-cfl:cfl:\(id)")
+                    abbreviation: abbreviation, logoURL: logoURL, canonicalIDString: "team:league.football-cfl:cfl:\(id)")
             }.sorted { $0.displayName < $1.displayName }
         }
     }

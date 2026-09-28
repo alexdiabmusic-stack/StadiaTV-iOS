@@ -44,10 +44,11 @@ nonisolated enum CFLFixtureMapper {
         guard let id = raw["ID"].string else { return nil }
         let abbreviation = raw["abbreviation"].string ?? "CFL"
         // `logo_svg` is an inline SVG data URI (verified live) — the app's existing team-logo
-        // pipeline only rasterizes PNG/JPG from a CDN URL, so this deliberately resolves to no
-        // logo rather than passing an unrenderable data URI through (disclosed gap).
+        // pipeline only rasterizes PNG/JPG from a CDN URL, so this resolves to the bundled
+        // local crest asset instead of passing an unrenderable data URI through.
+        let logo = TeamLogoAssetResolver.assetURL(leaguePath: "football/cfl", abbreviation: abbreviation)
         return FootballTeamState(id: id, name: raw["clubname"].string ?? raw["name"].string ?? abbreviation,
-            abbreviation: abbreviation, logo: nil, score: nil, quarters: [:], possession: false)
+            abbreviation: abbreviation, logo: logo, score: nil, quarters: [:], possession: false)
     }
     static func status(_ raw: String?, start: Date, now: Date) -> FootballGameStatus {
         guard let raw else { return start > now ? .scheduled : .live }

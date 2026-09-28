@@ -7,12 +7,13 @@ struct F1DriverDetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
-                if let url = timing.driver.headshot {
-                    AsyncImage(url: url) { image in image.resizable().scaledToFit() } placeholder: { Image(systemName: "person.crop.circle") }.frame(width: 64, height: 64).accessibilityHidden(true)
-                }
+                F1HeadshotView(driver: timing.driver, size: 64)
                 VStack(alignment: .leading) {
                     Text(timing.driver.name).font(.title2.bold())
-                    Text(timing.driver.team).foregroundStyle(.secondary)
+                    HStack(spacing: 6) {
+                        F1TeamLogoView(team: timing.driver.team, size: 18)
+                        Text(timing.driver.team).foregroundStyle(.secondary)
+                    }
                 }
             }
             F1DriverTimingRow(timing: timing, type: session.type)

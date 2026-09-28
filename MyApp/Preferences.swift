@@ -163,10 +163,35 @@ enum AppAppearance: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// A favorited individual competitor (e.g. a PGA TOUR golfer), for sports
+/// where the app's "follow a team" model doesn't apply. Mirrors
+/// `FavoriteTeam`'s shape/matching approach, scoped to `leaguePath` so the
+/// same player id from a different league can never collide.
+struct FavoritePlayer: Codable, Hashable, Identifiable {
+    var leaguePath: String
+    var playerID: String
+    var displayName: String
+    var country: String?
+
+    var id: String { "\(leaguePath)-\(playerID)" }
+
+    init(leaguePath: String, playerID: String, displayName: String, country: String? = nil) {
+        self.leaguePath = leaguePath
+        self.playerID = playerID
+        self.displayName = displayName
+        self.country = country
+    }
+
+    func matches(playerID: String, leaguePath: String) -> Bool {
+        self.leaguePath == leaguePath && self.playerID == playerID
+    }
+}
+
 struct UserPreferences: Codable, Equatable {
     var hasCompletedOnboarding = false
     var selectedLeagueIDs: Set<String> = []   // League.path values
     var favoriteTeams: [FavoriteTeam] = []
+    var favoritePlayers: [FavoritePlayer] = []
     var matchNotificationsEnabled = false
     var matchReminderLeadTime: MatchReminderLeadTime = .thirty
     var morningDigestEnabled = false
@@ -192,7 +217,7 @@ struct UserPreferences: Codable, Equatable {
     init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case hasCompletedOnboarding, selectedLeagueIDs, favoriteTeams
+        case hasCompletedOnboarding, selectedLeagueIDs, favoriteTeams, favoritePlayers
         case matchNotificationsEnabled, matchReminderLeadTime, morningDigestEnabled, cloudSyncEnabled
         case appearance, preferredStreamLanguages, spoilerFreeMode, showLiveScoreBadge, showLiveScoreBar
         case showChannelNumbers, guideProgrammeTitleLines, epgHighlightCurrentProgramme
@@ -207,6 +232,7 @@ struct UserPreferences: Codable, Equatable {
         hasCompletedOnboarding = try container.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding) ?? false
         selectedLeagueIDs = try container.decodeIfPresent(Set<String>.self, forKey: .selectedLeagueIDs) ?? []
         favoriteTeams = try container.decodeIfPresent([FavoriteTeam].self, forKey: .favoriteTeams) ?? []
+        favoritePlayers = try container.decodeIfPresent([FavoritePlayer].self, forKey: .favoritePlayers) ?? []
         matchNotificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .matchNotificationsEnabled) ?? false
         matchReminderLeadTime = try container.decodeIfPresent(MatchReminderLeadTime.self, forKey: .matchReminderLeadTime) ?? .thirty
         morningDigestEnabled = try container.decodeIfPresent(Bool.self, forKey: .morningDigestEnabled) ?? false
@@ -488,6 +514,25 @@ final class PreferencesStore: ObservableObject {
 
     var favoriteTeamNames: Set<String> {
         Set(prefs.favoriteTeams.map { $0.displayName.lowercased() })
+    }
+
+    // MARK: Favorite players (e.g. followed golfers)
+
+    func isFavorite(playerID: String, leaguePath: String) -> Bool {
+        prefs.favoritePlayers.contains { $0.matches(playerID: playerID, leaguePath: leaguePath) }
+    }
+
+    func toggleFavorite(playerID: String, leaguePath: String, displayName: String, country: String? = nil) {
+        if let index = prefs.favoritePlayers.firstIndex(where: { $0.matches(playerID: playerID, leaguePath: leaguePath) }) {
+            prefs.favoritePlayers.remove(at: index)
+        } else {
+            prefs.favoritePlayers.append(FavoritePlayer(leaguePath: leaguePath, playerID: playerID, displayName: displayName, country: country))
+        }
+        persist()
+    }
+
+    func favoritePlayerIDs(leaguePath: String) -> Set<String> {
+        Set(prefs.favoritePlayers.filter { $0.leaguePath == leaguePath }.map(\.playerID))
     }
 
     /// True when a match involves one of the user's favorite teams.

@@ -346,7 +346,7 @@ private struct GolfTournamentHero: View {
     let match: Match
     let tournament: BannerGolfTournament?
 
-    private var leaderboard: [GolfLeaderboardEntry] {
+    private var leaderboard: [LegacyGolfLeaderboardEntry] {
         GolfTournamentData(match: match, tournament: tournament).leaderboard
     }
 
@@ -912,9 +912,9 @@ private struct GolfTournamentData: Hashable {
     let match: Match
     let tournament: BannerGolfTournament?
 
-    var leaderboard: [GolfLeaderboardEntry] {
+    var leaderboard: [LegacyGolfLeaderboardEntry] {
         (tournament?.leaderboard ?? []).map { entry in
-            GolfLeaderboardEntry(
+            LegacyGolfLeaderboardEntry(
                 id: entry.id.rawValue,
                 position: entry.position,
                 playerName: entry.playerName,
@@ -940,7 +940,7 @@ private struct GolfTournamentData: Hashable {
         if let leader = leaderboard.first {
             cards.append(GolfTournamentCardModel(title: match.state == .final ? "Winner" : "Leader", value: leader.playerName, detail: leader.total))
         }
-        if let bestToday = leaderboard.compactMap({ entry -> GolfLeaderboardEntry? in
+        if let bestToday = leaderboard.compactMap({ entry -> LegacyGolfLeaderboardEntry? in
             guard entry.today != nil else { return nil }
             return entry
         }).min(by: { GolfScoreFormatter.sortValue($0.today ?? "") < GolfScoreFormatter.sortValue($1.today ?? "") }) {
@@ -953,7 +953,7 @@ private struct GolfTournamentData: Hashable {
     }
 }
 
-private struct GolfLeaderboardEntry: Identifiable, Hashable {
+private struct LegacyGolfLeaderboardEntry: Identifiable, Hashable {
     let id: String
     let position: String?
     let playerName: String
@@ -963,8 +963,8 @@ private struct GolfLeaderboardEntry: Identifiable, Hashable {
     let status: String?
     let rounds: [GolfRound]
 
-    func withPosition(_ value: String) -> GolfLeaderboardEntry {
-        GolfLeaderboardEntry(id: id, position: value, playerName: playerName, today: today, thru: thru, total: total, status: status, rounds: rounds)
+    func withPosition(_ value: String) -> LegacyGolfLeaderboardEntry {
+        LegacyGolfLeaderboardEntry(id: id, position: value, playerName: playerName, today: today, thru: thru, total: total, status: status, rounds: rounds)
     }
 }
 
@@ -1037,7 +1037,7 @@ private struct GolfPlayersTab: View {
     let data: GolfTournamentData
     @State private var query = ""
 
-    private var filteredEntries: [GolfLeaderboardEntry] {
+    private var filteredEntries: [LegacyGolfLeaderboardEntry] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return data.leaderboard }
         return data.leaderboard.filter { $0.playerName.localizedCaseInsensitiveContains(trimmed) }
@@ -1105,7 +1105,7 @@ private struct GolfCourseTab: View {
 }
 
 private struct GolfLeaderboardTable: View {
-    let entries: [GolfLeaderboardEntry]
+    let entries: [LegacyGolfLeaderboardEntry]
     var showHeader: Bool = true
 
     var body: some View {
@@ -1126,7 +1126,7 @@ private struct GolfLeaderboardTable: View {
             }
             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                 NavigationLink { GolfPlayerTournamentDetailView(entry: entry, match: nil) } label: {
-                    GolfLeaderboardRow(entry: entry)
+                    LegacyGolfLeaderboardRow(entry: entry)
                 }
                 .buttonStyle(.plain)
                 if index < entries.count - 1 { Divider().overlay(Theme.hairline) }
@@ -1138,7 +1138,7 @@ private struct GolfLeaderboardTable: View {
 }
 
 private struct GolfLeaderboardCompactRow: View {
-    let entry: GolfLeaderboardEntry
+    let entry: LegacyGolfLeaderboardEntry
 
     var body: some View {
         HStack(spacing: 10) {
@@ -1159,8 +1159,8 @@ private struct GolfLeaderboardCompactRow: View {
     }
 }
 
-private struct GolfLeaderboardRow: View {
-    let entry: GolfLeaderboardEntry
+private struct LegacyGolfLeaderboardRow: View {
+    let entry: LegacyGolfLeaderboardEntry
 
     var body: some View {
         HStack(spacing: 8) {
@@ -1192,7 +1192,7 @@ private struct GolfLeaderboardRow: View {
 }
 
 private struct GolfPlayerFieldRow: View {
-    let entry: GolfLeaderboardEntry
+    let entry: LegacyGolfLeaderboardEntry
 
     var body: some View {
         HStack(spacing: 10) {
@@ -1274,7 +1274,7 @@ private struct GolfFullLeaderboardView: View {
 }
 
 private struct GolfPlayerTournamentDetailView: View {
-    let entry: GolfLeaderboardEntry
+    let entry: LegacyGolfLeaderboardEntry
     let match: Match?
 
     var body: some View {

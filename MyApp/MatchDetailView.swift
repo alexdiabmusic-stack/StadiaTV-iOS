@@ -99,6 +99,12 @@ struct MatchDetailView: View {
                     picksSection
                     matchNewsSection
                 }
+            } else if match.league.path == "golf/pga" {
+                GolfTournamentCentreView(match: match, watchContent: { if match.state != .final { sourcesSection } }) {
+                    fantasySection
+                    picksSection
+                    matchNewsSection
+                }
             } else if match.league.path == "basketball/nba" {
                 BasketballGameCenterView(match: match, config: .nba, providerID: .nba, service: NBAGameCenterService(), cache: .nba,
                     watchContent: { if match.state != .final { sourcesSection } }) {
@@ -311,7 +317,7 @@ struct MatchDetailView: View {
 
     /// Loads boxscore stats once, then keeps polling while the game is live.
     private func loadGameSummary() async {
-        guard !["hockey/nhl", "baseball/mlb", "racing/f1", "football/nfl", "football/cfl", "basketball/nba", "basketball/wnba"].contains(match.league.path) else { return }
+        guard !["hockey/nhl", "baseball/mlb", "racing/f1", "football/nfl", "football/cfl", "basketball/nba", "basketball/wnba", "golf/pga"].contains(match.league.path) else { return }
         gameSummary = nil
         gameCenterTab = .players
         didAttemptGameSummaryLoad = false
@@ -336,7 +342,11 @@ struct MatchDetailView: View {
     private func loadGolfTournament() async {
         golfTournament = nil
         didAttemptGolfTournamentLoad = false
-        guard gameCentreArchetype == .golf else { return }
+        // "golf/pga" has its own bespoke Tournament Centre with its own data
+        // loading (GolfTournamentCentreView/PGATournamentCentreService) — this
+        // legacy polling loop only backs the generic GolfGameCentre fallback
+        // used by other (not-yet-native) golf leagues.
+        guard gameCentreArchetype == .golf, match.league.path != "golf/pga" else { return }
 
         while !Task.isCancelled {
             isLoadingGolfTournament = golfTournament == nil

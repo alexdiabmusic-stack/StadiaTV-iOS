@@ -9,6 +9,8 @@ nonisolated enum TeamLogoAssetResolver {
             return wnbaAssetURL(abbreviation: abbreviation, displayName: displayName)
         case "football/nfl":
             return nflAssetURL(abbreviation: abbreviation, displayName: displayName)
+        case "football/cfl":
+            return cflAssetURL(abbreviation: abbreviation, displayName: displayName)
         case "baseball/mlb":
             return mlbAssetURL(abbreviation: abbreviation, displayName: displayName, providerTeamID: providerTeamID)
         case "hockey/nhl":
@@ -34,10 +36,21 @@ nonisolated enum TeamLogoAssetResolver {
         return URL.bannerImageAsset(named: "NFLLogo_\(normalized)")
     }
 
+    static func cflAssetURL(abbreviation: String?, displayName: String? = nil) -> URL? {
+        let abbreviation = normalizedAbbreviation(abbreviation) ?? displayName.flatMap { cflNameAbbreviations[normalizedName($0)] }
+        return abbreviation.flatMap { URL.bannerImageAsset(named: "CFLLogo_\($0)") }
+    }
+
     static func nhlAssetURL(abbreviation: String?, displayName: String? = nil) -> URL? {
         guard let abbreviation = normalizedAbbreviation(abbreviation) ?? displayName.flatMap({ nhlNameAbbreviations[normalizedName($0)] }) else { return nil }
         let normalized = nhlAbbreviationAliases[abbreviation] ?? abbreviation
         return URL.bannerImageAsset(named: "NHLLogo_\(normalized)")
+    }
+
+    static func f1AssetURL(team: String?) -> URL? {
+        guard let team else { return nil }
+        guard let asset = f1TeamAssets[normalizedName(team)] else { return nil }
+        return URL.bannerImageAsset(named: asset)
     }
 
     static func mlbAssetURL(abbreviation: String?, displayName: String?, providerTeamID: String?) -> URL? {
@@ -150,6 +163,28 @@ nonisolated enum TeamLogoAssetResolver {
         "toronto maple leafs": "TOR", "utah mammoth": "UTA", "utah hockey club": "UTA",
         "vancouver canucks": "VAN", "vegas golden knights": "VGK", "washington capitals": "WSH",
         "winnipeg jets": "WPG"
+    ]
+
+    private static let f1TeamAssets: [String: String] = [
+        "alpine": "F1TeamLogo_Alpine",
+        "aston martin": "F1TeamLogo_Aston_Martin",
+        "audi": "F1TeamLogo_Audi",
+        "cadillac": "F1TeamLogo_Cadillac",
+        "ferrari": "F1TeamLogo_Ferrari",
+        "haas f1 team": "F1TeamLogo_Haas_F1_Team",
+        "haas": "F1TeamLogo_Haas_F1_Team",
+        "mclaren": "F1TeamLogo_McLaren",
+        "mercedes": "F1TeamLogo_Mercedes",
+        "racing bulls": "F1TeamLogo_Racing_Bulls",
+        "red bull racing": "F1TeamLogo_Red_Bull_Racing",
+        "red bull": "F1TeamLogo_Red_Bull_Racing",
+        "williams": "F1TeamLogo_Williams"
+    ]
+
+    private static let cflNameAbbreviations: [String: String] = [
+        "bc lions": "BC", "calgary stampeders": "CGY", "edmonton elks": "EDM",
+        "hamilton tiger cats": "HAM", "montreal alouettes": "MTL", "ottawa redblacks": "OTT",
+        "saskatchewan roughriders": "SSK", "toronto argonauts": "TOR", "winnipeg blue bombers": "WPG"
     ]
 
     private static let nflAbbreviationAliases: [String: String] = [

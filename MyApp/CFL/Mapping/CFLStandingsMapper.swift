@@ -12,8 +12,10 @@ nonisolated enum CFLStandingsMapper {
             return StandingsGroup(id: name, name: name, rows: rows.compactMap { row -> StandingRow? in
                 guard let teamID = row["team_id"].string else { return nil }
                 let team = teams[teamID]
+                let abbreviation = row["abbreviation"].string ?? team?["abbreviation"].string ?? "CFL"
+                let logoURL = TeamLogoAssetResolver.assetURL(leaguePath: "football/cfl", abbreviation: abbreviation)
                 return StandingRow(teamID: teamID, displayName: team?["clubname"].string ?? row["abbreviation"].string ?? "CFL",
-                    abbreviation: row["abbreviation"].string ?? team?["abbreviation"].string ?? "CFL", logoURL: nil,
+                    abbreviation: abbreviation, logoURL: logoURL,
                     record: [row["wins"].string, row["losses"].string, row["ties"].string].compactMap { $0 }.joined(separator: "-"),
                     wins: row["wins"].string, losses: row["losses"].string, ties: row["ties"].string, winPercent: row["winning_percentage"].string,
                     gamesBack: nil, streak: nil, pointsFor: row["points_for"].string, pointsAgainst: row["points_against"].string,

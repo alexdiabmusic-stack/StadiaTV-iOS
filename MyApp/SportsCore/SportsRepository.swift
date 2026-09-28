@@ -10,7 +10,7 @@ nonisolated struct SportsLiveMatchSnapshot: Sendable {
 nonisolated struct SportsRepository: Sendable {
     static let shared = SportsRepository()
     private let providers: [String: any NativeSportsProvider]
-    init(providers: [any NativeSportsProvider] = [NHLProvider(), MLBProvider(), F1Provider(), NFLProvider(), CFLProvider(), NBAProvider(), WNBAProvider(), EPLProvider(), MLSProvider(), LaLigaProvider()]) {
+    init(providers: [any NativeSportsProvider] = [NHLProvider(), MLBProvider(), F1Provider(), NFLProvider(), CFLProvider(), NBAProvider(), WNBAProvider(), EPLProvider(), MLSProvider(), LaLigaProvider(), PGAProvider()]) {
         self.providers = Dictionary(providers.map { ($0.leaguePath, $0) }, uniquingKeysWith: { _, new in new })
     }
     private func provider(_ league: League, _ capability: SportsDataCapability) throws -> any NativeSportsProvider {
@@ -100,7 +100,10 @@ nonisolated struct SportsRepository: Sendable {
         if league.path == "racing/f1", let f1 = providers[league.path] as? F1Provider { return try await f1.racers() }
         throw SportsDataError.noProviderAvailable(.players, league.name)
     }
-    func golfTournament(for league: League, gameID: BannerEntityID) async throws -> BannerGolfTournament { throw SportsDataError.noProviderAvailable(.golfTournament, league.name) }
+    func golfTournament(for league: League, gameID: BannerEntityID) async throws -> BannerGolfTournament {
+        if let pga = providers[league.path] as? PGAProvider { return try await pga.golfTournament(for: league, gameID: gameID) }
+        throw SportsDataError.noProviderAvailable(.golfTournament, league.name)
+    }
     func legacyArticleBody(from url: URL) async throws -> [String] { throw SportsDataError.unsupportedCapability(.newsMetadata) }
     func playerStats(for league: League, playerIDs: Set<BannerEntityID>, range: SportsDateRange?) async throws -> [BannerPlayerStat] {
         var output: [BannerPlayerStat] = []

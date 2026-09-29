@@ -4,7 +4,7 @@ import Foundation
 // Official sport-tagged feeds from the FOX Sports RSS directory (foxsports.com/rss-feeds).
 // partnerKey sourced from the public FOX RSS directory page — not a private credential.
 
-struct FOXRSSNewsProvider: SportsNewsProvider {
+nonisolated struct FOXRSSNewsProvider: SportsNewsProvider {
     let metadata: SportsDataProviderMetadata
     var supportsPagination: Bool { false }
 

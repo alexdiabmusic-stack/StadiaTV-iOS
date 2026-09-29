@@ -182,7 +182,7 @@ final class RecordingService: ObservableObject {
         stateTask?.cancel()
         stateTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.tick()
+                self?.tick()
                 try? await Task.sleep(for: .seconds(30))
             }
         }

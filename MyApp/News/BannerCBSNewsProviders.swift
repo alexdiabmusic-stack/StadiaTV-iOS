@@ -3,7 +3,7 @@ import Foundation
 // MARK: - CBS Sports RSS provider
 // Live-verified 2026-09-07: all feeds return HTTP 200 with valid RSS content.
 
-private let cbsLeagueForPath: [(String, League?)] = {
+nonisolated private let cbsLeagueForPath: [(String, League?)] = {
     let all = League.all
     return [
         ("",               nil),   // general — all sports
@@ -21,7 +21,7 @@ private let cbsLeagueForPath: [(String, League?)] = {
     ]
 }()
 
-struct CBSRSSNewsProvider: SportsNewsProvider {
+nonisolated struct CBSRSSNewsProvider: SportsNewsProvider {
     let metadata: SportsDataProviderMetadata
     var supportsPagination: Bool { false }
 

@@ -18,9 +18,9 @@ struct TVMatchCard: View {
                 if streamCount > 0 && match.state != .final {
                     HStack(spacing: 3) {
                         Image(systemName: "play.tv")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(Theme.Typography.overline)
                         Text("\(streamCount)")
-                            .font(.system(size: 9, weight: .bold).monospacedDigit())
+                            .font(Theme.Typography.overline.monospacedDigit())
                     }
                     .foregroundStyle(Theme.accent)
                     .padding(.horizontal, 6).padding(.vertical, 3)
@@ -111,7 +111,7 @@ struct TVHeroCard: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             LinearGradient(
-                colors: [Color(hex: 0x0A1628), Color(hex: 0x0D1F3C)],
+                colors: [Theme.Palette.abyss, Theme.Palette.navy],
                 startPoint: .topLeading, endPoint: .bottomTrailing
             )
 
@@ -223,7 +223,7 @@ struct TVArticleCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            AsyncImage(url: article.imageURL) { phase in
+            CachedImage(url: article.imageURL) { phase in
                 switch phase {
                 case .success(let img):
                     img.resizable().scaledToFill()
@@ -279,7 +279,7 @@ struct TVTeamLogo: View {
                 .resizable()
                 .scaledToFit()
         } else {
-            AsyncImage(url: url) { phase in
+            CachedImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image.resizable().scaledToFit()
@@ -300,7 +300,7 @@ struct TVChannelLogo: View {
     let size: CGFloat
 
     var body: some View {
-        AsyncImage(url: url) { phase in
+        CachedImage(url: url) { phase in
             switch phase {
             case .success(let image):
                 image.resizable().scaledToFit()
@@ -431,7 +431,7 @@ struct TVSourceTile: View {
                         .lineLimit(1)
                     if let label = strongest?.displayLabel {
                         Text(label)
-                            .font(.system(size: 9, weight: .bold))
+                            .font(Theme.Typography.overline)
                             .foregroundStyle(strongest == .guideListsMatch ? Color.green : Theme.accent)
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background((strongest == .guideListsMatch ? Color.green : Theme.accent).opacity(0.15),

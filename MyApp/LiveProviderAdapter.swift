@@ -4,7 +4,7 @@ import Foundation
 
 /// Raw channel record produced by a provider adapter before ID assignment and normalization.
 /// Named `AdapterChannel` to avoid collision with the existing `ProviderChannel` in IPTVOrgModels.
-struct AdapterChannel: Sendable {
+nonisolated struct AdapterChannel: Sendable {
     var name: String
     var streamURL: URL
     var logoURL: URL?
@@ -17,11 +17,13 @@ struct AdapterChannel: Sendable {
     var archiveEnabled: Bool
     var archiveDays: Int
     var catchupSource: String?   // M3U catchup-source URL template
+    var httpHeaders: [String: String]?   // #EXTVLCOPT / #KODIPROP / pipe-suffix headers
 
     init(name: String, streamURL: URL, logoURL: URL? = nil, groupTitle: String? = nil,
          tvgID: String? = nil, tvgName: String? = nil, rawIndex: Int = 0,
          xtreamStreamID: Int? = nil, xtreamCategoryID: String? = nil,
-         archiveEnabled: Bool = false, archiveDays: Int = 0, catchupSource: String? = nil) {
+         archiveEnabled: Bool = false, archiveDays: Int = 0, catchupSource: String? = nil,
+         httpHeaders: [String: String]? = nil) {
         self.name = name
         self.streamURL = streamURL
         self.logoURL = logoURL
@@ -34,10 +36,11 @@ struct AdapterChannel: Sendable {
         self.archiveEnabled = archiveEnabled
         self.archiveDays = archiveDays
         self.catchupSource = catchupSource
+        self.httpHeaders = httpHeaders
     }
 }
 
-struct AdapterGroup: Sendable {
+nonisolated struct AdapterGroup: Sendable {
     var id: String
     var title: String
 }
@@ -46,7 +49,7 @@ struct AdapterGroup: Sendable {
 
 /// Abstracts a live TV source behind a uniform interface.
 /// Implementations must be Sendable so they can cross actor boundaries.
-protocol LiveProviderAdapter: Sendable {
+nonisolated protocol LiveProviderAdapter: Sendable {
     var provider: LiveProvider { get }
     func loadGroups() async throws -> [AdapterGroup]
     func loadChannels() async throws -> (epgURL: String?, channels: [AdapterChannel])
@@ -55,7 +58,7 @@ protocol LiveProviderAdapter: Sendable {
 
 // MARK: - Provider error
 
-enum LiveProviderError: LocalizedError, Sendable {
+nonisolated enum LiveProviderError: LocalizedError, Sendable {
     case missingConfiguration(String)
     case badResponse
     case noStreamAvailable
@@ -73,7 +76,7 @@ enum LiveProviderError: LocalizedError, Sendable {
 
 // MARK: - Stable channel ID generation
 
-enum LiveChannelIDGenerator {
+nonisolated enum LiveChannelIDGenerator {
     /// DJB2 hash — stable across Swift versions, process restarts, and platforms.
     static func stableHash(_ string: String) -> String {
         var hash: UInt32 = 5381
@@ -107,7 +110,7 @@ enum LiveChannelIDGenerator {
 
 // MARK: - LiveChannel factory
 
-extension LiveChannel {
+nonisolated extension LiveChannel {
     /// Constructs a LiveChannel from an AdapterChannel emitted by any adapter.
     static func make(from ac: AdapterChannel, providerID: UUID, kind: LiveProviderKind) -> LiveChannel {
         let channelID: String
@@ -132,7 +135,8 @@ extension LiveChannel {
             tvgLogoURL: ac.logoURL,
             groupTitle: ac.groupTitle,
             archiveEnabled: ac.archiveEnabled,
-            archiveDays: ac.archiveDays
+            archiveDays: ac.archiveDays,
+            httpHeaders: ac.httpHeaders
         )
 
         let catchup: CatchupCapability? = ac.archiveEnabled ? CatchupCapability(

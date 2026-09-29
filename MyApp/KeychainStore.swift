@@ -1,12 +1,12 @@
 import Foundation
 import Security
 
-struct XtreamCredentials: Codable, Hashable {
+nonisolated struct XtreamCredentials: Codable, Hashable, Sendable {
     let username: String
     let password: String
 }
 
-enum KeychainStore {
+nonisolated enum KeychainStore {
     private static let service = "com.alexdiab.BannerTV.xtream"
 
     static func saveXtreamCredentials(_ credentials: XtreamCredentials, for playlistID: UUID) throws {

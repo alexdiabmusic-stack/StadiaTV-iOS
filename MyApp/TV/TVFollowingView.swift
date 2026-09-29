@@ -83,7 +83,7 @@ struct TVFollowingView: View {
                 if upcomingMatches.count > (nextUpcoming != nil ? 1 : 0) {
                     let remaining = nextUpcoming != nil ? Array(upcomingMatches.dropFirst()) : upcomingMatches
                     if !remaining.isEmpty {
-                        TVShelfRow(title: "Coming Up", systemImage: "calendar", tint: Color(hex: 0x3DBE6B)) {
+                        TVShelfRow(title: "Coming Up", systemImage: "calendar", tint: Theme.Palette.positive) {
                             ForEach(remaining.prefix(12)) { match in
                                 NavigationLink(value: match) { TVMatchCard(match: match, streamCount: streamStore.count(for: match.id)) }.buttonStyle(.card)
                             }

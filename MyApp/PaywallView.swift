@@ -18,12 +18,12 @@ struct PaywallView: View {
 
     private static let features: [(icon: String, title: String, description: String, tint: Color)] = [
         ("play.circle.fill",           "Game Center",       "Roster, live leaders and deep team stats",       Theme.accent),
-        ("list.bullet.clipboard.fill", "Play by Play",      "Real-time feed of every key moment",             Color(hex: 0xFF6B35)),
-        ("rectangle.grid.2x2.fill",    "Multiscreen",       "Watch up to 4 games side by side",               Color(hex: 0x34C759)),
-        ("chart.line.uptrend.xyaxis",  "Full Standings",    "Conference & division tables with every column", Color(hex: 0x30B0C7)),
-        ("cross.case.fill",            "Injury Reports",    "League-wide injury and availability updates",    Color(hex: 0xFF453A)),
-        ("bell.badge.fill",            "Smart Alerts",      "Game reminders and close-game notifications",    Color(hex: 0xFFCC00)),
-        ("sunrise.fill",               "Morning Briefing",  "Daily 8 AM digest of today's games",            Color(hex: 0xE67E22)),
+        ("list.bullet.clipboard.fill", "Play by Play",      "Real-time feed of every key moment",             Theme.Palette.orange),
+        ("rectangle.grid.2x2.fill",    "Multiscreen",       "Watch up to 4 games side by side",               Theme.Palette.systemGreen),
+        ("chart.line.uptrend.xyaxis",  "Full Standings",    "Conference & division tables with every column", Theme.Palette.teal),
+        ("cross.case.fill",            "Injury Reports",    "League-wide injury and availability updates",    Theme.Palette.systemRed),
+        ("bell.badge.fill",            "Smart Alerts",      "Game reminders and close-game notifications",    Theme.Palette.highlightYellow),
+        ("sunrise.fill",               "Morning Briefing",  "Daily 8 AM digest of today's games",            Theme.Palette.carrot),
     ]
 
     // MARK: Derived
@@ -52,17 +52,17 @@ struct PaywallView: View {
 
     private var ctaGradient: LinearGradient {
         if isLifetimeSelected {
-            return LinearGradient(colors: [Color(hex: 0xFFD700), Color(hex: 0xE8A020)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [Theme.Palette.gold, Theme.Palette.marigold], startPoint: .topLeading, endPoint: .bottomTrailing)
         } else if isMonthlySelected {
-            return LinearGradient(colors: [Color(hex: 0x34C759), Color(hex: 0x1A9E40)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [Theme.Palette.systemGreen, Theme.Palette.fieldGreen], startPoint: .topLeading, endPoint: .bottomTrailing)
         } else {
-            return LinearGradient(colors: [Theme.accent, Color(hex: 0x1A6FE8)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            return LinearGradient(colors: [Theme.accent, Theme.Palette.royal], startPoint: .topLeading, endPoint: .bottomTrailing)
         }
     }
 
     private var ctaShadowColor: Color {
-        if isLifetimeSelected { return Color(hex: 0xFFD700) }
-        if isMonthlySelected  { return Color(hex: 0x34C759) }
+        if isLifetimeSelected { return Theme.Palette.gold }
+        if isMonthlySelected  { return Theme.Palette.systemGreen }
         return Theme.accent
     }
 
@@ -77,7 +77,7 @@ struct PaywallView: View {
     var body: some View {
         ZStack {
             // Deep navy base
-            Color(hex: 0x060D1B).ignoresSafeArea()
+            Theme.Palette.midnight.ignoresSafeArea()
 
             // Subtle accent glow at the top
             RadialGradient(
@@ -139,7 +139,7 @@ struct PaywallView: View {
             HStack(spacing: 8) {
                 BrandMark()
                 Text("PREMIUM")
-                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .font(Theme.Typography.overline)
                     .foregroundStyle(.black)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)
@@ -159,10 +159,10 @@ struct PaywallView: View {
                 Text("7-day free trial — no charge today")
                     .font(.caption.weight(.semibold))
             }
-            .foregroundStyle(Color(hex: 0x34C759))
+            .foregroundStyle(Theme.Palette.systemGreen)
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
-            .background(Color(hex: 0x34C759).opacity(0.12), in: Capsule())
+            .background(Theme.Palette.systemGreen.opacity(0.12), in: Capsule())
         }
         .padding(.top, 8)
     }
@@ -238,7 +238,7 @@ struct PaywallView: View {
                 planCard(
                     id: EntitlementStore.lifetimeID,
                     badge: "BEST VALUE",
-                    badgeColor: Color(hex: 0xFFCC00),
+                    badgeColor: Theme.Palette.highlightYellow,
                     label: "LIFETIME",
                     price: entitlements.lifetimeProduct?.displayPrice ?? "$24.99",
                     period: "one-time",
@@ -256,7 +256,7 @@ struct PaywallView: View {
 
     private var monthlyPlanCard: some View {
         let isSelected = isMonthlySelected
-        let cardColor = Color(hex: 0x34C759)
+        let cardColor = Theme.Palette.systemGreen
 
         return Button {
             withAnimation(.spring(duration: 0.22)) { selectedID = EntitlementStore.monthlyID }
@@ -267,11 +267,11 @@ struct PaywallView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("MOST POPULAR")
-                        .font(.system(size: 10, weight: .black))
+                        .font(Theme.Typography.overline)
                         .foregroundStyle(isSelected ? cardColor : .white.opacity(0.35))
                     Spacer()
                     Text("7 DAYS FREE")
-                        .font(.system(size: 9, weight: .black))
+                        .font(Theme.Typography.overline)
                         .foregroundStyle(.black)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 4)
@@ -288,7 +288,7 @@ struct PaywallView: View {
                 }
 
                 Text("Free for 7 days · then billed monthly · cancel anytime")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(Theme.Typography.caption)
                     .foregroundStyle(.white.opacity(0.5))
             }
             .padding(.horizontal, 16)
@@ -328,7 +328,7 @@ struct PaywallView: View {
                 } label: {
                     VStack(spacing: 4) {
                         Text("SAVE 25%")
-                            .font(.system(size: 9, weight: .black))
+                            .font(Theme.Typography.overline)
                             .foregroundStyle(.black)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
@@ -340,7 +340,7 @@ struct PaywallView: View {
                             .font(.system(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(.white)
                         Text("per year")
-                            .font(.system(size: 9, weight: .medium))
+                            .font(Theme.Typography.overline)
                             .foregroundStyle(.white.opacity(0.45))
                     }
                     .padding(.vertical, 12)
@@ -359,11 +359,11 @@ struct PaywallView: View {
                 } label: {
                     VStack(spacing: 4) {
                         Text("ONE-TIME")
-                            .font(.system(size: 9, weight: .black))
+                            .font(Theme.Typography.overline)
                             .foregroundStyle(.black)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
-                            .background(Color(hex: 0xFFCC00), in: Capsule())
+                            .background(Theme.Palette.highlightYellow, in: Capsule())
                         Text("Lifetime")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.white)
@@ -371,13 +371,13 @@ struct PaywallView: View {
                             .font(.system(size: 15, weight: .black, design: .rounded))
                             .foregroundStyle(.white)
                         Text("one-time")
-                            .font(.system(size: 9, weight: .medium))
+                            .font(Theme.Typography.overline)
                             .foregroundStyle(.white.opacity(0.45))
                     }
                     .padding(.vertical, 12)
                     .frame(maxWidth: .infinity)
-                    .background(Color(hex: 0xFFCC00).opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color(hex: 0xFFCC00).opacity(0.35)))
+                    .background(Theme.Palette.highlightYellow.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.Palette.highlightYellow.opacity(0.35)))
                 }
                 .buttonStyle(.plain)
             }
@@ -390,7 +390,7 @@ struct PaywallView: View {
     private func planCard(id: String, badge: String?, badgeColor: Color, label: String, price: String, period: String, note: String) -> some View {
         let isSelected = selectedID == id
         let isLifetime = id == EntitlementStore.lifetimeID
-        let accentForCard: Color = isLifetime ? Color(hex: 0xFFCC00) : Theme.accent
+        let accentForCard: Color = isLifetime ? Theme.Palette.highlightYellow : Theme.accent
 
         return Button {
             withAnimation(.spring(duration: 0.22)) { selectedID = id }
@@ -401,7 +401,7 @@ struct PaywallView: View {
             ZStack(alignment: .topTrailing) {
                 VStack(alignment: .center, spacing: 4) {
                     Text(label)
-                        .font(.system(size: 11, weight: .black))
+                        .font(Theme.Typography.caption)
                         .foregroundStyle(isSelected ? accentForCard : .white.opacity(0.35))
                         .padding(.bottom, 2)
 
@@ -418,7 +418,7 @@ struct PaywallView: View {
                         .padding(.vertical, 5)
 
                     Text(note)
-                        .font(.system(size: 10, weight: .medium))
+                        .font(Theme.Typography.overline)
                         .foregroundStyle(.white.opacity(0.45))
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
@@ -595,7 +595,7 @@ struct PremiumGateOverlay: View {
 struct PremiumLockBadge: View {
     var body: some View {
         Image(systemName: "lock.fill")
-            .font(.system(size: 10, weight: .bold))
+            .font(Theme.Typography.overline)
             .foregroundStyle(.white)
             .padding(5)
             .background(Theme.accent, in: Circle())
@@ -613,7 +613,7 @@ struct PremiumSuccessOverlay: View {
 
     var body: some View {
         ZStack {
-            Color(hex: 0x060D1B).ignoresSafeArea()
+            Theme.Palette.midnight.ignoresSafeArea()
 
             RadialGradient(
                 gradient: Gradient(colors: [Theme.accent.opacity(0.18), Color.clear]),

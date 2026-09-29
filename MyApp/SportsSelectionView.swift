@@ -256,14 +256,14 @@ private struct LeaguePill: View {
             HStack(spacing: 6) {
                 if isSelected {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(Theme.Typography.caption)
                         .transition(.scale.combined(with: .opacity))
                 }
 
                 // Logo area: remote image or SF Symbol fallback
                 ZStack {
                     if let url = logoURL {
-                        AsyncImage(url: url) { phase in
+                        CachedImage(url: url) { phase in
                             switch phase {
                             case .success(let image):
                                 image

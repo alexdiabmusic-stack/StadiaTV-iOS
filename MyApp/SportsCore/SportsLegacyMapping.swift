@@ -1,5 +1,5 @@
 import Foundation
-extension BannerPlayer {
+nonisolated extension BannerPlayer {
     func toLegacyRosterAthlete() -> RosterAthlete {
         var athlete = RosterAthlete(
             id: aliases.first { $0.provider == .espn }?.id ?? aliases.first?.id ?? id.rawValue,
@@ -21,13 +21,13 @@ extension BannerPlayer {
     }
 }
 
-extension BannerStandingGroup {
+nonisolated extension BannerStandingGroup {
     func toLegacyStandingsGroup() -> StandingsGroup {
         StandingsGroup(id: id.rawValue, name: name, rows: standings.map { $0.toLegacyStandingRow() })
     }
 }
 
-extension BannerStanding {
+nonisolated extension BannerStanding {
     func toLegacyStandingRow() -> StandingRow {
         StandingRow(
             teamID: SportsIdentityResolver.providerID(from: teamID, provider: .espn)
@@ -54,7 +54,7 @@ extension BannerStanding {
     }
 }
 
-extension BannerLeader {
+nonisolated extension BannerLeader {
     func toLegacyLeaderBoard() -> LeaderBoard {
         LeaderBoard(
             id: id.rawValue,
@@ -78,7 +78,7 @@ extension BannerLeader {
     }
 }
 
-extension BannerInjury {
+nonisolated extension BannerInjury {
     func toLegacyLeagueInjury() -> LeagueInjury {
         LeagueInjury(
             id: id.rawValue,
@@ -92,7 +92,7 @@ extension BannerInjury {
     }
 }
 
-extension BannerNewsArticle {
+nonisolated extension BannerNewsArticle {
     func toLegacyArticle(league: League) -> ESPNArticle {
         // Prefer author byline; fall back to publisher name for attribution.
         let displayByline = authorByline ?? publisher ?? sourceName

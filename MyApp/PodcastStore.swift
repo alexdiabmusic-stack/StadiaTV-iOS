@@ -79,7 +79,8 @@ final class PodcastStore: ObservableObject {
 
     init() {
         loadPersistedState()
-        loadBundledCatalog()
+        // The bundled catalogs (~340 KB of JSON) are decoded lazily off the main thread;
+        // see ensureCatalogLoaded().
         setupRemoteCommands()
         prefetchTopArtwork()
         setupAppLifecycleObservers()
@@ -89,6 +90,9 @@ final class PodcastStore: ObservableObject {
 
     private func prefetchTopArtwork() {
         Task(priority: .background) {
+            // Deferred so it doesn't compete with launch work or the first stream.
+            try? await Task.sleep(for: .seconds(5))
+            await ensureCatalogLoaded()
             // Pre-warm URLCache for feeds with artwork URLs already known from catalog
             for feed in catalog.prefix(24) {
                 let key = feed.feedURL.absoluteString
@@ -108,29 +112,47 @@ final class PodcastStore: ObservableObject {
 
     // MARK: - Catalog loading
 
-    private func loadBundledCatalog() {
+    private var catalogLoadTask: Task<Void, Never>?
+
+    /// Loads the bundled catalogs once, decoding them off the main thread.
+    /// Call from podcast UI (and any flow that needs `catalog`/`teamSeeds`); repeat calls await the same load.
+    func ensureCatalogLoaded() async {
+        if let catalogLoadTask {
+            await catalogLoadTask.value
+            return
+        }
+        let task = Task { [weak self] in
+            let loaded = await Task.detached(priority: .utility) { PodcastStore.decodeBundledCatalogs() }.value
+            self?.applyBundledCatalogs(feeds: loaded.feeds, seeds: loaded.seeds)
+        }
+        catalogLoadTask = task
+        await task.value
+    }
+
+    nonisolated private static func decodeBundledCatalogs() -> (feeds: [PodcastCatalog.CatalogFeed], seeds: [TeamPodcastSeed]) {
         var allFeeds: [PodcastCatalog.CatalogFeed] = []
         var seenURLs = Set<String>()
-
-        // Primary curated catalog
-        if let url = Bundle.main.url(forResource: "sports_podcast_rss_catalog_v2", withExtension: "json"),
-           let data = try? Data(contentsOf: url),
-           let decoded = try? JSONDecoder().decode(PodcastCatalog.self, from: data) {
+        // Primary curated catalog, then the DB-derived supplemental catalog
+        // (higher volume, includes pre-seeded artwork URLs).
+        for resource in ["sports_podcast_rss_catalog_v2", "sports_db_catalog"] {
+            guard let url = Bundle.main.url(forResource: resource, withExtension: "json"),
+                  let data = try? Data(contentsOf: url),
+                  let decoded = try? JSONDecoder().decode(PodcastCatalog.self, from: data) else { continue }
             for feed in decoded.feeds where seenURLs.insert(feed.feedURL.absoluteString).inserted {
                 allFeeds.append(feed)
             }
         }
-
-        // DB-derived supplemental catalog (higher volume, includes pre-seeded artwork URLs)
-        if let url = Bundle.main.url(forResource: "sports_db_catalog", withExtension: "json"),
+        var seeds: [TeamPodcastSeed] = []
+        if let url = Bundle.main.url(forResource: "sports_team_podcast_coverage", withExtension: "json"),
            let data = try? Data(contentsOf: url),
-           let decoded = try? JSONDecoder().decode(PodcastCatalog.self, from: data) {
-            for feed in decoded.feeds where seenURLs.insert(feed.feedURL.absoluteString).inserted {
-                allFeeds.append(feed)
-            }
+           let decoded = try? JSONDecoder().decode(TeamPodcastRegistry.self, from: data) {
+            seeds = decoded.teams
         }
+        return (allFeeds, seeds)
+    }
 
-        catalog = allFeeds
+    private func applyBundledCatalogs(feeds: [PodcastCatalog.CatalogFeed], seeds: [TeamPodcastSeed]) {
+        catalog = feeds
 
         // Pre-seed artwork cache from catalog entries that ship with an image URL
         for feed in catalog {
@@ -144,12 +166,7 @@ final class PodcastStore: ObservableObject {
                 )
             }
         }
-
-        if let url = Bundle.main.url(forResource: "sports_team_podcast_coverage", withExtension: "json"),
-           let data = try? Data(contentsOf: url),
-           let decoded = try? JSONDecoder().decode(TeamPodcastRegistry.self, from: data) {
-            teamSeeds = Dictionary(uniqueKeysWithValues: decoded.teams.map { ($0.id, $0) })
-        }
+        teamSeeds = Dictionary(seeds.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     // MARK: - Catalog queries
@@ -288,6 +305,7 @@ final class PodcastStore: ObservableObject {
         async let matcherResult = PodcastMatcher.shared.findPodcasts(for: team, max: 20)
         async let piSearchResult = api.searchPodcasts(query: team.displayName, max: 30)
 
+        await ensureCatalogLoaded()
         var applePodcasts: [Podcast] = []
         let seedID = seedID(for: team)
         let seed = teamSeeds[seedID]
@@ -582,6 +600,35 @@ final class PodcastStore: ObservableObject {
                 self?.handleWillEnterForeground()
             }
         }
+
+        // The live TV player owns the lock-screen controls while it's on screen.
+        NotificationCenter.default.addObserver(
+            forName: .bannerVideoTookRemoteCommands,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.releaseRemoteCommands() }
+        }
+        NotificationCenter.default.addObserver(
+            forName: .bannerVideoReleasedRemoteCommands,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.setupRemoteCommands()
+                if let episode = self.nowPlaying { self.configureNowPlaying(for: episode) }
+            }
+        }
+
+        // A live TV stream is starting; don't keep the episode playing over it.
+        NotificationCenter.default.addObserver(
+            forName: .bannerVideoPlaybackWillStart,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.isPlaying else { return }
+                self.togglePlayPause()
+            }
+        }
     }
 
     private func handleDidEnterBackground() {
@@ -680,49 +727,61 @@ final class PodcastStore: ObservableObject {
 
     // MARK: - Remote Command Center
 
+    /// Target tokens, kept so the live TV player can take over the remote commands
+    /// (lock screen, Control Center, AirPods) while it's on screen.
+    private var remoteCommandTargets: [(MPRemoteCommand, Any)] = []
+
     private func setupRemoteCommands() {
+        guard remoteCommandTargets.isEmpty else { return }
         let center = MPRemoteCommandCenter.shared()
 
         center.playCommand.isEnabled = true
-        center.playCommand.addTarget { [weak self] _ in
+        remoteCommandTargets.append((center.playCommand, center.playCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in self?.togglePlayPause() }
             return .success
-        }
+        }))
 
         center.pauseCommand.isEnabled = true
-        center.pauseCommand.addTarget { [weak self] _ in
+        remoteCommandTargets.append((center.pauseCommand, center.pauseCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in self?.togglePlayPause() }
             return .success
-        }
+        }))
 
         center.togglePlayPauseCommand.isEnabled = true
-        center.togglePlayPauseCommand.addTarget { [weak self] _ in
+        remoteCommandTargets.append((center.togglePlayPauseCommand, center.togglePlayPauseCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in self?.togglePlayPause() }
             return .success
-        }
+        }))
 
         center.skipForwardCommand.isEnabled = true
         center.skipForwardCommand.preferredIntervals = [30]
-        center.skipForwardCommand.addTarget { [weak self] event in
+        remoteCommandTargets.append((center.skipForwardCommand, center.skipForwardCommand.addTarget { [weak self] event in
             guard let e = event as? MPSkipIntervalCommandEvent else { return .commandFailed }
             Task { @MainActor [weak self] in self?.skip(seconds: e.interval) }
             return .success
-        }
+        }))
 
         center.skipBackwardCommand.isEnabled = true
         center.skipBackwardCommand.preferredIntervals = [15]
-        center.skipBackwardCommand.addTarget { [weak self] event in
+        remoteCommandTargets.append((center.skipBackwardCommand, center.skipBackwardCommand.addTarget { [weak self] event in
             guard let e = event as? MPSkipIntervalCommandEvent else { return .commandFailed }
             Task { @MainActor [weak self] in self?.skip(seconds: -e.interval) }
             return .success
-        }
+        }))
 
         center.changePlaybackPositionCommand.isEnabled = true
-        center.changePlaybackPositionCommand.addTarget { [weak self] event in
+        remoteCommandTargets.append((center.changePlaybackPositionCommand, center.changePlaybackPositionCommand.addTarget { [weak self] event in
             guard let e = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
             Task { @MainActor [weak self] in self?.seek(to: e.positionTime) }
             return .success
+        }))
+    }
+
+    private func releaseRemoteCommands() {
+        for (command, target) in remoteCommandTargets {
+            command.removeTarget(target)
         }
+        remoteCommandTargets.removeAll()
     }
 
     // MARK: - Persistence

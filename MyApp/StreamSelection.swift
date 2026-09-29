@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import CoreMedia
 import Combine
+import os
 
 struct StreamRuntimeMetadata: Equatable, Hashable {
     var width: Int?
@@ -45,18 +46,36 @@ struct RankedStreamCandidate: Identifiable, Hashable {
     var id: String { stream.id }
 }
 
+/// Ranking inputs that come from user settings rather than the stream itself.
+enum StreamRankingSettings {
+    /// Mirrors `UserPreferences.preferUHDStreams`; kept here so ranking stays a pure function.
+    static var preferUHD = false
+}
+
 enum StreamRanker {
+    /// Orders streams for Auto: the last stream that started successfully, then
+    /// 1080p, 720p, 4K, SD, unknown (4K first when `preferUHD`), H.264 ahead of HEVC at
+    /// equal resolution, backups last. Recently failed streams sink to the bottom.
     static func ranked(
         streams: [ChannelStream],
         runtimeMetadata: [String: StreamRuntimeMetadata] = [:],
         failureRecords: [String: StreamFailureRecord] = [:],
+        health: [String: StreamHealthStore.Record] = [:],
+        preferUHD: Bool = StreamRankingSettings.preferUHD,
         now: Date = Date()
     ) -> [RankedStreamCandidate] {
+        let lastKnownGoodID = health
+            .filter { entry in streams.contains { $0.id == entry.key } && entry.value.lastOutcomeWasSuccess }
+            .max { ($0.value.lastSuccess ?? .distantPast) < ($1.value.lastSuccess ?? .distantPast) }?
+            .key
         let base = streams.enumerated().map { index, stream in
             makeCandidate(stream: stream,
                           index: index,
                           metadata: runtimeMetadata[stream.id],
                           failure: failureRecords[stream.id],
+                          healthRecord: health[stream.id],
+                          isLastKnownGood: stream.id == lastKnownGoodID,
+                          preferUHD: preferUHD,
                           now: now)
         }
         let duplicateCounts = Dictionary(grouping: base, by: { $0.primaryLabel }).mapValues(\.count)
@@ -103,6 +122,9 @@ enum StreamRanker {
         index: Int,
         metadata: StreamRuntimeMetadata?,
         failure: StreamFailureRecord?,
+        healthRecord: StreamHealthStore.Record?,
+        isLastKnownGood: Bool,
+        preferUHD: Bool,
         now: Date
     ) -> RankedStreamCandidate {
         let quality = qualityLabel(for: stream, metadata: metadata)
@@ -111,14 +133,20 @@ enum StreamRanker {
         let isAlternate = stream.isAlternateHint || index > 0
         let isUnavailable = failure?.recentlyFailedUntil.map { $0 > now } ?? false
         let health: StreamHealth = isUnavailable ? .unavailable : ((failure?.failureCount ?? 0) >= 2 ? .unstable : .unknown)
-        var score = stream.resolution.rawValue * 100
-        if metadata?.hasVideoSize == true { score += 40 }
-        if codec == "HEVC" { score += 8 }
-        if codec == "H.264" { score += 5 }
+        var score = resolutionTierScore(for: stream, metadata: metadata, preferUHD: preferUHD)
+        if metadata?.hasVideoSize == true { score += 20 }
+        if codec == "H.264" { score += 8 }
+        if codec == "HEVC" { score += preferUHD ? 6 : 2 }
         if isAlternate { score -= 8 }
-        if isBackup { score -= 18 }
+        if isBackup { score -= 1_000 }
         if health == .unstable { score -= 80 }
-        if health == .unavailable { score -= 500 }
+        if health == .unavailable { score -= 5_000 }
+        if isLastKnownGood, health != .unavailable { score += 2_000 }
+        // A stream whose last outcome was a failure (in an earlier session) drops within its tier.
+        if let healthRecord, !healthRecord.lastOutcomeWasSuccess,
+           let lastFailure = healthRecord.lastFailure, now.timeIntervalSince(lastFailure) < 86_400 {
+            score -= 60
+        }
 
         var details: [String] = []
         if let codec { details.append(codec) }
@@ -133,6 +161,27 @@ enum StreamRanker {
                                      primaryLabel: quality,
                                      detailLabel: details.isEmpty ? nil : details.joined(separator: " • "),
                                      sortKey: sortValue(for: stream, metadata: metadata))
+    }
+
+    /// FHD > HD > UHD > SD > unknown by default; UHD first when the user prefers 4K.
+    /// 4K mirrors are usually the slowest to start and often HEVC, so they aren't the default.
+    private static func resolutionTierScore(for stream: ChannelStream, metadata: StreamRuntimeMetadata?, preferUHD: Bool) -> Int {
+        let resolution: StreamResolution
+        if let height = metadata?.height, height > 0 {
+            if height >= 2160 { resolution = .uhd }
+            else if height >= 1080 { resolution = .fhd }
+            else if height >= 720 { resolution = .hd }
+            else { resolution = .sd }
+        } else {
+            resolution = stream.resolution
+        }
+        switch resolution {
+        case .uhd: return preferUHD ? 600 : 300
+        case .fhd: return 500
+        case .hd: return 400
+        case .sd: return 200
+        case .unknown: return 100
+        }
     }
 
     static func qualityLabel(for stream: ChannelStream, metadata: StreamRuntimeMetadata?) -> String {
@@ -186,24 +235,65 @@ final class StreamSelectionState: ObservableObject {
     @Published private(set) var switchState: StreamSwitchState = .idle
     @Published private(set) var runtimeMetadata: [String: StreamRuntimeMetadata] = [:]
     @Published private(set) var failureRecords: [String: StreamFailureRecord] = [:]
+    /// Incremented whenever the player should (re)load `activeChannel`: a channel reset,
+    /// a source change, a failover, or a retry of the same source.
+    @Published private(set) var loadToken = 0
 
-    let canonicalChannel: CanonicalChannel?
-    let fallbackChannel: Channel
+    private(set) var canonicalChannel: CanonicalChannel?
+    private(set) var fallbackChannel: Channel
+    /// Candidates in their given order when there is no canonical channel
+    /// (a plain channel, or the ranked sources of a match).
+    private var rawStreams: [ChannelStream] = []
+    private var rawChannels: [String: Channel] = [:]
 
     private static var sessionManualSelections: [String: String] = [:]
     private var attemptedAutoStreamIDs: Set<String> = []
     private let cooldown: TimeInterval = 90
+    /// Maximum number of match sources offered for failover and cycling.
+    static let maxRawCandidates = 8
 
-    init(channel: Channel, canonicalChannel: CanonicalChannel? = nil) {
+    /// - Parameters:
+    ///   - candidates: alternative channels for the same content, used when there is no
+    ///     canonical channel (e.g. a match's ranked sources). `channel` is always tried first.
+    init(channel: Channel, canonicalChannel: CanonicalChannel? = nil, candidates: [Channel] = []) {
         self.fallbackChannel = channel
+        configure(channel: channel, canonicalChannel: canonicalChannel, candidates: candidates, preferredStreamID: nil)
+    }
+
+    /// Switches to a different channel, keeping per-stream failure history.
+    /// - Parameter preferredStreamID: start on this stream if it belongs to the channel
+    ///   (e.g. the exact mirror the user picked from a list); Auto can still fail over.
+    func reset(to channel: Channel, canonicalChannel: CanonicalChannel?, candidates: [Channel] = [], preferredStreamID: String? = nil) {
+        configure(channel: channel, canonicalChannel: canonicalChannel, candidates: candidates, preferredStreamID: preferredStreamID)
+        loadToken &+= 1
+    }
+
+    private func configure(channel: Channel, canonicalChannel: CanonicalChannel?, candidates: [Channel], preferredStreamID: String?) {
+        fallbackChannel = channel
         self.canonicalChannel = canonicalChannel
+        rawStreams = []
+        rawChannels = [:]
+        if canonicalChannel == nil {
+            var seen = Set<String>()
+            let ordered = ([channel] + candidates).filter { seen.insert($0.id).inserted }.prefix(Self.maxRawCandidates)
+            rawStreams = ordered.map(Self.stream(from:))
+            rawChannels = Dictionary(uniqueKeysWithValues: ordered.map { ($0.id, $0) })
+        }
+        mode = .auto
+        attemptedAutoStreamIDs.removeAll()
+        switchState = .idle
+
         if let canonicalChannel,
            let streamID = Self.sessionManualSelections[canonicalChannel.id],
-           canonicalChannel.allStreams.contains(where: { $0.id == streamID }) {
+           let stream = canonicalChannel.allStreams.first(where: { $0.id == streamID }) {
             mode = .manual(streamID)
-            activeStream = canonicalChannel.allStreams.first { $0.id == streamID }
-        } else if let canonicalChannel {
-            selectBestAutoStream(for: canonicalChannel)
+            activeStream = stream
+            autoSelectedStream = nil
+        } else if let preferredStreamID, let stream = usableStreams.first(where: { $0.id == preferredStreamID }) {
+            activeStream = stream
+            autoSelectedStream = stream
+        } else {
+            selectBestAutoStream()
         }
     }
 
@@ -212,12 +302,13 @@ final class StreamSelectionState: ObservableObject {
     }
 
     var usableStreams: [ChannelStream] {
-        canonicalChannel?.allStreams ?? []
+        canonicalChannel?.allStreams ?? rawStreams
     }
 
     var activeChannel: Channel {
-        guard let canonicalChannel, let stream = activeStream else { return fallbackChannel }
-        return canonicalChannel.channel(for: stream)
+        guard let stream = activeStream else { return fallbackChannel }
+        if let canonicalChannel { return canonicalChannel.channel(for: stream) }
+        return rawChannels[stream.id] ?? fallbackChannel
     }
 
     var displayCandidates: [RankedStreamCandidate] {
@@ -250,31 +341,32 @@ final class StreamSelectionState: ObservableObject {
         mode = .auto
         if let canonicalChannel {
             Self.sessionManualSelections[canonicalChannel.id] = nil
-            attemptedAutoStreamIDs.removeAll()
-            switchState = .switching
-            selectBestAutoStream(for: canonicalChannel)
-            switchState = .idle
         }
+        attemptedAutoStreamIDs.removeAll()
+        switchState = .idle
+        selectBestAutoStream()
+        loadToken &+= 1
         logSelection(reason: "user_auto")
     }
 
     func selectManual(streamID: String) {
-        guard let canonicalChannel,
-              let stream = canonicalChannel.allStreams.first(where: { $0.id == streamID }) else { return }
+        guard let stream = usableStreams.first(where: { $0.id == streamID }) else { return }
         mode = .manual(streamID)
-        Self.sessionManualSelections[canonicalChannel.id] = streamID
-        switchState = .switching
-        activeStream = stream
+        if let canonicalChannel {
+            Self.sessionManualSelections[canonicalChannel.id] = streamID
+        }
         switchState = .idle
+        activeStream = stream
+        loadToken &+= 1
         logSelection(reason: "user_manual")
     }
 
+    /// Reloads the current source after clearing its failure record.
     func retryActiveStream() {
-        guard let activeStream else { return }
-        clearFailure(for: activeStream.id)
-        switchState = .switching
-        self.activeStream = activeStream
+        if let activeStream { clearFailure(for: activeStream.id) }
+        attemptedAutoStreamIDs.removeAll()
         switchState = .idle
+        loadToken &+= 1
     }
 
     func handlePlaybackFailure(message: String = "Couldn't play this stream.") {
@@ -292,41 +384,88 @@ final class StreamSelectionState: ObservableObject {
         }
     }
 
+    /// Clears the cooldown on a stream that just started, so it isn't shown as unavailable.
+    func recordPlaybackSuccess(streamID: String) {
+        guard var record = failureRecords[streamID] else { return }
+        record.recentlyFailedUntil = nil
+        failureRecords[streamID] = record
+    }
+
     func updateRuntimeMetadata(_ metadata: StreamRuntimeMetadata, for streamID: String) {
         runtimeMetadata[streamID] = metadata
-        if case .auto = mode, let canonicalChannel {
-            autoSelectedStream = activeStream ?? StreamRanker.ranked(streams: canonicalChannel.allStreams,
-                                                                    runtimeMetadata: runtimeMetadata,
-                                                                    failureRecords: failureRecords).first?.stream
+        if case .auto = mode {
+            autoSelectedStream = activeStream ?? autoOrderedStreams().first
+        }
+    }
+
+    /// Probes the next two Auto candidates in parallel and marks dead ones unavailable,
+    /// so a failover skips them instead of waiting out the start-up watchdog.
+    func preflightAlternates() async {
+        let activeID = activeStream?.id
+        let targets = autoOrderedStreams()
+            .filter { $0.id != activeID && !isUnavailable($0.id) }
+            .prefix(2)
+            .map { stream -> (id: String, url: URL, headers: [String: String]?) in
+                let channel = channel(for: stream)
+                return (stream.id, channel.streamURL, channel.httpHeaders)
+            }
+        guard !targets.isEmpty else { return }
+        let results = await withTaskGroup(of: (String, StreamPreflight.Result).self) { group in
+            for target in targets {
+                group.addTask { (target.id, await StreamPreflight.probe(url: target.url, headers: target.headers)) }
+            }
+            var collected: [(String, StreamPreflight.Result)] = []
+            for await result in group { collected.append(result) }
+            return collected
+        }
+        for (streamID, result) in results where result == .dead {
+            PlaybackMetrics.logger.info("Preflight: candidate \(streamID, privacy: .private) unreachable; skipping it for failover")
+            recordFailure(for: streamID)
         }
     }
 
     private func failoverFromAuto(message: String) {
-        guard let canonicalChannel else {
-            switchState = .failed(message)
-            return
-        }
-        let candidates = StreamRanker.ranked(streams: canonicalChannel.allStreams,
-                                            runtimeMetadata: runtimeMetadata,
-                                            failureRecords: failureRecords)
-        if let next = candidates.first(where: { !attemptedAutoStreamIDs.contains($0.stream.id) && $0.health != .unavailable })?.stream {
-            switchState = .switching
+        if let next = autoOrderedStreams().first(where: { !attemptedAutoStreamIDs.contains($0.id) && !isUnavailable($0.id) }) {
+            switchState = .idle
             activeStream = next
             autoSelectedStream = next
-            switchState = .idle
+            loadToken &+= 1
             logSelection(reason: "auto_failover")
         } else {
             switchState = .failed(message)
         }
     }
 
-    private func selectBestAutoStream(for canonicalChannel: CanonicalChannel) {
-        let candidates = StreamRanker.ranked(streams: canonicalChannel.allStreams,
-                                            runtimeMetadata: runtimeMetadata,
-                                            failureRecords: failureRecords)
-        activeStream = candidates.first?.stream ?? canonicalChannel.primaryStream ?? canonicalChannel.fallbackStreams.first
+    private func selectBestAutoStream() {
+        activeStream = autoOrderedStreams().first
+            ?? canonicalChannel?.primaryStream
+            ?? canonicalChannel?.fallbackStreams.first
+            ?? rawStreams.first
         autoSelectedStream = activeStream
         logSelection(reason: "auto_rank")
+    }
+
+    /// Canonical channels are ranked; raw candidates (match sources) keep their given
+    /// order because it already reflects how well each source matches the event.
+    private func autoOrderedStreams() -> [ChannelStream] {
+        if canonicalChannel != nil {
+            let streams = usableStreams
+            return StreamRanker.ranked(streams: streams,
+                                       runtimeMetadata: runtimeMetadata,
+                                       failureRecords: failureRecords,
+                                       health: StreamHealthStore.shared.records(for: streams.map(\.id)))
+                .map(\.stream)
+        }
+        return rawStreams.filter { !isUnavailable($0.id) } + rawStreams.filter { isUnavailable($0.id) }
+    }
+
+    private func channel(for stream: ChannelStream) -> Channel {
+        if let canonicalChannel { return canonicalChannel.channel(for: stream) }
+        return rawChannels[stream.id] ?? fallbackChannel
+    }
+
+    private func isUnavailable(_ streamID: String, now: Date = Date()) -> Bool {
+        failureRecords[streamID]?.recentlyFailedUntil.map { $0 > now } ?? false
     }
 
     private func recordFailure(for streamID: String) {
@@ -339,6 +478,25 @@ final class StreamSelectionState: ObservableObject {
 
     private func clearFailure(for streamID: String) {
         failureRecords[streamID] = nil
+    }
+
+    private static func stream(from channel: Channel) -> ChannelStream {
+        var stream = ChannelStream(
+            id: channel.id,
+            providerChannelId: channel.id,
+            originalName: channel.name,
+            normalizedName: channel.name.lowercased(),
+            streamURL: channel.streamURL,
+            tvgId: channel.tvgId,
+            tvgName: channel.name,
+            tvgLogoURL: channel.logoURL,
+            groupTitle: channel.group,
+            resolution: StreamResolution.detect(from: channel.name),
+            playlistID: channel.playlistID,
+            playlistName: channel.playlistName
+        )
+        stream.httpHeaders = channel.httpHeaders
+        return stream
     }
 
     private func logSelection(reason: String) {
@@ -359,7 +517,8 @@ extension CanonicalChannel {
                 logoURL: effectiveLogoURL ?? stream.tvgLogoURL,
                 group: categoryId,
                 playlistID: stream.playlistID,
-                playlistName: stream.playlistName)
+                playlistName: stream.playlistName,
+                httpHeaders: stream.httpHeaders)
     }
 }
 
@@ -376,6 +535,11 @@ extension ChannelStream {
 }
 
 enum StreamMetadataReader {
+    /// Reads resolution, codec, frame rate and bitrate for the stream that is actually playing.
+    ///
+    /// HLS assets never expose tracks on the `AVURLAsset`; they only appear on
+    /// `AVPlayerItem.tracks` once variants are loaded, so read from there. Bitrate comes
+    /// from the access log because HLS asset tracks don't report `estimatedDataRate`.
     static func metadata(from playerItem: AVPlayerItem) async -> StreamRuntimeMetadata? {
         var metadata = StreamRuntimeMetadata()
         let size = playerItem.presentationSize
@@ -384,50 +548,43 @@ enum StreamMetadataReader {
             metadata.height = Int(size.height.rounded())
         }
 
-        do {
-            let tracks = try await playerItem.asset.loadTracks(withMediaType: .video)
-            if let track = tracks.first {
-                let naturalSize = try await track.load(.naturalSize)
-                if naturalSize.width > 0, naturalSize.height > 0 {
-                    metadata.width = Int(abs(naturalSize.width).rounded())
-                    metadata.height = Int(abs(naturalSize.height).rounded())
-                }
-                let frameRate = try await track.load(.nominalFrameRate)
-                if frameRate > 0 {
-                    metadata.frameRate = Double(frameRate)
-                }
-                let bitrate = try await track.load(.estimatedDataRate)
-                if bitrate > 0 {
-                    metadata.bitrate = Double(bitrate)
-                }
-                let descriptions = try await track.load(.formatDescriptions)
-                metadata.codec = descriptions.compactMap { codecName(from: $0) }.first
+        let videoTrack = playerItem.tracks.first { track in
+            track.isEnabled && track.assetTrack?.mediaType == .video
+        }
+        if let videoTrack {
+            if videoTrack.currentVideoFrameRate > 0 {
+                metadata.frameRate = Double(videoTrack.currentVideoFrameRate)
             }
-        } catch {
-            // Live streams often expose metadata late; keep any presentation size already observed.
+            if let assetTrack = videoTrack.assetTrack {
+                do {
+                    if !metadata.hasVideoSize {
+                        let naturalSize = try await assetTrack.load(.naturalSize)
+                        if naturalSize.width > 0, naturalSize.height > 0 {
+                            metadata.width = Int(abs(naturalSize.width).rounded())
+                            metadata.height = Int(abs(naturalSize.height).rounded())
+                        }
+                    }
+                    if metadata.frameRate == nil {
+                        let frameRate = try await assetTrack.load(.nominalFrameRate)
+                        if frameRate > 0 { metadata.frameRate = Double(frameRate) }
+                    }
+                    let descriptions = try await assetTrack.load(.formatDescriptions)
+                    metadata.codec = descriptions.compactMap { codecName(from: $0) }.first
+                } catch {
+                    // Live streams often expose metadata late; keep whatever was already observed.
+                }
+            }
+        }
+
+        if let event = playerItem.accessLog()?.events.last {
+            if event.indicatedBitrate > 0 {
+                metadata.bitrate = event.indicatedBitrate
+            } else if event.observedBitrate > 0 {
+                metadata.bitrate = event.observedBitrate
+            }
         }
 
         return metadata.hasVideoSize || metadata.codec != nil || metadata.frameRate != nil || metadata.bitrate != nil ? metadata : nil
-    }
-
-    /// Fetches the raw HLS playlist text and checks whether it advertises a video
-    /// rendition (`#EXT-X-STREAM-INF` with a `RESOLUTION` attribute). Used to tell a
-    /// genuinely audio-only channel apart from one where AVPlayer silently dropped
-    /// down to an audio-only rendition because it couldn't decode any video variant.
-    /// Returns `nil` when the fetch fails or the response isn't a playlist at all,
-    /// since that's inconclusive rather than evidence either way.
-    static func masterPlaylistAdvertisesVideo(at url: URL) async -> Bool? {
-        do {
-            var request = URLRequest(url: url)
-            request.timeoutInterval = 8
-            let (data, _) = try await URLSession.shared.data(for: request)
-            guard let text = String(data: data, encoding: .utf8),
-                  text.contains("#EXTM3U") else { return nil }
-            guard text.contains("#EXT-X-STREAM-INF") else { return nil }
-            return text.range(of: "RESOLUTION=", options: .caseInsensitive) != nil
-        } catch {
-            return nil
-        }
     }
 
     private static func codecName(from description: CMFormatDescription) -> String? {

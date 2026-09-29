@@ -86,7 +86,7 @@ struct TVMatchDetailView: View {
             }
         }
         .navigationTitle(match.shortName)
-        .task(id: "\(match.id)-\(playlistStore.allChannels.count)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
+        .task(id: "\(match.id)-\(playlistStore.channelsRevision)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
             await rankSources()
         }
         // A launch-time or Following-tab background scan can finish confirming this match's
@@ -334,7 +334,7 @@ private struct TVNewsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            AsyncImage(url: article.imageURL) { phase in
+            CachedImage(url: article.imageURL) { phase in
                 if case .success(let image) = phase {
                     image.resizable().scaledToFill()
                 } else {

@@ -176,7 +176,7 @@ struct TVHomeView: View {
             ? Array(viewModel.upcoming.prefix(12))
             : Array(viewModel.favoriteTeamUpcoming.prefix(12))
         if !matches.isEmpty {
-            TVShelfRow(title: "Upcoming Games", systemImage: "calendar", tint: Color(hex: 0x3DBE6B)) {
+            TVShelfRow(title: "Upcoming Games", systemImage: "calendar", tint: Theme.Palette.positive) {
                 ForEach(matches) { match in
                     NavigationLink(value: match) { TVMatchCard(match: match, streamCount: streamStore.count(for: match.id)) }.buttonStyle(.card)
                 }

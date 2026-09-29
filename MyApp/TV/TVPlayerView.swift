@@ -14,8 +14,9 @@ struct TVPlayerView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var fantasyStore: FantasyStore
 
-    @State private var player: AVPlayer?
-    @State private var isPlaying = true
+    /// Same playback engine as iOS: fast-start tuning, provider headers, watchdog and stall recovery.
+    @StateObject private var playback = PlaybackController()
+    @State private var failureMessage: String?
     @State private var isChromeVisible = true
     @State private var chromeHideTask: Task<Void, Never>?
     @State private var showMultiscreen = false
@@ -38,10 +39,9 @@ struct TVPlayerView: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            if let player {
-                TVVideoSurface(player: player)
-                    .ignoresSafeArea()
-            }
+            TVVideoSurface(controller: playback)
+                .ignoresSafeArea()
+            playbackStatus
             if let match = liveScoreMatch, prefs.showLiveScoreBadge, !isScoreDismissed {
                 VStack {
                     HStack(spacing: 10) {
@@ -87,13 +87,18 @@ struct TVPlayerView: View {
             TVPaywallView()
         }
         .onAppear {
-            setupPlayer()
+            playback.setBufferProfile(prefs.playerBufferProfile)
+            playback.onFailure = { reason in failureMessage = reason }
+            playback.onFirstFrame = { _, _ in failureMessage = nil }
+            playback.load(channel)
             watchStore.recordWatch(channel)
             revealChromeTemporarily()
         }
         .onDisappear {
-            player?.pause()
-            player = nil
+            // The controller's closures capture this view; clear them before stopping.
+            playback.onFailure = nil
+            playback.onFirstFrame = nil
+            playback.stop()
             chromeHideTask?.cancel()
         }
         .task(id: channel.id) {
@@ -156,7 +161,7 @@ struct TVPlayerView: View {
                 matches: fantasyStore.playerGames.compactMap(\.event)
             )
         }
-        .task(id: playlistStore.allChannels.count) {
+        .task(id: playlistStore.channelsRevision) {
             let channels = playlistStore.allChannels
             let current = channel
             multiscreenChannelsList = await Task.detached(priority: .utility) {
@@ -204,13 +209,14 @@ struct TVPlayerView: View {
                 Spacer()
 
                 Button { togglePlayback() } label: {
-                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                    Image(systemName: playback.isUserPaused ? "play.fill" : "pause.fill")
                         .font(.title2.weight(.bold))
                         .foregroundStyle(.white)
                         .frame(width: 44, height: 44)
                         .background(.black.opacity(0.72), in: Circle())
                 }
                 .buttonStyle(.card)
+                .accessibilityLabel(playback.isUserPaused ? "Play" : "Pause")
             }
             .padding(.horizontal, 60)
             .padding(.top, 44)
@@ -257,17 +263,39 @@ struct TVPlayerView: View {
 
     // MARK: - Helpers
 
-    private func setupPlayer() {
-        let avPlayer = AVPlayer(url: channel.streamURL)
-        avPlayer.play()
-        isPlaying = true
-        player = avPlayer
+    private func togglePlayback() {
+        playback.togglePlayPause()
     }
 
-    private func togglePlayback() {
-        guard let player else { return }
-        if isPlaying { player.pause() } else { player.play() }
-        isPlaying.toggle()
+    /// Spinner until the first frame, a reconnect pill, and a retry panel on failure.
+    @ViewBuilder
+    private var playbackStatus: some View {
+        if let failureMessage {
+            VStack(spacing: Theme.Spacing.md) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.largeTitle)
+                    .foregroundStyle(Theme.live)
+                Text(failureMessage)
+                    .font(Theme.Typography.headline)
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                Button("Try Again") {
+                    self.failureMessage = nil
+                    playback.load(channel)
+                }
+            }
+            .padding(Theme.Spacing.xl)
+            .background(.black.opacity(0.8), in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        } else if !playback.firstFrameRendered || playback.showsBufferingIndicator {
+            VStack(spacing: Theme.Spacing.sm) {
+                ProgressView()
+                if playback.reconnectAttempt > 0 {
+                    Text("Reconnecting (\(playback.reconnectAttempt)/\(PlaybackController.maxReconnectAttempts))…")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(.white)
+                }
+            }
+        }
     }
 
     private func startMultiscreen() {
@@ -337,19 +365,36 @@ struct TVPlayerView: View {
 
 // MARK: - AVPlayerLayer surface
 
+/// Attaches the controller's AVPlayer to a layer and reports the first displayable frame.
 private struct TVVideoSurface: UIViewRepresentable {
-    let player: AVPlayer
+    let controller: PlaybackController
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> TVPlayerUIView {
         let view = TVPlayerUIView()
-        view.playerLayer.player = player
+        view.playerLayer.player = controller.player
         view.playerLayer.videoGravity = .resizeAspect
         view.backgroundColor = .black
+        context.coordinator.readyObservation = view.playerLayer.observe(\.isReadyForDisplay, options: [.initial, .new]) { @Sendable [weak controller] layer, _ in
+            guard layer.isReadyForDisplay else { return }
+            Task { @MainActor [weak controller] in controller?.surfaceReadyForDisplay() }
+        }
         return view
     }
 
     func updateUIView(_ view: TVPlayerUIView, context: Context) {
-        view.playerLayer.player = player
+        if view.playerLayer.player !== controller.player {
+            view.playerLayer.player = controller.player
+        }
+    }
+
+    static func dismantleUIView(_ view: TVPlayerUIView, coordinator: Coordinator) {
+        coordinator.readyObservation?.invalidate()
+    }
+
+    final class Coordinator {
+        var readyObservation: NSKeyValueObservation?
     }
 
     class TVPlayerUIView: UIView {

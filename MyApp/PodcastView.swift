@@ -258,6 +258,7 @@ struct PodcastBrowserView: View {
                 }
             }
         }
+        .task { await store.ensureCatalogLoaded() }
     }
 
     // MARK: - Custom Navigation Bar
@@ -448,7 +449,7 @@ struct PodcastBrowserView: View {
                     HStack(spacing: 3) {
                         Text("See All")
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(Theme.Typography.caption)
                     }
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.accent)
@@ -503,7 +504,7 @@ struct PodcastBrowserView: View {
                 HStack(spacing: 4) {
                     Text(sortOption == .recommended ? "Sort" : sortOption.rawValue)
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(Theme.Typography.caption)
                 }
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.accent)
@@ -1268,7 +1269,7 @@ ShareLink(item: podcast.feedURL) {
             } label: {
                 HStack(spacing: 5) {
                     Image(systemName: filterUnplayedOnly ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(Theme.Typography.caption)
                     Text("Unplayed")
                         .font(.system(size: 13, weight: .semibold))
                 }
@@ -1304,7 +1305,7 @@ ShareLink(item: podcast.feedURL) {
                 HStack(spacing: 4) {
                     Text(sortOrder == .newest ? "Sort" : sortOrder.rawValue)
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(Theme.Typography.caption)
                 }
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(Theme.accent)
@@ -1415,7 +1416,7 @@ struct PodcastEpisodeRow: View {
 
                     if episode.isVideo {
                         Text("VIDEO")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(Theme.Typography.overline)
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -1720,7 +1721,7 @@ struct PodcastPlayerSheet: View {
                         .multilineTextAlignment(.leading)
                     if episode.isVideo {
                         Text("VIDEO")
-                            .font(.system(size: 9, weight: .bold))
+                            .font(Theme.Typography.overline)
                             .foregroundStyle(.white)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 3)

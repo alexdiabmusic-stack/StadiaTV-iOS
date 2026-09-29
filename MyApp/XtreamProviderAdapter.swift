@@ -2,7 +2,7 @@ import Foundation
 
 /// Loads live channels from an Xtream Codes server.
 /// Category and stream fetches are parallel-friendly; decoding runs on a background thread.
-struct XtreamProviderAdapter: LiveProviderAdapter {
+nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
     let provider: LiveProvider
     private let session: URLSession
 
@@ -23,7 +23,7 @@ struct XtreamProviderAdapter: LiveProviderAdapter {
             URLQueryItem(name: "action",   value: "get_live_categories"),
         ]
         guard let url = comps.url else { return [] }
-        let (data, _) = try await session.data(from: url)
+        let (data, _) = try await session.data(for: apiRequest(url))
         let cats = (try? JSONDecoder().decode([XtreamCategory].self, from: data)) ?? []
         return cats.map { AdapterGroup(id: $0.category_id, title: $0.category_name) }
     }
@@ -44,7 +44,7 @@ struct XtreamProviderAdapter: LiveProviderAdapter {
         guard let url = comps.url else {
             throw LiveProviderError.missingConfiguration("Could not build stream request URL")
         }
-        let (data, response) = try await session.data(from: url)
+        let (data, response) = try await session.data(for: apiRequest(url))
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw LiveProviderError.badResponse
         }
@@ -94,6 +94,16 @@ struct XtreamProviderAdapter: LiveProviderAdapter {
 
     // MARK: - Helpers
 
+    /// API request carrying the playlist's User-Agent, so providers that filter on it
+    /// see the same client for the API calls and the streams.
+    private func apiRequest(_ url: URL) -> URLRequest {
+        var request = URLRequest(url: url)
+        if let userAgent = provider.userAgent?.trimmingCharacters(in: .whitespaces), !userAgent.isEmpty {
+            request.setValue(userAgent, forHTTPHeaderField: StreamHTTPHeaders.userAgentKey)
+        }
+        return request
+    }
+
     private func baseComponents() throws -> (URLComponents, String, String)? {
         guard let host = provider.host, let base = URLComponents(string: host) else { return nil }
         guard let creds = try KeychainStore.xtreamCredentials(for: provider.credentialID) else {
@@ -111,7 +121,7 @@ struct XtreamProviderAdapter: LiveProviderAdapter {
             URLQueryItem(name: "action",   value: "get_live_categories"),
         ]
         guard let url = comps.url else { return [:] }
-        let (data, _) = try await session.data(from: url)
+        let (data, _) = try await session.data(for: apiRequest(url))
         let cats = (try? JSONDecoder().decode([XtreamCategory].self, from: data)) ?? []
         return Dictionary(uniqueKeysWithValues: cats.map { ($0.category_id, $0.category_name) })
     }

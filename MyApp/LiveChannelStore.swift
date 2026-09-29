@@ -4,7 +4,7 @@ import SQLite3
 // SQLITE_TRANSIENT tells SQLite to copy text/blob data before bind returns,
 // so the Swift string can be freed at any point after the bind call.
 private typealias SQLiteDestructor = @convention(c) (UnsafeMutableRawPointer?) -> Void
-private let kSQLiteTransient = unsafeBitCast(-1 as Int, to: SQLiteDestructor?.self)
+nonisolated private let kSQLiteTransient = unsafeBitCast(-1 as Int, to: SQLiteDestructor?.self)
 
 /// SQLite-backed persistent store for live TV channels.
 ///
@@ -41,7 +41,7 @@ actor LiveChannelStore {
         ) == SQLITE_OK else {
             throw StoreError.openFailed
         }
-        try createSchema()
+        try Self.createSchema(on: db)
     }
 
     static func inMemory() throws -> LiveChannelStore {
@@ -59,7 +59,8 @@ actor LiveChannelStore {
 
     // MARK: - Schema
 
-    private func createSchema() throws {
+    /// Static so the synchronous initializer can run it before the actor is fully set up.
+    nonisolated private static func createSchema(on db: OpaquePointer?) throws {
         let ddl = """
         PRAGMA journal_mode = WAL;
         PRAGMA foreign_keys = ON;
@@ -106,7 +107,7 @@ actor LiveChannelStore {
         CREATE INDEX IF NOT EXISTS idx_ch_tvg
             ON live_channels(tvg_id) WHERE tvg_id IS NOT NULL;
         """
-        try exec(ddl)
+        try exec(ddl, on: db)
     }
 
     // MARK: - Provider operations
@@ -313,6 +314,18 @@ actor LiveChannelStore {
         return count
     }
 
+    /// When the provider's channels were last written, or nil if never refreshed.
+    func lastRefreshed(for providerID: UUID) throws -> Date? {
+        var date: Date?
+        try withStatement("SELECT last_refreshed FROM live_providers WHERE id = ?") { stmt in
+            bindText(stmt, 1, providerID.uuidString)
+            if sqlite3_step(stmt) == SQLITE_ROW, sqlite3_column_type(stmt, 0) != SQLITE_NULL {
+                date = Date(timeIntervalSinceReferenceDate: sqlite3_column_double(stmt, 0))
+            }
+        }
+        return date
+    }
+
     func hasChannels(for providerID: UUID) throws -> Bool {
         try channelCount(for: providerID) > 0
     }
@@ -384,6 +397,10 @@ actor LiveChannelStore {
     }
 
     private func exec(_ sql: String) throws {
+        try Self.exec(sql, on: db)
+    }
+
+    nonisolated private static func exec(_ sql: String, on db: OpaquePointer?) throws {
         var errMsg: UnsafeMutablePointer<CChar>?
         guard sqlite3_exec(db, sql, nil, nil, &errMsg) == SQLITE_OK else {
             let msg = errMsg.map { String(cString: $0) } ?? "unknown error"

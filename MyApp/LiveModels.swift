@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Provider Kind
 
-enum LiveProviderKind: String, Codable, Sendable {
+nonisolated enum LiveProviderKind: String, Codable, Sendable {
     case m3u
     case xtream
 }
@@ -11,7 +11,7 @@ enum LiveProviderKind: String, Codable, Sendable {
 
 /// Canonical representation of a live TV source.
 /// Maps 1:1 to the existing Playlist type so both describe the same source.
-struct LiveProvider: Identifiable, Codable, Sendable, Hashable {
+nonisolated struct LiveProvider: Identifiable, Codable, Sendable, Hashable {
     let id: UUID
     var name: String
     var kind: LiveProviderKind
@@ -22,6 +22,8 @@ struct LiveProvider: Identifiable, Codable, Sendable, Hashable {
     var addedAt: Date
     var lastRefreshedAt: Date?
     var channelCount: Int
+    /// Playlist-level User-Agent; used for playlist/API requests and streams without their own.
+    var userAgent: String?
 
     init(playlist: Playlist) {
         self.id = playlist.id
@@ -34,6 +36,7 @@ struct LiveProvider: Identifiable, Codable, Sendable, Hashable {
         self.addedAt = Date()
         self.lastRefreshedAt = nil
         self.channelCount = 0
+        self.userAgent = playlist.userAgent
     }
 
     static func == (lhs: LiveProvider, rhs: LiveProvider) -> Bool { lhs.id == rhs.id }
@@ -43,7 +46,7 @@ struct LiveProvider: Identifiable, Codable, Sendable, Hashable {
 // MARK: - Live Group
 
 /// A channel group/category within a provider.
-struct LiveGroup: Identifiable, Codable, Sendable, Hashable {
+nonisolated struct LiveGroup: Identifiable, Codable, Sendable, Hashable {
     let id: String              // "\(providerID)|\(title)"
     let providerID: UUID
     let title: String
@@ -62,7 +65,7 @@ extension StreamResolution: Codable, @unchecked Sendable {}
 
 /// A single playable stream endpoint for a channel.
 /// One channel may have multiple descriptors (primary + fallbacks, different qualities).
-struct StreamDescriptor: Identifiable, Codable, Sendable, Hashable {
+nonisolated struct StreamDescriptor: Identifiable, Codable, Sendable, Hashable {
     let id: String
     let streamURL: URL
     let providerID: UUID
@@ -73,12 +76,15 @@ struct StreamDescriptor: Identifiable, Codable, Sendable, Hashable {
     var groupTitle: String?
     var archiveEnabled: Bool
     var archiveDays: Int
+    /// Per-stream HTTP headers parsed from the playlist (User-Agent, Referer, Origin…).
+    var httpHeaders: [String: String]?
 
     init(id: String, streamURL: URL, providerID: UUID,
          resolution: StreamResolution = .unknown,
          tvgID: String? = nil, tvgName: String? = nil,
          tvgLogoURL: URL? = nil, groupTitle: String? = nil,
-         archiveEnabled: Bool = false, archiveDays: Int = 0) {
+         archiveEnabled: Bool = false, archiveDays: Int = 0,
+         httpHeaders: [String: String]? = nil) {
         self.id = id
         self.streamURL = streamURL
         self.providerID = providerID
@@ -89,6 +95,7 @@ struct StreamDescriptor: Identifiable, Codable, Sendable, Hashable {
         self.groupTitle = groupTitle
         self.archiveEnabled = archiveEnabled
         self.archiveDays = archiveDays
+        self.httpHeaders = httpHeaders
     }
 
     static func == (lhs: StreamDescriptor, rhs: StreamDescriptor) -> Bool { lhs.id == rhs.id }
@@ -97,7 +104,7 @@ struct StreamDescriptor: Identifiable, Codable, Sendable, Hashable {
 
 // MARK: - Catchup Capability
 
-struct CatchupCapability: Codable, Sendable, Hashable {
+nonisolated struct CatchupCapability: Codable, Sendable, Hashable {
     var isEnabled: Bool
     var daysAvailable: Int
     var type: CatchupType
@@ -117,7 +124,7 @@ struct CatchupCapability: Codable, Sendable, Hashable {
 ///   - M3U with tvg-id  → "<providerUUID>-m3u-tvg:<djb2(tvgID)>"
 ///   - M3U name-based   → "<providerUUID>-m3u:<djb2(name|group)>"
 ///   - Xtream           → "<providerUUID>-<stream_id>"  (matches legacy format exactly)
-struct LiveChannel: Identifiable, Codable, Sendable, Hashable {
+nonisolated struct LiveChannel: Identifiable, Codable, Sendable, Hashable {
     let id: String
     let providerID: UUID
     let providerKind: LiveProviderKind
@@ -159,7 +166,8 @@ struct LiveChannel: Identifiable, Codable, Sendable, Hashable {
     }
 
     /// Converts to the legacy Channel type expected by all existing UI code.
-    func asChannel(playlistName: String = "") -> Channel {
+    /// `defaultUserAgent` is the playlist-level User-Agent, applied when the stream has none.
+    func asChannel(playlistName: String = "", defaultUserAgent: String? = nil) -> Channel {
         Channel(
             id: id,
             name: name,
@@ -168,7 +176,8 @@ struct LiveChannel: Identifiable, Codable, Sendable, Hashable {
             group: groupTitle,
             playlistID: providerID,
             playlistName: playlistName,
-            tvgId: tvgID
+            tvgId: tvgID,
+            httpHeaders: StreamHTTPHeaders.merged(primaryStream?.httpHeaders, defaultUserAgent: defaultUserAgent)
         )
     }
 
@@ -179,7 +188,7 @@ struct LiveChannel: Identifiable, Codable, Sendable, Hashable {
 // MARK: - Channel Preferences
 
 /// Per-channel user overlay. Provider refreshes never modify these.
-struct ChannelPreferences: Codable, Sendable, Hashable {
+nonisolated struct ChannelPreferences: Codable, Sendable, Hashable {
     let channelID: String
     var customName: String?
     var isHidden: Bool
@@ -222,7 +231,7 @@ struct ChannelPreferences: Codable, Sendable, Hashable {
 
 // MARK: - Channel Sort Order
 
-enum ChannelSortOrder: String, Codable, Sendable, CaseIterable, Identifiable {
+nonisolated enum ChannelSortOrder: String, Codable, Sendable, CaseIterable, Identifiable {
     case providerOrder  = "Provider Order"
     case nameAZ         = "A → Z"
     case nameZA         = "Z → A"
@@ -236,7 +245,7 @@ enum ChannelSortOrder: String, Codable, Sendable, CaseIterable, Identifiable {
 // MARK: - Custom Group
 
 /// A user-created channel group that can span multiple providers.
-struct CustomGroup: Identifiable, Codable, Sendable, Hashable {
+nonisolated struct CustomGroup: Identifiable, Codable, Sendable, Hashable {
     var id: String
     var name: String
     var sortOrder: Int
@@ -257,7 +266,7 @@ struct CustomGroup: Identifiable, Codable, Sendable, Hashable {
 
 /// Per-provider-group user overlay: hide, rename, custom sort position.
 /// Group ID format: "\(providerUUID)|\(groupTitle)"
-struct GroupPreferences: Codable, Sendable, Hashable {
+nonisolated struct GroupPreferences: Codable, Sendable, Hashable {
     let groupID: String
     var isHidden: Bool
     var customName: String?

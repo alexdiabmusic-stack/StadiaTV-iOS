@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Production RSS 2.0 + Atom parser
 
-final class BannerRSSParser: NSObject, XMLParserDelegate {
+nonisolated final class BannerRSSParser: NSObject, XMLParserDelegate {
     struct ParsedItem {
         var title: String?
         var link: String?

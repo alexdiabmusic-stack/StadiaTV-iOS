@@ -42,7 +42,7 @@ struct PlaylistsView: View {
         }
         .listStyle(.plain)
         .hidesScrollContentBackground()
-        .refreshable { await store.refreshAll() }
+        .refreshable { await store.refreshAll(force: true) }
     }
 
     private var emptyState: some View {
@@ -127,6 +127,7 @@ struct AddPlaylistView: View {
     @State private var host: String
     @State private var username = ""
     @State private var password = ""
+    @State private var userAgent: String
 
     init(initialPlaylist: Playlist? = nil, onAdd: @escaping (Playlist) -> Void) {
         self.initialPlaylist = initialPlaylist
@@ -135,6 +136,7 @@ struct AddPlaylistView: View {
         _name = State(initialValue: initialPlaylist?.name ?? "")
         _m3uURL = State(initialValue: initialPlaylist?.m3uURL ?? "")
         _host = State(initialValue: initialPlaylist?.host ?? "")
+        _userAgent = State(initialValue: initialPlaylist?.userAgent ?? "")
     }
 
     private var isValid: Bool {
@@ -193,6 +195,17 @@ struct AddPlaylistView: View {
                 }
 
                 Section {
+                    TextField("Default (Apple)", text: $userAgent)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                } header: {
+                    Text("User-Agent (Optional)")
+                } footer: {
+                    Text("Some providers only accept a specific player, e.g. VLC/3.0.20. Used for the playlist download and any channel that doesn't set its own.")
+                }
+                .listRowBackground(Theme.surface)
+
+                Section {
                     Text("Banner TV does not provide, host, or sell streaming content. This feature is intended for use with paid subscription services and personal DVR systems (such as Plex or Channels DVR) that you already subscribe to and that permit playlist export.")
                         .font(.footnote)
                         .foregroundStyle(Theme.textSecondary)
@@ -221,18 +234,21 @@ struct AddPlaylistView: View {
 
     private func add() {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        let trimmedUserAgent = userAgent.trimmingCharacters(in: .whitespaces)
         let playlist: Playlist
         switch mode {
         case .m3u:
             playlist = Playlist(id: initialPlaylist?.id ?? UUID(), name: trimmedName, kind: .m3u,
                                 m3uURL: m3uURL.trimmingCharacters(in: .whitespaces),
-                                credentialID: initialPlaylist?.credentialID)
+                                credentialID: initialPlaylist?.credentialID,
+                                userAgent: trimmedUserAgent.isEmpty ? nil : trimmedUserAgent)
         case .xtream:
             playlist = Playlist(id: initialPlaylist?.id ?? UUID(), name: trimmedName, kind: .xtream,
                                 host: host.trimmingCharacters(in: .whitespaces),
                                 credentialID: initialPlaylist?.credentialID,
                                 username: username.trimmingCharacters(in: .whitespaces),
-                                password: password)
+                                password: password,
+                                userAgent: trimmedUserAgent.isEmpty ? nil : trimmedUserAgent)
         }
         onAdd(playlist)
         dismiss()

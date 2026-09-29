@@ -47,6 +47,7 @@ struct TVGuideView: View {
                     onPlayLive: {
                         if ch.playableChannel != nil {
                             watchStore.recordWatch(ch.playableChannel!)
+                            PlaybackTapClock.record()
                             playingChannel = ch
                         }
                     },
@@ -131,6 +132,7 @@ struct TVGuideView: View {
                         onChannelSelected(channel)
                     } else {
                         if let ch = channel.playableChannel { watchStore.recordWatch(ch) }
+                        PlaybackTapClock.record()
                         playingChannel = channel
                     }
                 } onProgramTap: { programme, channel in
@@ -141,6 +143,7 @@ struct TVGuideView: View {
                             onChannelSelected(channel)
                         } else {
                             if let ch = channel.playableChannel { watchStore.recordWatch(ch) }
+                            PlaybackTapClock.record()
                             playingChannel = channel
                         }
                     } else {
@@ -229,6 +232,7 @@ struct TVGuideView: View {
                             .foregroundStyle(Theme.textSecondary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
                 }
             }
             .padding(.horizontal, 10)
@@ -420,7 +424,7 @@ struct EPGGuideGrid: View {
         ZStack {
             Theme.background
             Text("CH")
-                .font(.system(size: 10, weight: .bold))
+                .font(Theme.Typography.overline)
                 .foregroundStyle(Theme.textTertiary)
         }
         .frame(width: colW, height: rulerH)
@@ -452,30 +456,44 @@ private struct ProgrammeGridView: View {
     let onProgramTap: (EPGProgramme, CanonicalChannel) -> Void
 
     @State private var scrollPos = ScrollPosition(x: 0, y: 0)
+    /// Rows currently rendered: the visible range plus a margin, snapped to chunks so it
+    /// only changes (and re-renders the grid) every few rows of scrolling, not every frame.
+    @State private var renderedRows: Range<Int> = 0..<24
 
     private let rowH = TVGuideViewModel.rowHeight
     private let colW = TVGuideViewModel.channelColumnWidth
     private let rulerH = TVGuideViewModel.timeRulerHeight
+    private static let rowMargin = 6
+
+    private var fantasyRevision: Int {
+        var hasher = Hasher()
+        hasher.combine(fantasyStore.playerGames.count)
+        hasher.combine(fantasyStore.settings.showFantasyIndicatorsInGuide)
+        hasher.combine(nativeFantasyStore.fantasyEventContextsByEventID.count)
+        hasher.combine(nativeFantasyStore.fantasyGamesByChannelID.count)
+        return hasher.finalize()
+    }
 
     var body: some View {
+        let channels = vm.visibleChannels
+        let rows = renderedRows.clamped(to: 0..<channels.count)
         ScrollView([.horizontal, .vertical], showsIndicators: false) {
             ZStack(alignment: .topLeading) {
+                // Full content size is kept so scrolling and indicators behave as if every row existed.
                 Color.clear
                     .frame(
                         width: colW + vm.guideWindowWidth,
-                        height: rulerH + CGFloat(vm.visibleChannels.count) * rowH
+                        height: rulerH + CGFloat(channels.count) * rowH
                     )
                     .background(DirectionalLockModifier())
 
-                ForEach(Array(vm.visibleChannels.enumerated()), id: \.element.id) { i, _ in
+                ForEach(rows, id: \.self) { i in
+                    let ch = channels[i]
+                    let rowY = rulerH + CGFloat(i) * rowH
                     Divider().overlay(Theme.hairline)
                         .frame(width: colW + vm.guideWindowWidth)
-                        .offset(x: 0, y: rulerH + CGFloat(i) * rowH)
-                }
-
-                ForEach(Array(vm.visibleChannels.enumerated()), id: \.element.id) { i, ch in
-                    let rowY = rulerH + CGFloat(i) * rowH
-                    programCells(for: ch, rowIndex: i, rowY: rowY)
+                        .offset(x: 0, y: rowY)
+                    programCells(for: ch, rowY: rowY)
                 }
             }
         }
@@ -485,7 +503,8 @@ private struct ProgrammeGridView: View {
             scrollState.offset = offset
             let firstRow = max(0, Int((offset.y - rulerH) / rowH))
             let visibleRows = max(1, Int(scrollState.viewSize.height / rowH) + 2)
-            vm.prefetchProgrammesAround(rowIndex: firstRow, visibleRowCount: visibleRows)
+            updateRenderedRows(firstRow: firstRow, visibleRows: visibleRows)
+            vm.scrolledTo(firstRow: firstRow, visibleRowCount: visibleRows)
         }
         .contentMargins(.bottom, scrollState.bottomInset + 16, for: .scrollContent)
         .onChange(of: scrollToNowTrigger) { _, _ in
@@ -496,11 +515,18 @@ private struct ProgrammeGridView: View {
         }
     }
 
+    private func updateRenderedRows(firstRow: Int, visibleRows: Int) {
+        let chunk = Self.rowMargin
+        let start = max(0, (firstRow - Self.rowMargin) / chunk * chunk)
+        let end = ((firstRow + visibleRows + Self.rowMargin) / chunk + 1) * chunk
+        let range = start..<end
+        if range != renderedRows { renderedRows = range }
+    }
+
     @ViewBuilder
-    private func programCells(for channel: CanonicalChannel, rowIndex: Int, rowY: CGFloat) -> some View {
-        let window = vm.guideWindowStart...vm.guideWindowEnd
-        let progs = vm.programmes(for: channel, in: window)
-        if progs.isEmpty {
+    private func programCells(for channel: CanonicalChannel, rowY: CGFloat) -> some View {
+        let layout = vm.rowLayout(for: channel)
+        if layout.isEmpty {
             if repository.refreshState == .refreshing {
                 Rectangle()
                     .fill(Theme.surface.opacity(0.35))
@@ -510,23 +536,30 @@ private struct ProgrammeGridView: View {
                 noEPGCell(channel: channel, rowY: rowY)
             }
         } else {
-            ForEach(progs) { prog in
-                let x = colW + vm.xOffset(for: prog.start)
-                let w = vm.width(for: prog)
-                ProgrammeCell(
-                    programme: prog,
-                    width: w,
-                    now: now,
-                    hasCatchup: channel.hasCatchup,
-                    fantasyIndicatorCount: fantasyStore.settings.showFantasyIndicatorsInGuide ? fantasyStore.fantasyIndicatorCount(for: prog, channel: channel) + nativeFantasyStore.fantasyIndicatorCount(for: prog, channel: channel) : 0,
-                    streamCount: channel.allStreams.count
-                ) {
-                    onProgramTap(prog, channel)
+            let showsFantasy = fantasyStore.settings.showFantasyIndicatorsInGuide
+            ForEach(layout.cells) { cell in
+                if let prog = cell.programme {
+                    ProgrammeCell(
+                        programme: prog,
+                        width: cell.width,
+                        now: now,
+                        hasCatchup: channel.hasCatchup,
+                        fantasyIndicatorCount: showsFantasy ? vm.fantasyIndicatorCount(for: prog, channel: channel, revision: fantasyRevision) {
+                            fantasyStore.fantasyIndicatorCount(for: prog, channel: channel) + nativeFantasyStore.fantasyIndicatorCount(for: prog, channel: channel)
+                        } : 0,
+                        streamCount: channel.allStreams.count
+                    ) {
+                        onProgramTap(prog, channel)
+                    }
+                    .frame(width: cell.width, height: rowH - 2)
+                    .offset(x: colW + cell.x, y: rowY + 1)
+                } else {
+                    Rectangle()
+                        .fill(Theme.surface.opacity(0.6))
+                        .frame(width: cell.width, height: rowH - 2)
+                        .offset(x: colW + cell.x, y: rowY + 1)
                 }
-                .frame(width: w, height: rowH - 2)
-                .offset(x: x, y: rowY + 1)
             }
-            gapCells(progs: progs, rowY: rowY)
         }
     }
 
@@ -538,35 +571,6 @@ private struct ProgrammeGridView: View {
             .frame(width: max(120, vm.guideWindowWidth), height: rowH - 2, alignment: .leading)
             .padding(.leading, 12)
             .offset(x: colW, y: rowY + 1)
-    }
-
-    private func computeGaps(progs: [EPGProgramme]) -> [(Date, Date)] {
-        var gaps: [(Date, Date)] = []
-        let start = vm.guideWindowStart
-        let end = vm.guideWindowEnd
-        if let first = progs.first, first.start > start { gaps.append((start, first.start)) }
-        for i in 0..<progs.count - 1 {
-            let gapStart = progs[i].end
-            let gapEnd = progs[i + 1].start
-            if gapEnd > gapStart + 30 { gaps.append((gapStart, gapEnd)) }
-        }
-        if let last = progs.last, last.end < end { gaps.append((last.end, end)) }
-        return gaps
-    }
-
-    @ViewBuilder
-    private func gapCells(progs: [EPGProgramme], rowY: CGFloat) -> some View {
-        let gaps = computeGaps(progs: progs)
-        ForEach(Array(gaps.enumerated()), id: \.offset) { _, gap in
-            let x = colW + vm.xOffset(for: gap.0)
-            let w = CGFloat(gap.1.timeIntervalSince(gap.0) / 60) * TVGuideViewModel.ptsPerMinute
-            if w > 4 {
-                Rectangle()
-                    .fill(Theme.surface.opacity(0.6))
-                    .frame(width: w - 2, height: rowH - 2)
-                    .offset(x: x + 1, y: rowY + 1)
-            }
-        }
     }
 }
 
@@ -676,7 +680,7 @@ private struct TimeRulerOverlayView: View {
                 let screenX = colW + x - offsetX
                 if screenX < viewW + 4 {
                     Text(label)
-                        .font(.system(size: 11, weight: .medium))
+                        .font(Theme.Typography.caption)
                         .foregroundStyle(Theme.textSecondary)
                         .fixedSize()
                         .frame(height: rulerH, alignment: .center)
@@ -758,7 +762,7 @@ private struct JumpToNowOverlayView: View {
                         } label: {
                             HStack(spacing: 5) {
                                 Image(systemName: "clock.badge.fill")
-                                    .font(.system(size: 11, weight: .bold))
+                                    .font(Theme.Typography.caption)
                                 Text("Now")
                                     .font(.caption.weight(.bold))
                             }
@@ -832,7 +836,7 @@ struct ProgrammeCell: View {
                 // Catch-up and Fantasy badges stay inside the existing cell height.
                 if showCatchupBadge {
                     Image(systemName: "clock.arrow.circlepath")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(Theme.Typography.overline)
                         .foregroundStyle(Theme.accent.opacity(0.8))
                         .padding(3)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
@@ -840,7 +844,7 @@ struct ProgrammeCell: View {
 
                 if showStreamBadge {
                     Image(systemName: "play.tv")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(Theme.Typography.overline)
                         .foregroundStyle(Theme.accent)
                         .padding(3)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
@@ -848,7 +852,7 @@ struct ProgrammeCell: View {
 
                 if showFantasyBadge {
                     Text(fantasyIndicatorCount == 1 ? "★" : "★\(fantasyIndicatorCount)")
-                        .font(.system(size: 9, weight: .heavy))
+                        .font(Theme.Typography.overline)
                         .foregroundStyle(Theme.accent)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 2)
@@ -872,7 +876,7 @@ struct ProgrammeCell: View {
                 .lineLimit(1)
             if width > 90 {
                 Text(timeSubtitle)
-                    .font(.system(size: 10))
+                    .font(Theme.Typography.overline)
                     .foregroundStyle(isCurrent ? Theme.accent : Theme.textSecondary)
                     .lineLimit(1)
             }
@@ -912,7 +916,7 @@ struct ChannelLogoCell: View {
         Button(action: onTap) {
             VStack(spacing: 4) {
                 if let logoURL = channel.effectiveLogoURL {
-                    AsyncImage(url: logoURL) { phase in
+                    CachedImage(url: logoURL) { phase in
                         if case .success(let img) = phase {
                             img.resizable().scaledToFit()
                         } else {
@@ -925,7 +929,7 @@ struct ChannelLogoCell: View {
                         .frame(width: 44, height: 28)
                 }
                 Text(channel.name)
-                    .font(.system(size: 9, weight: .medium))
+                    .font(Theme.Typography.overline)
                     .foregroundStyle(Theme.textTertiary)
                     .lineLimit(1)
                     .frame(maxWidth: TVGuideViewModel.channelColumnWidth - 8)
@@ -938,7 +942,7 @@ struct ChannelLogoCell: View {
     private var channelInitials: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 6).fill(Theme.surfaceElevated)
-            Text(initials).font(.system(size: 11, weight: .bold)).foregroundStyle(Theme.accent)
+            Text(initials).font(Theme.Typography.caption).foregroundStyle(Theme.accent)
         }
     }
 
@@ -1019,7 +1023,7 @@ struct ProgrammeDetailSheet: View {
     private var channelHeader: some View {
         HStack(spacing: 12) {
             if let logoURL = channel.effectiveLogoURL {
-                AsyncImage(url: logoURL) { phase in
+                CachedImage(url: logoURL) { phase in
                     if case .success(let img) = phase {
                         img.resizable().scaledToFit()
                     } else {
@@ -1062,7 +1066,7 @@ struct ProgrammeDetailSheet: View {
     @ViewBuilder
     private var programmeImage: some View {
         if let imgURL = programme.imageURL {
-            AsyncImage(url: imgURL) { phase in
+            CachedImage(url: imgURL) { phase in
                 if case .success(let img) = phase {
                     img.resizable().scaledToFill()
                         .frame(maxWidth: .infinity)
@@ -1607,7 +1611,7 @@ private struct ChannelSelectRow: View {
         Button(action: onToggle) {
             HStack(spacing: 12) {
                 if let logoURL = channel.effectiveLogoURL {
-                    AsyncImage(url: logoURL) { phase in
+                    CachedImage(url: logoURL) { phase in
                         if case .success(let img) = phase {
                             img.resizable().scaledToFit()
                         } else {
@@ -1638,7 +1642,7 @@ private struct ChannelSelectRow: View {
         ZStack {
             RoundedRectangle(cornerRadius: 4).fill(Theme.surfaceElevated)
             Text(channel.name.prefix(2).uppercased())
-                .font(.system(size: 9, weight: .bold))
+                .font(Theme.Typography.overline)
                 .foregroundStyle(Theme.accent)
         }
     }
@@ -1749,7 +1753,7 @@ struct EPGOffsetSheet: View {
                     // Channel identity
                     VStack(spacing: 6) {
                         if let logoURL = channel.effectiveLogoURL {
-                            AsyncImage(url: logoURL) { phase in
+                            CachedImage(url: logoURL) { phase in
                                 if case .success(let img) = phase {
                                     img.resizable().scaledToFit()
                                 } else {
@@ -1868,6 +1872,7 @@ struct WhatsOnView: View {
                             WhatsOnCard(item: item) {
                                 if let ch = item.channel.playableChannel {
                                     watchStore.recordWatch(ch)
+                                    PlaybackTapClock.record()
                                     playingChannel = item.channel
                                 }
                             }
@@ -1908,7 +1913,7 @@ struct WhatsOnCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     if let logoURL = item.channel.effectiveLogoURL {
-                        AsyncImage(url: logoURL) { phase in
+                        CachedImage(url: logoURL) { phase in
                             if case .success(let img) = phase {
                                 img.resizable().scaledToFit()
                             } else {

@@ -65,7 +65,7 @@ struct PicksDashboardView: View {
                     }
                     Text("\(predictions.currentStreak)")
                         .font(.system(size: 40, weight: .heavy, design: .rounded))
-                        .foregroundStyle(predictions.currentStreak >= 3 ? Color(hex: 0xFF6B35) : Theme.textPrimary)
+                        .foregroundStyle(predictions.currentStreak >= 3 ? Theme.Palette.orange : Theme.textPrimary)
                         .monospacedDigit()
                 }
             }
@@ -193,7 +193,7 @@ private struct PickHistoryRow: View {
                     if pts > 0 {
                         Text("+\(pts) pts")
                             .font(.footnote.weight(.heavy))
-                            .foregroundStyle(Color(hex: 0x3DBE6B))
+                            .foregroundStyle(Theme.Palette.positive)
                     } else {
                         Text("0 pts")
                             .font(.footnote.weight(.semibold))
@@ -207,7 +207,7 @@ private struct PickHistoryRow: View {
                 if let streak = prediction.streakAtTime, streak >= 2 {
                     Text("🔥 \(streak)")
                         .font(.caption2.weight(.bold))
-                        .foregroundStyle(Color(hex: 0xFF6B35))
+                        .foregroundStyle(Theme.Palette.orange)
                 }
             }
 
@@ -228,7 +228,7 @@ private struct PickHistoryRow: View {
 
     private var statusColor: Color {
         switch prediction.isCorrect {
-        case true: return Color(hex: 0x3DBE6B)
+        case true: return Theme.Palette.positive
         case false: return Theme.live
         case nil: return Theme.textSecondary
         }

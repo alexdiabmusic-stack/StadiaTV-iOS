@@ -254,7 +254,7 @@ struct ArticleReaderView: View {
     private var heroSection: some View {
         if let imageURL = article.imageURL {
             ZStack(alignment: .bottomLeading) {
-                AsyncImage(url: imageURL) { phase in
+                CachedImage(url: imageURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFill()
                     } else {

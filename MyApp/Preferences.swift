@@ -4,7 +4,7 @@ import Combine
 
 // MARK: - Team model
 
-struct Team: Identifiable, Hashable {
+nonisolated struct Team: Identifiable, Hashable {
     let id: String
     let displayName: String
     let shortDisplayName: String
@@ -209,6 +209,9 @@ struct UserPreferences: Codable, Equatable {
     var playerPanelTimeoutSeconds: Int = 4
     var guideTimeScaleMinutes: Int = 60
     var playerBarActions: [String] = PlayerBarAction.defaultOrder.map(\.rawValue)
+    var playerBufferProfile: PlayerBufferProfile = .balanced
+    /// When false (default), Auto prefers 1080p/720p mirrors, which start faster than 4K.
+    var preferUHDStreams = false
 
     // Catalog-aware onboarding preferences (v2+)
     var selectedCatalogLeagueIDs: Set<String> = []
@@ -222,6 +225,7 @@ struct UserPreferences: Codable, Equatable {
         case appearance, preferredStreamLanguages, spoilerFreeMode, showLiveScoreBadge, showLiveScoreBar
         case showChannelNumbers, guideProgrammeTitleLines, epgHighlightCurrentProgramme
         case playerPanelTimeoutSeconds, guideTimeScaleMinutes, playerBarActions
+        case playerBufferProfile, preferUHDStreams
         case selectedCatalogLeagueIDs, selectedCatalogSportIDs
     }
 
@@ -249,6 +253,8 @@ struct UserPreferences: Codable, Equatable {
         guideTimeScaleMinutes = try container.decodeIfPresent(Int.self, forKey: .guideTimeScaleMinutes) ?? 60
         playerBarActions = try container.decodeIfPresent([String].self, forKey: .playerBarActions)
             ?? PlayerBarAction.defaultOrder.map(\.rawValue)
+        playerBufferProfile = (try? container.decodeIfPresent(PlayerBufferProfile.self, forKey: .playerBufferProfile)) ?? .balanced
+        preferUHDStreams = try container.decodeIfPresent(Bool.self, forKey: .preferUHDStreams) ?? false
         selectedCatalogLeagueIDs = try container.decodeIfPresent(Set<String>.self, forKey: .selectedCatalogLeagueIDs) ?? []
         selectedCatalogSportIDs  = try container.decodeIfPresent(Set<String>.self, forKey: .selectedCatalogSportIDs) ?? []
     }
@@ -287,6 +293,7 @@ final class PreferencesStore: ObservableObject {
             persist()
         }
         CloudSyncService.shared.setEnabled(prefs.cloudSyncEnabled)
+        StreamRankingSettings.preferUHD = prefs.preferUHDStreams
         NotificationCenter.default.addObserver(
             forName: .bannertvCloudSyncDidChange,
             object: nil,
@@ -312,6 +319,7 @@ final class PreferencesStore: ObservableObject {
               let cloud: UserPreferences = CloudSyncService.shared.load(UserPreferences.self, for: .preferences),
               cloud != prefs else { return }
         prefs = cloud
+        StreamRankingSettings.preferUHD = prefs.preferUHDStreams
         if let data = try? JSONEncoder().encode(prefs) {
             UserDefaults.standard.set(data, forKey: defaultsKey)
         }
@@ -443,6 +451,16 @@ final class PreferencesStore: ObservableObject {
     func setGuideTimeScaleMinutes(_ v: Int) { prefs.guideTimeScaleMinutes = v; persist() }
 
     var playerBarActions: [String] { prefs.playerBarActions }
+
+    var playerBufferProfile: PlayerBufferProfile { prefs.playerBufferProfile }
+    func setPlayerBufferProfile(_ v: PlayerBufferProfile) { prefs.playerBufferProfile = v; persist() }
+
+    var preferUHDStreams: Bool { prefs.preferUHDStreams }
+    func setPreferUHDStreams(_ v: Bool) {
+        prefs.preferUHDStreams = v
+        StreamRankingSettings.preferUHD = v
+        persist()
+    }
     var playerActionConfiguration: PlayerActionConfiguration {
         PlayerActionConfiguration(rawIDs: prefs.playerBarActions)
     }

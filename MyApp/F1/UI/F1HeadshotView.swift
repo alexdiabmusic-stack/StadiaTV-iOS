@@ -26,7 +26,7 @@ struct F1HeadshotView: View {
             if let assetName = F1HeadshotAssetResolver.assetURL(tla: driver.tla)?.bannerImageAssetName {
                 Image(assetName).resizable().scaledToFill()
             } else if let url = driver.headshot {
-                AsyncImage(url: url) { image in
+                CachedImage(url: url) { image in
                     image.resizable().scaledToFill()
                 } placeholder: {
                     Image(systemName: "person.crop.circle.fill").resizable().scaledToFit().foregroundStyle(Theme.textTertiary).padding(size * 0.06).background(Theme.surfaceElevated)

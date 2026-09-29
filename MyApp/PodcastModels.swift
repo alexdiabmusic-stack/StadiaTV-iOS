@@ -22,10 +22,10 @@ enum PodcastMedium: String, Codable {
 
 // MARK: - Bundled catalog types
 
-struct PodcastCatalog: Decodable {
+nonisolated struct PodcastCatalog: Decodable, Sendable {
     let feeds: [CatalogFeed]
 
-    struct CatalogFeed: Decodable, Identifiable {
+    struct CatalogFeed: Decodable, Identifiable, Sendable {
         let id: String
         let title: String
         let feedURL: URL
@@ -53,7 +53,7 @@ struct PodcastCatalog: Decodable {
             language = (try? c.decode(String.self, forKey: .language)) ?? "en"
         }
 
-        func toPodcast(cachedMeta: Podcast? = nil) -> Podcast {
+        @MainActor func toPodcast(cachedMeta: Podcast? = nil) -> Podcast {
             let pub = (cachedMeta?.publisher.isEmpty == false ? cachedMeta?.publisher : author) ?? ""
             return Podcast(
                 id: feedURL.absoluteString,
@@ -69,7 +69,7 @@ struct PodcastCatalog: Decodable {
     }
 }
 
-struct TeamPodcastRegistry: Decodable {
+nonisolated struct TeamPodcastRegistry: Decodable, Sendable {
     let teams: [TeamPodcastSeed]
 }
 

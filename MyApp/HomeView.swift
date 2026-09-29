@@ -46,6 +46,7 @@ struct HomeView: View {
     @EnvironmentObject private var playlistStore: PlaylistStore
     @EnvironmentObject private var epgRepository: EPGRepository
     @EnvironmentObject private var streamStore: StreamAvailabilityStore
+    @EnvironmentObject private var channelPrefs: ChannelPreferencesStore
     @StateObject private var viewModel = HomeViewModel()
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -200,7 +201,7 @@ struct HomeView: View {
 
     private var favoriteStreamScanKey: String {
         let ids = favoriteStreamMatches.map(\.id).sorted().joined(separator: ",")
-        return "\(ids)-\(playlistStore.allChannels.count)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))"
+        return "\(ids)-\(playlistStore.channelsRevision)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))"
     }
 
     private var loadPreferencesKey: String {
@@ -263,6 +264,21 @@ struct HomeView: View {
                     .offset(y: (showHero || reduceMotion) ? 0 : 26)
                     .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.5), value: showHero)
 
+                // Straight back into what you were watching, and your favourite channels.
+                if !watchStore.history.isEmpty {
+                    ContinueWatchingSection(entries: watchStore.history) { PlaybackTapClock.record(); playingChannel = $0 }
+                        .opacity(showHero ? 1 : 0)
+                        .offset(y: (showHero || reduceMotion) ? 0 : 26)
+                        .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.5), value: showHero)
+                }
+
+                if !favouriteChannels.isEmpty {
+                    FavouriteChannelsRail(channels: favouriteChannels) { PlaybackTapClock.record(); playingChannel = $0 }
+                        .opacity(showHero ? 1 : 0)
+                        .offset(y: (showHero || reduceMotion) ? 0 : 26)
+                        .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.5), value: showHero)
+                }
+
                 sportsDaySummaryCard
                     .opacity(showSportsDay ? 1 : 0)
                     .offset(y: (showSportsDay || reduceMotion) ? 0 : 30)
@@ -297,16 +313,15 @@ struct HomeView: View {
                         .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.45), value: showRemaining)
                 }
 
-                if !watchStore.history.isEmpty {
-                    ContinueWatchingSection(entries: watchStore.history) { playingChannel = $0 }
-                        .opacity(showRemaining ? 1 : 0)
-                        .offset(y: (showRemaining || reduceMotion) ? 0 : 40)
-                        .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.45), value: showRemaining)
-                }
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 104)
         }
+    }
+
+    /// Favourite channels in the user's order, resolved through the channel index.
+    private var favouriteChannels: [Channel] {
+        channelPrefs.favoriteChannelIDs.prefix(20).compactMap { playlistStore.channelsByID[$0] }
     }
 
     // MARK: - Greeting
@@ -431,7 +446,7 @@ struct HomeView: View {
                 }
                 Spacer(minLength: 0)
                 if let channel = summary.watchChannel {
-                    Button { playingChannel = channel } label: {
+                    Button { PlaybackTapClock.record(); playingChannel = channel } label: {
                         Label("Watch", systemImage: "play.fill")
                             .font(.caption.weight(.bold))
                     }
@@ -687,20 +702,20 @@ private struct TeamMatchupHero: View {
                         VStack(spacing: 4) {
                             TeamLogo(url: awaySide.logoURL, size: 48)
                             Text(awaySide.shortName)
-                                .font(.system(size: 11, weight: .bold))
+                                .font(Theme.Typography.caption)
                                 .foregroundStyle(.white.opacity(0.80))
                                 .lineLimit(1)
                         }
                         Spacer()
                         Text("VS")
-                            .font(.system(size: 10, weight: .black))
+                            .font(Theme.Typography.overline)
                             .foregroundStyle(.white.opacity(0.50))
                             .frame(width: 28)
                         Spacer()
                         VStack(spacing: 4) {
                             TeamLogo(url: homeSide.logoURL, size: 48)
                             Text(homeSide.shortName)
-                                .font(.system(size: 11, weight: .bold))
+                                .font(Theme.Typography.caption)
                                 .foregroundStyle(.white.opacity(0.80))
                                 .lineLimit(1)
                         }
@@ -775,7 +790,7 @@ private struct TeamMatchupHero: View {
         if isLive, let m = match {
             VStack(alignment: .leading, spacing: 1) {
                 Text("SCORE")
-                    .font(.system(size: 9, weight: .heavy))
+                    .font(Theme.Typography.overline)
                     .foregroundStyle(.white.opacity(0.55))
                     .tracking(1)
                 Text("\(m.away.score ?? "—") – \(m.home.score ?? "—")")
@@ -790,7 +805,7 @@ private struct TeamMatchupHero: View {
             VStack(alignment: .leading, spacing: 1) {
                 if secsRemaining <= -300 {
                     Text("STARTED")
-                        .font(.system(size: 9, weight: .heavy))
+                        .font(Theme.Typography.overline)
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(start, style: .time)
@@ -798,7 +813,7 @@ private struct TeamMatchupHero: View {
                         .foregroundStyle(.white)
                 } else if secsRemaining > 24 * 3600 {
                     Text("DATE")
-                        .font(.system(size: 9, weight: .heavy))
+                        .font(Theme.Typography.overline)
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
@@ -808,7 +823,7 @@ private struct TeamMatchupHero: View {
                     let h = max(0, secsRemaining) / 3600
                     let mins = (max(0, secsRemaining) % 3600) / 60
                     Text(secsRemaining < 60 ? "STARTING" : "STARTS IN")
-                        .font(.system(size: 9, weight: .heavy))
+                        .font(Theme.Typography.overline)
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(secsRemaining < 60 ? "NOW" : h > 0 ? "\(h)h \(mins)m" : "\(mins)m")
@@ -1024,7 +1039,7 @@ private struct EventHero: View {
     private var countdownView: some View {
         if isLive {
             Text("ON AIR")
-                .font(.system(size: 9, weight: .heavy))
+                .font(Theme.Typography.overline)
                 .foregroundStyle(Theme.live)
                 .tracking(1)
                 .padding(.bottom, 8)
@@ -1033,7 +1048,7 @@ private struct EventHero: View {
             VStack(alignment: .leading, spacing: 1) {
                 if secsRemaining <= -300 {
                     Text("STARTED")
-                        .font(.system(size: 9, weight: .heavy))
+                        .font(Theme.Typography.overline)
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(start, style: .time)
@@ -1041,27 +1056,27 @@ private struct EventHero: View {
                         .foregroundStyle(.white)
                 } else if secsRemaining > 24 * 3600 {
                     Text("DATE")
-                        .font(.system(size: 9, weight: .heavy))
+                        .font(Theme.Typography.overline)
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
                         .font(.system(size: 24, weight: .black, design: .rounded))
                         .foregroundStyle(.white)
                     Text(start, style: .time)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(Theme.Typography.caption)
                         .foregroundStyle(.white.opacity(0.55))
                 } else {
                     let h = max(0, secsRemaining) / 3600
                     let mins = (max(0, secsRemaining) % 3600) / 60
                     Text(secsRemaining < 60 ? "STARTING" : "STARTS IN")
-                        .font(.system(size: 9, weight: .heavy))
+                        .font(Theme.Typography.overline)
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(secsRemaining < 60 ? "NOW" : h > 0 ? "\(h)h \(mins)m" : "\(mins)m")
                         .font(.system(size: 30, weight: .black, design: .rounded).monospacedDigit())
                         .foregroundStyle(.white)
                     Text(start, style: .time)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(Theme.Typography.caption)
                         .foregroundStyle(.white.opacity(0.55))
                 }
             }
@@ -1390,7 +1405,7 @@ private struct SoonTimelineCard: View {
 
                 if !match.broadcasts.isEmpty {
                     Label(match.broadcasts.first!, systemImage: "tv")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(Theme.Typography.overline)
                         .foregroundStyle(Theme.textSecondary)
                         .lineLimit(1)
                 }
@@ -1638,6 +1653,39 @@ private struct TrendingSection: View {
 
 // MARK: - Continue Watching Section
 
+/// Horizontal rail of favourite channel logos on Home.
+struct FavouriteChannelsRail: View {
+    let channels: [Channel]
+    let onPlay: (Channel) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            Label("Favourite Channels", systemImage: "star.fill")
+                .overlineStyle()
+                .foregroundStyle(Theme.accent)
+                .accessibilityAddTraits(.isHeader)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    ForEach(channels) { channel in
+                        Button { onPlay(channel) } label: {
+                            VStack(spacing: Theme.Spacing.xs) {
+                                ChannelLogo(url: channel.logoURL, name: channel.name, size: 72)
+                                Text(channel.name)
+                                    .font(Theme.Typography.caption)
+                                    .foregroundStyle(Theme.textPrimary)
+                                    .lineLimit(1)
+                                    .frame(width: 80)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Play \(channel.name)")
+                    }
+                }
+            }
+        }
+    }
+}
+
 struct ContinueWatchingSection: View {
     let entries: [WatchHistoryEntry]
     let onPlay: (Channel) -> Void
@@ -1674,7 +1722,7 @@ private struct ContinueWatchingCard: View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack {
                 Theme.surfaceElevated
-                AsyncImage(url: entry.saved.channel?.logoURL) { phase in
+                CachedImage(url: entry.saved.channel?.logoURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFit().padding(10)
                     } else {

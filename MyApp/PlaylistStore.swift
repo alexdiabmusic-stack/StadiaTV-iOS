@@ -12,7 +12,17 @@ final class PlaylistStore: ObservableObject {
 
     @Published private(set) var playlists: [Playlist] = []
     /// Channels loaded per playlist, keyed by playlist id.
-    @Published private(set) var channelsByPlaylist: [UUID: [Channel]] = [:]
+    @Published private(set) var channelsByPlaylist: [UUID: [Channel]] = [:] {
+        didSet { rebuildChannelIndexes() }
+    }
+    /// All channels across every loaded playlist — the pool the matcher searches.
+    /// Rebuilt once when `channelsByPlaylist` changes, never on read.
+    @Published private(set) var allChannels: [Channel] = []
+    /// `allChannels` keyed by channel ID.
+    private(set) var channelsByID: [String: Channel] = [:]
+    /// Bumped each time `allChannels` is rebuilt. Use this, not `allChannels.count`,
+    /// as a `.task(id:)` / `onChange` key.
+    @Published private(set) var channelsRevision = 0
     @Published private(set) var loadingPlaylistIDs: Set<UUID> = []
     @Published private(set) var defaultPlaylistID: UUID?
     @Published var lastError: String?
@@ -22,13 +32,49 @@ final class PlaylistStore: ObservableObject {
 
     private let repository = LiveChannelRepository()
 
-    /// All channels across every loaded playlist — the pool the matcher searches.
-    var allChannels: [Channel] {
-        channelsByPlaylist.values.flatMap { $0 }
-    }
+    private var indexGeneration = 0
+    private var cacheLoadTask: Task<Void, Never>?
+    /// Above this, flattening and indexing runs off the main thread.
+    private static let backgroundIndexThreshold = 5_000
+    /// Playlists refreshed more recently than this aren't re-downloaded at launch.
+    static let automaticRefreshInterval: TimeInterval = 12 * 60 * 60
 
     init() {
         load()
+    }
+
+    // MARK: - Channel indexes
+
+    private func rebuildChannelIndexes() {
+        indexGeneration += 1
+        let generation = indexGeneration
+        let snapshot = channelsByPlaylist
+        let total = snapshot.values.reduce(0) { $0 + $1.count }
+        guard total > Self.backgroundIndexThreshold else {
+            apply(Self.buildIndexes(snapshot))
+            return
+        }
+        Task {
+            let built = await Task.detached(priority: .userInitiated) { Self.buildIndexes(snapshot) }.value
+            guard generation == self.indexGeneration else { return }
+            self.apply(built)
+        }
+    }
+
+    private func apply(_ built: (channels: [Channel], byID: [String: Channel])) {
+        allChannels = built.channels
+        channelsByID = built.byID
+        channelsRevision &+= 1
+    }
+
+    nonisolated private static func buildIndexes(_ byPlaylist: [UUID: [Channel]]) -> (channels: [Channel], byID: [String: Channel]) {
+        let channels = byPlaylist.values.flatMap { $0 }
+        var byID: [String: Channel] = [:]
+        byID.reserveCapacity(channels.count)
+        for channel in channels where byID[channel.id] == nil {
+            byID[channel.id] = channel
+        }
+        return (channels, byID)
     }
 
     // MARK: - Persistence
@@ -45,7 +91,7 @@ final class PlaylistStore: ObservableObject {
         }
         persist()
         // Populate the channel grid from the SQLite cache before any network calls.
-        Task { await loadCachedChannels() }
+        cacheLoadTask = Task { await loadCachedChannels() }
     }
 
     /// Reads channels from the local SQLite cache for each known playlist.
@@ -161,9 +207,22 @@ final class PlaylistStore: ObservableObject {
     /// Refreshes all playlists concurrently rather than serially.
     /// Each playlist's network request is independent, so there is no
     /// reason to wait for one before starting the next.
-    func refreshAll() async {
+    /// - Parameter force: when false (launch), playlists with cached channels refreshed in the
+    ///   last 12 hours are skipped. Pull-to-refresh and the playlist editor pass true.
+    func refreshAll(force: Bool = false) async {
+        // The TTL check needs to know which playlists already have cached channels.
+        await cacheLoadTask?.value
+        var due: [Playlist] = []
+        for playlist in playlists {
+            if !force, channelsByPlaylist[playlist.id]?.isEmpty == false,
+               let last = await repository.lastRefreshed(for: playlist.id),
+               Date().timeIntervalSince(last) < Self.automaticRefreshInterval {
+                continue
+            }
+            due.append(playlist)
+        }
         await withTaskGroup(of: Void.self) { group in
-            for playlist in playlists {
+            for playlist in due {
                 group.addTask { await self.refresh(playlist) }
             }
         }

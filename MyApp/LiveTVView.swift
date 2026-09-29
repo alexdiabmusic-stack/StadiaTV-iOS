@@ -1,6 +1,8 @@
 import SwiftUI
 
-struct LiveTVView: View {
+/// The Channels section of the Live tab: playlists, groups, favourites and channel lists.
+/// Lives inside the Live tab's NavigationStack, so it doesn't create its own.
+struct LiveChannelsView: View {
     @EnvironmentObject private var store: PlaylistStore
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var channelPrefs: ChannelPreferencesStore
@@ -16,13 +18,11 @@ struct LiveTVView: View {
     @State private var showingPINPrompt = false
 
     var body: some View {
-        NavigationStack {
-            ZStack(alignment: .bottom) {
+        ZStack(alignment: .bottom) {
                 Theme.background.ignoresSafeArea()
                 content
                 if isPickingMultiscreen { multiscreenFooter }
             }
-            .navigationTitle("Live TV")
             .toolbar { multiscreenToolbarItem }
             .fullScreenCover(item: $playingChannel) { channel in
                 PlayerView(
@@ -41,8 +41,7 @@ struct LiveTVView: View {
                 )
                 .environmentObject(parentalControl)
             }
-        }
-        .tint(Theme.accent)
+            .tint(Theme.accent)
     }
 
     @ViewBuilder
@@ -50,17 +49,32 @@ struct LiveTVView: View {
         if store.playlists.isEmpty {
             emptyPlaylistState
         } else if store.allChannels.isEmpty && !store.loadingPlaylistIDs.isEmpty {
-            ProgressView().tint(Theme.accent)
+            loadingState
         } else if store.allChannels.isEmpty {
             noChannelsState
         } else {
             LiveBrowserView(
                 onPlay: { handleTap($0, scopeChannels: $1) },
-                refreshAction: { await store.refreshAll() },
+                refreshAction: { await store.refreshAll(force: true) },
                 isPickingMultiscreen: $isPickingMultiscreen,
                 selectedMultiChannels: $selectedMultiChannels
             )
         }
+    }
+
+    private var loadingState: some View {
+        List {
+            ForEach(0..<8, id: \.self) { _ in
+                SkeletonRow()
+                    .listRowBackground(Theme.background)
+                    #if !os(tvOS)
+                    .listRowSeparator(.hidden)
+                    #endif
+            }
+        }
+        .listStyle(.plain)
+        .hidesScrollContentBackground()
+        .allowsHitTesting(false)
     }
 
     // MARK: - Multiscreen
@@ -80,46 +94,35 @@ struct LiveTVView: View {
     }
 
     private var multiscreenFooter: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
+        VStack(spacing: Theme.Spacing.sm) {
+            HStack(spacing: Theme.Spacing.sm) {
                 Label("\(selectedMultiChannels.count)/4", systemImage: "rectangle.grid.2x2")
-                    .font(.footnote.weight(.bold))
+                    .font(Theme.Typography.caption)
                     .foregroundStyle(Theme.textPrimary)
                 Text("Select 2–4 channels to watch together")
-                    .font(.caption)
+                    .font(Theme.Typography.caption)
                     .foregroundStyle(Theme.textSecondary)
                 Spacer()
             }
-            HStack(spacing: 10) {
+            HStack(spacing: Theme.Spacing.sm) {
                 Button("Cancel") {
-                    withAnimation { resetMultiscreenSelection() }
+                    withAnimation(Theme.Motion.snappy) { resetMultiscreenSelection() }
                 }
-                .font(.headline)
-                .foregroundStyle(Theme.textSecondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 13)
-                .background(Theme.surfaceElevated,
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .buttonStyle(SecondaryButtonStyle())
 
                 Button { startMultiscreen() } label: {
                     Label("Watch", systemImage: "play.fill")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
                 }
-                .foregroundStyle(.white)
-                .background(selectedMultiChannels.count >= 2 ? Theme.accent : Theme.accent.opacity(0.36),
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .buttonStyle(PrimaryButtonStyle())
+                .opacity(selectedMultiChannels.count >= 2 ? 1 : 0.4)
                 .disabled(selectedMultiChannels.count < 2)
             }
         }
-        .padding(12)
-        .background(.black.opacity(0.88),
-                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .strokeBorder(Theme.hairline))
-        .padding(.horizontal, 16)
-        .padding(.bottom, 10)
+        .padding(Theme.Spacing.sm)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.bottom, Theme.Spacing.sm)
     }
 
     private func handleTap(_ channel: Channel, scopeChannels: [Channel]) {
@@ -135,6 +138,7 @@ struct LiveTVView: View {
             showingPINPrompt = true
         } else {
             zapChannels = scopeChannels.isEmpty ? [channel] : scopeChannels
+            PlaybackTapClock.record()
             playingChannel = channel
         }
     }
@@ -142,13 +146,14 @@ struct LiveTVView: View {
     private func playPendingRestrictedChannel() {
         guard let ch = pendingRestrictedChannel else { return }
         zapChannels = pendingRestrictedZapChannels
+        PlaybackTapClock.record()
         playingChannel = ch
         pendingRestrictedChannel = nil
         pendingRestrictedZapChannels = []
     }
 
     private func toggleMultiscreenPicking() {
-        withAnimation {
+        withAnimation(Theme.Motion.snappy) {
             if isPickingMultiscreen { resetMultiscreenSelection() } else { isPickingMultiscreen = true }
         }
     }
@@ -168,34 +173,21 @@ struct LiveTVView: View {
     // MARK: - Empty states
 
     private var emptyPlaylistState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "tv")
-                .font(.system(size: Theme.scaled(48)))
-                .foregroundStyle(Theme.accent)
-            Text("No Playlists Added")
-                .font(.title3.weight(.bold))
-                .foregroundStyle(Theme.textPrimary)
-            Text("Add a subscription playlist in Settings to connect your personal channels.")
-                .font(.callout)
-                .foregroundStyle(Theme.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 36)
-        }
+        EmptyStateView(
+            systemImage: "tv",
+            title: "No Playlists Added",
+            message: "Add a subscription playlist in Settings to connect your personal channels."
+        )
     }
 
     private var noChannelsState: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "antenna.radiowaves.left.and.right.slash")
-                .font(.system(size: Theme.scaled(44)))
-                .foregroundStyle(Theme.textSecondary)
-            Text(store.lastError ?? "No channels loaded from your playlists yet.")
-                .font(.callout)
-                .foregroundStyle(Theme.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 36)
-            Button("Refresh") { Task { await store.refreshAll() } }
-                .buttonStyle(.borderedProminent)
-                .tint(Theme.accent)
+        EmptyStateView(
+            systemImage: "antenna.radiowaves.left.and.right.slash",
+            title: "No Channels Yet",
+            message: store.lastError ?? "No channels loaded from your playlists yet.",
+            actionTitle: "Refresh"
+        ) {
+            Task { await store.refreshAll(force: true) }
         }
     }
 }
@@ -209,71 +201,93 @@ private struct MultiscreenSession: Identifiable {
 
 // MARK: - ChannelListRow
 
+/// Flat channel row: logo tile, name, current programme with progress, optional
+/// channel number and a star when favourited. Secondary actions (favourite, hide,
+/// rename, add to group) live in swipe actions and the context menu, so the row
+/// has a single tap target.
 struct ChannelListRow: View {
     let channel: Channel
     let action: () -> Void
     var isFavorite: Bool = false
     var isPicking: Bool = false
     var isSelected: Bool = false
-    var onToggleFavorite: (() -> Void)? = nil
+    var channelNumber: Int?
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                AsyncImage(url: channel.logoURL) { phase in
-                    if case .success(let image) = phase {
-                        image.resizable().scaledToFit()
-                    } else {
-                        Image(systemName: "play.tv.fill")
-                            .font(.title3)
-                            .foregroundStyle(Theme.accent)
-                    }
-                }
-                .frame(width: 42, height: 42)
-                .background(Theme.surfaceElevated,
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            HStack(spacing: Theme.Spacing.sm) {
+                ChannelLogo(url: channel.logoURL, name: channel.name)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(channel.name)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(1)
-                    Text(channel.group ?? channel.playlistName)
-                        .font(.caption)
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(1)
-                }
-                Spacer()
-                if let onToggleFavorite, !isPicking {
-                    Button(action: onToggleFavorite) {
-                        Image(systemName: isFavorite ? "heart.fill" : "heart")
-                            .font(.headline)
-                            .foregroundStyle(isFavorite ? Theme.live : Theme.textSecondary)
-                            .frame(width: 34, height: 34)
+                VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                    HStack(spacing: Theme.Spacing.xs) {
+                        if let channelNumber {
+                            Text("\(channelNumber)")
+                                .font(Theme.Typography.captionDigits)
+                                .foregroundStyle(Theme.textTertiary)
+                        }
+                        Text(channel.name)
+                            .font(Theme.Typography.headline)
+                            .foregroundStyle(Theme.textPrimary)
+                            .lineLimit(1)
+                        if isFavorite {
+                            Image(systemName: "star.fill")
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(Theme.starting)
+                                .accessibilityLabel("Favourite")
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(isFavorite ? "Remove from favourites" : "Add to favourites")
+                    ChannelNowPlayingLine(channelID: channel.id, fallback: channel.group ?? channel.playlistName)
                 }
-                trailingIcon
+                Spacer(minLength: 0)
+                if isPicking {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .foregroundStyle(isSelected ? Theme.accent : Theme.textSecondary)
+                        .accessibilityHidden(true)
+                }
             }
-            .padding(12)
-            .background(isSelected ? Theme.accent.opacity(0.15) : Theme.surface,
-                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(isSelected ? Theme.accent : Theme.hairline))
+            .frame(minHeight: 72)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+/// "Now: {programme}" with a thin progress bar, refreshed every minute from the guide.
+/// Reads the EPG through non-observing references so guide imports don't re-render every row.
+private struct ChannelNowPlayingLine: View {
+    let channelID: String
+    let fallback: String
+    @Environment(\.playerStores) private var stores
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            if let programme = currentProgramme(at: context.date) {
+                VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
+                    Text("Now: \(programme.title)")
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
+                    ProgressView(value: programme.progress(at: context.date))
+                        .progressViewStyle(.linear)
+                        .tint(Theme.accent)
+                        .frame(height: 2)
+                        .scaleEffect(x: 1, y: 0.5, anchor: .center)
+                        .accessibilityHidden(true)
+                }
+            } else {
+                Text(fallback)
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+            }
+        }
     }
 
-    @ViewBuilder private var trailingIcon: some View {
-        if isPicking {
-            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                .font(.title3)
-                .foregroundStyle(isSelected ? Theme.accent : Theme.textSecondary)
-        } else {
-            Image(systemName: "play.circle.fill")
-                .font(.title2)
-                .foregroundStyle(Theme.accent)
-        }
+    private func currentProgramme(at date: Date) -> EPGProgramme? {
+        guard let epg = stores?.epgRepository,
+              let canonicalID = epg.channelToCanonicalMap[channelID] else { return nil }
+        return epg.currentProgramme(for: canonicalID, at: date)
     }
 }

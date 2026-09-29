@@ -6,7 +6,7 @@ import Combine
 enum LaunchPhase: Equatable {
     /// All-white logo centered. iOS launch screen hands off here seamlessly.
     case brandWhite
-    /// "TV" animating from white → Banner blue (0.20–0.65 s).
+    /// "TV" animating from white → Banner blue (0.05–0.35 s).
     case colorizingTV
     /// Fully branded wordmark resting while the startup pipeline runs.
     case brandComplete
@@ -72,41 +72,31 @@ final class StartupCoordinator: ObservableObject {
         #endif
 
         Task { @MainActor in
-            // ── t = 0.20 s ────────────────────────────────────────────────
-            // Begin animating "TV" from white to Banner blue.
-            // The withAnimation here propagates into BrandMark(tvColor:) via
-            // SwiftUI's animation transaction so Color interpolates smoothly.
-            try? await Task.sleep(for: .milliseconds(200))
-            withAnimation(.easeInOut(duration: 0.45)) {
+            // ── t = 0.05 s ────────────────────────────────────────────────
+            // Animate "TV" from white to Banner blue. The withAnimation propagates
+            // into BrandMark(tvColor:) so Color interpolates smoothly.
+            try? await Task.sleep(for: .milliseconds(50))
+            withAnimation(.easeInOut(duration: 0.3)) {
                 self.phase = .colorizingTV
             }
 
-            // ── t = 0.65 s ────────────────────────────────────────────────
-            // TV colourisation complete; brand rests.
-            try? await Task.sleep(for: .milliseconds(450))
+            // ── t = 0.35 s ────────────────────────────────────────────────
+            // Colourisation done and minimum brand presentation met.
+            try? await Task.sleep(for: .milliseconds(300))
             self.phase = .brandComplete
-            #if DEBUG
-            self.mark("brand complete  (0.65 s)")
-            #endif
-
-            // ── t = 1.10 s ────────────────────────────────────────────────
-            // Minimum brand presentation met.
-            try? await Task.sleep(for: .milliseconds(450))
             self.minimumBrandMet = true
             #if DEBUG
-            self.mark("minimum brand met  (1.10 s)")
+            self.mark("minimum brand met  (0.35 s)")
             #endif
 
             if self.shellReady {
-                // Home was already ready — brief intentional rest before moving.
-                try? await Task.sleep(for: .milliseconds(150))
+                // Home already has (cached) content — go straight to it.
                 self.fireTransition()
             } else {
                 self.phase = .waitingForShell
-                // Graceful degradation: never wait more than 1.5 s beyond
-                // minimum brand duration, even if the shell never reports ready.
+                // Never wait more than 1.0 s for the Home shell.
                 Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(1500))
+                    try? await Task.sleep(for: .milliseconds(1000))
                     guard !self.transitionFired else { return }
                     #if DEBUG
                     self.mark("graceful timeout fired")
@@ -126,11 +116,7 @@ final class StartupCoordinator: ObservableObject {
         mark("app shell ready")
         #endif
         guard minimumBrandMet else { return }
-        // Minimum brand time already elapsed — short rest then transition.
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(150))
-            self.fireTransition()
-        }
+        fireTransition()
     }
 
     // MARK: - Private
@@ -148,7 +134,7 @@ final class StartupCoordinator: ObservableObject {
 
         Task { @MainActor in
             // Wait for the animation to fully complete before removing the overlay.
-            try? await Task.sleep(for: .milliseconds(650))
+            try? await Task.sleep(for: .milliseconds(350))
             self.phase = .home
             #if DEBUG
             self.mark("home phase active — overlay removed")

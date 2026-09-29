@@ -1,0 +1,9 @@
+// Build settings shared by every configuration of the MyApp target.
+//
+// API keys come from Secrets.xcconfig, which is git-ignored. Copy
+// Secrets.example.xcconfig to Secrets.xcconfig and fill in your own keys.
+// Without it the build still succeeds; odds and YouTube features are disabled.
+ODDS_API_KEY =
+YOUTUBE_API_KEY =
+
+#include? "Secrets.xcconfig"

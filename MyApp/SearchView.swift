@@ -149,6 +149,7 @@ struct SearchView: View {
             guard shouldLoadPlayers else { return }
             await viewModel.loadFavoritePlayers(favoriteTeams: prefs.favoriteTeams)
         }
+        .task { await podcastStore.ensureCatalogLoaded() }
     }
 
     @ViewBuilder private var content: some View {
@@ -755,7 +756,7 @@ private struct SearchResultArtwork: View {
         ZStack {
             Theme.surfaceElevated
             if let imageURL = result.imageURL {
-                AsyncImage(url: imageURL) { phase in
+                CachedImage(url: imageURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFit().padding(5)
                     } else {

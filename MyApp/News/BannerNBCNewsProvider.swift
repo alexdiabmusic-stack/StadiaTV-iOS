@@ -4,7 +4,7 @@ import Foundation
 // Live-verified 2026-09-07: index.rss returns HTTP 200 with valid RSS content.
 // sport-specific feeds follow https://www.nbcsports.com/{sport}/rss/index.rss pattern.
 
-struct NBCSportsNewsProvider: SportsNewsProvider {
+nonisolated struct NBCSportsNewsProvider: SportsNewsProvider {
     let metadata: SportsDataProviderMetadata
     var supportsPagination: Bool { false }
 

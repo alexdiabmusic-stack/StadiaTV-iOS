@@ -20,6 +20,7 @@ struct LiveBrowserView: View {
     @State private var newGroupName = ""
     @State private var groupToRename: CustomGroup?
     @State private var renameText = ""
+    @StateObject private var model = LiveBrowserModel()
 
     var body: some View {
         List {
@@ -45,7 +46,7 @@ struct LiveBrowserView: View {
                 scopeRow(
                     title: "All Channels",
                     systemImage: "list.bullet",
-                    count: store.allChannels.filter { !channelPrefs.isHidden($0.id) }.count,
+                    count: model.visibleChannelCount,
                     scope: .allChannels
                 )
             }
@@ -91,7 +92,8 @@ struct LiveBrowserView: View {
                         Image(systemName: "plus")
                             .foregroundStyle(Theme.accent)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(IconButtonStyle())
+                    .accessibilityLabel("New group")
                 }
             }
 
@@ -106,7 +108,13 @@ struct LiveBrowserView: View {
         .environment(\.editMode, $editMode)
         .refreshable { await refreshAction() }
         .toolbar { editToolbar }
-        .animation(.snappy, value: customGroups.groups.map(\.id))
+        .animation(Theme.Motion.snappy, value: customGroups.groups.map(\.id))
+        .onChange(of: store.channelsRevision, initial: true) {
+            model.rebuildGroups(channelsByPlaylist: store.channelsByPlaylist)
+        }
+        .onChange(of: "\(store.channelsRevision)|\(channelPrefs.revision)", initial: true) {
+            model.rebuildVisibleCount(channels: store.allChannels, hiddenIDs: channelPrefs.hiddenChannelIDs)
+        }
         // Create group alert
         .alert("New Group", isPresented: $showingCreateGroup) {
             TextField("Group name", text: $newGroupName)
@@ -137,9 +145,8 @@ struct LiveBrowserView: View {
 
     @ViewBuilder
     private func providerSection(for playlist: Playlist) -> some View {
-        let channels = store.channelsByPlaylist[playlist.id] ?? []
-        if !channels.isEmpty {
-            let groups = providerGroups(in: channels, providerID: playlist.id)
+        let groups = model.sortedGroups(for: playlist.id) { groupPrefs.sortOrder(for: $0) }
+        if !groups.isEmpty {
             let visible = editMode == .active ? groups : groups.filter { !groupPrefs.isHidden($0.id) }
             if !visible.isEmpty {
                 Section(playlist.name) {
@@ -206,29 +213,6 @@ struct LiveBrowserView: View {
         }
         .listRowBackground(Theme.surface)
     }
-
-    /// Returns deduplicated groups with counts, sorted by user-set order then alphabetically.
-    private func providerGroups(in channels: [Channel], providerID: UUID) -> [ProviderGroupEntry] {
-        let grouped = Dictionary(grouping: channels) { $0.group ?? $0.playlistName }
-        return grouped.map { title, chs in
-            let id = "\(providerID.uuidString)|\(title)"
-            return ProviderGroupEntry(id: id, title: title, count: chs.count)
-        }
-        .sorted { a, b in
-            let ao = groupPrefs.sortOrder(for: a.id) ?? Int.max
-            let bo = groupPrefs.sortOrder(for: b.id) ?? Int.max
-            if ao != Int.max || bo != Int.max { return ao < bo }
-            return a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
-        }
-    }
-}
-
-// MARK: - Supporting types
-
-private struct ProviderGroupEntry: Identifiable {
-    let id: String
-    let title: String
-    let count: Int
 }
 
 // MARK: - BrowserRow
@@ -241,7 +225,7 @@ struct BrowserRow: View {
     var isHidden: Bool = false
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Theme.Spacing.sm) {
             Image(systemName: systemImage)
                 .font(.body.weight(.semibold))
                 .foregroundStyle(isHidden ? Theme.textSecondary : Theme.accent)
@@ -255,7 +239,7 @@ struct BrowserRow: View {
                 .font(.subheadline.monospacedDigit())
                 .foregroundStyle(Theme.textSecondary)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Theme.Spacing.xxs)
     }
 }
 

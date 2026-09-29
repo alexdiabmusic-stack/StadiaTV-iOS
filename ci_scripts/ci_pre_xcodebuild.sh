@@ -1,18 +1,21 @@
 #!/bin/sh
 set -e
 
-# Inject secret API keys into Info.plist before Xcode Cloud builds.
+# Provide secret API keys to Xcode Cloud builds.
 # Add YOUTUBE_API_KEY and ODDS_API_KEY as Secret Environment Variables
-# in your Xcode Cloud workflow settings.
+# in your Xcode Cloud workflow settings. They're written to the git-ignored
+# Config/Secrets.xcconfig, which Config/App.xcconfig includes; Info.plist
+# reads them as $(ODDS_API_KEY) and $(YOUTUBE_API_KEY).
 
-PLIST="$CI_WORKSPACE/MyApp/Info.plist"
+SECRETS="$CI_PRIMARY_REPOSITORY_PATH/Config/Secrets.xcconfig"
+: > "$SECRETS"
 
 if [ -n "$YOUTUBE_API_KEY" ]; then
-    /usr/libexec/PlistBuddy -c "Set :YouTubeAPIKey $YOUTUBE_API_KEY" "$PLIST"
-    echo "Injected YouTubeAPIKey"
+    echo "YOUTUBE_API_KEY = $YOUTUBE_API_KEY" >> "$SECRETS"
+    echo "Provided YOUTUBE_API_KEY"
 fi
 
 if [ -n "$ODDS_API_KEY" ]; then
-    /usr/libexec/PlistBuddy -c "Set :OddsAPIKey $ODDS_API_KEY" "$PLIST"
-    echo "Injected OddsAPIKey"
+    echo "ODDS_API_KEY = $ODDS_API_KEY" >> "$SECRETS"
+    echo "Provided ODDS_API_KEY"
 fi

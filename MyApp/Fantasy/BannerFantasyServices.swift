@@ -1,12 +1,12 @@
 import Foundation
 
-protocol BannerSportsDataProvider: Sendable {
+nonisolated protocol BannerSportsDataProvider: Sendable {
     func currentPlayers(for sport: FantasySport) async throws -> [BannerFantasyAvailablePlayer]
     func currentSchedule(for sport: FantasySport, starting date: Date, days: Int) async throws -> [Match]
     func statLines(for sport: FantasySport, playerIDs: Set<String>, from start: Date, to end: Date) async throws -> [String: BannerFantasyStatLine]
 }
 
-struct BannerFantasyAvailablePlayer: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyAvailablePlayer: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let fullName: String
     let teamAbbreviation: String?
@@ -42,7 +42,7 @@ actor ESPNSportsPlayerPoolCache {
     }
 }
 
-struct ESPNSportsDataProvider: BannerSportsDataProvider {
+nonisolated struct ESPNSportsDataProvider: BannerSportsDataProvider {
     private let cache: ESPNSportsPlayerPoolCache
     private let session: URLSession
 
@@ -93,7 +93,7 @@ struct ESPNSportsDataProvider: BannerSportsDataProvider {
             }
     }
 
-    private static func rosterPlayers(team: Team, league: League, sport: FantasySport, session: URLSession) async throws -> [BannerFantasyAvailablePlayer] {
+    nonisolated private static func rosterPlayers(team: Team, league: League, sport: FantasySport, session: URLSession) async throws -> [BannerFantasyAvailablePlayer] {
         var components = URLComponents(string: "https://site.api.espn.com/apis/site/v2/sports/\(league.path)/teams/\(team.id)/roster")!
         components.queryItems = [URLQueryItem(name: "enable", value: "stats")]
         let (data, response) = try await session.data(from: components.url!)
@@ -105,17 +105,17 @@ struct ESPNSportsDataProvider: BannerSportsDataProvider {
     }
 }
 
-private struct ESPNSportsRosterResponse: Decodable {
+nonisolated private struct ESPNSportsRosterResponse: Decodable {
     let athletes: [ESPNSportsRosterGroup]?
 
     var athletesList: [ESPNSportsRosterGroup] { athletes ?? [] }
 }
 
-private struct ESPNSportsRosterGroup: Decodable {
+nonisolated private struct ESPNSportsRosterGroup: Decodable {
     let items: [ESPNSportsAthleteDTO]
 }
 
-private struct ESPNSportsAthleteDTO: Decodable {
+nonisolated private struct ESPNSportsAthleteDTO: Decodable {
     let id: String?
     let displayName: String?
     let fullName: String?
@@ -158,7 +158,7 @@ private struct ESPNSportsAthleteDTO: Decodable {
         return values.isEmpty ? nil : BannerFantasyStatLine(values: values, appearances: 1)
     }
 
-    private static func mapStat(_ raw: String?, sport: FantasySport) -> BannerFantasyStat? {
+    nonisolated private static func mapStat(_ raw: String?, sport: FantasySport) -> BannerFantasyStat? {
         let key = (raw ?? "").lowercased().replacingOccurrences(of: "_", with: "")
         switch sport {
         case .nfl:
@@ -199,7 +199,7 @@ private struct ESPNSportsAthleteDTO: Decodable {
         return nil
     }
 
-    private static func eligibleSlots(position: String?, sport: FantasySport) -> [BannerFantasyRosterSlot] {
+    nonisolated private static func eligibleSlots(position: String?, sport: FantasySport) -> [BannerFantasyRosterSlot] {
         let raw = (position ?? "").uppercased()
         switch sport {
         case .nfl:
@@ -246,7 +246,7 @@ private struct ESPNSportsAthleteDTO: Decodable {
         }
     }
 
-    private static func keyInfo(from statLine: BannerFantasyStatLine?, sport: FantasySport) -> [String] {
+    nonisolated private static func keyInfo(from statLine: BannerFantasyStatLine?, sport: FantasySport) -> [String] {
         guard let statLine else { return [] }
         return FantasySportConfiguration.configuration(for: sport).relevantLiveStatistics.prefix(4).compactMap { stat in
             let value = statLine[stat]
@@ -255,16 +255,16 @@ private struct ESPNSportsAthleteDTO: Decodable {
     }
 }
 
-private struct ESPNSportsImageDTO: Decodable { let href: String? }
-private struct ESPNSportsPositionDTO: Decodable { let abbreviation: String?; let name: String? }
-private struct ESPNSportsInjuryDTO: Decodable { let status: String?; let type: String? }
-private struct ESPNSportsStatisticGroupDTO: Decodable { let splits: [ESPNSportsStatisticSplitDTO]? }
-private struct ESPNSportsStatisticSplitDTO: Decodable { let stats: [ESPNSportsStatisticDTO]? }
-private struct ESPNSportsStatisticDTO: Decodable { let name: String?; let abbreviation: String?; let value: Double?; let displayValue: String? }
+nonisolated private struct ESPNSportsImageDTO: Decodable { let href: String? }
+nonisolated private struct ESPNSportsPositionDTO: Decodable { let abbreviation: String?; let name: String? }
+nonisolated private struct ESPNSportsInjuryDTO: Decodable { let status: String?; let type: String? }
+nonisolated private struct ESPNSportsStatisticGroupDTO: Decodable { let splits: [ESPNSportsStatisticSplitDTO]? }
+nonisolated private struct ESPNSportsStatisticSplitDTO: Decodable { let stats: [ESPNSportsStatisticDTO]? }
+nonisolated private struct ESPNSportsStatisticDTO: Decodable { let name: String?; let abbreviation: String?; let value: Double?; let displayValue: String? }
 
 typealias ESPNHockeySportsDataProvider = ESPNSportsDataProvider
 
-protocol BannerFantasyBackendService: Sendable {
+nonisolated protocol BannerFantasyBackendService: Sendable {
     func loadMyLeagues(userID: String) async throws -> [BannerFantasyLeagueBundle]
     func createLeague(_ request: BannerFantasyCreateLeagueRequest, commissionerUserID: String) async throws -> BannerFantasyLeagueBundle
     func joinLeague(_ request: BannerFantasyJoinLeagueRequest, userID: String) async throws -> BannerFantasyLeagueBundle
@@ -277,7 +277,7 @@ protocol BannerFantasyBackendService: Sendable {
     func disconnect() async
 }
 
-enum BannerFantasyBackendError: LocalizedError, Sendable {
+nonisolated enum BannerFantasyBackendError: LocalizedError, Sendable {
     case leagueNotFound
     case leagueFull
     case teamNotFound
@@ -615,13 +615,13 @@ actor LocalBannerFantasyBackendService: BannerFantasyBackendService {
         return updated
     }
 
-    private static func abbreviation(for name: String) -> String {
+    nonisolated private static func abbreviation(for name: String) -> String {
         let letters = name.split(separator: " ").compactMap(\.first)
         let abbreviation = letters.isEmpty ? String(name.prefix(3)) : String(letters.prefix(3))
         return abbreviation.uppercased()
     }
 
-    private static func cpuTeams(leagueID: String, count: Int) -> [BannerFantasyTeam] {
+    nonisolated private static func cpuTeams(leagueID: String, count: Int) -> [BannerFantasyTeam] {
         let names = ["Ice Breakers", "Goal Line", "Fast Break", "Diamond Club", "Power Play", "Red Zone", "Baseline", "Bullpen", "North Stars", "City Skaters", "Sunday Squad", "Late Shift"]
         return (0..<count).map { index in
             let name = names[index % names.count]
@@ -629,14 +629,14 @@ actor LocalBannerFantasyBackendService: BannerFantasyBackendService {
         }
     }
 
-    private static func draftRounds(for rosterConfiguration: BannerFantasyRosterConfiguration) -> Int {
+    nonisolated private static func draftRounds(for rosterConfiguration: BannerFantasyRosterConfiguration) -> Int {
         rosterConfiguration.slotCounts
             .filter { slot, _ in slot != .injuredReserve && slot != .injuredList }
             .map(\.value)
             .reduce(0, +)
     }
 
-    private static func snakeDraftPicks(leagueID: String, teamIDs: [String], rounds: Int) -> [BannerFantasyDraftPick] {
+    nonisolated private static func snakeDraftPicks(leagueID: String, teamIDs: [String], rounds: Int) -> [BannerFantasyDraftPick] {
         guard !teamIDs.isEmpty, rounds > 0 else { return [] }
         var picks: [BannerFantasyDraftPick] = []
         for round in 1...rounds {
@@ -649,7 +649,7 @@ actor LocalBannerFantasyBackendService: BannerFantasyBackendService {
         return picks
     }
 
-    private static func bestCPUPlayer(from players: [BannerFantasyAvailablePlayer], roster: BannerFantasyRoster?, configuration: BannerFantasyRosterConfiguration) -> BannerFantasyAvailablePlayer? {
+    nonisolated private static func bestCPUPlayer(from players: [BannerFantasyAvailablePlayer], roster: BannerFantasyRoster?, configuration: BannerFantasyRosterConfiguration) -> BannerFantasyAvailablePlayer? {
         guard !players.isEmpty else { return nil }
         let currentSlots = roster?.entries.flatMap(\.eligibleSlots) ?? []
         let filledCounts = Dictionary(grouping: currentSlots, by: { $0 }).mapValues(\.count)
@@ -658,7 +658,7 @@ actor LocalBannerFantasyBackendService: BannerFantasyBackendService {
         }
     }
 
-    private static func scoreCPUPlayer(_ player: BannerFantasyAvailablePlayer, filledCounts: [BannerFantasyRosterSlot: Int], configuration: BannerFantasyRosterConfiguration) -> Double {
+    nonisolated private static func scoreCPUPlayer(_ player: BannerFantasyAvailablePlayer, filledCounts: [BannerFantasyRosterSlot: Int], configuration: BannerFantasyRosterConfiguration) -> Double {
         let needScore = player.eligibleSlots.map { slot -> Double in
             let target = configuration.slotCounts[slot] ?? 0
             guard target > 0 else { return 0 }
@@ -670,11 +670,11 @@ actor LocalBannerFantasyBackendService: BannerFantasyBackendService {
         return needScore + positionBonus + injuryPenalty + Double(stableTieBreaker(for: player.id) % 100) / 10_000
     }
 
-    private static func stableTieBreaker(for id: String) -> Int {
+    nonisolated private static func stableTieBreaker(for id: String) -> Int {
         id.unicodeScalars.reduce(0) { ($0 &+ Int($1.value)) % 10_000 }
     }
 
-    private static func matchups(leagueID: String, teams: [BannerFantasyTeam], start: Date, periods: Int) -> [BannerFantasyMatchup] {
+    nonisolated private static func matchups(leagueID: String, teams: [BannerFantasyTeam], start: Date, periods: Int) -> [BannerFantasyMatchup] {
         guard teams.count > 1 else { return [] }
         let calendar = Calendar.current
         let startDay = calendar.startOfDay(for: start)
@@ -701,30 +701,30 @@ actor LocalBannerFantasyBackendService: BannerFantasyBackendService {
         return generated
     }
 
-    private static func isEligible(entry: BannerFantasyPlayerEntry, for slot: BannerFantasyRosterSlot) -> Bool {
+    nonisolated private static func isEligible(entry: BannerFantasyPlayerEntry, for slot: BannerFantasyRosterSlot) -> Bool {
         if slot == .bench { return true }
         if slot == .injuredReserve || slot == .injuredList { return entry.injuryStatus != nil }
         return entry.eligibleSlots.contains(slot) || entry.eligibleSlots.contains(.utility) && slot == .utility || entry.eligibleSlots.contains(.flex) && slot == .flex
     }
 
-    private static func transaction(leagueID: String, teamID: String?, type: BannerFantasyTransactionType, playerEntryIDs: [String], description: String) -> BannerFantasyTransaction {
+    nonisolated private static func transaction(leagueID: String, teamID: String?, type: BannerFantasyTransactionType, playerEntryIDs: [String], description: String) -> BannerFantasyTransaction {
         BannerFantasyTransaction(id: UUID().uuidString, leagueID: leagueID, teamID: teamID, type: type, playerEntryIDs: playerEntryIDs, description: description, createdAt: Date())
     }
 
-    private static func inviteCode() -> String {
+    nonisolated private static func inviteCode() -> String {
         String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8)).uppercased()
     }
 }
 
-private extension BannerFantasyLeagueBundle {
+nonisolated private extension BannerFantasyLeagueBundle {
     func copySelecting(teamID: String) -> BannerFantasyLeagueBundle { self }
 }
 
-protocol FantasySportScoringStrategy: Sendable {
+nonisolated protocol FantasySportScoringStrategy: Sendable {
     func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore
 }
 
-struct DefaultFantasySportScoringStrategy: FantasySportScoringStrategy {
+nonisolated struct DefaultFantasySportScoringStrategy: FantasySportScoringStrategy {
     func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore {
         switch rules.type {
         case .headToHeadPoints:
@@ -742,12 +742,12 @@ struct DefaultFantasySportScoringStrategy: FantasySportScoringStrategy {
     }
 }
 
-struct NFLFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
-struct NHLFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
-struct NBAFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
-struct MLBFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
+nonisolated struct NFLFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
+nonisolated struct NHLFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
+nonisolated struct NBAFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
+nonisolated struct MLBFantasyScoringStrategy: FantasySportScoringStrategy { private let base = DefaultFantasySportScoringStrategy(); func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules) -> BannerFantasyPlayerScore { base.score(statLine: statLine, rules: rules) } }
 
-struct FantasyScoringEngine: Sendable {
+nonisolated struct FantasyScoringEngine: Sendable {
     func score(statLine: BannerFantasyStatLine, rules: BannerFantasyScoringRules, sport: FantasySport = .nhl) -> BannerFantasyPlayerScore {
         strategy(for: sport).score(statLine: statLine, rules: rules)
     }

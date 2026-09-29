@@ -1,6 +1,6 @@
 import Foundation
 
-struct TeamPodcastSeed: Codable, Identifiable {
+nonisolated struct TeamPodcastSeed: Codable, Identifiable, Sendable {
     let id: String
     let league: String
     let sport: String

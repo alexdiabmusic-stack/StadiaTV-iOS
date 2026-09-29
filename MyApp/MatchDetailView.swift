@@ -210,7 +210,7 @@ struct MatchDetailView: View {
         .task(id: match.id) {
             matchNews = (try? await SportsRepository.shared.legacyNews(for: match.league, limit: 5)) ?? []
         }
-        .task(id: "\(match.id)-\(playlists.allChannels.count)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
+        .task(id: "\(match.id)-\(playlists.channelsRevision)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
             await rankSources()
         }
         // A launch-time or Following-tab background scan can finish confirming this match's
@@ -264,13 +264,18 @@ struct MatchDetailView: View {
             }
         }
 
+        // O(channels) grouping; kept off the main thread for large playlists.
         let channelToCanonical = epgRepository.channelToCanonicalMap
-        var canonicalToChannels: [String: [Channel]] = [:]
-        for channel in channels {
-            if let cid = channelToCanonical[channel.id] {
-                canonicalToChannels[cid, default: []].append(channel)
+        let canonicalToChannels: [String: [Channel]] = await Task.detached(priority: .userInitiated) {
+            var grouped: [String: [Channel]] = [:]
+            for channel in channels {
+                if let cid = channelToCanonical[channel.id] {
+                    grouped[cid, default: []].append(channel)
+                }
             }
-        }
+            return grouped
+        }.value
+        guard !Task.isCancelled else { return }
 
         var primarySources: [RankedSource] = []
         var primaryIds = Set<String>()
@@ -380,7 +385,7 @@ struct MatchDetailView: View {
                 golfTournament: golfTournament,
                 spoilerFreeMode: prefs.spoilerFreeMode,
                 spoilerRevealed: spoilerRevealed,
-                revealScore: { withAnimation(.snappy) { spoilerRevealed = true } }
+                revealScore: { withAnimation(Theme.Motion.snappy) { spoilerRevealed = true } }
             )
         }
     }
@@ -399,7 +404,7 @@ struct MatchDetailView: View {
                                 .font(.title.weight(.heavy).monospacedDigit())
                                 .foregroundStyle(Theme.textSecondary)
                             Button("Reveal Score") {
-                                withAnimation(.snappy) { spoilerRevealed = true }
+                                withAnimation(Theme.Motion.snappy) { spoilerRevealed = true }
                             }
                             .font(.caption.weight(.bold))
                             .foregroundStyle(Theme.accent)
@@ -828,7 +833,7 @@ struct MatchDetailView: View {
                         Label(correct ? "Correct" : "Incorrect",
                               systemImage: correct ? "checkmark.circle.fill" : "xmark.circle.fill")
                             .font(.caption.weight(.bold))
-                            .foregroundStyle(correct ? Color(hex: 0x3DBE6B) : Theme.live)
+                            .foregroundStyle(correct ? Theme.Palette.positive : Theme.live)
                     }
                 }
                 .font(.headline.weight(.bold))
@@ -849,12 +854,12 @@ struct MatchDetailView: View {
                                 if pts > 0 {
                                     Text("+\(pts) pts")
                                         .font(.subheadline.weight(.heavy))
-                                        .foregroundStyle(Color(hex: 0x3DBE6B))
+                                        .foregroundStyle(Theme.Palette.positive)
                                 }
                                 if let streak = p.streakAtTime, streak >= 2 {
                                     Text("🔥 \(streak) streak")
                                         .font(.caption2.weight(.bold))
-                                        .foregroundStyle(Color(hex: 0xFF6B35))
+                                        .foregroundStyle(Theme.Palette.orange)
                                 }
                             }
                         }
@@ -887,13 +892,13 @@ struct MatchDetailView: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 9)
                     .frame(maxWidth: .infinity)
-                    .background(Color(hex: 0x3DBE6B), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .background(Theme.Palette.positive, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .transition(.move(edge: .top).combined(with: .opacity))
                     .padding(.top, -8)
                 }
             }
             .clipped()
-            .animation(.spring(response: 0.4), value: showPickCelebration)
+            .animation(Theme.Motion.smooth, value: showPickCelebration)
             .sensoryFeedback(.success, trigger: showPickCelebration) { _, new in new }
             .task(id: match.id) {
                 predictions.resolveIfNeeded(for: match)
@@ -1035,7 +1040,7 @@ struct MatchDetailView: View {
             HStack(spacing: 0) {
                 ForEach(availableGameCenterTabs) { tab in
                     Button {
-                        withAnimation(.snappy) { gameCenterTab = tab }
+                        withAnimation(Theme.Motion.snappy) { gameCenterTab = tab }
                     } label: {
                         Text(tab.rawValue)
                             .font(.subheadline.weight(.semibold))
@@ -1244,7 +1249,7 @@ struct MatchDetailView: View {
 
                     if filteredAthletes.count > 5 {
                         Button {
-                            withAnimation(.snappy) { isShowingAll.toggle() }
+                            withAnimation(Theme.Motion.snappy) { isShowingAll.toggle() }
                         } label: {
                             HStack {
                                 Text(isShowingAll ? "Show fewer" : "More players")
@@ -1416,14 +1421,14 @@ struct MatchDetailView: View {
 
         private var backgroundColor: Color {
             switch sport {
-            case .soccer, .football: return Color(hex: 0x153B2C)
-            case .basketball: return Color(hex: 0x5A3520)
-            case .baseball: return Color(hex: 0x234329)
-            case .hockey: return Color(hex: 0xD7E4EF)
-            case .golf: return Color(hex: 0x1B3B2A)
-            case .racing: return Color(hex: 0x2A2C31)
-            case .tennis: return Color(hex: 0x3B6E2A)
-            case .cycling, .wrestling, .esports: return Color(hex: 0x2A2C31)
+            case .soccer, .football: return Theme.Palette.deepGreen
+            case .basketball: return Theme.Palette.clay
+            case .baseball: return Theme.Palette.pitch
+            case .hockey: return Theme.Palette.frost
+            case .golf: return Theme.Palette.forest
+            case .racing: return Theme.Palette.graphite
+            case .tennis: return Theme.Palette.turf
+            case .cycling, .wrestling, .esports: return Theme.Palette.graphite
             }
         }
 
@@ -1664,7 +1669,7 @@ struct MatchDetailView: View {
                     }
                     path.addEllipse(in: CGRect(x: rect.midX - 24, y: rect.midY - 24, width: 48, height: 48))
                 }
-                .stroke(Color(hex: 0x2458A6).opacity(0.5), lineWidth: 1.2)
+                .stroke(Theme.Palette.cobalt.opacity(0.5), lineWidth: 1.2)
             }
         }
     }
@@ -1818,7 +1823,7 @@ struct MatchDetailView: View {
                 .listRowBackground(Theme.surface)
             }
             .listStyle(.plain)
-            .scrollContentBackground(.hidden)
+            .hidesScrollContentBackground()
             .background(Theme.background)
             .navigationTitle("Matched Streams")
             #if os(iOS)
@@ -1833,8 +1838,10 @@ struct MatchDetailView: View {
     }
 
     private func handleSourceTap(_ channel: Channel) {
+        PlaybackTapClock.record()
         #if os(iOS)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        // Starting a stream counts as a channel switch.
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         #endif
         playbackContext = MatchPlaybackContext(match: match, channel: channel, rankedSources: rankedSources)
     }
@@ -2131,7 +2138,7 @@ private struct MatchStandingPreviewRow: View {
 
     private var streakColor: Color {
         guard let streak = row.streak?.lowercased() else { return Theme.textSecondary }
-        if streak.hasPrefix("w") { return Color(hex: 0x37C871) }
+        if streak.hasPrefix("w") { return Theme.Palette.green }
         if streak.hasPrefix("l") { return Theme.live }
         return Theme.textSecondary
     }
@@ -2152,7 +2159,7 @@ private struct SourceRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                AsyncImage(url: logoURL) { phase in
+                CachedImage(url: logoURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFit()
                     } else {
@@ -2312,10 +2319,7 @@ private struct PlayByPlaySectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Button {
-                withAnimation(.snappy) { isExpanded.toggle() }
-                #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
+                withAnimation(Theme.Motion.snappy) { isExpanded.toggle() }
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "list.bullet.clipboard")
@@ -2349,7 +2353,7 @@ private struct PlayByPlaySectionView: View {
 
                 if plays.count > 20 {
                     Button {
-                        withAnimation(.snappy) { showAll.toggle() }
+                        withAnimation(Theme.Motion.snappy) { showAll.toggle() }
                     } label: {
                         HStack {
                             Text(showAll ? "Show less" : "Show all \(plays.count) plays")
@@ -2415,10 +2419,10 @@ private struct PlayRowView: View {
     private func teamColor(abbreviation: String?) -> Color {
         guard let abbr = abbreviation, !abbr.isEmpty else { return Color.clear }
         if abbr.localizedCaseInsensitiveCompare(match.away.abbreviation) == .orderedSame {
-            return Color(hex: 0x4A90E2)
+            return Theme.Palette.cornflower
         }
         if abbr.localizedCaseInsensitiveCompare(match.home.abbreviation) == .orderedSame {
-            return Color(hex: 0xE24A6B)
+            return Theme.Palette.raspberry
         }
         return Theme.textSecondary.opacity(0.5)
     }
@@ -2645,10 +2649,7 @@ private struct MLBHalfInningSection: View {
         VStack(spacing: 0) {
             // Section header row
             Button {
-                withAnimation(.snappy(duration: 0.22)) { isExpanded.toggle() }
-                #if os(iOS)
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                #endif
+                withAnimation(Theme.Motion.snappy) { isExpanded.toggle() }
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
@@ -2775,16 +2776,16 @@ private struct MLBEventBadge: View {
 
     private var badgeColor: Color {
         switch badge {
-        case "HR":        return Color(hex: 0xF5C842)
+        case "HR":        return Theme.Palette.sunflower
         case "3B":        return Theme.accent
         case "2B":        return Theme.accent.opacity(0.75)
         case "1B":        return Theme.accent.opacity(0.55)
-        case "BB", "HBP": return Color(hex: 0x5B9CF5)
+        case "BB", "HBP": return Theme.Palette.skyBlue
         case "K":         return Theme.textSecondary.opacity(0.5)
-        case "E":         return Color(hex: 0xE24A6B)
+        case "E":         return Theme.Palette.raspberry
         case "DP":        return Theme.textSecondary.opacity(0.45)
-        case "SB":        return Color(hex: 0x52C28E)
-        case "CS":        return Color(hex: 0xE24A6B).opacity(0.7)
+        case "SB":        return Theme.Palette.mint
+        case "CS":        return Theme.Palette.raspberry.opacity(0.7)
         case "WP", "PB":  return Theme.textSecondary.opacity(0.4)
         case "OUT":       return Theme.textSecondary.opacity(0.4)
         default:          return Theme.textSecondary.opacity(0.3)
@@ -2830,7 +2831,7 @@ struct HighlightCard: View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack {
                 Theme.surfaceElevated
-                AsyncImage(url: clip.thumbnailURL) { phase in
+                CachedImage(url: clip.thumbnailURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFill()
                     } else {

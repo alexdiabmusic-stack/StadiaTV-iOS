@@ -4,7 +4,7 @@ import Foundation
 // Live-verified 2026-09-07: all feeds return HTTP 200 with valid RSS content.
 // All URLs are BBC's official public RSS endpoints.
 
-struct BBCSportNewsProvider: SportsNewsProvider {
+nonisolated struct BBCSportNewsProvider: SportsNewsProvider {
     let metadata: SportsDataProviderMetadata
     var supportsPagination: Bool { false }
 

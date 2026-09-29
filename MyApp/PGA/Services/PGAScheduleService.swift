@@ -4,7 +4,7 @@ import Foundation
 /// since the season list barely changes intra-day and current-tournament
 /// discovery only needs to run a few times per session.
 actor PGAScheduleService {
-    static let shared = PGAScheduleService()
+    nonisolated static let shared = PGAScheduleService()
 
     private let client: PGATourClient
     private var scheduleCache: [String: (Date, GolfSeasonSchedule)] = [:]

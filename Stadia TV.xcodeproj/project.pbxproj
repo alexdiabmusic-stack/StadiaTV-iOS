@@ -14,6 +14,7 @@
 		D28647D33041356500260FB3 /* SportsDataFoundationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SportsDataFoundationTests.swift; sourceTree = "<group>"; };
 		D2B8CEEC304D50140034778D /* SourceMatcherRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceMatcherRegressionTests.swift; sourceTree = "<group>"; };
 		D2B8CEEF304E7AB20034778D /* PrecisionStreamMatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrecisionStreamMatcherTests.swift; sourceTree = "<group>"; };
+		A1C0FF1E0000000000000001 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -52,7 +53,16 @@
 				000000000000000000000010 /* MyApp */,
 				000000000000000000000020 /* Products */,
 				D2268B0D303FB4760014AE4B /* StadiaTVTests */,
+				A1C0FF1E0000000000000002 /* Config */,
 			);
+			sourceTree = "<group>";
+		};
+		A1C0FF1E0000000000000002 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				A1C0FF1E0000000000000001 /* App.xcconfig */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		000000000000000000000020 /* Products */ = {
@@ -282,6 +292,7 @@
 		};
 		000000000000000111000000 /* Debug configuration for PBXNativeTarget "MyApp" */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A1C0FF1E0000000000000001 /* App.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
@@ -327,6 +338,7 @@
 		};
 		000000000000000112000000 /* Release configuration for PBXNativeTarget "MyApp" */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A1C0FF1E0000000000000001 /* App.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;

@@ -94,6 +94,7 @@ struct DiscoverView: View {
         .task(id: selectedSport.id) {
             await loadTargetLeaguesIfNeeded()
         }
+        .task { await podcastStore.ensureCatalogLoaded() }
     }
 
     private var stickyFilters: some View {
@@ -491,7 +492,7 @@ private struct ArticleImage: View {
     let url: URL?
 
     var body: some View {
-        AsyncImage(url: url) { phase in
+        CachedImage(url: url) { phase in
             if case .success(let image) = phase {
                 image.resizable().scaledToFill()
             } else {

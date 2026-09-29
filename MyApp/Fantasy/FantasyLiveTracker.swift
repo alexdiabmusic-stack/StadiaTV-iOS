@@ -140,7 +140,7 @@ struct FantasyRedZoneToastView: View {
                         .foregroundStyle(alert.isTouchdown ? Theme.live : Theme.accent)
                     Spacer()
                     Text("NOW")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(Theme.Typography.overline)
                         .foregroundStyle(Theme.textSecondary)
                 }
 
@@ -510,7 +510,7 @@ struct FantasyWinProbabilityChartView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("WIN PROBABILITY")
-                    .font(.system(size: 10, weight: .black))
+                    .font(Theme.Typography.overline)
                     .foregroundStyle(Theme.textSecondary)
 
                 Spacer()
@@ -588,13 +588,13 @@ struct FantasyPlayerPaceWidget: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("PLAYER PACE PROJECTIONS")
-                    .font(.system(size: 10, weight: .black))
+                    .font(Theme.Typography.overline)
                     .foregroundStyle(Theme.textSecondary)
 
                 Spacer()
 
                 Text("LIVE")
-                    .font(.system(size: 9, weight: .bold))
+                    .font(Theme.Typography.overline)
                     .foregroundStyle(.green)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -617,11 +617,11 @@ struct FantasyPlayerPaceWidget: View {
 
                         HStack(spacing: 4) {
                             Text(pg.fantasyPlayer.position ?? "FLEX")
-                                .font(.system(size: 9, weight: .heavy))
+                                .font(Theme.Typography.overline)
                                 .foregroundStyle(Theme.accent)
                             if let team = pg.fantasyPlayer.teamAbbreviation {
                                 Text("• \(team)")
-                                    .font(.system(size: 9))
+                                    .font(Theme.Typography.overline)
                                     .foregroundStyle(Theme.textSecondary)
                             }
                         }
@@ -635,16 +635,16 @@ struct FantasyPlayerPaceWidget: View {
                                 .font(.caption.weight(.heavy))
                                 .foregroundStyle(.white)
                             Text(String(format: "/ %.1f proj", proj))
-                                .font(.system(size: 10))
+                                .font(Theme.Typography.overline)
                                 .foregroundStyle(Theme.textSecondary)
                         }
 
                         HStack(spacing: 2) {
                             Image(systemName: isOnPace ? "arrow.up.right.circle.fill" : "arrow.down.right.circle.fill")
-                                .font(.system(size: 9))
+                                .font(Theme.Typography.overline)
                                 .foregroundStyle(isOnPace ? .green : .orange)
                             Text(isOnPace ? "On Pace" : "Behind Pace")
-                                .font(.system(size: 9, weight: .bold))
+                                .font(Theme.Typography.overline)
                                 .foregroundStyle(isOnPace ? .green : .orange)
                         }
                     }

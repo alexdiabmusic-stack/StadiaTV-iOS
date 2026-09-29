@@ -23,6 +23,19 @@ nonisolated struct SportsRepository: Sendable {
     func legacyScoreboards(for league: League, starting start: Date, days: Int) async throws -> [Match] {
         try await provider(league, .schedule).schedule(start: start, days: days)
     }
+    /// `legacyScoreboard(for:)` with a short shared cache, so zapping between channels in the
+    /// player doesn't refetch the same scoreboards. Other callers keep uncached results.
+    func cachedLegacyScoreboard(for league: League, maxAge: TimeInterval = 30) async throws -> [Match] {
+        try await ScoreboardCache.shared.value(for: "live|\(league.path)", maxAge: maxAge) {
+            try await legacyScoreboard(for: league)
+        }
+    }
+    func cachedLegacyScoreboards(for league: League, starting start: Date, days: Int, maxAge: TimeInterval = 30) async throws -> [Match] {
+        let key = "schedule|\(league.path)|\(Int(start.timeIntervalSince1970))|\(days)"
+        return try await ScoreboardCache.shared.value(for: key, maxAge: maxAge) {
+            try await legacyScoreboards(for: league, starting: start, days: days)
+        }
+    }
     func legacyTeams(for league: League) async throws -> [Team] { try await provider(league, .teams).teams() }
     func legacyStandings(for league: League) async throws -> [StandingsGroup] { try await provider(league, .standings).standings() }
     func legacyRoster(for league: League, teamID: String) async throws -> [RosterGroup] { try await provider(league, .rosters).roster(teamID: teamID) }
@@ -130,5 +143,29 @@ nonisolated struct SportsRepository: Sendable {
     }
     func prefetchNews(for leagues: [League]) async {
         for league in leagues { _ = try? await legacyNews(for: league) }
+    }
+}
+
+/// Short-lived cache of scoreboard results keyed by league (and date window).
+/// Concurrent requests for the same key share one in-flight fetch.
+private actor ScoreboardCache {
+    static let shared = ScoreboardCache()
+
+    private var entries: [String: (date: Date, matches: [Match])] = [:]
+    private var inFlight: [String: Task<[Match], Error>] = [:]
+
+    func value(for key: String, maxAge: TimeInterval, fetch: @escaping @Sendable () async throws -> [Match]) async throws -> [Match] {
+        if let entry = entries[key], Date().timeIntervalSince(entry.date) < maxAge {
+            return entry.matches
+        }
+        if let task = inFlight[key] {
+            return try await task.value
+        }
+        let task = Task { try await fetch() }
+        inFlight[key] = task
+        defer { inFlight[key] = nil }
+        let matches = try await task.value
+        entries[key] = (Date(), matches)
+        return matches
     }
 }

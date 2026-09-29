@@ -18,13 +18,11 @@ import UIKit
 /// Animation choreography
 /// ──────────────────────
 ///  0.00 s  White logo centred (matches native launch screen background).
-///  0.20 s  TV starts animating white → Banner blue (easeInOut 0.45 s).
-///  0.65 s  Fully branded wordmark at rest. Startup pipeline is running.
-///  1.10 s  Minimum brand duration met.
-///  ~1.25 s Logo flies from centre → nav-bar header (0.58 s, custom ease).
-///           Background fades to transparent simultaneously (0.35 s ease-in).
-///           Home sections begin rising underneath while logo travels.
-///  ~1.9 s  Overlay removed; toolbar BrandMark takes over in the same frame.
+///  0.05 s  TV starts animating white → Banner blue (easeInOut 0.3 s).
+///  0.35 s  Minimum brand duration met; transitions at once if Home is ready,
+///          otherwise waits for it (at most 1.0 s).
+///  +0.35 s Logo flies from centre → nav-bar header while the background fades.
+///  ~0.7 s  Overlay removed (with cached data); toolbar BrandMark takes over.
 struct LaunchAnimationView: View {
     @EnvironmentObject private var coordinator: StartupCoordinator
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -34,7 +32,6 @@ struct LaunchAnimationView: View {
     // comparable visual weight to the previous text-based logo at 2×.
     private static let splashScale: CGFloat = 4.0
 
-    @State private var bounceScale: CGFloat = 1.0
 
     var body: some View {
         GeometryReader { geo in
@@ -53,12 +50,12 @@ struct LaunchAnimationView: View {
     // MARK: - Background
 
     private var splashBackground: some View {
-        Color(hex: 0x080A0F)
+        Theme.Palette.nearBlack
             .opacity(backgroundOpacity)
             .animation(
                 reduceMotion
                     ? .easeOut(duration: 0.25)
-                    : .easeIn(duration: 0.35),
+                    : .easeIn(duration: 0.3),
                 value: coordinator.isTransitioningToHome
             )
     }
@@ -88,29 +85,14 @@ struct LaunchAnimationView: View {
                 .opacity(isAllWhite ? 1.0 : 0.0)
         }
         .frame(height: splashHeight)
-        .scaleEffect(logoScale * bounceScale)
+        .scaleEffect(logoScale)
         .offset(y: logoOffset(in: geo))
         .animation(
             // No position/scale animation when Reduce Motion is enabled —
             // the colour change still plays; the overlay simply fades out.
-            reduceMotion ? nil : .timingCurve(0.4, 0.0, 0.2, 1.0, duration: 0.58),
+            reduceMotion ? nil : .timingCurve(0.4, 0.0, 0.2, 1.0, duration: 0.35),
             value: coordinator.isTransitioningToHome
         )
-        .onChange(of: coordinator.phase) { _, newPhase in
-            guard newPhase == .brandComplete && !reduceMotion else { return }
-            // Spring pulse: logo scales up ~6 % then bounces back to rest.
-            // Completes ~500 ms before the travel animation fires.
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(80))
-                withAnimation(.spring(response: 0.2, dampingFraction: 0.65)) {
-                    bounceScale = 1.06
-                }
-                try? await Task.sleep(for: .milliseconds(220))
-                withAnimation(.spring(response: 0.38, dampingFraction: 0.42)) {
-                    bounceScale = 1.0
-                }
-            }
-        }
     }
 
     // MARK: - Animated properties

@@ -135,7 +135,7 @@ struct FantasyDriveTickerOverlayView: View {
                             .fill(Color.red)
                             .frame(width: 7, height: 7)
                         Text("LIVE FANTASY TICKER")
-                            .font(.system(size: 11, weight: .black))
+                            .font(Theme.Typography.caption)
                             .foregroundColor(.white)
                     }
                     .padding(.horizontal, 8)
@@ -158,9 +158,9 @@ struct FantasyDriveTickerOverlayView: View {
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "tv.fill")
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(Theme.Typography.overline)
                                 Text("Watch")
-                                    .font(.system(size: 11, weight: .bold))
+                                    .font(Theme.Typography.caption)
                             }
                             .foregroundColor(.black)
                             .padding(.horizontal, 10)
@@ -177,7 +177,7 @@ struct FantasyDriveTickerOverlayView: View {
                         }
                     } label: {
                         Image(systemName: isExpanded ? "chevron.down" : "chevron.up")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(Theme.Typography.caption)
                             .foregroundColor(.white.opacity(0.8))
                             .padding(6)
                             .background(Color.white.opacity(0.15))
@@ -229,7 +229,7 @@ struct ScoringPlayCard: View {
                     .fill(play.isTouchdown ? Color.green.opacity(0.3) : Color.white.opacity(0.15))
                     .frame(width: 32, height: 32)
                 Text(play.player.position ?? "FLEX")
-                    .font(.system(size: 11, weight: .heavy))
+                    .font(Theme.Typography.caption)
                     .foregroundColor(play.isTouchdown ? .green : .white)
             }
 
@@ -239,7 +239,7 @@ struct ScoringPlayCard: View {
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.white)
                     Text(play.formattedPoints)
-                        .font(.system(size: 11, weight: .black))
+                        .font(Theme.Typography.caption)
                         .foregroundColor(play.pointsDelta >= 0 ? .green : .red)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
@@ -248,7 +248,7 @@ struct ScoringPlayCard: View {
                 }
 
                 Text(play.playText)
-                    .font(.system(size: 11))
+                    .font(Theme.Typography.caption)
                     .foregroundColor(.white.opacity(0.8))
                     .lineLimit(1)
             }
@@ -256,7 +256,7 @@ struct ScoringPlayCard: View {
             if play.channel != nil {
                 Button(action: onWatch) {
                     Image(systemName: "play.fill")
-                        .font(.system(size: 10))
+                        .font(Theme.Typography.overline)
                         .foregroundColor(.black)
                         .padding(6)
                         .background(Color.white)

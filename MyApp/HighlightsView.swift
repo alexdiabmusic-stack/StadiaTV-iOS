@@ -190,15 +190,15 @@ struct TopHighlightsSection: View {
                 if !entitlements.isPremium {
                     HStack(spacing: 4) {
                         Image(systemName: "crown.fill")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Color(hex: 0xFFCC00))
+                            .font(Theme.Typography.overline)
+                            .foregroundStyle(Theme.Palette.highlightYellow)
                         Text("VIP")
-                            .font(.system(size: 9, weight: .black))
-                            .foregroundStyle(Color(hex: 0xFFCC00))
+                            .font(Theme.Typography.overline)
+                            .foregroundStyle(Theme.Palette.highlightYellow)
                     }
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
-                    .background(Color(hex: 0xFFCC00).opacity(0.15), in: Capsule())
+                    .background(Theme.Palette.highlightYellow.opacity(0.15), in: Capsule())
                 }
             }
             .font(.footnote.weight(.semibold))
@@ -232,9 +232,9 @@ struct TopHighlightsSection: View {
                         VStack(spacing: 5) {
                             Image(systemName: "crown.fill")
                                 .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(Color(hex: 0xFFCC00))
+                                .foregroundStyle(Theme.Palette.highlightYellow)
                             Text("VIP ONLY")
-                                .font(.system(size: 10, weight: .black))
+                                .font(Theme.Typography.overline)
                                 .foregroundStyle(.white)
                                 .tracking(0.5)
                         }
@@ -330,15 +330,15 @@ struct TeamHighlightsSection: View {
                 if !entitlements.isPremium {
                     HStack(spacing: 4) {
                         Image(systemName: "crown.fill")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Color(hex: 0xFFCC00))
+                            .font(Theme.Typography.overline)
+                            .foregroundStyle(Theme.Palette.highlightYellow)
                         Text("VIP")
-                            .font(.system(size: 9, weight: .black))
-                            .foregroundStyle(Color(hex: 0xFFCC00))
+                            .font(Theme.Typography.overline)
+                            .foregroundStyle(Theme.Palette.highlightYellow)
                     }
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)
-                    .background(Color(hex: 0xFFCC00).opacity(0.15), in: Capsule())
+                    .background(Theme.Palette.highlightYellow.opacity(0.15), in: Capsule())
                 }
             }
             .font(.footnote.weight(.semibold))
@@ -372,9 +372,9 @@ struct TeamHighlightsSection: View {
                         VStack(spacing: 5) {
                             Image(systemName: "crown.fill")
                                 .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(Color(hex: 0xFFCC00))
+                                .foregroundStyle(Theme.Palette.highlightYellow)
                             Text("VIP ONLY")
-                                .font(.system(size: 10, weight: .black))
+                                .font(Theme.Typography.overline)
                                 .foregroundStyle(.white)
                                 .tracking(0.5)
                         }
@@ -416,7 +416,7 @@ private struct HighlightVideoCard: View {
     }
 
     private var thumbnailView: some View {
-        AsyncImage(url: item.thumbnailURL) { phase in
+        CachedImage(url: item.thumbnailURL) { phase in
             if case .success(let image) = phase {
                 image.resizable().scaledToFill()
             } else {

@@ -11,7 +11,7 @@ struct PlayerHeadshot: View {
     var size: CGFloat = 44
 
     var body: some View {
-        AsyncImage(url: url) { phase in
+        CachedImage(url: url) { phase in
             switch phase {
             case .success(let image):
                 image.resizable().scaledToFill()
@@ -193,7 +193,7 @@ enum StandingsCol: Hashable {
     func textColor(for row: StandingRow) -> Color {
         if self == .streak {
             let s = row.streak?.lowercased() ?? ""
-            if s.hasPrefix("w") { return Color(hex: 0x37C871) }
+            if s.hasPrefix("w") { return Theme.Palette.green }
             if s.hasPrefix("l") { return Theme.live }
         }
         return isKey ? Theme.textPrimary : Theme.textSecondary
@@ -478,9 +478,9 @@ private struct InjuryRowView: View {
             Spacer()
             Text(injury.status.uppercased())
                 .font(.caption2.weight(.heavy))
-                .foregroundStyle(injury.isOut ? Theme.live : Color(hex: 0xE0A83D))
+                .foregroundStyle(injury.isOut ? Theme.live : Theme.Palette.amber)
                 .padding(.horizontal, 8).padding(.vertical, 4)
-                .background((injury.isOut ? Theme.live : Color(hex: 0xE0A83D)).opacity(0.15), in: Capsule())
+                .background((injury.isOut ? Theme.live : Theme.Palette.amber).opacity(0.15), in: Capsule())
         }
         .padding(12)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))

@@ -38,7 +38,7 @@ enum ChannelBrowserScope {
 
     var emptyMessage: String {
         switch self {
-        case .favorites:   return "No favourite channels yet.\nTap ♥ on any channel to add one."
+        case .favorites:   return "No favourite channels yet.\nSwipe right on any channel to add one."
         case .allChannels: return "No channels loaded from your playlists."
         case .customGroup: return "This group has no channels yet.\nUse the context menu on any channel to add it."
         case .providerGroup: return "No channels in this group."
@@ -69,6 +69,8 @@ struct ChannelBrowserView: View {
     @State private var renameText = ""
     @State private var channelForGroup: Channel?
     @State private var channelForInfo: Channel?
+    @StateObject private var model = ChannelBrowserModel()
+    @State private var hasComputedOnce = false
 
     init(scope: ChannelBrowserScope,
          onPlay: @escaping (Channel, [Channel]) -> Void,
@@ -86,73 +88,70 @@ struct ChannelBrowserView: View {
 
     // MARK: - Data
 
-    private var baseChannels: [Channel] {
+    /// Changes whenever the list's inputs do; drives `model.update`.
+    private var inputKey: String {
+        var groupHash = 0
+        if case .customGroup(let id, _) = scope {
+            groupHash = customGroups.groups.first(where: { $0.id == id })?.channelIDs.hashValue ?? 0
+        }
+        return "\(store.channelsRevision)|\(channelPrefs.revision)|\(groupHash)|\(sortOrder.rawValue)|\(query)"
+    }
+
+    private var modelInput: ChannelBrowserModel.Input {
+        let source: ChannelBrowserModel.Input.Source
+        var byPlaylist: [Channel] = []
         switch scope {
         case .favorites:
-            let favIDs = Set(channelPrefs.favoriteChannelIDs)
-            return store.allChannels.filter { favIDs.contains($0.id) }
-
+            source = .favorites
         case .allChannels:
-            return store.allChannels.filter { !channelPrefs.isHidden($0.id) }
-
+            source = .all
         case .customGroup(let id, _):
-            guard let group = customGroups.groups.first(where: { $0.id == id }) else { return [] }
-            let byID = Dictionary(uniqueKeysWithValues: store.allChannels.map { ($0.id, $0) })
-            return group.channelIDs.compactMap { byID[$0] }
-
+            source = .ids(customGroups.groups.first(where: { $0.id == id })?.channelIDs ?? [])
         case .providerGroup(let providerID, let groupTitle, _):
-            return (store.channelsByPlaylist[providerID] ?? [])
-                .filter { ($0.group ?? "") == groupTitle && !channelPrefs.isHidden($0.id) }
+            source = .playlistGroup(providerID, groupTitle)
+            byPlaylist = store.channelsByPlaylist[providerID] ?? []
         }
+        return ChannelBrowserModel.Input(
+            source: source,
+            channels: store.allChannels,
+            byPlaylist: byPlaylist,
+            channelsByID: store.channelsByID,
+            hiddenIDs: channelPrefs.hiddenChannelIDs,
+            favoriteIDs: channelPrefs.favoriteChannelIDs,
+            customNames: channelPrefs.customNames,
+            query: query,
+            sortOrder: sortOrder
+        )
     }
 
-    private var displayChannels: [Channel] {
-        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let filtered = q.isEmpty ? baseChannels : baseChannels.filter {
-            effectiveName($0).localizedCaseInsensitiveContains(q)
-        }
-
-        switch sortOrder {
-        case .providerOrder:
-            return filtered
-        case .nameAZ:
-            return filtered.sorted {
-                effectiveName($0).localizedCaseInsensitiveCompare(effectiveName($1)) == .orderedAscending
-            }
-        case .nameZA:
-            return filtered.sorted {
-                effectiveName($0).localizedCaseInsensitiveCompare(effectiveName($1)) == .orderedDescending
-            }
-        case .channelNumber:
-            return filtered.sorted {
-                (channelNumber(effectiveName($0)) ?? Int.max) < (channelNumber(effectiveName($1)) ?? Int.max)
-            }
-        case .favoritesFirst:
-            let favIDs = Set(channelPrefs.favoriteChannelIDs)
-            return filtered.sorted { a, b in
-                let aFav = favIDs.contains(a.id), bFav = favIDs.contains(b.id)
-                if aFav != bFav { return aFav }
-                return effectiveName(a).localizedCaseInsensitiveCompare(effectiveName(b)) == .orderedAscending
-            }
-        case .custom:
-            return filtered   // baseChannels already in custom order for .customGroup scope
-        }
-    }
+    private var displayChannels: [Channel] { model.displayChannels }
 
     // MARK: - Body
 
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
-            if displayChannels.isEmpty {
+            if displayChannels.isEmpty && (model.isComputing || !hasComputedOnce) {
+                List {
+                    ForEach(0..<8, id: \.self) { _ in
+                        SkeletonRow().listRowBackground(Theme.background)
+                    }
+                }
+                .listStyle(.plain)
+                .hidesScrollContentBackground()
+                .allowsHitTesting(false)
+            } else if displayChannels.isEmpty {
                 emptyState
             } else {
                 List {
                     ForEach(displayChannels) { channel in
                         channelRow(channel)
-                            .listRowBackground(Theme.surface)
+                            .listRowBackground(Theme.background)
+                            .listRowInsets(EdgeInsets(top: 0, leading: Theme.Spacing.md, bottom: 0, trailing: Theme.Spacing.md))
                             #if !os(tvOS)
                             .listRowSeparatorTint(Theme.hairline)
+                            // Separators start at the text, not under the logo tile.
+                            .alignmentGuide(.listRowSeparatorLeading) { _ in 56 + Theme.Spacing.sm }
                             #endif
                     }
                 }
@@ -166,6 +165,12 @@ struct ChannelBrowserView: View {
         .toolbar { sortMenu }
         .onChange(of: sortOrder) { _, new in
             UserDefaults.standard.set(new.rawValue, forKey: sortStorageKey)
+        }
+        .onChange(of: inputKey, initial: true) {
+            model.update(modelInput)
+        }
+        .onChange(of: model.isComputing) { _, computing in
+            if !computing { hasComputedOnce = true }
         }
         // Rename alert
         .alert("Rename Channel", isPresented: Binding(
@@ -198,15 +203,48 @@ struct ChannelBrowserView: View {
     @ViewBuilder
     private func channelRow(_ channel: Channel) -> some View {
         let displayed = withCustomName(channel)
+        let isFavorite = channelPrefs.isFavorite(channel.id)
         ChannelListRow(
             channel: displayed,
             action: { handleTap(channel) },
-            isFavorite: channelPrefs.isFavorite(channel.id),
+            isFavorite: isFavorite,
             isPicking: isPickingMultiscreen,
             isSelected: selectedMultiChannels.contains { $0.id == channel.id },
-            onToggleFavorite: { channelPrefs.toggleFavorite(channelID: channel.id) }
+            channelNumber: sortOrder == .channelNumber ? ChannelBrowserModel.channelNumber(displayed.name) : nil
         )
         .contextMenu { contextMenu(for: channel) }
+        #if !os(tvOS)
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button {
+                channelPrefs.toggleFavorite(channelID: channel.id)
+            } label: {
+                Label(isFavorite ? "Unfavourite" : "Favourite", systemImage: isFavorite ? "star.slash" : "star")
+            }
+            .tint(Theme.starting)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            Button(role: .destructive) {
+                channelPrefs.setHidden(true, for: channel.id)
+            } label: {
+                Label("Hide", systemImage: "eye.slash")
+            }
+            Button {
+                channelForGroup = channel
+            } label: {
+                Label("Group", systemImage: "folder.badge.plus")
+            }
+            .tint(Theme.accent)
+            Button {
+                renameText = channelPrefs.customName(for: channel.id) ?? channel.name
+                channelToRename = channel
+            } label: {
+                Label("Rename", systemImage: "pencil")
+            }
+            .tint(Theme.textTertiary)
+        }
+        #endif
+        // Logo tiles are ≤ 64 pt; 192 px covers @3x.
+        .onAppear { model.prefetchLogos(after: channel.id, maxPixelSize: 192) }
     }
 
     @ViewBuilder
@@ -271,24 +309,18 @@ struct ChannelBrowserView: View {
             } label: {
                 Image(systemName: "arrow.up.arrow.down.circle")
             }
+            .accessibilityLabel("Sort channels")
         }
     }
 
     // MARK: - Empty state
 
     private var emptyState: some View {
-        VStack(spacing: 14) {
-            Spacer()
-            Image(systemName: query.isEmpty ? "play.tv" : "magnifyingglass")
-                .font(.system(size: 40))
-                .foregroundStyle(Theme.textSecondary)
-            Text(query.isEmpty ? scope.emptyMessage : "No channels match \"\(query)\".")
-                .font(.callout)
-                .foregroundStyle(Theme.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 36)
-            Spacer()
-        }
+        EmptyStateView(
+            systemImage: query.isEmpty ? "play.tv" : "magnifyingglass",
+            title: query.isEmpty ? scope.title : "No Results",
+            message: query.isEmpty ? scope.emptyMessage : "No channels match \"\(query)\"."
+        )
     }
 
     // MARK: - Helpers
@@ -301,27 +333,18 @@ struct ChannelBrowserView: View {
                 selectedMultiChannels.append(channel)
             }
         } else {
+            PlaybackTapClock.record()
             onPlay(channel, displayChannels)
         }
     }
 
     /// Returns the channel with any user-applied custom name substituted in.
     private func withCustomName(_ channel: Channel) -> Channel {
-        guard let custom = channelPrefs.customName(for: channel.id) else { return channel }
+        guard let custom = channelPrefs.customNames[channel.id] else { return channel }
         return Channel(id: channel.id, name: custom, streamURL: channel.streamURL,
                        logoURL: channel.logoURL, group: channel.group,
-                       playlistID: channel.playlistID, playlistName: channel.playlistName)
-    }
-
-    private func effectiveName(_ channel: Channel) -> String {
-        channelPrefs.customName(for: channel.id) ?? channel.name
-    }
-
-    private func channelNumber(_ name: String) -> Int? {
-        guard let match = name.range(of: #"^\s*(\d+)\s*[.\-|)]\s*"#, options: .regularExpression),
-              let numRange = name.range(of: #"\d+"#, options: .regularExpression, range: match)
-        else { return nil }
-        return Int(name[numRange])
+                       playlistID: channel.playlistID, playlistName: channel.playlistName,
+                       tvgId: channel.tvgId, httpHeaders: channel.httpHeaders)
     }
 }
 
@@ -383,6 +406,7 @@ struct AddToGroupSheet: View {
                     Button { showingCreate = true } label: {
                         Image(systemName: "plus")
                     }
+                    .accessibilityLabel("New group")
                 }
             }
             .alert("New Group", isPresented: $showingCreate) {
@@ -444,7 +468,7 @@ struct ChannelInfoSheet: View {
     }
 
     private func infoRow(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xxs) {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(Theme.textSecondary)
@@ -455,6 +479,6 @@ struct ChannelInfoSheet: View {
                 .textSelection(.enabled)
                 #endif
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, Theme.Spacing.xxs)
     }
 }

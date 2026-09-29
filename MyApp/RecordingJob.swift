@@ -3,7 +3,7 @@ import Foundation
 // MARK: - Recording Mode
 
 /// How a recording is performed. Determined at schedule time from channel capabilities.
-enum RecordingMode: String, Codable, Hashable, Sendable {
+nonisolated enum RecordingMode: String, Codable, Hashable, Sendable {
     /// Provider archives the live stream server-side (e.g., Xtream with catch-up enabled).
     /// No local download; playback builds a timeshift URL via CatchupResolver at view time.
     case providerDVR
@@ -26,7 +26,7 @@ enum RecordingMode: String, Codable, Hashable, Sendable {
 
 // MARK: - Recording State
 
-enum RecordingState: String, Codable, Hashable, Sendable {
+nonisolated enum RecordingState: String, Codable, Hashable, Sendable {
     case scheduled   // Future programme; not yet started
     case recording   // Actively running right now
     case finalizing  // Writing final output (local mode)
@@ -38,7 +38,7 @@ enum RecordingState: String, Codable, Hashable, Sendable {
 
 // MARK: - Recurrence
 
-struct RecordingRecurrence: Codable, Hashable, Sendable {
+nonisolated struct RecordingRecurrence: Codable, Hashable, Sendable {
     enum Pattern: String, Codable, Sendable { case once, daily, weekly }
 
     var pattern: Pattern
@@ -63,7 +63,7 @@ struct RecordingRecurrence: Codable, Hashable, Sendable {
 
 // MARK: - Recording Job
 
-struct RecordingJob: Codable, Identifiable, Hashable, Sendable {
+nonisolated struct RecordingJob: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     var channelID: String
     var channelName: String

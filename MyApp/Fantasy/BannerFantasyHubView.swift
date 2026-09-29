@@ -869,7 +869,7 @@ private struct BannerFantasyPlayerHeadshot: View {
         ZStack {
             Circle().fill(Theme.surfaceElevated)
             if let url {
-                AsyncImage(url: url) { image in
+                CachedImage(url: url) { image in
                     image.resizable().scaledToFill()
                 } placeholder: {
                     Image(systemName: "person.crop.circle.fill")

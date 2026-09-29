@@ -50,14 +50,14 @@ struct TVRootView: View {
         .environmentObject(streamStore)
         .task { await liveViewModel.load(favoriteTeams: prefs.favoriteTeams) }
         .task { epgRepository.setupWithChannels(playlistStore.allChannels) }
-        .task(id: "\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.allChannels.count)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
+        .task(id: "\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.channelsRevision)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
             await streamStore.scanDebounced(
                 matches: liveViewModel.allLive + liveViewModel.startingSoon,
                 channels: playlistStore.allChannels,
                 epgRepository: epgRepository
             )
         }
-        .onChange(of: playlistStore.channelsByPlaylist) {
+        .onChange(of: playlistStore.channelsRevision) {
             epgRepository.setupWithChannels(playlistStore.allChannels)
             Task {
                 async let espnRefresh: Void = fantasyStore.refresh(

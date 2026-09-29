@@ -55,6 +55,9 @@ final class StreamAvailabilityStore: ObservableObject {
             try? await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
             guard !Task.isCancelled else { return }
         }
+        // Deferred at launch and while a stream is starting; the first phase runs on the main actor.
+        await PlaybackPriority.waitForBackgroundSlot()
+        guard !Task.isCancelled else { return }
         lastScanAttemptAt = Date()
         await scan(matches: matches, channels: channels, epgRepository: epgRepository)
     }
@@ -84,15 +87,21 @@ final class StreamAvailabilityStore: ObservableObject {
         var freshSources: [String: [RankedSource]] = [:]
 
         if !channels.isEmpty {
-            // Phase 1 (main actor, synchronous): run EPG lookups for all matches at once.
-            // programmesNear is an in-memory dictionary scan — fast and actor-safe.
+            // Grouping every playlist channel by canonical ID is O(channels), so it runs off the main thread.
             let channelToCanonical = epgRepository.channelToCanonicalMap
-            var canonicalToChannels: [String: [Channel]] = [:]
-            for channel in channels {
-                if let cid = channelToCanonical[channel.id] {
-                    canonicalToChannels[cid, default: []].append(channel)
+            let canonicalToChannels: [String: [Channel]] = await Task.detached(priority: .utility) {
+                var grouped: [String: [Channel]] = [:]
+                for channel in channels {
+                    if let cid = channelToCanonical[channel.id] {
+                        grouped[cid, default: []].append(channel)
+                    }
                 }
-            }
+                return grouped
+            }.value
+            guard !Task.isCancelled else { return }
+
+            // Phase 1 (main actor): run EPG lookups for all matches at once.
+            // programmesNear is an in-memory dictionary scan — fast and actor-safe.
 
             struct EPGMatchResult: Sendable {
                 let matchId: String

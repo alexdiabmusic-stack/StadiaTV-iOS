@@ -31,7 +31,7 @@ nonisolated struct GolfPlayerReference: Identifiable, Codable, Sendable, Hashabl
     }
 }
 
-private extension String {
+nonisolated private extension String {
     func ifEmpty(_ fallback: String) -> String { isEmpty ? fallback : self }
 }
 

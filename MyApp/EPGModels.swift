@@ -51,7 +51,8 @@ nonisolated struct CanonicalChannel: Identifiable, Hashable {
             logoURL: logoURL ?? stream.tvgLogoURL,
             group: categoryId,
             playlistID: stream.playlistID,
-            playlistName: stream.playlistName
+            playlistName: stream.playlistName,
+            httpHeaders: stream.httpHeaders
         )
     }
 
@@ -107,6 +108,8 @@ nonisolated struct ChannelStream: Identifiable, Hashable {
     var countryHint: String? = nil
     /// Pre-normalization metadata extracted before display-name cleanup.
     var streamMetadata: StreamMetadata = .empty
+    /// HTTP headers the provider expects on requests for this stream.
+    var httpHeaders: [String: String]? = nil
 
     static func == (lhs: ChannelStream, rhs: ChannelStream) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }

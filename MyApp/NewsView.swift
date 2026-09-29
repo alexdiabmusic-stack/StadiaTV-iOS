@@ -300,7 +300,7 @@ struct NewsArticleCard: View {
     var body: some View {
         Button(action: action) {
             HStack(alignment: .top, spacing: 12) {
-                AsyncImage(url: article.imageURL) { phase in
+                CachedImage(url: article.imageURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFill()
                     } else {
@@ -323,7 +323,7 @@ struct NewsArticleCard: View {
                                 .font(.caption2.weight(.heavy))
                                 .foregroundStyle(.black)
                                 .padding(.horizontal, 5).padding(.vertical, 1)
-                                .background(Color(hex: 0xE0A83D), in: Capsule())
+                                .background(Theme.Palette.amber, in: Capsule())
                         }
                         if let type = article.type, !type.isEmpty, type != "Story" {
                             Text(type.uppercased())

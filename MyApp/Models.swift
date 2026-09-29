@@ -15,7 +15,7 @@ extension URL {
 // MARK: - Leagues / Sports catalog
 
 /// A sport grouping used to organize the league picker.
-enum SportGroup: String, CaseIterable, Identifiable {
+nonisolated enum SportGroup: String, CaseIterable, Identifiable, Codable, Sendable {
     case football = "Football"
     case basketball = "Basketball"
     case baseball = "Baseball"
@@ -58,7 +58,7 @@ enum SportGroup: String, CaseIterable, Identifiable {
 
 /// A single Banner league / competition.
 /// `path` remains the legacy ESPN URL segment during migration. Use `bannerKey` for Banner-owned identity and routing.
-struct League: Identifiable, Hashable {
+nonisolated struct League: Identifiable, Hashable {
     let id: String        // migration-compatible identifier == path
     let name: String      // display name
     let shortName: String // compact label
@@ -112,7 +112,7 @@ struct League: Identifiable, Hashable {
 
 // MARK: - Match model (app-level, decoded from ESPN scoreboard)
 
-enum GameState: String {
+nonisolated enum GameState: String, Codable, Sendable {
     case pre, live, final
 
     var label: String {
@@ -124,7 +124,7 @@ enum GameState: String {
     }
 }
 
-struct TeamSide: Hashable {
+nonisolated struct TeamSide: Hashable {
     let displayName: String
     let shortName: String
     let abbreviation: String
@@ -159,7 +159,7 @@ struct TeamSide: Hashable {
     }
 }
 
-struct MatchLiveContext: Hashable, Sendable {
+nonisolated struct MatchLiveContext: Hashable, Sendable {
     var clock: MatchClock?
     var period: MatchPeriod?
     var baseball: BaseballSituation?
@@ -212,18 +212,18 @@ struct MatchLiveContext: Hashable, Sendable {
     }
 }
 
-struct MatchClock: Hashable, Sendable {
+nonisolated struct MatchClock: Hashable, Sendable {
     var displayValue: String?
     var remainingSeconds: Int?
     var isRunning: Bool?
 }
 
-struct MatchPeriod: Hashable, Sendable {
+nonisolated struct MatchPeriod: Hashable, Sendable {
     var number: Int?
     var displayName: String?
 }
 
-struct BaseballSituation: Hashable, Sendable {
+nonisolated struct BaseballSituation: Hashable, Sendable {
     var inning: String?
     var inningHalf: String?
     var outs: Int?
@@ -236,7 +236,7 @@ struct BaseballSituation: Hashable, Sendable {
     var pitcherName: String?
 }
 
-struct HockeySituation: Hashable, Sendable {
+nonisolated struct HockeySituation: Hashable, Sendable {
     var period: String?
     var clock: String?
     var powerPlayTeamID: String?
@@ -247,7 +247,7 @@ struct HockeySituation: Hashable, Sendable {
     var emptyNetTeamID: String?
 }
 
-struct FootballSituation: Hashable, Sendable {
+nonisolated struct FootballSituation: Hashable, Sendable {
     var quarter: String?
     var clock: String?
     var possessionTeamID: String?
@@ -261,7 +261,7 @@ struct FootballSituation: Hashable, Sendable {
     var awayTimeoutsRemaining: Int?
 }
 
-struct SoccerSituation: Hashable, Sendable {
+nonisolated struct SoccerSituation: Hashable, Sendable {
     var minute: String?
     var stoppageTime: String?
     var aggregateScore: String?
@@ -270,7 +270,7 @@ struct SoccerSituation: Hashable, Sendable {
     var latestEvent: MatchPlay?
 }
 
-struct BasketballSituation: Hashable, Sendable {
+nonisolated struct BasketballSituation: Hashable, Sendable {
     var quarter: String?
     var clock: String?
     var possessionTeamID: String?
@@ -282,14 +282,14 @@ struct BasketballSituation: Hashable, Sendable {
     var scoringByPeriod: [LineScorePeriod]
 }
 
-struct LineScorePeriod: Identifiable, Hashable, Sendable {
+nonisolated struct LineScorePeriod: Identifiable, Hashable, Sendable {
     var id: String { label }
     let label: String
     let awayScore: String?
     let homeScore: String?
 }
 
-struct MatchTeamStats: Identifiable, Hashable, Sendable {
+nonisolated struct MatchTeamStats: Identifiable, Hashable, Sendable {
     var id: String { teamID ?? side.rawValue }
     let side: MatchTeamSide
     let teamID: String?
@@ -297,26 +297,26 @@ struct MatchTeamStats: Identifiable, Hashable, Sendable {
     let stats: [MatchStat]
 }
 
-enum MatchTeamSide: String, Hashable, Sendable {
+nonisolated enum MatchTeamSide: String, Hashable, Sendable {
     case home
     case away
 }
 
-struct MatchStat: Identifiable, Hashable, Sendable {
+nonisolated struct MatchStat: Identifiable, Hashable, Sendable {
     var id: String { key }
     let key: String
     let displayName: String
     let value: String
 }
 
-struct MatchLeader: Identifiable, Hashable, Sendable {
+nonisolated struct MatchLeader: Identifiable, Hashable, Sendable {
     var id: String { key }
     let key: String
     let displayName: String
     let players: [MatchPlayerStat]
 }
 
-struct MatchPlayerStat: Identifiable, Hashable, Sendable {
+nonisolated struct MatchPlayerStat: Identifiable, Hashable, Sendable {
     let id: String
     let displayName: String
     let teamAbbreviation: String?
@@ -324,7 +324,7 @@ struct MatchPlayerStat: Identifiable, Hashable, Sendable {
     let stats: [MatchStat]
 }
 
-struct MatchPlay: Identifiable, Hashable, Sendable {
+nonisolated struct MatchPlay: Identifiable, Hashable, Sendable {
     let id: String
     let sequence: Int?
     let period: MatchPeriod?
@@ -339,7 +339,7 @@ struct MatchPlay: Identifiable, Hashable, Sendable {
     let providerTimestamp: Date?
 }
 
-enum MatchEventType: String, Hashable, Sendable {
+nonisolated enum MatchEventType: String, Hashable, Sendable {
     case goal
     case penalty
     case powerPlay
@@ -357,12 +357,12 @@ enum MatchEventType: String, Hashable, Sendable {
     case other
 }
 
-struct MatchBoxScore: Hashable, Sendable {
+nonisolated struct MatchBoxScore: Hashable, Sendable {
     var teamStats: [MatchTeamStats]
     var playerStats: [MatchPlayerStat]
 }
 
-struct TeamFormation: Identifiable, Hashable, Sendable {
+nonisolated struct TeamFormation: Identifiable, Hashable, Sendable {
     var id: String { teamID ?? teamAbbreviation ?? formationName ?? "formation" }
     let teamID: String?
     let teamAbbreviation: String?
@@ -370,13 +370,13 @@ struct TeamFormation: Identifiable, Hashable, Sendable {
     let groups: [LineupGroup]
 }
 
-struct LineupGroup: Identifiable, Hashable, Sendable {
+nonisolated struct LineupGroup: Identifiable, Hashable, Sendable {
     var id: String { title }
     let title: String
     let players: [LineupPlayer]
 }
 
-struct LineupPlayer: Identifiable, Hashable, Sendable {
+nonisolated struct LineupPlayer: Identifiable, Hashable, Sendable {
     let id: String
     let displayName: String
     let position: String?
@@ -385,7 +385,7 @@ struct LineupPlayer: Identifiable, Hashable, Sendable {
     let y: Double?
 }
 
-struct FootballDrive: Identifiable, Hashable, Sendable {
+nonisolated struct FootballDrive: Identifiable, Hashable, Sendable {
     let id: String
     let teamID: String?
     let teamAbbreviation: String?
@@ -395,7 +395,7 @@ struct FootballDrive: Identifiable, Hashable, Sendable {
     let plays: [MatchPlay]
 }
 
-struct Match: Identifiable, Hashable {
+nonisolated struct Match: Identifiable, Hashable {
     let id: String
     let league: League
     let date: Date
@@ -475,7 +475,7 @@ struct Match: Identifiable, Hashable {
 
 /// A single entrant in a racing event (e.g. an F1 driver) with constructor/team info,
 /// synced from the ESPN scoreboard.
-struct Racer: Identifiable, Hashable {
+nonisolated struct Racer: Identifiable, Hashable {
     let id: String
     let name: String
     let shortName: String
@@ -488,7 +488,7 @@ struct Racer: Identifiable, Hashable {
 // MARK: - Stream languages
 
 /// A language a stream can be tagged with in playlist channel names (e.g. "EN: Sky Sports").
-struct StreamLanguage: Identifiable, Hashable {
+nonisolated struct StreamLanguage: Identifiable, Hashable {
     let code: String   // lowercase tag used in channel names, e.g. "en"
     let name: String
 
@@ -532,13 +532,13 @@ struct StreamLanguage: Identifiable, Hashable {
 
 // MARK: - Playlists
 
-enum PlaylistKind: String, Codable {
+nonisolated enum PlaylistKind: String, Codable {
     case m3u
     case xtream
 }
 
 /// Persisted playlist configuration. Xtream secrets are migrated to Keychain and excluded from new encodes.
-struct Playlist: Identifiable, Codable, Hashable {
+nonisolated struct Playlist: Identifiable, Codable, Hashable {
     var id: UUID
     var name: String
     var kind: PlaylistKind
@@ -551,13 +551,18 @@ struct Playlist: Identifiable, Codable, Hashable {
     var host: String?      // e.g. https://example.com:8080
     var credentialID: UUID
 
+    /// Optional User-Agent sent for the playlist download, Xtream API calls, and any
+    /// stream whose playlist entry doesn't specify its own.
+    var userAgent: String?
+
     // Legacy decode-only fields. New persistence never writes these values.
     var username: String?
     var password: String?
 
     init(id: UUID = UUID(), name: String, kind: PlaylistKind,
          m3uURL: String? = nil, epgURL: String? = nil, host: String? = nil,
-         credentialID: UUID? = nil, username: String? = nil, password: String? = nil) {
+         credentialID: UUID? = nil, username: String? = nil, password: String? = nil,
+         userAgent: String? = nil) {
         self.id = id
         self.name = name
         self.kind = kind
@@ -567,10 +572,11 @@ struct Playlist: Identifiable, Codable, Hashable {
         self.credentialID = credentialID ?? id
         self.username = username
         self.password = password
+        self.userAgent = userAgent
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, kind, m3uURL, epgURL, host, credentialID, username, password
+        case id, name, kind, m3uURL, epgURL, host, credentialID, username, password, userAgent
     }
 
     init(from decoder: Decoder) throws {
@@ -584,6 +590,7 @@ struct Playlist: Identifiable, Codable, Hashable {
         credentialID = try container.decodeIfPresent(UUID.self, forKey: .credentialID) ?? id
         username = try container.decodeIfPresent(String.self, forKey: .username)
         password = try container.decodeIfPresent(String.self, forKey: .password)
+        userAgent = try container.decodeIfPresent(String.self, forKey: .userAgent)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -595,15 +602,17 @@ struct Playlist: Identifiable, Codable, Hashable {
         try container.encodeIfPresent(epgURL, forKey: .epgURL)
         try container.encodeIfPresent(host, forKey: .host)
         try container.encode(credentialID, forKey: .credentialID)
+        try container.encodeIfPresent(userAgent, forKey: .userAgent)
     }
 
     var sanitizedForPersistence: Playlist {
-        Playlist(id: id, name: name, kind: kind, m3uURL: m3uURL, epgURL: epgURL, host: host, credentialID: credentialID)
+        Playlist(id: id, name: name, kind: kind, m3uURL: m3uURL, epgURL: epgURL, host: host,
+                 credentialID: credentialID, userAgent: userAgent)
     }
 }
 
 /// A single playable channel/stream parsed from a playlist.
-struct Channel: Identifiable, Hashable {
+nonisolated struct Channel: Identifiable, Hashable {
     let id: String
     let name: String
     let streamURL: URL
@@ -612,11 +621,14 @@ struct Channel: Identifiable, Hashable {
     let playlistID: UUID
     let playlistName: String
     var tvgId: String? = nil    // Provider EPG ID (tvg-id), preserved from M3U for guide matching
+    /// HTTP headers the provider expects on stream requests (User-Agent, Referer, Origin…),
+    /// parsed from #EXTVLCOPT / #KODIPROP / pipe-suffix syntax or the playlist's default User-Agent.
+    var httpHeaders: [String: String]? = nil
 }
 
 /// Named evidence signals that explain why a stream was surfaced for an event.
 /// Multiple categories can be active simultaneously; the highest-priority one drives the badge label.
-enum StreamEvidenceCategory: String, Hashable, Sendable, CaseIterable {
+nonisolated enum StreamEvidenceCategory: String, Hashable, Sendable, CaseIterable {
     /// The channel's EPG guide lists a programme whose title matches this event at its scheduled time.
     case guideListsMatch
     /// The channel's curated network is a known broadcast rights holder for this league.
@@ -655,7 +667,7 @@ enum StreamEvidenceCategory: String, Hashable, Sendable, CaseIterable {
 }
 
 /// A channel paired with a relevance score and named evidence for a given match.
-struct RankedSource: Identifiable, Hashable {
+nonisolated struct RankedSource: Identifiable, Hashable {
     let channel: Channel
     let score: Int
     /// Named signals that explain why this channel was surfaced.
@@ -687,7 +699,7 @@ struct RankedSource: Identifiable, Hashable {
 
 /// Carries the explicitly-selected event identity from match selection into the media player.
 /// PlayerView must never independently discover or replace this event.
-struct MatchPlaybackContext: Identifiable, Sendable {
+nonisolated struct MatchPlaybackContext: Identifiable, Sendable {
     let match: Match
     let channel: Channel
     let rankedSources: [RankedSource]
@@ -712,7 +724,7 @@ struct MatchPlaybackContext: Identifiable, Sendable {
 // MARK: - v3 Precision Stream Matching Types
 
 /// Confidence level for a stream's association with a selected event.
-enum MatchStatus: String, Hashable, Sendable {
+nonisolated enum MatchStatus: String, Hashable, Sendable {
     /// Event-specific evidence confirmed: EPG match, both team names, or event title.
     case confirmed
     /// Discovery-only: broadcaster rights, league keyword, or feed family match.
@@ -724,7 +736,7 @@ enum MatchStatus: String, Hashable, Sendable {
 
 /// Types of hard conflicts that reject a candidate before scoring.
 /// A single hard conflict makes the result `.rejected` regardless of positive evidence.
-enum HardConflictType: String, Hashable, Sendable {
+nonisolated enum HardConflictType: String, Hashable, Sendable {
     case wrongSport               // HC-001: feed family incompatible with event sport
     case wrongRacingSession       // HC-010: qualifying channel for race event (or vice versa)
     case nonSportsChannelFamily   // HC-015: news / weather / cooking channel
@@ -732,13 +744,13 @@ enum HardConflictType: String, Hashable, Sendable {
     case sourceDisagreement       // HC-018: EPG and dynamic title disagree on which event is airing
 }
 
-struct HardConflict: Hashable, Sendable {
+nonisolated struct HardConflict: Hashable, Sendable {
     let type: HardConflictType
     let description: String
 }
 
 /// Relationship between a candidate stream and the selected event.
-enum EventRelationship: String, Hashable, Sendable {
+nonisolated enum EventRelationship: String, Hashable, Sendable {
     /// The stream is carrying this specific event live — the only relationship eligible
     /// for primary stream selection.
     case exactEvent
@@ -750,7 +762,7 @@ enum EventRelationship: String, Hashable, Sendable {
 }
 
 /// Current playability state of a stream, independent of event identity.
-enum StreamAvailabilityState: String, Hashable, Sendable {
+nonisolated enum StreamAvailabilityState: String, Hashable, Sendable {
     case online
     case offline
     /// Channel confirmed for this event but stream has not yet started.
@@ -763,7 +775,7 @@ enum StreamAvailabilityState: String, Hashable, Sendable {
 
 // MARK: - News
 
-struct ESPNArticle: Identifiable, Hashable {
+nonisolated struct ESPNArticle: Identifiable, Hashable {
     let id: String
     let headline: String
     let description: String

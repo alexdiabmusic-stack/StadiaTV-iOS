@@ -11,7 +11,7 @@ import Foundation
 /// this app deliberately uses much less headroom below that ceiling since a
 /// mobile client polling in the background has no reason to approach it.
 actor PGATourClient {
-    static let shared = PGATourClient()
+    nonisolated static let shared = PGATourClient()
 
     private let session: URLSession
     private let minimumInterval: TimeInterval
@@ -151,7 +151,7 @@ actor PGATourClient {
     }
 }
 
-private struct PGAGraphQLRequestBody: Encodable, Sendable {
+nonisolated private struct PGAGraphQLRequestBody: Encodable, Sendable {
     let query: String
     let variables: PGAValue
     let operationName: String

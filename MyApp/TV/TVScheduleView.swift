@@ -97,7 +97,7 @@ struct TVScheduleView: View {
 
                     // Upcoming shelf
                     if !viewModel.upcomingMatches.isEmpty {
-                        TVShelfRow(title: "Upcoming", systemImage: "clock", tint: Color(hex: 0x3DBE6B)) {
+                        TVShelfRow(title: "Upcoming", systemImage: "clock", tint: Theme.Palette.positive) {
                             ForEach(viewModel.upcomingMatches) { match in
                                 NavigationLink(value: match) { TVMatchCard(match: match, streamCount: streamStore.count(for: match.id)) }.buttonStyle(.card)
                             }

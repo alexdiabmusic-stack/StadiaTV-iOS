@@ -1,11 +1,10 @@
 import Foundation
 import Foundation
 
-extension SportGroup: Codable, Sendable {}
 
 // MARK: - Provider metadata
 
-enum SportsDataProviderID: String, Codable, CaseIterable, Hashable, Sendable {
+nonisolated enum SportsDataProviderID: String, Codable, CaseIterable, Hashable, Sendable {
     case nhl
     case f1
     case mlb
@@ -32,7 +31,7 @@ enum SportsDataProviderID: String, Codable, CaseIterable, Hashable, Sendable {
     case bleacherReport
 }
 
-enum SportsDataProviderSupportLevel: String, Codable, Hashable, Sendable {
+nonisolated enum SportsDataProviderSupportLevel: String, Codable, Hashable, Sendable {
     case official
     case firstPartyWeb
     case undocumented
@@ -40,7 +39,7 @@ enum SportsDataProviderSupportLevel: String, Codable, Hashable, Sendable {
     case legacy
 }
 
-enum SportsDataAuthenticationType: String, Codable, Hashable, Sendable {
+nonisolated enum SportsDataAuthenticationType: String, Codable, Hashable, Sendable {
     case none
     case publicWebHeaders
     case anonymousBearerToken
@@ -49,7 +48,7 @@ enum SportsDataAuthenticationType: String, Codable, Hashable, Sendable {
     case cookies
 }
 
-enum SportsDataCapability: String, Codable, CaseIterable, Hashable, Sendable {
+nonisolated enum SportsDataCapability: String, Codable, CaseIterable, Hashable, Sendable {
     case liveScores
     case schedule
     case gameStatus
@@ -70,7 +69,7 @@ enum SportsDataCapability: String, Codable, CaseIterable, Hashable, Sendable {
     case fantasyRelevantData
 }
 
-struct SportsDataProviderMetadata: Identifiable, Hashable, Sendable {
+nonisolated struct SportsDataProviderMetadata: Identifiable, Hashable, Sendable {
     let id: SportsDataProviderID
     let name: String
     let supportLevel: SportsDataProviderSupportLevel
@@ -84,7 +83,7 @@ struct SportsDataProviderMetadata: Identifiable, Hashable, Sendable {
 
 // MARK: - Banner normalized domain
 
-struct BannerEntityID: RawRepresentable, Codable, Hashable, Sendable, CustomStringConvertible {
+nonisolated struct BannerEntityID: RawRepresentable, Codable, Hashable, Sendable, CustomStringConvertible {
     let rawValue: String
 
     nonisolated init(rawValue: String) {
@@ -94,19 +93,19 @@ struct BannerEntityID: RawRepresentable, Codable, Hashable, Sendable, CustomStri
     var description: String { rawValue }
 }
 
-struct ProviderEntityAlias: Codable, Hashable, Sendable {
+nonisolated struct ProviderEntityAlias: Codable, Hashable, Sendable {
     let provider: SportsDataProviderID
     let id: String
 }
 
-struct DataProvenance: Codable, Hashable, Sendable {
+nonisolated struct DataProvenance: Codable, Hashable, Sendable {
     let provider: SportsDataProviderID
     let fetchedAt: Date
     let providerEntityID: String?
     let confidence: Double
 }
 
-struct BannerSeason: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerSeason: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let leagueID: BannerEntityID
     let year: Int?
@@ -114,7 +113,7 @@ struct BannerSeason: Identifiable, Codable, Hashable, Sendable {
     let type: String?
 }
 
-struct BannerLeague: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerLeague: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let sport: SportGroup
     let name: String
@@ -140,7 +139,7 @@ struct BannerLeague: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
-struct BannerVenue: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerVenue: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID?
     let name: String
     let city: String?
@@ -149,7 +148,7 @@ struct BannerVenue: Identifiable, Codable, Hashable, Sendable {
     let aliases: [ProviderEntityAlias]
 }
 
-struct BannerTeam: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerTeam: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let leagueID: BannerEntityID
     let displayName: String
@@ -160,7 +159,7 @@ struct BannerTeam: Identifiable, Codable, Hashable, Sendable {
     let provenance: DataProvenance?
 }
 
-struct BannerPlayer: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerPlayer: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let leagueID: BannerEntityID
     let fullName: String
@@ -175,7 +174,7 @@ struct BannerPlayer: Identifiable, Codable, Hashable, Sendable {
     let provenance: DataProvenance?
 }
 
-extension BannerGameStatus {
+nonisolated extension BannerGameStatus {
     init(gameState: GameState) {
         switch gameState {
         case .pre: self = .scheduled
@@ -193,30 +192,30 @@ extension BannerGameStatus {
     }
 }
 
-struct BannerScore: Codable, Hashable, Sendable {
+nonisolated struct BannerScore: Codable, Hashable, Sendable {
     let home: String?
     let away: String?
 }
 
-struct BannerGameClock: Codable, Hashable, Sendable {
+nonisolated struct BannerGameClock: Codable, Hashable, Sendable {
     let displayValue: String?
     let remainingSeconds: Int?
     let isRunning: Bool?
 }
 
-struct BannerPeriod: Codable, Hashable, Sendable {
+nonisolated struct BannerPeriod: Codable, Hashable, Sendable {
     let number: Int?
     let displayName: String?
 }
 
-struct BannerBroadcast: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerBroadcast: Identifiable, Codable, Hashable, Sendable {
     var id: String { [network, type].compactMap { $0 }.joined(separator: ":") }
     let network: String?
     let type: String?
     let countryCode: String?
 }
 
-struct BannerGame: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerGame: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let leagueID: BannerEntityID
     let scheduledStart: Date
@@ -235,7 +234,7 @@ struct BannerGame: Identifiable, Codable, Hashable, Sendable {
     let provenance: DataProvenance
 }
 
-enum BannerTournamentStatus: String, Codable, Hashable, Sendable {
+nonisolated enum BannerTournamentStatus: String, Codable, Hashable, Sendable {
     case upcoming
     case live
     case suspended
@@ -258,7 +257,7 @@ enum BannerTournamentStatus: String, Codable, Hashable, Sendable {
     }
 }
 
-struct BannerGolfCourse: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerGolfCourse: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID?
     let name: String
     let location: String?
@@ -267,7 +266,7 @@ struct BannerGolfCourse: Identifiable, Codable, Hashable, Sendable {
     let holes: [BannerGolfCourseHole]
 }
 
-struct BannerGolfCourseHole: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerGolfCourseHole: Identifiable, Codable, Hashable, Sendable {
     let number: Int
     let par: Int?
     let yardage: Int?
@@ -276,7 +275,7 @@ struct BannerGolfCourseHole: Identifiable, Codable, Hashable, Sendable {
     var id: Int { number }
 }
 
-struct BannerGolfHoleScore: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerGolfHoleScore: Identifiable, Codable, Hashable, Sendable {
     let hole: Int
     let par: Int?
     let strokes: Int?
@@ -285,7 +284,7 @@ struct BannerGolfHoleScore: Identifiable, Codable, Hashable, Sendable {
     var id: Int { hole }
 }
 
-struct BannerGolfRound: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerGolfRound: Identifiable, Codable, Hashable, Sendable {
     let number: Int
     let displayName: String?
     let score: String?
@@ -296,7 +295,7 @@ struct BannerGolfRound: Identifiable, Codable, Hashable, Sendable {
     var id: Int { number }
 }
 
-struct BannerGolfLeaderboardEntry: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerGolfLeaderboardEntry: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let playerID: BannerEntityID?
     let playerName: String
@@ -312,7 +311,7 @@ struct BannerGolfLeaderboardEntry: Identifiable, Codable, Hashable, Sendable {
     let provenance: DataProvenance?
 }
 
-struct BannerGolfTournament: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerGolfTournament: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let leagueID: BannerEntityID
     let gameID: BannerEntityID?
@@ -330,7 +329,7 @@ struct BannerGolfTournament: Identifiable, Codable, Hashable, Sendable {
     let provenance: DataProvenance
 }
 
-enum BannerGolfScoreFormatter {
+nonisolated enum BannerGolfScoreFormatter {
     nonisolated static func format(raw: String?) -> String? {
         guard let raw else { return nil }
         let cleaned = raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -354,7 +353,7 @@ enum BannerGolfScoreFormatter {
     }
 }
 
-enum BannerGolfLeaderboardNormalizer {
+nonisolated enum BannerGolfLeaderboardNormalizer {
     nonisolated static func normalized(_ entries: [BannerGolfLeaderboardEntry]) -> [BannerGolfLeaderboardEntry] {
         let sorted = entries.sorted {
             BannerGolfScoreFormatter.sortValue($0.totalScore) < BannerGolfScoreFormatter.sortValue($1.totalScore)
@@ -383,7 +382,7 @@ enum BannerGolfLeaderboardNormalizer {
     }
 }
 
-struct BannerStanding: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerStanding: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let teamID: BannerEntityID
     let teamDisplayName: String?
@@ -432,20 +431,20 @@ struct BannerStanding: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
-struct BannerStandingGroup: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerStandingGroup: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let name: String
     let standings: [BannerStanding]
 }
 
-struct BannerStatValue: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerStatValue: Identifiable, Codable, Hashable, Sendable {
     var id: String { key }
     let key: String
     let displayName: String
     let value: String
 }
 
-struct BannerPlayerStat: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerPlayerStat: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let playerID: BannerEntityID
     let playerDisplayName: String?
@@ -479,7 +478,7 @@ struct BannerPlayerStat: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
-struct BannerTeamStat: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerTeamStat: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let teamID: BannerEntityID
     let seasonID: BannerEntityID?
@@ -487,7 +486,7 @@ struct BannerTeamStat: Identifiable, Codable, Hashable, Sendable {
     let provenance: DataProvenance?
 }
 
-struct BannerBoxScore: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerBoxScore: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let gameID: BannerEntityID
     let teamStats: [BannerTeamStat]
@@ -495,7 +494,7 @@ struct BannerBoxScore: Identifiable, Codable, Hashable, Sendable {
     let provenance: DataProvenance
 }
 
-struct BannerPlay: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerPlay: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let sequence: Int?
     let period: BannerPeriod?
@@ -508,14 +507,14 @@ struct BannerPlay: Identifiable, Codable, Hashable, Sendable {
     let provenance: DataProvenance?
 }
 
-struct BannerPlayByPlay: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerPlayByPlay: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let gameID: BannerEntityID
     let plays: [BannerPlay]
     let provenance: DataProvenance
 }
 
-struct BannerRoster: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerRoster: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let teamID: BannerEntityID
     let leagueID: BannerEntityID
@@ -523,7 +522,7 @@ struct BannerRoster: Identifiable, Codable, Hashable, Sendable {
     let provenance: DataProvenance
 }
 
-struct BannerInjury: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerInjury: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let playerID: BannerEntityID?
     let playerName: String
@@ -533,7 +532,7 @@ struct BannerInjury: Identifiable, Codable, Hashable, Sendable {
     let provenance: DataProvenance?
 }
 
-struct BannerLeader: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerLeader: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let statKey: String
     let displayName: String
@@ -541,7 +540,7 @@ struct BannerLeader: Identifiable, Codable, Hashable, Sendable {
     let provenance: DataProvenance?
 }
 
-struct BannerSchedule: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerSchedule: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let leagueID: BannerEntityID
     let range: SportsDateRange
@@ -549,7 +548,7 @@ struct BannerSchedule: Identifiable, Codable, Hashable, Sendable {
     let provenance: DataProvenance
 }
 
-struct BannerNewsArticle: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerNewsArticle: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let headline: String
     let description: String
@@ -569,7 +568,7 @@ struct BannerNewsArticle: Identifiable, Codable, Hashable, Sendable {
     var authorByline: String? = nil
 }
 
-struct BannerOdds: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerOdds: Identifiable, Codable, Hashable, Sendable {
     let id: BannerEntityID
     let gameID: BannerEntityID
     let bookmakerName: String
@@ -579,7 +578,7 @@ struct BannerOdds: Identifiable, Codable, Hashable, Sendable {
     let provenance: DataProvenance?
 }
 
-struct SportsDateRange: Codable, Hashable, Sendable {
+nonisolated struct SportsDateRange: Codable, Hashable, Sendable {
     enum Kind: String, Codable, Hashable, Sendable {
         case today
         case nextDays

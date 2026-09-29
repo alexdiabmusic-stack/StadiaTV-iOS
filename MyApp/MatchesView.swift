@@ -87,7 +87,7 @@ struct MatchesView: View {
     }
 
     private var streamScanKey: String {
-        "\(viewModel.allFollowedMatches.count)-\(viewModel.matches.count)-\(playlists.allChannels.count)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))"
+        "\(viewModel.allFollowedMatches.count)-\(viewModel.matches.count)-\(playlists.channelsRevision)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))"
     }
 
     private func loadAll() async {
@@ -290,7 +290,7 @@ struct MatchesView: View {
     ) -> some View {
         Button {
             #if os(iOS)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            UISelectionFeedbackGenerator().selectionChanged()
             #endif
             action()
         } label: {
@@ -619,7 +619,7 @@ private struct FollowingUpNextHero: View {
                     .frame(maxWidth: .infinity)
 
                     Text("VS")
-                        .font(.system(size: 11, weight: .heavy))
+                        .font(Theme.Typography.caption)
                         .foregroundStyle(Theme.textTertiary)
                         .tracking(1)
                         .padding(.horizontal, 4)
@@ -1062,9 +1062,9 @@ private struct FollowingEventRow: View {
                     Button { showingQuickStream = true } label: {
                         HStack(spacing: 3) {
                             Image(systemName: "play.tv")
-                                .font(.system(size: 9, weight: .bold))
+                                .font(Theme.Typography.overline)
                             Text("\(streamCount)")
-                                .font(.system(size: 9, weight: .bold).monospacedDigit())
+                                .font(Theme.Typography.overline.monospacedDigit())
                         }
                         .foregroundStyle(Theme.accent)
                         .padding(.horizontal, 6).padding(.vertical, 3)
@@ -1163,7 +1163,7 @@ private struct FollowingNewsCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            AsyncImage(url: article.imageURL) { phase in
+            CachedImage(url: article.imageURL) { phase in
                 switch phase {
                 case .success(let img): img.resizable().scaledToFill()
                 default:
@@ -1566,7 +1566,7 @@ struct PickResultCard: View {
 
     private var pickColor: Color {
         switch prediction.isCorrect {
-        case true: return Color(hex: 0x3DBE6B)
+        case true: return Theme.Palette.positive
         case false: return Theme.live
         case nil: return Theme.accent
         }
@@ -1580,14 +1580,14 @@ struct PickResultCard: View {
     }
     private var statusColor: Color {
         switch prediction.isCorrect {
-        case true: return Color(hex: 0x3DBE6B)
+        case true: return Theme.Palette.positive
         case false: return Theme.live
         case nil: return Theme.textSecondary
         }
     }
     private var borderColor: Color {
         switch prediction.isCorrect {
-        case true: return Color(hex: 0x3DBE6B).opacity(0.4)
+        case true: return Theme.Palette.positive.opacity(0.4)
         case false: return Theme.live.opacity(0.4)
         case nil: return Theme.hairline
         }
@@ -1611,7 +1611,7 @@ struct TeamLogo: View {
                 .resizable()
                 .scaledToFit()
         } else {
-            AsyncImage(url: url) { phase in
+            CachedImage(url: url) { phase in
                 switch phase {
                 case .success(let image):
                     image.resizable().scaledToFit()

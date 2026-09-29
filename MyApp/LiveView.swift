@@ -15,7 +15,8 @@ struct LiveView: View {
     @State private var hiddenMatchIDs: Set<String> = []
     @State private var showingActionAlert = false
     @State private var actionAlertMessage = ""
-    @State private var showingChannels = false
+    /// Channels | Guide | Sports, remembered across launches.
+    @AppStorage("live.section.v1") private var sectionRaw: String = LiveSection.channels.rawValue
 
     var body: some View {
         NavigationStack {
@@ -29,23 +30,22 @@ struct LiveView: View {
                 .toolbarBackground(.visible, for: .navigationBar)
                 .toolbar {
                     ToolbarItemGroup(placement: .topBarTrailing) {
-                        Button { showingChannels = true } label: {
-                            Image(systemName: "tv")
-                                .foregroundStyle(Theme.textPrimary)
-                        }
                         NavigationLink(destination: SearchView()) {
                             Image(systemName: "magnifyingglass")
                                 .foregroundStyle(Theme.textPrimary)
                         }
+                        .accessibilityLabel("Search")
                     }
-                }
-                .sheet(isPresented: $showingChannels) {
-                    LiveTVView()
                 }
                 .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
         }
         .tint(Theme.accent)
         .task {
+            // The Guide used to be a filter chip; it's a section now.
+            if savedFilterRaw == LiveFilter.guide.rawValue {
+                savedFilterRaw = LiveFilter.forYou.rawValue
+                sectionRaw = LiveSection.guide.rawValue
+            }
             filter = LiveFilter(rawValue: savedFilterRaw) ?? .forYou
             await viewModel.load(favoriteTeams: prefs.favoriteTeams)
             viewModel.startAutoRefresh(favoriteTeams: prefs.favoriteTeams)
@@ -59,18 +59,42 @@ struct LiveView: View {
         }
     }
 
-    @ViewBuilder
+    private var section: LiveSection {
+        LiveSection(rawValue: sectionRaw) ?? .channels
+    }
+
     private var content: some View {
-        if filter == .guide {
-            VStack(spacing: 0) {
-                filterStrip
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 8)
-                    .background(Theme.background)
-                Divider().overlay(Theme.hairline)
-                TVGuideView()
+        VStack(spacing: 0) {
+            Picker("Section", selection: Binding(
+                get: { section },
+                set: { newValue in
+                    #if os(iOS)
+                    UISelectionFeedbackGenerator().selectionChanged()
+                    #endif
+                    sectionRaw = newValue.rawValue
+                }
+            )) {
+                ForEach(LiveSection.allCases) { Text($0.title).tag($0) }
             }
-        } else if viewModel.isLoading && viewModel.allLive.isEmpty {
+            .pickerStyle(.segmented)
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.xs)
+            .background(Theme.background)
+
+            switch section {
+            case .channels:
+                LiveChannelsView()
+            case .guide:
+                TVGuideView()
+            case .sports:
+                sportsContent
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var sportsContent: some View {
+        if viewModel.isLoading && viewModel.allLive.isEmpty {
             loadingView
         } else {
             VStack(spacing: 0) {
@@ -176,9 +200,9 @@ struct LiveView: View {
     private func sportNavChip(_ sport: SportGroup?, label: String) -> some View {
         Button {
             #if os(iOS)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            UISelectionFeedbackGenerator().selectionChanged()
             #endif
-            withAnimation(.snappy) { selectedSport = sport }
+            withAnimation(Theme.Motion.snappy) { selectedSport = sport }
         } label: {
             HStack(spacing: 4) {
                 if let sport {
@@ -200,7 +224,7 @@ struct LiveView: View {
     private var filterStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(LiveFilter.allCases) { f in
+                ForEach(LiveFilter.allCases.filter { $0 != .guide }) { f in
                     filterChip(f)
                 }
             }
@@ -210,9 +234,9 @@ struct LiveView: View {
     private func filterChip(_ f: LiveFilter) -> some View {
         Button {
             #if os(iOS)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            UISelectionFeedbackGenerator().selectionChanged()
             #endif
-            withAnimation(.snappy) { filter = f }
+            withAnimation(Theme.Motion.snappy) { filter = f }
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: f.icon)
@@ -320,7 +344,7 @@ struct LiveView: View {
                         .font(.callout)
                         .foregroundStyle(Theme.textSecondary)
                     Button("See All Live") {
-                        withAnimation(.snappy) { filter = .all }
+                        withAnimation(Theme.Motion.snappy) { filter = .all }
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Theme.accent)
@@ -487,9 +511,9 @@ struct LiveMatchCard: View {
                     Button { showingQuickStream = true } label: {
                         HStack(spacing: 3) {
                             Image(systemName: "play.tv")
-                                .font(.system(size: 9, weight: .bold))
+                                .font(Theme.Typography.overline)
                             Text("\(streamCount)")
-                                .font(.system(size: 9, weight: .bold).monospacedDigit())
+                                .font(Theme.Typography.overline.monospacedDigit())
                         }
                         .foregroundStyle(Theme.accent)
                         .padding(.horizontal, 6).padding(.vertical, 3)
@@ -681,6 +705,20 @@ struct PulsingLiveBadge: View {
 }
 
 // MARK: - Filter
+
+enum LiveSection: String, CaseIterable, Identifiable {
+    case channels, guide, sports
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .channels: return "Channels"
+        case .guide: return "Guide"
+        case .sports: return "Sports"
+        }
+    }
+}
 
 enum LiveFilter: String, CaseIterable, Identifiable {
     case forYou = "forYou"

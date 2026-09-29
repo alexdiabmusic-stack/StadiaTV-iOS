@@ -113,7 +113,7 @@ private struct TVArticleDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     if let url = article.imageURL {
-                        AsyncImage(url: url) { phase in
+                        CachedImage(url: url) { phase in
                             switch phase {
                             case .success(let img): img.resizable().scaledToFill()
                             default: Color.clear

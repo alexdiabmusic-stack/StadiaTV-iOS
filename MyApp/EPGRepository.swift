@@ -63,6 +63,9 @@ final class EPGRepository: ObservableObject {
     /// Flat map from `providerChannelId` → canonical channel ID, rebuilt whenever `canonicalChannels` changes.
     /// Used by MatchDetailView and TVMatchDetailView so they don't rebuild the map on every ranking call.
     private(set) var channelToCanonicalMap: [String: String] = [:]
+    /// Canonical channels keyed by ID, rebuilt alongside `channelToCanonicalMap`.
+    private(set) var canonicalChannelsByID: [String: CanonicalChannel] = [:]
+    private var fingerprintTask: Task<Void, Never>?
     /// Streams that passed the hide filter but matched no curated channel.
     /// Available for global event-to-stream matching so uncatalogued feeds are not silently dropped.
     @Published private(set) var unresolvedStreams: [ChannelStream] = []
@@ -72,7 +75,11 @@ final class EPGRepository: ObservableObject {
     @Published private(set) var importDiagnostics = LiveTVImportDiagnostics()
 
     // Programme index: canonicalChannelId -> [EPGProgramme] sorted by start
-    private var programmeIndex: [String: [EPGProgramme]] = [:]
+    private var programmeIndex: [String: [EPGProgramme]] = [:] {
+        didSet { programmeRevision &+= 1 }
+    }
+    /// Bumped whenever guide data changes; lets views cache per-row layout.
+    private(set) var programmeRevision = 0
     // EPG channel id -> canonical channel id
     private var epgToCanonical: [String: String] = [:]
     // Coverage range per canonical channel, rebuilt on every finalizeProgrammeIndex call
@@ -133,7 +140,18 @@ final class EPGRepository: ObservableObject {
     func setupWithChannels(_ channels: [Channel], customEPGURLs: [URL] = []) {
         self.customEPGURLs = customEPGURLs
         guard !channels.isEmpty else { return }
-        let fingerprint = Self.channelFingerprint(channels) + customEPGURLs.map { $0.absoluteString }.joined()
+        // Hashing every channel is O(n) over a potentially 50k-channel playlist, so the
+        // fingerprint is computed off the main thread before deciding whether to re-import.
+        let urlSuffix = customEPGURLs.map { $0.absoluteString }.joined()
+        fingerprintTask?.cancel()
+        fingerprintTask = Task { [weak self] in
+            let hash = await Task.detached(priority: .userInitiated) { Self.channelFingerprint(channels) }.value
+            guard let self, !Task.isCancelled else { return }
+            self.importIfChanged(channels, fingerprint: hash + urlSuffix)
+        }
+    }
+
+    private func importIfChanged(_ channels: [Channel], fingerprint: String) {
         if fingerprint == lastChannelFingerprint, setupTask != nil || !canonicalChannels.isEmpty {
             // Keep it updated if we missed it earlier.
             return
@@ -298,6 +316,7 @@ final class EPGRepository: ObservableObject {
             )
             stream.countryHint = normalizer.extractCountryHint(from: channel.name)
             stream.streamMetadata = metadata
+            stream.httpHeaders = channel.httpHeaders
             visible.append(stream)
         }
         diagnostics.prefilterDuration = Date().timeIntervalSince(prefilterStart)
@@ -346,6 +365,7 @@ final class EPGRepository: ObservableObject {
 
     private func loadInitialEPGPWProgrammes(for channels: [CanonicalChannel]) async {
         guard EPGPWSourcePolicy.epgPWEnabled else { return }
+        await PlaybackPriority.waitForIdle()
         let prioritized = channels.sorted { $0.priority > $1.priority }
         await loadEPGPWProgrammes(for: Array(prioritized.prefix(24)), forceRefresh: false)
     }
@@ -947,6 +967,12 @@ final class EPGRepository: ObservableObject {
             }
         }
         channelToCanonicalMap = map
+        canonicalChannelsByID = Dictionary(canonicalChannels.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// The canonical channel a provider channel was matched to, via the prebuilt maps (no scans).
+    func canonicalChannel(forProviderChannelID id: String) -> CanonicalChannel? {
+        channelToCanonicalMap[id].flatMap { canonicalChannelsByID[$0] }
     }
 
     private func rebuildCoverageIndex() {

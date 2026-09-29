@@ -195,6 +195,92 @@ final class TVGuideViewModel: ObservableObject {
         return progs.map { $0.shifted(by: offsetMinutes) }
     }
 
+    // MARK: - Row layout cache
+
+    /// One programme cell (or gap) positioned within a guide row.
+    struct GuideCellLayout: Identifiable {
+        let id: String
+        let programme: EPGProgramme?
+        let x: CGFloat
+        let width: CGFloat
+    }
+
+    struct GuideRowLayout {
+        let cells: [GuideCellLayout]
+        var isEmpty: Bool { !cells.contains { $0.programme != nil } }
+    }
+
+    private struct RowLayoutKey: Equatable {
+        let date: Date
+        let offset: Int
+        let revision: Int
+    }
+    private var rowLayoutCache: [String: (key: RowLayoutKey, layout: GuideRowLayout)] = [:]
+
+    /// Cell positions for a channel's row, cached until the day, EPG offset or guide data changes,
+    /// so scrolling and re-rendering don't redo the date maths for every cell.
+    func rowLayout(for channel: CanonicalChannel) -> GuideRowLayout {
+        let key = RowLayoutKey(date: selectedDate, offset: epgOffsetMinutes(for: channel),
+                               revision: repository?.programmeRevision ?? 0)
+        if let cached = rowLayoutCache[channel.id], cached.key == key { return cached.layout }
+
+        let progs = programmes(for: channel, in: guideWindowStart...guideWindowEnd)
+        var cells: [GuideCellLayout] = []
+        cells.reserveCapacity(progs.count * 2)
+        func addGap(_ from: Date, _ to: Date) {
+            let width = CGFloat(to.timeIntervalSince(from) / 60) * Self.ptsPerMinute
+            guard width > 4 else { return }
+            cells.append(GuideCellLayout(id: "gap-\(from.timeIntervalSince1970)", programme: nil,
+                                         x: xOffset(for: from) + 1, width: width - 2))
+        }
+        if let first = progs.first, first.start > guideWindowStart { addGap(guideWindowStart, first.start) }
+        for (index, prog) in progs.enumerated() {
+            cells.append(GuideCellLayout(id: prog.id, programme: prog, x: xOffset(for: prog.start), width: width(for: prog)))
+            if index + 1 < progs.count, progs[index + 1].start > prog.end + 30 {
+                addGap(prog.end, progs[index + 1].start)
+            }
+        }
+        if let last = progs.last, last.end < guideWindowEnd { addGap(last.end, guideWindowEnd) }
+
+        let layout = GuideRowLayout(cells: cells)
+        if rowLayoutCache.count > 2_000 { rowLayoutCache.removeAll(keepingCapacity: true) }
+        rowLayoutCache[channel.id] = (key, layout)
+        return layout
+    }
+
+    // MARK: - Fantasy indicator cache
+
+    private var fantasyIndicatorCache: [String: Int] = [:]
+    private var fantasyIndicatorRevision = -1
+
+    /// Fantasy badge count for a programme, computed once per programme per fantasy-data change.
+    func fantasyIndicatorCount(for programme: EPGProgramme, channel: CanonicalChannel,
+                               revision: Int, compute: () -> Int) -> Int {
+        if revision != fantasyIndicatorRevision {
+            fantasyIndicatorCache.removeAll(keepingCapacity: true)
+            fantasyIndicatorRevision = revision
+        }
+        let key = "\(channel.id)|\(programme.id)"
+        if let cached = fantasyIndicatorCache[key] { return cached }
+        let value = compute()
+        fantasyIndicatorCache[key] = value
+        return value
+    }
+
+    // MARK: - Prefetch throttle
+
+    private var lastPrefetchRow = -1
+    private var lastPrefetchAt = Date.distantPast
+
+    /// Called on scroll; prefetches at most every 250 ms and only when the first visible row changes.
+    func scrolledTo(firstRow: Int, visibleRowCount: Int) {
+        let now = Date()
+        guard firstRow != lastPrefetchRow, now.timeIntervalSince(lastPrefetchAt) >= 0.25 else { return }
+        lastPrefetchRow = firstRow
+        lastPrefetchAt = now
+        prefetchProgrammesAround(rowIndex: firstRow, visibleRowCount: visibleRowCount)
+    }
+
     func currentProgramme(for channel: CanonicalChannel) -> EPGProgramme? {
         let offsetMinutes = epgOffsetMinutes(for: channel)
         let adjustedNow = Date().addingTimeInterval(-TimeInterval(offsetMinutes * 60))

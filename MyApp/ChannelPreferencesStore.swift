@@ -8,7 +8,15 @@ import Combine
 @MainActor
 final class ChannelPreferencesStore: ObservableObject {
 
-    @Published private(set) var preferences: [String: ChannelPreferences] = [:]
+    @Published private(set) var preferences: [String: ChannelPreferences] = [:] {
+        didSet { rebuildDerived() }
+    }
+    /// Ordered favourite channel IDs (ascending favoriteOrder), cached on write.
+    private(set) var favoriteChannelIDs: [String] = []
+    private(set) var hiddenChannelIDs: Set<String> = []
+    private(set) var customNames: [String: String] = [:]
+    /// Bumped on every preference change; a cheap key for list models and `.task(id:)`.
+    private(set) var revision = 0
 
     private let defaultsKey = "bannertv.channelprefs.v1"
 
@@ -40,16 +48,20 @@ final class ChannelPreferencesStore: ObservableObject {
         preferences[channelID]?.isFavorite == true
     }
 
-    /// Ordered list of favorite channel IDs (ascending favoriteOrder).
-    var favoriteChannelIDs: [String] {
-        preferences.values
+    var favoriteCount: Int {
+        favoriteChannelIDs.count
+    }
+
+    private func rebuildDerived() {
+        favoriteChannelIDs = preferences.values
             .filter { $0.isFavorite }
             .sorted { ($0.favoriteOrder ?? Int.max) < ($1.favoriteOrder ?? Int.max) }
             .map { $0.channelID }
-    }
-
-    var favoriteCount: Int {
-        preferences.values.filter { $0.isFavorite }.count
+        hiddenChannelIDs = Set(preferences.values.lazy.filter(\.isHidden).map(\.channelID))
+        customNames = preferences.values.reduce(into: [:]) { names, p in
+            if let name = p.customName { names[p.channelID] = name }
+        }
+        revision &+= 1
     }
 
     // MARK: - Write

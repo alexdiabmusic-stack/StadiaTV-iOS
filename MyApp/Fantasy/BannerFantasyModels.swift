@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - Native Banner Fantasy Domain
 
-enum BannerFantasyLeagueSource: String, Codable, CaseIterable, Identifiable, Sendable {
+nonisolated enum BannerFantasyLeagueSource: String, Codable, CaseIterable, Identifiable, Sendable {
     case native
     case importedESPN
     case importedSleeper
@@ -18,7 +18,7 @@ enum BannerFantasyLeagueSource: String, Codable, CaseIterable, Identifiable, Sen
     }
 }
 
-enum BannerFantasyVisibility: String, Codable, CaseIterable, Identifiable, Sendable {
+nonisolated enum BannerFantasyVisibility: String, Codable, CaseIterable, Identifiable, Sendable {
     case `public`
     case `private`
 
@@ -26,7 +26,7 @@ enum BannerFantasyVisibility: String, Codable, CaseIterable, Identifiable, Senda
     var displayName: String { self == .public ? "Public" : "Private" }
 }
 
-enum BannerFantasyMode: String, Codable, CaseIterable, Identifiable, Sendable {
+nonisolated enum BannerFantasyMode: String, Codable, CaseIterable, Identifiable, Sendable {
     case personalTeam
     case simulatedLeague
 
@@ -40,7 +40,7 @@ enum BannerFantasyMode: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum BannerFantasyScoringType: String, Codable, CaseIterable, Identifiable, Sendable {
+nonisolated enum BannerFantasyScoringType: String, Codable, CaseIterable, Identifiable, Sendable {
     case headToHeadPoints
     case headToHeadCategories
     case rotisserie
@@ -56,14 +56,14 @@ enum BannerFantasyScoringType: String, Codable, CaseIterable, Identifiable, Send
     }
 }
 
-enum BannerFantasyDraftType: String, Codable, CaseIterable, Identifiable, Sendable {
+nonisolated enum BannerFantasyDraftType: String, Codable, CaseIterable, Identifiable, Sendable {
     case snake
 
     var id: String { rawValue }
     var displayName: String { "Snake Draft" }
 }
 
-enum BannerFantasyLeaguePhase: String, Codable, Sendable {
+nonisolated enum BannerFantasyLeaguePhase: String, Codable, Sendable {
     case lobby
     case drafting
     case inSeason
@@ -71,12 +71,12 @@ enum BannerFantasyLeaguePhase: String, Codable, Sendable {
     case complete
 }
 
-enum BannerFantasyMembershipRole: String, Codable, Sendable {
+nonisolated enum BannerFantasyMembershipRole: String, Codable, Sendable {
     case commissioner
     case manager
 }
 
-enum BannerFantasyRosterSlot: String, Codable, CaseIterable, Identifiable, Sendable {
+nonisolated enum BannerFantasyRosterSlot: String, Codable, CaseIterable, Identifiable, Sendable {
     case center = "C"
     case leftWing = "LW"
     case rightWing = "RW"
@@ -152,7 +152,7 @@ enum BannerFantasyRosterSlot: String, Codable, CaseIterable, Identifiable, Senda
     var isActive: Bool { self != .bench && self != .injuredReserve && self != .injuredList }
 }
 
-enum BannerFantasyStat: String, Codable, CaseIterable, Identifiable, Sendable {
+nonisolated enum BannerFantasyStat: String, Codable, CaseIterable, Identifiable, Sendable {
     case goals
     case assists
     case plusMinus
@@ -267,7 +267,7 @@ enum BannerFantasyStat: String, Codable, CaseIterable, Identifiable, Sendable {
     var isRatio: Bool { [.goalsAgainstAverage, .savePercentage, .fieldGoalPercentage, .freeThrowPercentage, .battingAverage, .onBasePercentage, .earnedRunAverage, .walksHitsPerInningPitched].contains(self) }
 }
 
-struct BannerFantasySeason: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasySeason: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let year: Int
     let startsAt: Date?
@@ -275,14 +275,14 @@ struct BannerFantasySeason: Identifiable, Codable, Hashable, Sendable {
     let scoringPeriodDays: Int
 }
 
-struct BannerFantasyScoringRule: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyScoringRule: Identifiable, Codable, Hashable, Sendable {
     var id: String { stat.rawValue }
     let stat: BannerFantasyStat
     var points: Double
     var enabledForCategories: Bool
 }
 
-struct BannerFantasyScoringRules: Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyScoringRules: Codable, Hashable, Sendable {
     var type: BannerFantasyScoringType
     var rules: [BannerFantasyScoringRule]
 
@@ -295,7 +295,7 @@ struct BannerFantasyScoringRules: Codable, Hashable, Sendable {
     }
 }
 
-struct BannerFantasyRosterConfiguration: Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyRosterConfiguration: Codable, Hashable, Sendable {
     var slotCounts: [BannerFantasyRosterSlot: Int]
 
     static func standard(for sport: FantasySport) -> BannerFantasyRosterConfiguration {
@@ -305,23 +305,23 @@ struct BannerFantasyRosterConfiguration: Codable, Hashable, Sendable {
     static let standard = BannerFantasyRosterConfiguration.standard(for: .nhl)
 }
 
-enum FantasyLineupFrequency: String, Codable, Sendable {
+nonisolated enum FantasyLineupFrequency: String, Codable, Sendable {
     case weekly
     case daily
 }
 
-enum FantasyMatchupStructure: String, Codable, Sendable {
+nonisolated enum FantasyMatchupStructure: String, Codable, Sendable {
     case weekly
     case dailyScoringPeriods
     case seasonLong
 }
 
-enum FantasyLockRule: String, Codable, Sendable {
+nonisolated enum FantasyLockRule: String, Codable, Sendable {
     case gameStart
     case scoringPeriodStart
 }
 
-struct FantasySportConfiguration: Hashable, Sendable {
+nonisolated struct FantasySportConfiguration: Hashable, Sendable {
     let sport: FantasySport
     let eligiblePositions: [BannerFantasyRosterSlot]
     let defaultRoster: BannerFantasyRosterConfiguration
@@ -430,7 +430,7 @@ struct FantasySportConfiguration: Hashable, Sendable {
     }
 }
 
-struct BannerFantasyDraftSettings: Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyDraftSettings: Codable, Hashable, Sendable {
     var type: BannerFantasyDraftType
     var scheduledAt: Date?
     var pickTimerSeconds: Int
@@ -439,7 +439,7 @@ struct BannerFantasyDraftSettings: Codable, Hashable, Sendable {
     static let standard = BannerFantasyDraftSettings(type: .snake, scheduledAt: nil, pickTimerSeconds: 90, draftOrderTeamIDs: [])
 }
 
-struct BannerFantasyWaiverSettings: Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyWaiverSettings: Codable, Hashable, Sendable {
     enum WaiverType: String, Codable, CaseIterable, Identifiable, Sendable {
         case freeAgency
         case rollingPriority
@@ -455,7 +455,7 @@ struct BannerFantasyWaiverSettings: Codable, Hashable, Sendable {
     static let standard = BannerFantasyWaiverSettings(type: .rollingPriority, waiverPeriodHours: 24, usesFAAB: false, faabBudget: nil)
 }
 
-struct BannerFantasyTradeSettings: Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyTradeSettings: Codable, Hashable, Sendable {
     enum ReviewType: String, Codable, CaseIterable, Identifiable, Sendable {
         case none
         case commissioner
@@ -467,14 +467,14 @@ struct BannerFantasyTradeSettings: Codable, Hashable, Sendable {
     var reviewType: ReviewType
 }
 
-struct BannerFantasyPlayoffSettings: Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyPlayoffSettings: Codable, Hashable, Sendable {
     var regularSeasonPeriods: Int
     var playoffTeams: Int
     var playoffRounds: Int
     var championshipPeriod: Int?
 }
 
-struct BannerFantasyLeague: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyLeague: Identifiable, Codable, Hashable, Sendable {
     let id: String
     var name: String
     var source: BannerFantasyLeagueSource
@@ -495,7 +495,7 @@ struct BannerFantasyLeague: Identifiable, Codable, Hashable, Sendable {
     var createdAt: Date
 }
 
-struct BannerFantasyMembership: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyMembership: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
     let userID: String
@@ -504,7 +504,7 @@ struct BannerFantasyMembership: Identifiable, Codable, Hashable, Sendable {
     var joinedAt: Date
 }
 
-struct BannerFantasyTeam: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyTeam: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
     let ownerUserID: String
@@ -513,7 +513,7 @@ struct BannerFantasyTeam: Identifiable, Codable, Hashable, Sendable {
     var avatarID: String?
 }
 
-struct BannerFantasyPlayerEntry: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyPlayerEntry: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
     let teamID: String
@@ -526,21 +526,21 @@ struct BannerFantasyPlayerEntry: Identifiable, Codable, Hashable, Sendable {
     var acquiredAt: Date
 }
 
-struct BannerFantasyRoster: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyRoster: Identifiable, Codable, Hashable, Sendable {
     var id: String { teamID }
     let leagueID: String
     let teamID: String
     var entries: [BannerFantasyPlayerEntry]
 }
 
-struct BannerFantasyLineupSlot: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyLineupSlot: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let playerEntryID: String
     var slot: BannerFantasyRosterSlot
     var lockedAt: Date?
 }
 
-struct BannerFantasyLineup: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyLineup: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
     let teamID: String
@@ -548,7 +548,7 @@ struct BannerFantasyLineup: Identifiable, Codable, Hashable, Sendable {
     var slots: [BannerFantasyLineupSlot]
 }
 
-struct BannerFantasyStatLine: Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyStatLine: Codable, Hashable, Sendable {
     var values: [BannerFantasyStat: Double]
     var appearances: Int
 
@@ -557,14 +557,14 @@ struct BannerFantasyStatLine: Codable, Hashable, Sendable {
     }
 }
 
-struct BannerFantasyPlayerScore: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyPlayerScore: Identifiable, Codable, Hashable, Sendable {
     var id: String { playerEntryID }
     let playerEntryID: String
     let points: Double?
     let categoryValues: [BannerFantasyStat: Double]
 }
 
-struct BannerFantasyMatchupSide: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyMatchupSide: Identifiable, Codable, Hashable, Sendable {
     var id: String { teamID }
     let teamID: String
     var points: Double?
@@ -572,7 +572,7 @@ struct BannerFantasyMatchupSide: Identifiable, Codable, Hashable, Sendable {
     var categoryWins: Int?
 }
 
-struct BannerFantasyMatchup: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyMatchup: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
     let matchupPeriod: Int
@@ -583,7 +583,7 @@ struct BannerFantasyMatchup: Identifiable, Codable, Hashable, Sendable {
     var winnerTeamID: String?
 }
 
-struct BannerFantasyStanding: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyStanding: Identifiable, Codable, Hashable, Sendable {
     var id: String { teamID }
     let leagueID: String
     let teamID: String
@@ -595,7 +595,7 @@ struct BannerFantasyStanding: Identifiable, Codable, Hashable, Sendable {
     var pointsAgainst: Double?
 }
 
-enum BannerFantasyTransactionType: String, Codable, Sendable {
+nonisolated enum BannerFantasyTransactionType: String, Codable, Sendable {
     case add
     case drop
     case addDrop
@@ -605,14 +605,14 @@ enum BannerFantasyTransactionType: String, Codable, Sendable {
     case lineupChange
 }
 
-struct BannerFantasyPersistenceEnvelope: Codable, Sendable {
+nonisolated struct BannerFantasyPersistenceEnvelope: Codable, Sendable {
     var schemaVersion: Int
     var bundles: [BannerFantasyLeagueBundle]
 
     static let currentSchemaVersion = 1
 }
 
-struct BannerFantasyTransaction: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyTransaction: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
     let teamID: String?
@@ -622,7 +622,7 @@ struct BannerFantasyTransaction: Identifiable, Codable, Hashable, Sendable {
     var createdAt: Date
 }
 
-struct BannerFantasyWaiver: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyWaiver: Identifiable, Codable, Hashable, Sendable {
     enum Status: String, Codable, Sendable { case pending, processed, failed, cancelled }
     let id: String
     let leagueID: String
@@ -634,7 +634,7 @@ struct BannerFantasyWaiver: Identifiable, Codable, Hashable, Sendable {
     var createdAt: Date
 }
 
-struct BannerFantasyTrade: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyTrade: Identifiable, Codable, Hashable, Sendable {
     enum Status: String, Codable, Sendable { case proposed, accepted, rejected, cancelled, underReview, processed }
     let id: String
     let leagueID: String
@@ -646,7 +646,7 @@ struct BannerFantasyTrade: Identifiable, Codable, Hashable, Sendable {
     var createdAt: Date
 }
 
-struct BannerFantasyDraftPick: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyDraftPick: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
     let teamID: String
@@ -658,7 +658,7 @@ struct BannerFantasyDraftPick: Identifiable, Codable, Hashable, Sendable {
     var madeAt: Date?
 }
 
-struct BannerFantasyDraft: Identifiable, Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyDraft: Identifiable, Codable, Hashable, Sendable {
     let id: String
     let leagueID: String
     var status: BannerFantasyLeaguePhase
@@ -666,7 +666,7 @@ struct BannerFantasyDraft: Identifiable, Codable, Hashable, Sendable {
     var picks: [BannerFantasyDraftPick]
 }
 
-struct BannerFantasyLeagueBundle: Codable, Hashable, Sendable {
+nonisolated struct BannerFantasyLeagueBundle: Codable, Hashable, Sendable {
     var league: BannerFantasyLeague
     var memberships: [BannerFantasyMembership]
     var teams: [BannerFantasyTeam]
@@ -682,13 +682,13 @@ struct BannerFantasyLeagueBundle: Codable, Hashable, Sendable {
     }
 }
 
-extension BannerFantasyLeague {
+nonisolated extension BannerFantasyLeague {
     var effectiveMode: BannerFantasyMode {
         mode ?? (maxTeams <= 1 ? .personalTeam : .simulatedLeague)
     }
 }
 
-struct BannerFantasyCreateLeagueRequest: Sendable {
+nonisolated struct BannerFantasyCreateLeagueRequest: Sendable {
     var sport: FantasySport
     var mode: BannerFantasyMode
     var leagueName: String
@@ -704,7 +704,7 @@ struct BannerFantasyCreateLeagueRequest: Sendable {
     var playoffSettings: BannerFantasyPlayoffSettings
 }
 
-struct BannerFantasyJoinLeagueRequest: Sendable {
+nonisolated struct BannerFantasyJoinLeagueRequest: Sendable {
     var inviteCode: String
     var teamName: String
 }

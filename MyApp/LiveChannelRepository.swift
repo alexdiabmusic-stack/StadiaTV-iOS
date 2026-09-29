@@ -24,7 +24,7 @@ final class LiveChannelRepository {
             guard try await store.hasChannels(for: playlist.id) else { return nil }
             // store.channels() runs on the LiveChannelStore actor (off-main thread).
             let liveChannels = try await store.channels(for: playlist.id)
-            return liveChannels.map { $0.asChannel(playlistName: playlist.name) }
+            return liveChannels.map { $0.asChannel(playlistName: playlist.name, defaultUserAgent: playlist.userAgent) }
         } catch {
             return nil
         }
@@ -74,7 +74,12 @@ final class LiveChannelRepository {
             }
         }
 
-        return (liveChannels.map { $0.asChannel(playlistName: playlist.name) }, epgURL)
+        return (liveChannels.map { $0.asChannel(playlistName: playlist.name, defaultUserAgent: playlist.userAgent) }, epgURL)
+    }
+
+    /// When a playlist's channels were last fetched from the provider (nil if never).
+    func lastRefreshed(for playlistID: UUID) async -> Date? {
+        try? await store.lastRefreshed(for: playlistID)
     }
 
     // MARK: - Single channel lookup

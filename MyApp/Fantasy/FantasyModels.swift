@@ -1,6 +1,5 @@
 import Foundation
 
-extension GameState: Codable, Sendable {}
 
 // MARK: - Provider-independent Fantasy domain
 

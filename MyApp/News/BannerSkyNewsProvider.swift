@@ -4,7 +4,7 @@ import Foundation
 // Live-verified 2026-09-07: feeds return HTTP 200 with valid RSS content.
 // Feed ID 12040 is Sky Sports' main sports news RSS.
 
-struct SkySportsNewsProvider: SportsNewsProvider {
+nonisolated struct SkySportsNewsProvider: SportsNewsProvider {
     let metadata: SportsDataProviderMetadata
     var supportsPagination: Bool { false }
 

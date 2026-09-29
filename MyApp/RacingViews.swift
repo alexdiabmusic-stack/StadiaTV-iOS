@@ -103,7 +103,7 @@ private struct RacerRow: View {
                 .foregroundStyle(racer.isWinner ? Theme.accent : Theme.textSecondary)
                 .frame(width: 22, alignment: .trailing)
 
-            AsyncImage(url: racer.flagURL) { phase in
+            CachedImage(url: racer.flagURL) { phase in
                 if case .success(let image) = phase {
                     image.resizable().scaledToFit()
                 } else {

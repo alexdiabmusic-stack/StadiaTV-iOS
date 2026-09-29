@@ -37,7 +37,7 @@ struct NHLPlayEventRow: View {
                         NavigationLink {
                             PlayerDetailView(league: league, athlete: NHLProvider.athlete(player))
                         } label: {
-                            AsyncImage(url: url) { image in image.resizable().scaledToFit() } placeholder: { Image(systemName: "person.crop.circle") }
+                            CachedImage(url: url) { image in image.resizable().scaledToFit() } placeholder: { Image(systemName: "person.crop.circle") }
                                 .frame(width: 56, height: 56)
                         }.accessibilityLabel("View \(player.name)")
                     }

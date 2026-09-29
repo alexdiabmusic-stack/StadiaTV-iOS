@@ -67,7 +67,7 @@ struct PlaylistsSettingsView: View {
                 }
             }
         }
-        .refreshable { await playlists.refreshAll() }
+        .refreshable { await playlists.refreshAll(force: true) }
     }
 
     @ViewBuilder private func playlistActions(for playlist: Playlist) -> some View {
@@ -1354,6 +1354,32 @@ struct PlayerPlaybackSettingsView: View {
                     SettingsDisclosureRow(title: "Controls Hide After", value: "\(prefs.playerPanelTimeoutSeconds)s")
                 }
             }
+
+            SettingsPanel(title: "STREAMS") {
+                Menu {
+                    ForEach(PlayerBufferProfile.allCases) { profile in
+                        Button { prefs.setPlayerBufferProfile(profile) } label: {
+                            if prefs.playerBufferProfile == profile {
+                                Label(profile.rawValue, systemImage: "checkmark")
+                            } else {
+                                Text(profile.rawValue)
+                            }
+                        }
+                    }
+                } label: {
+                    SettingsDisclosureRow(title: "Buffer", value: prefs.playerBufferProfile.rawValue)
+                }
+                Divider().overlay(Theme.hairline)
+                SettingsToggleRow(
+                    title: "Prefer 4K Streams",
+                    isOn: Binding(get: { prefs.preferUHDStreams }, set: { prefs.setPreferUHDStreams($0) })
+                )
+                Text("Auto normally starts on 1080p or 720p, which start faster. Turn on to try 4K sources first.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
+            }
         }
     }
 
@@ -1499,7 +1525,7 @@ private struct AppearanceThemeCard: View {
 
                     VStack(spacing: 5) {
                         RoundedRectangle(cornerRadius: 2, style: .continuous)
-                            .fill(Color(hex: 0x3B82F6))
+                            .fill(Theme.accent)
                             .frame(height: 7)
                             .padding(.horizontal, 10)
                             .padding(.top, 10)
@@ -1535,8 +1561,8 @@ private struct AppearanceThemeCard: View {
 
     private var previewBackground: Color {
         switch appearance {
-        case .dark:   return Color(hex: 0x080A0F)
-        case .light:  return Color(hex: 0xF4F5F7)
+        case .dark:   return Theme.Palette.nearBlack
+        case .light:  return Theme.Palette.cloud
         case .system:
             #if os(tvOS)
             return Theme.background
@@ -1548,8 +1574,8 @@ private struct AppearanceThemeCard: View {
 
     private var previewCard: Color {
         switch appearance {
-        case .dark:   return Color(hex: 0x181C24)
-        case .light:  return Color(hex: 0xE0E2E8)
+        case .dark:   return Theme.Palette.slate
+        case .light:  return Theme.Palette.mist
         case .system:
             #if os(tvOS)
             return Theme.surfaceElevated

@@ -16,6 +16,11 @@ struct MyApp: App {
     @StateObject private var bannerFantasyStore = BannerFantasyStore.shared
     @StateObject private var launchCoordinator = StartupCoordinator()
 
+    init() {
+        PlaybackPriority.launchDate = Date()
+        AudioSessionManager.configureAtLaunch()
+    }
+
     var body: some Scene {
         WindowGroup {
             Group {
@@ -57,8 +62,10 @@ struct MyApp: App {
             // Channel refresh — parallel across all playlists (see PlaylistStore.refreshAll).
             .task { await playlistStore.refreshAll() }
             // Fantasy — load local state first, then refresh ESPN and event contexts concurrently.
-            .task {
+            .task(priority: .utility) {
                 await bannerFantasyStore.load()
+                // Not needed for the first screen; don't compete with launch or the first stream.
+                await PlaybackPriority.waitForBackgroundSlot()
                 async let espnRefresh: Void = fantasyStore.refresh(
                     channels: playlistStore.allChannels,
                     preferredLanguages: preferences.preferredStreamLanguages
@@ -140,6 +147,7 @@ struct RootView: View {
         .tint(Theme.accent)
         .environmentObject(liveViewModel)
         .environmentObject(epgRepository)
+        .environment(\.playerStores, PlayerStoreReferences(playlistStore: playlistStore, epgRepository: epgRepository))
         .environmentObject(guideStore)
         .environmentObject(streamStore)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: podcastStore.nowPlaying != nil)
@@ -151,14 +159,14 @@ struct RootView: View {
                 customEPGURLs: playlistStore.playlists.compactMap(\.epgURL).compactMap(URL.init(string:))
             ) 
         }
-        .task(id: "\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.allChannels.count)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
+        .task(id: "\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.channelsRevision)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
             await streamStore.scanDebounced(
                 matches: liveViewModel.allLive + liveViewModel.startingSoon,
                 channels: playlistStore.allChannels,
                 epgRepository: epgRepository
             )
         }
-        .onChange(of: playlistStore.channelsByPlaylist) {
+        .onChange(of: playlistStore.channelsRevision) {
             epgRepository.setupWithChannels(
                 playlistStore.allChannels,
                 customEPGURLs: playlistStore.playlists.compactMap(\.epgURL).compactMap(URL.init(string:))
@@ -181,6 +189,7 @@ struct RootView: View {
 
     private func refreshFantasyContexts(force: Bool = false) async {
         await bannerFantasyStore.load()
+        await PlaybackPriority.waitForBackgroundSlot()
         async let espnRefresh: Void = fantasyStore.refresh(
             channels: playlistStore.allChannels,
             preferredLanguages: prefs.preferredStreamLanguages,

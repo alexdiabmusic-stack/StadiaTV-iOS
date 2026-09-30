@@ -301,8 +301,8 @@ private struct StatsSectionPicker: View {
                             .foregroundStyle(section == selected ? .white : Theme.textPrimary)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(section == selected ? Theme.surfaceElevated : Theme.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(section == selected ? Theme.accent : Theme.hairline))
+                            .background(section == selected ? Theme.surfaceElevated : Theme.surface.opacity(0.72), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(section == selected ? Theme.accent : Theme.hairline))
                     }
                     .buttonStyle(.plain)
                 }
@@ -325,7 +325,7 @@ private struct StatsLeagueHeader: View {
                 .font(.title2.weight(.bold))
                 .foregroundStyle(Theme.accent)
                 .frame(width: 44, height: 44)
-                .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(league.name)
@@ -338,8 +338,8 @@ private struct StatsLeagueHeader: View {
             Spacer()
         }
         .padding(14)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     private var subtitle: String {
@@ -361,7 +361,7 @@ private struct StatsActionTile: View {
                 .font(.headline.weight(.bold))
                 .foregroundStyle(Theme.accent)
                 .frame(width: 34, height: 34)
-                .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(section.rawValue)
                     .font(.subheadline.weight(.bold))
@@ -375,8 +375,8 @@ private struct StatsActionTile: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     private var detail: String {
@@ -420,8 +420,8 @@ private struct StatsFavoriteTeamsCard: View {
                             .foregroundStyle(Theme.textSecondary)
                     }
                     .padding(10)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
                 }
                 .buttonStyle(.plain)
             }
@@ -461,8 +461,8 @@ private struct StatsTeamSection: View {
                                 .foregroundStyle(Theme.textSecondary)
                         }
                         .padding(12)
-                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
                     }
                     .buttonStyle(.plain)
                 }
@@ -494,8 +494,8 @@ private struct StatsFormatCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     private var title: String {
@@ -556,13 +556,13 @@ private struct StatsGolfCard: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             }
             .buttonStyle(.plain)
         }
         .padding(14)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
     }
 }
 

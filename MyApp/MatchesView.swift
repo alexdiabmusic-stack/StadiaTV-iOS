@@ -87,7 +87,7 @@ struct MatchesView: View {
     }
 
     private var streamScanKey: String {
-        "\(viewModel.allFollowedMatches.count)-\(viewModel.matches.count)-\(playlists.channelsRevision)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))"
+        "\(viewModel.allFollowedMatches.count)-\(viewModel.matches.count)-\(playlists.channelsRevision)-\(epgRepository.programmeRevision)"
     }
 
     private func loadAll() async {
@@ -514,7 +514,7 @@ private struct FollowingLiveHero: View {
                                 Text("–").foregroundStyle(Theme.textTertiary)
                                 Text(match.home.score ?? "-")
                             }
-                            .font(.system(size: 36, weight: .black, design: .rounded).monospacedDigit())
+                            .font(.system(size: 36, weight: .bold, design: .rounded).monospacedDigit())
                             .foregroundStyle(Theme.textPrimary)
 
                             Text(match.statusDetail)
@@ -1335,8 +1335,8 @@ private struct FollowingStandingsPanelView: View {
                     }
                 }
             }
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.hairline))
         }
         .padding(.bottom, 24)
     }
@@ -1389,7 +1389,7 @@ private struct FollowingEmptyStateView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 36)
@@ -1440,7 +1440,7 @@ private struct FollowingSkeletonView: View {
     }
 
     private func skeletonRect(h: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
+        RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
             .fill(Theme.surface)
             .frame(maxWidth: .infinity).frame(height: h)
     }
@@ -1471,7 +1471,7 @@ struct MatchRow: View {
             }
         }
         .padding(14)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
     }
 
     private func teamRow(_ team: TeamSide) -> some View {
@@ -1560,8 +1560,8 @@ struct PickResultCard: View {
         }
         .padding(12)
         .frame(width: 160, alignment: .leading)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(borderColor))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(borderColor))
     }
 
     private var pickColor: Color {

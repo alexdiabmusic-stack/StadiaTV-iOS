@@ -147,7 +147,7 @@ struct PaywallView: View {
             }
 
             Text("Every sport.\nEvery moment. Unlocked.")
-                .font(.system(size: 28, weight: .black, design: .rounded))
+                .font(.system(size: 28, weight: .bold, design: .rounded))
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
                 .lineSpacing(3)
@@ -280,7 +280,7 @@ struct PaywallView: View {
 
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(entitlements.monthlyProduct?.displayPrice ?? "$1.99")
-                        .font(.system(size: 30, weight: .black, design: .rounded).monospacedDigit())
+                        .font(.system(size: 30, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(.white)
                     Text("/ month")
                         .font(.subheadline.weight(.semibold))
@@ -337,7 +337,7 @@ struct PaywallView: View {
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.white)
                         Text(entitlements.annualProduct?.displayPrice ?? "$14.99")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
                         Text("per year")
                             .font(Theme.Typography.overline)
@@ -345,8 +345,8 @@ struct PaywallView: View {
                     }
                     .padding(.vertical, 12)
                     .frame(maxWidth: .infinity)
-                    .background(Theme.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.accent.opacity(0.35)))
+                    .background(Theme.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.accent.opacity(0.35)))
                 }
                 .buttonStyle(.plain)
 
@@ -368,7 +368,7 @@ struct PaywallView: View {
                             .font(.caption.weight(.bold))
                             .foregroundStyle(.white)
                         Text(entitlements.lifetimeProduct?.displayPrice ?? "$24.99")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
                         Text("one-time")
                             .font(Theme.Typography.overline)
@@ -376,8 +376,8 @@ struct PaywallView: View {
                     }
                     .padding(.vertical, 12)
                     .frame(maxWidth: .infinity)
-                    .background(Theme.Palette.highlightYellow.opacity(0.1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.Palette.highlightYellow.opacity(0.35)))
+                    .background(Theme.Palette.highlightYellow.opacity(0.1), in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.Palette.highlightYellow.opacity(0.35)))
                 }
                 .buttonStyle(.plain)
             }
@@ -406,7 +406,7 @@ struct PaywallView: View {
                         .padding(.bottom, 2)
 
                     Text(price)
-                        .font(.system(size: 26, weight: .black, design: .rounded).monospacedDigit())
+                        .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(.white)
 
                     Text(period)
@@ -437,7 +437,7 @@ struct PaywallView: View {
 
                 if let badge {
                     Text(badge)
-                        .font(.system(size: 8, weight: .black))
+                        .font(.system(size: 8, weight: .bold))
                         .foregroundStyle(.black)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 4)
@@ -585,7 +585,7 @@ struct PremiumGateOverlay: View {
             .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.white.opacity(0.1)))
             .padding(24)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
     }
 }
 
@@ -637,7 +637,7 @@ struct PremiumSuccessOverlay: View {
                         .frame(width: 100, height: 100)
 
                     Image(systemName: "checkmark")
-                        .font(.system(size: 46, weight: .black))
+                        .font(.system(size: 46, weight: .bold))
                         .foregroundStyle(Theme.accent)
                         .opacity(checkOpacity)
                         .scaleEffect(scale)
@@ -645,7 +645,7 @@ struct PremiumSuccessOverlay: View {
 
                 VStack(spacing: 8) {
                     Text("You're Premium")
-                        .font(.system(size: 28, weight: .black, design: .rounded))
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
 
                     Text("Every feature unlocked. Enjoy the game.")

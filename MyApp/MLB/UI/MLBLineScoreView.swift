@@ -14,7 +14,7 @@ struct MLBLineScoreView: View {
                 row(game.away, home: false)
                 row(game.home, home: true)
             }.font(.subheadline.monospacedDigit()).padding()
-        }.background(Theme.surface, in: RoundedRectangle(cornerRadius: 12))
+        }.background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
     }
     private func row(_ team: BaseballTeam, home: Bool) -> some View {
         GridRow {

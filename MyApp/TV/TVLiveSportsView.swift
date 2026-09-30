@@ -99,7 +99,7 @@ struct TVLiveSportsView: View {
             .padding(.vertical, 10)
             .background(
                 selected ? Theme.accent.opacity(0.9) : Color.clear,
-                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
             )
         }
         .buttonStyle(.plain)

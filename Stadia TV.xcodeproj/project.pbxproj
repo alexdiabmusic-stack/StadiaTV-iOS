@@ -6,15 +6,29 @@
 	objectVersion = 90;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		D2F879B6306C5AA6000F7B04 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000100000000;
+			remoteInfo = MyApp;
+		};
+		D2F879C3306C5EF1000F7B04 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 000000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 000000000000000100000000;
+			remoteInfo = MyApp;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* StadiaTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StadiaTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		D2268B0E303FB4B90014AE4B /* FantasyFoundationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FantasyFoundationTests.swift; sourceTree = "<group>"; };
-		D27D9E98304F61D30062353E /* NewsProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewsProviderTests.swift; sourceTree = "<group>"; };
-		D27D9EB73050BAD90062353E /* SportsCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SportsCatalogTests.swift; sourceTree = "<group>"; };
-		D28647D33041356500260FB3 /* SportsDataFoundationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SportsDataFoundationTests.swift; sourceTree = "<group>"; };
-		D2B8CEEC304D50140034778D /* SourceMatcherRegressionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceMatcherRegressionTests.swift; sourceTree = "<group>"; };
-		D2B8CEEF304E7AB20034778D /* PrecisionStreamMatcherTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrecisionStreamMatcherTests.swift; sourceTree = "<group>"; };
 		A1C0FF1E0000000000000001 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
+		D2F879A4306C57D9000F7B04 /* MyAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MyAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D2F879B2306C5AA6000F7B04 /* MyAppUnitTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MyAppUnitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D2F879BF306C5EF1000F7B04 /* MyAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MyAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -24,6 +38,16 @@
 				Info.plist,
 			);
 			target = 000000000000000100000000 /* MyApp */;
+		};
+		D2F879AB306C5836000F7B04 /* Exceptions for "MyAppTests" folder in "MyAppTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				FantasyFoundationTests.swift,
+				NewsProviderTests.swift,
+				SportsCatalogTests.swift,
+				SportsDataFoundationTests.swift,
+			);
+			target = D2F879A3306C57D9000F7B04 /* MyAppTests */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -36,10 +60,43 @@
 			path = MyApp;
 			sourceTree = "<group>";
 		};
+		D2F879A5306C57D9000F7B04 /* MyAppTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D2F879AB306C5836000F7B04 /* Exceptions for "MyAppTests" folder in "MyAppTests" target */,
+			);
+			path = MyAppTests;
+			sourceTree = "<group>";
+		};
+		D2F879B3306C5AA6000F7B04 /* MyAppUnitTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MyAppUnitTests;
+			sourceTree = "<group>";
+		};
+		D2F879C0306C5EF1000F7B04 /* MyAppUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MyAppUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		000000000000000130000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		D2F879A1306C57D9000F7B04 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		D2F879AF306C5AA6000F7B04 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		D2F879BC306C5EF1000F7B04 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
 			);
@@ -51,10 +108,23 @@
 			isa = PBXGroup;
 			children = (
 				000000000000000000000010 /* MyApp */,
+				D2F879A5306C57D9000F7B04 /* MyAppTests */,
+				D2F879B3306C5AA6000F7B04 /* MyAppUnitTests */,
+				D2F879C0306C5EF1000F7B04 /* MyAppUITests */,
 				000000000000000000000020 /* Products */,
-				D2268B0D303FB4760014AE4B /* StadiaTVTests */,
 				A1C0FF1E0000000000000002 /* Config */,
 			);
+			sourceTree = "<group>";
+		};
+		000000000000000000000020 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000120 /* StadiaTV.app */,
+				D2F879A4306C57D9000F7B04 /* MyAppTests.xctest */,
+				D2F879B2306C5AA6000F7B04 /* MyAppUnitTests.xctest */,
+				D2F879BF306C5EF1000F7B04 /* MyAppUITests.xctest */,
+			);
+			name = Products;
 			sourceTree = "<group>";
 		};
 		A1C0FF1E0000000000000002 /* Config */ = {
@@ -63,27 +133,6 @@
 				A1C0FF1E0000000000000001 /* App.xcconfig */,
 			);
 			path = Config;
-			sourceTree = "<group>";
-		};
-		000000000000000000000020 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				000000000000000000000120 /* StadiaTV.app */,
-			);
-			name = Products;
-			sourceTree = "<group>";
-		};
-		D2268B0D303FB4760014AE4B /* StadiaTVTests */ = {
-			isa = PBXGroup;
-			children = (
-				D2268B0E303FB4B90014AE4B /* FantasyFoundationTests.swift */,
-				D28647D33041356500260FB3 /* SportsDataFoundationTests.swift */,
-				D2B8CEEC304D50140034778D /* SourceMatcherRegressionTests.swift */,
-				D2B8CEEF304E7AB20034778D /* PrecisionStreamMatcherTests.swift */,
-				D27D9E98304F61D30062353E /* NewsProviderTests.swift */,
-				D27D9EB73050BAD90062353E /* SportsCatalogTests.swift */,
-			);
-			path = StadiaTVTests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -107,6 +156,66 @@
 			productReference = 000000000000000000000120 /* StadiaTV.app */;
 			productType = "com.apple.product-type.application";
 		};
+		D2F879A3306C57D9000F7B04 /* MyAppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D2F879A8306C57DA000F7B04 /* Build configuration list for PBXNativeTarget "MyAppTests" */;
+			buildPhases = (
+				D2F879A0306C57D9000F7B04 /* Sources */,
+				D2F879A1306C57D9000F7B04 /* Frameworks */,
+				D2F879A2306C57D9000F7B04 /* Resources */,
+			);
+			buildRules = (
+			);
+			fileSystemSynchronizedGroups = (
+				D2F879A5306C57D9000F7B04 /* MyAppTests */,
+			);
+			name = MyAppTests;
+			productName = MyAppTests;
+			productReference = D2F879A4306C57D9000F7B04 /* MyAppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		D2F879B1306C5AA6000F7B04 /* MyAppUnitTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D2F879B8306C5AA6000F7B04 /* Build configuration list for PBXNativeTarget "MyAppUnitTests" */;
+			buildPhases = (
+				D2F879AE306C5AA6000F7B04 /* Sources */,
+				D2F879AF306C5AA6000F7B04 /* Frameworks */,
+				D2F879B0306C5AA6000F7B04 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D2F879B7306C5AA6000F7B04 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				D2F879B3306C5AA6000F7B04 /* MyAppUnitTests */,
+			);
+			name = MyAppUnitTests;
+			productName = MyAppUnitTests;
+			productReference = D2F879B2306C5AA6000F7B04 /* MyAppUnitTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		D2F879BE306C5EF1000F7B04 /* MyAppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D2F879C5306C5EF1000F7B04 /* Build configuration list for PBXNativeTarget "MyAppUITests" */;
+			buildPhases = (
+				D2F879BB306C5EF1000F7B04 /* Sources */,
+				D2F879BC306C5EF1000F7B04 /* Frameworks */,
+				D2F879BD306C5EF1000F7B04 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				D2F879C4306C5EF1000F7B04 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				D2F879C0306C5EF1000F7B04 /* MyAppUITests */,
+			);
+			name = MyAppUITests;
+			productName = MyAppUITests;
+			productReference = D2F879BF306C5EF1000F7B04 /* MyAppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -114,11 +223,22 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2630;
+				LastSwiftUpdateCheck = 2720;
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					000000000000000100000000 = {
 						CreatedOnToolsVersion = 26.3;
+					};
+					D2F879A3306C57D9000F7B04 = {
+						CreatedOnToolsVersion = 27.2;
+					};
+					D2F879B1306C5AA6000F7B04 = {
+						CreatedOnToolsVersion = 27.2;
+						TestTargetID = 000000000000000100000000;
+					};
+					D2F879BE306C5EF1000F7B04 = {
+						CreatedOnToolsVersion = 27.2;
+						TestTargetID = 000000000000000100000000;
 					};
 				};
 			};
@@ -137,12 +257,30 @@
 			projectRoot = "";
 			targets = (
 				000000000000000100000000 /* MyApp */,
+				D2F879A3306C57D9000F7B04 /* MyAppTests */,
+				D2F879B1306C5AA6000F7B04 /* MyAppUnitTests */,
+				D2F879BE306C5EF1000F7B04 /* MyAppUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		000000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		D2F879A2306C57D9000F7B04 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		D2F879B0306C5AA6000F7B04 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+			);
+		};
+		D2F879BD306C5EF1000F7B04 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
 			);
@@ -155,7 +293,35 @@
 			files = (
 			);
 		};
+		D2F879A0306C57D9000F7B04 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		D2F879AE306C5AA6000F7B04 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
+		D2F879BB306C5EF1000F7B04 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+			);
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D2F879B7306C5AA6000F7B04 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000100000000 /* MyApp */;
+			targetProxy = D2F879B6306C5AA6000F7B04 /* PBXContainerItemProxy */;
+		};
+		D2F879C4306C5EF1000F7B04 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 000000000000000100000000 /* MyApp */;
+			targetProxy = D2F879C3306C5EF1000F7B04 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		000000000000000011000000 /* Debug configuration for PBXProject "Stadia TV" */ = {
@@ -327,6 +493,7 @@
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator appletvos appletvsimulator";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG GUIDEBENCHMARK $(inherited)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -373,12 +540,142 @@
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator appletvos appletvsimulator";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG GUIDEBENCHMARK $(inherited)";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,3,7";
+			};
+			name = Release;
+		};
+		D2F879A9306C57DA000F7B04 /* Debug configuration for PBXNativeTarget "MyAppTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.MyAppTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		D2F879AA306C57DA000F7B04 /* Release configuration for PBXNativeTarget "MyAppTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.MyAppTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		D2F879B9306C5AA6000F7B04 /* Debug configuration for PBXNativeTarget "MyAppUnitTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alexdiab.StadiaTV.MyAppUnitTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MyApp.app/MyApp";
+			};
+			name = Debug;
+		};
+		D2F879BA306C5AA6000F7B04 /* Release configuration for PBXNativeTarget "MyAppUnitTests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alexdiab.StadiaTV.MyAppUnitTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MyApp.app/MyApp";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		D2F879C6306C5EF1000F7B04 /* Debug configuration for PBXNativeTarget "MyAppUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alexdiab.StadiaTV.MyAppUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = MyApp;
+			};
+			name = Debug;
+		};
+		D2F879C7306C5EF1000F7B04 /* Release configuration for PBXNativeTarget "MyAppUITests" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alexdiab.StadiaTV.MyAppUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = MyApp;
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
@@ -398,6 +695,30 @@
 			buildConfigurations = (
 				000000000000000111000000 /* Debug configuration for PBXNativeTarget "MyApp" */,
 				000000000000000112000000 /* Release configuration for PBXNativeTarget "MyApp" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		D2F879A8306C57DA000F7B04 /* Build configuration list for PBXNativeTarget "MyAppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D2F879A9306C57DA000F7B04 /* Debug configuration for PBXNativeTarget "MyAppTests" */,
+				D2F879AA306C57DA000F7B04 /* Release configuration for PBXNativeTarget "MyAppTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		D2F879B8306C5AA6000F7B04 /* Build configuration list for PBXNativeTarget "MyAppUnitTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D2F879B9306C5AA6000F7B04 /* Debug configuration for PBXNativeTarget "MyAppUnitTests" */,
+				D2F879BA306C5AA6000F7B04 /* Release configuration for PBXNativeTarget "MyAppUnitTests" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		D2F879C5306C5EF1000F7B04 /* Build configuration list for PBXNativeTarget "MyAppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D2F879C6306C5EF1000F7B04 /* Debug configuration for PBXNativeTarget "MyAppUITests" */,
+				D2F879C7306C5EF1000F7B04 /* Release configuration for PBXNativeTarget "MyAppUITests" */,
 			);
 			defaultConfigurationName = Release;
 		};

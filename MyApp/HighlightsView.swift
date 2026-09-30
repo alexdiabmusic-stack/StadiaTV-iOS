@@ -225,7 +225,7 @@ struct TopHighlightsSection: View {
                 .saturation(entitlements.isPremium ? 1 : 0.35)
 
             if !entitlements.isPremium {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                     .fill(.black.opacity(0.55))
                     .frame(width: 180, height: 101)
                     .overlay {
@@ -365,7 +365,7 @@ struct TeamHighlightsSection: View {
                 .saturation(entitlements.isPremium ? 1 : 0.35)
 
             if !entitlements.isPremium {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                     .fill(.black.opacity(0.55))
                     .frame(width: 180, height: 101)
                     .overlay {
@@ -429,9 +429,9 @@ private struct HighlightVideoCard: View {
         }
         .frame(width: 180, height: 101)   // 16:9
         .clipped()
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                 .strokeBorder(Theme.hairline)
         )
         .overlay(alignment: .bottomTrailing) {

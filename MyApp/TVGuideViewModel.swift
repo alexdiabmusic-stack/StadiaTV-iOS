@@ -203,6 +203,9 @@ final class TVGuideViewModel: ObservableObject {
         let programme: EPGProgramme?
         let x: CGFloat
         let width: CGFloat
+        /// Formatted "start – end" label, precomputed once per layout build (not per
+        /// render) since a past/future programme's time range never changes.
+        let timeRangeLabel: String
     }
 
     struct GuideRowLayout {
@@ -231,11 +234,13 @@ final class TVGuideViewModel: ObservableObject {
             let width = CGFloat(to.timeIntervalSince(from) / 60) * Self.ptsPerMinute
             guard width > 4 else { return }
             cells.append(GuideCellLayout(id: "gap-\(from.timeIntervalSince1970)", programme: nil,
-                                         x: xOffset(for: from) + 1, width: width - 2))
+                                         x: xOffset(for: from) + 1, width: width - 2, timeRangeLabel: ""))
         }
         if let first = progs.first, first.start > guideWindowStart { addGap(guideWindowStart, first.start) }
         for (index, prog) in progs.enumerated() {
-            cells.append(GuideCellLayout(id: prog.id, programme: prog, x: xOffset(for: prog.start), width: width(for: prog)))
+            let label = "\(Self.rulerFmt.string(from: prog.start)) – \(Self.rulerFmt.string(from: prog.end))"
+            cells.append(GuideCellLayout(id: prog.id, programme: prog, x: xOffset(for: prog.start),
+                                         width: width(for: prog), timeRangeLabel: label))
             if index + 1 < progs.count, progs[index + 1].start > prog.end + 30 {
                 addGap(prog.end, progs[index + 1].start)
             }

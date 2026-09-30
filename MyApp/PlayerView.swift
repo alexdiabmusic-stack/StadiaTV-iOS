@@ -189,9 +189,14 @@ struct PlayerView: View {
     @State private var multiscreenChannels: [Channel] = []
 
     private var canStartMultiscreen: Bool {
-        stores?.playlistStore.channelsByPlaylist.values.contains { channels in
+        guard let stores else { return false }
+        let hasOtherChannels = stores.playlistStore.channelsByPlaylist.values.contains { channels in
             channels.contains { $0.id != currentZapChannel.id }
-        } ?? false
+        }
+        guard hasOtherChannels else { return false }
+        // A single-connection (or unknown-limit) Xtream account can't safely open a
+        // second stream on top of the one already playing.
+        return !stores.playlistStore.xtreamAccountStatus.blocksAdditionalConnection(forPlaylistID: activePlaybackChannel.playlistID)
     }
 
     /// "More in {group}": other channels in the zap list from the same group.
@@ -343,7 +348,7 @@ struct PlayerView: View {
                 ProgressView()
                     .tint(Theme.accent)
                     .padding(18)
-                    .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             }
         }
         // Gesture onboarding hint
@@ -2442,7 +2447,7 @@ private struct ScoreboardRow: View {
             team(match?.away, alignment: .leading)
             VStack(spacing: 4) {
                 Text(scoreText)
-                    .font(.system(.title, design: .rounded, weight: .black).monospacedDigit())
+                    .font(.system(.title, design: .rounded, weight: .bold).monospacedDigit())
                     .foregroundStyle(Theme.textPrimary)
                 if let stateLabel, !stateLabel.isEmpty {
                     Text(stateLabel)
@@ -2497,7 +2502,7 @@ private struct SituationGrid: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)
-                    .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                 }
             }
         }
@@ -2689,7 +2694,7 @@ private struct DrivesPlaceholder: View {
                             }
                         }
                         .padding(10)
-                        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                     }
                 }
             } else {
@@ -2722,9 +2727,9 @@ private struct LandscapeGameCentrePanel: View {
             }
         }
         .padding(14)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .background(.black.opacity(0.70), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(.white.opacity(0.14)))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .background(.black.opacity(0.70), in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(.white.opacity(0.14)))
     }
 
     private var panelTitle: String {
@@ -2883,8 +2888,8 @@ private struct StreamFailurePanel: View {
             .tint(Theme.accent)
         }
         .padding(18)
-        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
     }
 }
 
@@ -3089,11 +3094,11 @@ struct MultiScreenPlayerView: View {
                 }
             }
             .padding(4)
-            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         }
         .padding(10)
-        .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     @ViewBuilder private var screenGrid: some View {
@@ -3123,9 +3128,9 @@ struct MultiScreenPlayerView: View {
                         let pipHeight = pipWidth * (9.0 / 16.0)
                         tile(for: secondary, isPiPInset: true)
                             .frame(width: pipWidth, height: pipHeight)
-                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                                     .strokeBorder(secondary.id == activePrimaryID ? Theme.accent : .white.opacity(0.3), lineWidth: 2)
                             )
                             .shadow(color: .black.opacity(0.6), radius: 10, x: 0, y: 4)
@@ -3576,7 +3581,7 @@ private struct PlayerSourceBar: View {
                 .font(.title3)
                 .foregroundStyle(Theme.accent)
                 .frame(width: 36, height: 36)
-                .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(channel.name)
@@ -3598,7 +3603,7 @@ private struct PlayerSourceBar: View {
             #if os(iOS)
             AirPlayButton()
                 .frame(width: 34, height: 34)
-                .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                 .accessibilityLabel("AirPlay")
             #endif
             Button(action: multiscreenAction) {
@@ -3607,7 +3612,7 @@ private struct PlayerSourceBar: View {
                         .font(.headline.weight(.bold))
                         .foregroundStyle(canStartMultiscreen ? .white : Theme.textSecondary)
                         .frame(width: 34, height: 34)
-                        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                     if !entitlements.isPremium {
                         Image(systemName: "lock.fill")
                             .font(.system(size: 8, weight: .bold))
@@ -3641,8 +3646,8 @@ private struct PlayerSourceBar: View {
                 .background(Theme.live, in: Capsule())
         }
         .padding(12)
-        .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
     }
 }
 
@@ -4813,9 +4818,9 @@ private struct PlayerAdjustmentHUD: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 16)
-        .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.1))
         )
         .transition(.opacity.combined(with: .scale(scale: 0.88)))

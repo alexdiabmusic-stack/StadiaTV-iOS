@@ -744,8 +744,8 @@ private struct UniversalSearchRow: View {
                 .foregroundStyle(Theme.textSecondary)
         }
         .padding(12)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
     }
 }
 
@@ -768,7 +768,7 @@ private struct SearchResultArtwork: View {
             }
         }
         .frame(width: 42, height: 42)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
     }
 
     private var fallbackIcon: some View {

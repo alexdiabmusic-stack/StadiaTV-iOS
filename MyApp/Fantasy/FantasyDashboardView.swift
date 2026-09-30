@@ -172,8 +172,8 @@ struct FantasyDashboardView: View {
                             .foregroundStyle(Theme.textSecondary)
                     }
                     .padding(14)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
                 }
                 .buttonStyle(.plain)
             } else {
@@ -244,8 +244,8 @@ struct FantasyDashboardView: View {
                         if row.id != rosterRows.last?.id { Divider().overlay(Theme.hairline) }
                     }
                 }
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
             }
         }
     }
@@ -264,8 +264,8 @@ struct FantasyDashboardView: View {
                         if index < min(fantasyStore.standings.count, 6) - 1 { Divider().overlay(Theme.hairline) }
                     }
                 }
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
             }
         }
     }
@@ -324,7 +324,7 @@ struct SleeperConnectSheet: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .padding(14)
-                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                         .foregroundStyle(Theme.textPrimary)
                     if let error = fantasyStore.lastError {
                         Text(error)
@@ -491,8 +491,8 @@ private struct FantasyInlineStatus: View {
             Spacer(minLength: 0)
         }
         .padding(14)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
     }
 }
 
@@ -552,8 +552,8 @@ private struct FantasyMatchupHero: View {
             }
         }
         .padding(16)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     private var periodTitle: String {
@@ -590,7 +590,7 @@ private struct FantasyMatchupHero: View {
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(points.map(Self.pointsText) ?? "--")
-                .font(.system(size: 30, weight: .black, design: .rounded).monospacedDigit())
+                .font(.system(size: 30, weight: .bold, design: .rounded).monospacedDigit())
                 .foregroundStyle(points == nil ? Theme.textSecondary : Theme.textPrimary)
             if let record {
                 Text(record)
@@ -675,8 +675,8 @@ private struct FantasyEventContextCard: View {
             }
         }
         .padding(14)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(context.isLive ? Theme.live.opacity(0.35) : Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(context.isLive ? Theme.live.opacity(0.35) : Theme.hairline))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilitySummary)
     }
@@ -738,8 +738,8 @@ private struct FantasyPlayerGameRow: View {
             }
         }
         .padding(14)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(game.gameState == .live ? Theme.live.opacity(0.35) : Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(game.gameState == .live ? Theme.live.opacity(0.35) : Theme.hairline))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilitySummary)
     }
@@ -939,8 +939,8 @@ struct FantasyDashboardStateHarness: View {
                     FantasyRosterRow(row: row)
                 }
             }
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
         }
     }
 

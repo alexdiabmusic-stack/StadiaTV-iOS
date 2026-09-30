@@ -1,0 +1,13 @@
+[
+  {
+    "id": "match-1",
+    "leaguePath": "basketball/nba",
+    "date": "2026-09-29T12:00:00Z",
+    "name": "Celtics at Lakers",
+    "shortName": "BOS @ LAL",
+    "statusDetail": "In Progress",
+    "home": {"displayName": "Los Angeles Lakers", "shortName": "Lakers", "abbreviation": "LAL"},
+    "away": {"displayName": "Boston Celtics", "shortName": "Celtics", "abbreviation": "BOS"},
+    "broadcasts": ["ESPN"]
+  }
+]

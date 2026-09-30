@@ -311,7 +311,7 @@ struct NewsArticleCard: View {
                 }
                 .frame(width: 86, height: 86)
                 .background(Theme.surfaceElevated)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 7) {
                     HStack(spacing: 6) {
@@ -360,8 +360,8 @@ struct NewsArticleCard: View {
                 Spacer(minLength: 0)
             }
             .padding(12)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
         }
         .buttonStyle(.plain)
     }

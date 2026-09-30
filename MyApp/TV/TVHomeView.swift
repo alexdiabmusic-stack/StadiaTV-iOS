@@ -220,7 +220,7 @@ private struct TVScheduleRow: View {
 
             if match.state != .pre {
                 Text("\(match.away.score ?? "–") – \(match.home.score ?? "–")")
-                    .font(.system(size: 18, weight: .black, design: .rounded).monospacedDigit())
+                    .font(.system(size: 18, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(match.state == .live ? Theme.live : Theme.textPrimary)
             } else {
                 Text(match.statusDetail)
@@ -240,9 +240,9 @@ private struct TVScheduleRow: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                 .strokeBorder(match.state == .live ? Theme.live.opacity(0.4) : Theme.hairline)
         )
     }

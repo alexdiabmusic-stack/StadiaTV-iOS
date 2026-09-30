@@ -36,7 +36,7 @@ struct MLBGameCenterView<WatchContent: View, RelatedContent: View>: View {
                         ForEach(MLBGameTab.allCases) { tab in
                             Button { fullRefresh = false; model.selectedTab = tab } label: {
                                 Text(tab.rawValue).font(.subheadline.bold()).padding(.horizontal, 12).frame(minHeight: 44)
-                                    .background(model.selectedTab == tab ? Theme.surfaceElevated : .clear, in: RoundedRectangle(cornerRadius: 8))
+                                    .background(model.selectedTab == tab ? Theme.surfaceElevated : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
                             }.buttonStyle(.bordered).accessibilityAddTraits(model.selectedTab == tab ? .isSelected : [])
                         }
                     }.padding(8)
@@ -135,7 +135,7 @@ struct MLBGameCenterView<WatchContent: View, RelatedContent: View>: View {
         }.font(.subheadline).padding().frame(maxWidth: .infinity).background(Theme.surface)
     }
     private var loading: some View {
-        VStack(spacing: 18) { ForEach(0..<4) { _ in RoundedRectangle(cornerRadius: 8).fill(Theme.surfaceElevated).frame(height: 64).redacted(reason: .placeholder) } }.padding()
+        VStack(spacing: 18) { ForEach(0..<4) { _ in RoundedRectangle(cornerRadius: Theme.Radius.sm).fill(Theme.surfaceElevated).frame(height: 64).redacted(reason: .placeholder) } }.padding()
     }
     private func seed(_ id: Int) -> BaseballGame? {
         guard let away = match.away.teamID.flatMap(Int.init), let home = match.home.teamID.flatMap(Int.init) else { return nil }

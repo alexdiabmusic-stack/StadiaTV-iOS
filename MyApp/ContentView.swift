@@ -23,21 +23,35 @@ struct MyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                #if os(tvOS)
-                if preferences.hasCompletedOnboarding {
-                    TVRootView()
-                } else {
-                    TVOnboardingView()
-                }
-                #else
-                if preferences.hasCompletedOnboarding {
-                    RootView()
-                } else {
-                    OnboardingView()
-                }
-                #endif
+            #if DEBUG || GUIDEBENCHMARK
+            if let guideBenchmarkDirectory = GuideBenchmark.requestedDirectory {
+                GuideBenchmarkRunnerView(directory: guideBenchmarkDirectory)
+            } else {
+                normalContent
             }
+            #else
+            normalContent
+            #endif
+        }
+    }
+
+    @ViewBuilder
+    private var normalContent: some View {
+        Group {
+            #if os(tvOS)
+            if preferences.hasCompletedOnboarding {
+                TVRootView()
+            } else {
+                TVOnboardingView()
+            }
+            #else
+            if preferences.hasCompletedOnboarding {
+                RootView()
+            } else {
+                OnboardingView()
+            }
+            #endif
+        }
             .environmentObject(playlistStore)
             .environmentObject(preferences)
             .environmentObject(watchStore)
@@ -92,9 +106,9 @@ struct MyApp: App {
             #endif
         }
     }
-}
 
 enum AppTab: String, Hashable {
+
     case home, following, live, discover, settings
 }
 
@@ -152,14 +166,15 @@ struct RootView: View {
         .environmentObject(streamStore)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: podcastStore.nowPlaying != nil)
         .task { updateFavoriteNotificationPrompt() }
+        .task { epgRepository.xtreamEPGFetcher = playlistStore.fetchXtreamEPG }
         .task { await liveViewModel.load(favoriteTeams: prefs.favoriteTeams) }
-        .task(id: playlistStore.playlists) { 
+        .task(id: playlistStore.playlists) {
             epgRepository.setupWithChannels(
                 playlistStore.allChannels,
                 customEPGURLs: playlistStore.playlists.compactMap(\.epgURL).compactMap(URL.init(string:))
             ) 
         }
-        .task(id: "\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.channelsRevision)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
+        .task(id: "\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.channelsRevision)-\(epgRepository.programmeRevision)") {
             await streamStore.scanDebounced(
                 matches: liveViewModel.allLive + liveViewModel.startingSoon,
                 channels: playlistStore.allChannels,

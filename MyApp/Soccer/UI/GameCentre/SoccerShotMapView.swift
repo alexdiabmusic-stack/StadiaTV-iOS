@@ -58,8 +58,8 @@ struct SoccerShotMapView: View {
     private var pitch: some View {
         GeometryReader { geometry in
             ZStack {
-                RoundedRectangle(cornerRadius: 12).fill(Color(red: 0.09, green: 0.32, blue: 0.15))
-                    .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.3)))
+                RoundedRectangle(cornerRadius: Theme.Radius.md).fill(Color(red: 0.09, green: 0.32, blue: 0.15))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).strokeBorder(.white.opacity(0.3)))
                     .overlay(Rectangle().fill(.white.opacity(0.3)).frame(width: 1))
                 ForEach(filteredShots) { shot in
                     marker(for: shot).position(position(for: shot, in: geometry.size))

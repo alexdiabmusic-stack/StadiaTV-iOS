@@ -414,8 +414,8 @@ struct SavedArticlesSettingsView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(28)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
             } else {
                 VStack(spacing: 0) {
                     ForEach(articleLibrary.savedArticles) { saved in
@@ -459,8 +459,8 @@ struct SavedArticlesSettingsView: View {
                         }
                     }
                 }
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
             }
 
             if !articleLibrary.mutedSources.isEmpty {
@@ -527,8 +527,8 @@ struct PrivacySyncSettingsView: View {
                     .foregroundStyle(Theme.textSecondary)
             }
             .padding(14)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
 
             SettingsPanel(title: "DATA CONTROLS") {
                 Button {
@@ -606,8 +606,8 @@ struct WatchHistorySettingsView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(28)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
             } else {
                 VStack(spacing: 0) {
                     ForEach(watchStore.history) { entry in
@@ -642,8 +642,8 @@ struct WatchHistorySettingsView: View {
                         }
                     }
                 }
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
 
                 Button(role: .destructive) {
                     showingClearConfirmation = true
@@ -653,8 +653,8 @@ struct WatchHistorySettingsView: View {
                         .foregroundStyle(.red)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
-                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
                 }
                 .buttonStyle(.plain)
             }
@@ -1519,7 +1519,7 @@ private struct AppearanceThemeCard: View {
         Button(action: action) {
             VStack(spacing: 8) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                         .fill(previewBackground)
                         .frame(height: 56)
 
@@ -1542,7 +1542,7 @@ private struct AppearanceThemeCard: View {
                     }
                 }
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                         .strokeBorder(isSelected ? Theme.accent : Theme.hairline, lineWidth: isSelected ? 1.5 : 0.5)
                 )
 
@@ -1755,9 +1755,9 @@ private struct SettingsPanel<Content: View>: View {
             VStack(spacing: 0) {
                 content
             }
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         }
     }
 }

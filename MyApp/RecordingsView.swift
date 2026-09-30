@@ -366,7 +366,7 @@ struct RecordingScheduleSheet: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
     }
 
     private var paddingSection: some View {
@@ -443,7 +443,7 @@ struct RecordingScheduleSheet: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(mode == .unavailable ? Theme.textSecondary : Theme.live,
-                        in: RoundedRectangle(cornerRadius: 12))
+                        in: RoundedRectangle(cornerRadius: Theme.Radius.md))
             .foregroundStyle(.white)
         }
         .buttonStyle(.plain)

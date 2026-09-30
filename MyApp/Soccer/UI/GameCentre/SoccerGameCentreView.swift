@@ -67,7 +67,7 @@ struct SoccerGameCentreView<WatchContent: View, RelatedContent: View>: View {
                         ForEach(availableTabs) { tab in
                             Button { fullRefresh = false; model.selectedTab = tab } label: {
                                 Text(tab.rawValue).font(.subheadline.bold()).padding(.horizontal, 12).frame(minHeight: 44)
-                                    .background(model.selectedTab == tab ? Theme.surfaceElevated : .clear, in: RoundedRectangle(cornerRadius: 8))
+                                    .background(model.selectedTab == tab ? Theme.surfaceElevated : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
                             }.buttonStyle(.bordered).accessibilityAddTraits(model.selectedTab == tab ? .isSelected : [])
                         }
                     }.padding(8)
@@ -163,6 +163,6 @@ struct SoccerGameCentreView<WatchContent: View, RelatedContent: View>: View {
     }
 
     private var loading: some View {
-        VStack(spacing: 18) { ForEach(0..<4, id: \.self) { _ in RoundedRectangle(cornerRadius: 8).fill(Theme.surfaceElevated).frame(height: 64).redacted(reason: .placeholder) } }.padding()
+        VStack(spacing: 18) { ForEach(0..<4, id: \.self) { _ in RoundedRectangle(cornerRadius: Theme.Radius.sm).fill(Theme.surfaceElevated).frame(height: 64).redacted(reason: .placeholder) } }.padding()
     }
 }

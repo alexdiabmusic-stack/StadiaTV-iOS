@@ -122,7 +122,7 @@ private struct TVArticleDetailView: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 480)
                         .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
                     }
 
                     Text(article.league.name.uppercased())
@@ -157,7 +157,7 @@ private struct TVArticleDetailView: View {
                         .foregroundStyle(Theme.textSecondary)
                         .padding(16)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                 }
                 .frame(maxWidth: 1000, alignment: .leading)
                 .padding(60)

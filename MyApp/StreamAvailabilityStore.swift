@@ -89,6 +89,7 @@ final class StreamAvailabilityStore: ObservableObject {
         if !channels.isEmpty {
             // Grouping every playlist channel by canonical ID is O(channels), so it runs off the main thread.
             let channelToCanonical = epgRepository.channelToCanonicalMap
+            let guideIndex = epgRepository.guideIdToProviderChannelIds
             let canonicalToChannels: [String: [Channel]] = await Task.detached(priority: .utility) {
                 var grouped: [String: [Channel]] = [:]
                 for channel in channels {
@@ -97,6 +98,11 @@ final class StreamAvailabilityStore: ObservableObject {
                     }
                 }
                 return grouped
+            }.value
+            // Built once per scan cycle, not once per match — teamNameBackups uses this
+            // instead of re-scanning every channel for every match.
+            let nameIndex = await Task.detached(priority: .utility) {
+                ChannelNameIndex(channels: channels)
             }.value
             guard !Task.isCancelled else { return }
 
@@ -142,11 +148,14 @@ final class StreamAvailabilityStore: ObservableObject {
                         var primarySources: [RankedSource] = []
                         var primaryIds = Set<String>()
                         for (canonicalId, join) in er.bestJoinByCanonical {
-                            // See MatchDetailView.rankSources(): a scoped programme only
-                            // confirms the one mirror/feed it names, not the whole canonical group.
-                            let scopedId = join.programme.scopedProviderChannelId
+                            // See MatchDetailView.rankSources(): only confirm streams that
+                            // actually declare this programme's guide ID — a canonical
+                            // channel can merge several mirrors that don't share content.
+                            // nil means no stream in the group declared any guide ID at
+                            // all, so there's no positive evidence to restrict against.
+                            let sharingGuideId = guideIndex[join.programme.epgChannelId.lowercased()]
                             for channel in (er.canonicalToChannels[canonicalId] ?? []) {
-                                guard scopedId == nil || scopedId == channel.id else { continue }
+                                guard sharingGuideId?.contains(channel.id) ?? true else { continue }
                                 guard SourceMatcher.isEligible(channel: channel, for: m) else { continue }
                                 var source = RankedSource(channel: channel, score: 100 + Int(join.titleSimilarity * 50))
                                 source.evidenceCategories = [.guideListsMatch]
@@ -157,7 +166,7 @@ final class StreamAvailabilityStore: ObservableObject {
                             }
                         }
                         primarySources.sort(by: SourceMatcher.ranksBefore)
-                        let backups = SourceMatcher.teamNameBackups(match: m, channels: chans, excludeIds: primaryIds)
+                        let backups = SourceMatcher.teamNameBackups(match: m, channels: chans, excludeIds: primaryIds, index: nameIndex)
                         return (m.id, primarySources + backups)
                     }
                 }

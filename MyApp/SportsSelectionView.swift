@@ -143,11 +143,11 @@ private struct SportCard: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                     .fill(isSelected ? Theme.accent.opacity(0.08) : Theme.surface)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                     .strokeBorder(
                         isSelected ? Theme.accent.opacity(0.6) : Theme.hairline,
                         lineWidth: isSelected ? 1.5 : 1
@@ -229,7 +229,7 @@ private struct LeagueExpansionDrawer: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
     }
 }
 
@@ -328,6 +328,6 @@ private struct LeagueSearchField: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Theme.background, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(Theme.background, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
     }
 }

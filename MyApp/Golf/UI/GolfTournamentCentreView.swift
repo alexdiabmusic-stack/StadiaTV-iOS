@@ -99,7 +99,7 @@ struct GolfTournamentCentreView<WatchContent: View, RelatedContent: View>: View 
                         Text(item.rawValue)
                             .font(.subheadline.bold())
                             .padding(.horizontal, 12).padding(.vertical, 8)
-                            .background(tab == item ? Theme.surfaceElevated : .clear, in: RoundedRectangle(cornerRadius: 8))
+                            .background(tab == item ? Theme.surfaceElevated : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
                             .overlay(alignment: .bottom) { if tab == item { Capsule().fill(Theme.accessibleAccent).frame(height: 3) } }
                     }
                     .buttonStyle(.plain)

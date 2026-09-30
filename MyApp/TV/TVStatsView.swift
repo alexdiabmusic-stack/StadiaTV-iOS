@@ -110,7 +110,7 @@ struct TVStatsView: View {
                         .padding(.vertical, 12)
                         .background(
                             selectedLeague == league ? Theme.accent.opacity(0.9) : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                         )
                     }
                     .buttonStyle(.plain)

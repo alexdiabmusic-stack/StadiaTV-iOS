@@ -61,7 +61,7 @@ struct GolfTournamentHeaderView: View {
             }
         }
         .padding(16)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
     }
 
     @ViewBuilder

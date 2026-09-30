@@ -31,9 +31,13 @@ struct TVPlayerView: View {
     @State private var isScoreDismissed = false
 
     private var canStartMultiscreen: Bool {
-        playlistStore.channelsByPlaylist.values.contains { channels in
+        let hasOtherChannels = playlistStore.channelsByPlaylist.values.contains { channels in
             channels.contains { $0.id != channel.id }
         }
+        guard hasOtherChannels else { return false }
+        // A single-connection (or unknown-limit) Xtream account can't safely open a
+        // second stream on top of the one already playing.
+        return !playlistStore.xtreamAccountStatus.blocksAdditionalConnection(forPlaylistID: channel.playlistID)
     }
 
     var body: some View {
@@ -190,7 +194,7 @@ struct TVPlayerView: View {
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 16).padding(.vertical, 10)
-                    .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                 }
                 .buttonStyle(.card)
 
@@ -204,7 +208,7 @@ struct TVPlayerView: View {
                         .lineLimit(1)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 10)
-                .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
 
                 Spacer()
 
@@ -241,7 +245,7 @@ struct TVPlayerView: View {
                             .font(.headline.weight(.semibold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 20).padding(.vertical, 12)
-                            .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                     }
                     .buttonStyle(.card)
                 }
@@ -251,7 +255,7 @@ struct TVPlayerView: View {
                             .font(.headline.weight(.semibold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 20).padding(.vertical, 12)
-                            .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                     }
                     .buttonStyle(.card)
                 }

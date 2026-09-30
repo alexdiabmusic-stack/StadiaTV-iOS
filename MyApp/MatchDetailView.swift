@@ -210,7 +210,7 @@ struct MatchDetailView: View {
         .task(id: match.id) {
             matchNews = (try? await SportsRepository.shared.legacyNews(for: match.league, limit: 5)) ?? []
         }
-        .task(id: "\(match.id)-\(playlists.channelsRevision)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
+        .task(id: "\(match.id)-\(playlists.channelsRevision)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))-\(epgRepository.programmeRevision)") {
             await rankSources()
         }
         // A launch-time or Following-tab background scan can finish confirming this match's
@@ -281,12 +281,12 @@ struct MatchDetailView: View {
         var primaryIds = Set<String>()
         for (canonicalId, join) in bestJoinByCanonical {
             // A canonical channel can merge several mirrors/feeds that don't actually
-            // share content. A scoped programme (exact tvg-id match from a playlist's
-            // own EPG) only confirms the one stream it names — not every stream
-            // grouped under the same canonical identity.
-            let scopedId = join.programme.scopedProviderChannelId
+            // share content — only confirm streams that actually declare this
+            // programme's guide ID. nil means no stream in the group declared any
+            // guide ID at all, so there's no positive evidence to restrict against.
+            let sharingGuideId = epgRepository.providerChannelIds(forGuideId: join.programme.epgChannelId)
             for channel in (canonicalToChannels[canonicalId] ?? []) {
-                guard scopedId == nil || scopedId == channel.id else { continue }
+                guard sharingGuideId?.contains(channel.id) ?? true else { continue }
                 guard SourceMatcher.isEligible(channel: channel, for: match) else { continue }
                 var source = RankedSource(channel: channel, score: 100 + Int(join.titleSimilarity * 50))
                 source.evidenceCategories = [.guideListsMatch]
@@ -431,8 +431,8 @@ struct MatchDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(16)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     @ViewBuilder
@@ -490,8 +490,8 @@ struct MatchDetailView: View {
                 }
             }
             .padding(14)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
         }
     }
 
@@ -640,7 +640,7 @@ struct MatchDetailView: View {
                         showPaywall: $showPaywall
                     )
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             }
         }
     }
@@ -716,8 +716,8 @@ struct MatchDetailView: View {
         }
         .padding(.horizontal, 14)
         .padding(.bottom, 6)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     private func gameLeaders(_ leaders: [GameSummary.GameLeader]) -> some View {
@@ -753,8 +753,8 @@ struct MatchDetailView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 4)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     // MARK: Scoring / Play by Play
@@ -782,8 +782,8 @@ struct MatchDetailView: View {
                         }
                     }
                 }
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
             }
         }
     }
@@ -814,7 +814,7 @@ struct MatchDetailView: View {
                         showPaywall: $showPaywall
                     )
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             }
         }
     }
@@ -876,8 +876,8 @@ struct MatchDetailView: View {
                 }
             }
             .padding(16)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.hairline))
             .overlay(alignment: .top) {
                 if showPickCelebration, let pts = existing?.pointsEarned, pts > 0 {
                     HStack(spacing: 6) {
@@ -930,7 +930,7 @@ struct MatchDetailView: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
-            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(Theme.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(match.state != .pre)
@@ -962,8 +962,8 @@ struct MatchDetailView: View {
                 .padding(.horizontal, 8)
             }
             .padding(16)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.hairline))
         }
     }
 
@@ -1022,7 +1022,7 @@ struct MatchDetailView: View {
                     showPaywall: $showPaywall
                 )
             }
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         }
     }
 
@@ -1100,8 +1100,8 @@ struct MatchDetailView: View {
             .foregroundStyle(Theme.textSecondary)
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
         } else if isLoadingGameSummary && !didAttemptGameSummaryLoad {
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small).tint(Theme.accent)
@@ -1130,8 +1130,8 @@ struct MatchDetailView: View {
             .tint(Theme.accent)
         }
         .padding(14)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     private var gameCenterStandingsTab: some View {
@@ -1181,8 +1181,8 @@ struct MatchDetailView: View {
                 }
             }
             .padding(14)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
         }
     }
 
@@ -1245,7 +1245,7 @@ struct MatchDetailView: View {
                             }
                         }
                     }
-                    .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
 
                     if filteredAthletes.count > 5 {
                         Button {
@@ -1260,7 +1260,7 @@ struct MatchDetailView: View {
                             }
                             .foregroundStyle(Theme.accent)
                             .padding(12)
-                            .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                            .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                         }
                         .buttonStyle(.plain)
                     }
@@ -1409,13 +1409,13 @@ struct MatchDetailView: View {
                                       y: player.point.y * proxy.size.height)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
             }
         }
 
         private var fieldBackground: some View {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                 .fill(backgroundColor)
         }
 
@@ -1462,7 +1462,7 @@ struct MatchDetailView: View {
                     .background(Theme.accent, in: Circle())
                     .overlay(Circle().strokeBorder(.white.opacity(0.45)))
                 Text(label)
-                    .font(.system(size: 8, weight: .heavy))
+                    .font(.system(size: 8, weight: .bold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -1684,7 +1684,7 @@ struct MatchDetailView: View {
                     .font(.headline)
                     .foregroundStyle(Theme.accent)
                     .frame(width: 34, height: 34)
-                    .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                 Text(title)
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
@@ -1696,7 +1696,7 @@ struct MatchDetailView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(10)
-            .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         }
         .buttonStyle(.plain)
     }
@@ -1711,7 +1711,7 @@ struct MatchDetailView: View {
                     .font(.headline)
                     .foregroundStyle(Theme.accent)
                     .frame(width: 40, height: 40)
-                    .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.subheadline.weight(.semibold))
@@ -1728,8 +1728,8 @@ struct MatchDetailView: View {
                     .foregroundStyle(Theme.textSecondary)
             }
             .padding(12)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
         }
         .buttonStyle(.plain)
     }
@@ -1754,8 +1754,8 @@ struct MatchDetailView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(14)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
             } else if let top = rankedSources.first {
                 Button { handleSourceTap(top.channel) } label: {
                     VStack(alignment: .leading, spacing: 4) {
@@ -1789,8 +1789,8 @@ struct MatchDetailView: View {
                                 .foregroundStyle(Theme.textSecondary)
                         }
                         .padding(12)
-                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
                     }
                     .buttonStyle(.plain)
                 }
@@ -1800,8 +1800,8 @@ struct MatchDetailView: View {
                     .foregroundStyle(Theme.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
             }
         }
         .sheet(isPresented: $isShowingMoreSources) { moreSourcesSheet }
@@ -1901,8 +1901,8 @@ struct MatchDetailView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(20)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     /// Maps an ESPN broadcast network name to where it streams online. Matching
@@ -1973,8 +1973,8 @@ struct MatchDetailView: View {
                 }
             }
             .padding(14)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
         }
     }
 }
@@ -2030,14 +2030,14 @@ struct MatchStandingsPreview: View {
                     Spacer()
                 }
                 .padding(14)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             } else if previewRows.isEmpty {
                 Text("Standings are not available for this league right now.")
                     .font(.callout)
                     .foregroundStyle(Theme.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             } else {
                 VStack(spacing: 0) {
                     standingsHeader
@@ -2048,8 +2048,8 @@ struct MatchStandingsPreview: View {
                         }
                     }
                 }
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
             }
         }
         .task { await load() }
@@ -2168,7 +2168,7 @@ private struct SourceRow: View {
                     }
                 }
                 .frame(width: 40, height: 40)
-                .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(name)
@@ -2187,8 +2187,8 @@ private struct SourceRow: View {
                 trailingIcon
             }
             .padding(12)
-            .background(rowBackground, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(rowBorder, lineWidth: 1))
+            .background(rowBackground, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(rowBorder, lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
@@ -2348,8 +2348,8 @@ private struct PlayByPlaySectionView: View {
                         }
                     }
                 }
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
 
                 if plays.count > 20 {
                     Button {
@@ -2364,7 +2364,7 @@ private struct PlayByPlaySectionView: View {
                         }
                         .foregroundStyle(Theme.accent)
                         .padding(12)
-                        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
@@ -2794,7 +2794,7 @@ private struct MLBEventBadge: View {
 
     var body: some View {
         Text(badge)
-            .font(.system(size: badge.count > 2 ? 8.5 : 10, weight: .heavy, design: .rounded))
+            .font(.system(size: badge.count > 2 ? 8.5 : 10, weight: .bold, design: .rounded))
             .foregroundStyle(tier == 3 ? badgeColor : badgeColor.opacity(0.9))
             .padding(.horizontal, badge.count > 2 ? 4 : 5)
             .padding(.vertical, 3)
@@ -2842,7 +2842,7 @@ struct HighlightCard: View {
                 }
             }
             .frame(width: 200, height: 112)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             .overlay(alignment: .bottomTrailing) {
                 Image(systemName: "play.circle.fill")
                     .font(.title3)

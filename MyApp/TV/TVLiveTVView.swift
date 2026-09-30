@@ -118,7 +118,7 @@ struct TVLiveTVView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
-            .background(selected ? Theme.accent.opacity(0.9) : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .background(selected ? Theme.accent.opacity(0.9) : Color.clear, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         }
         .buttonStyle(.plain)
     }

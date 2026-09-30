@@ -1018,7 +1018,7 @@ struct PlayerView: View {
         var bestMatch: Match?
         var bestScore = 0
         for match in uniqueCandidates {
-            let score = matchCandidateScore(match, channel: channel, programme: programme)
+            let score = await matchCandidateScore(match, channel: channel, programme: programme)
             if score > bestScore {
                 bestScore = score
                 bestMatch = match
@@ -1061,8 +1061,13 @@ struct PlayerView: View {
         return nil
     }
 
-    private func matchCandidateScore(_ match: Match, channel: Channel, programme: EPGProgramme?) -> Int {
-        var score = SourceMatcher.rank(match: match, channels: [channel], preferredLanguages: prefs.preferredStreamLanguages).first?.score ?? 0
+    private func matchCandidateScore(_ match: Match, channel: Channel, programme: EPGProgramme?) async -> Int {
+        var score = 0
+        if let stores {
+            score = await stores.streamStore.confidenceScore(
+                match: match, channel: channel, channels: stores.playlistStore.allChannels, epgRepository: stores.epgRepository
+            )
+        }
         let programmeText = [programme?.title, programme?.subtitle, programme?.description, programme?.categories.joined(separator: " ")]
             .compactMap { $0 }
             .joined(separator: " ")
@@ -3664,6 +3669,8 @@ private struct PlayerMultiscreenPicker: View {
     let startAction: () -> Void
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var prefs: PreferencesStore
+    @EnvironmentObject private var epgRepository: EPGRepository
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
 
     @State private var liveEntries: [LiveMatchEntry] = []
     @State private var isLoadingLive = true
@@ -3874,23 +3881,24 @@ private struct PlayerMultiscreenPicker: View {
         let channels = allChannels
         liveEntries = []
 
-        await withTaskGroup(of: [LiveMatchEntry].self) { group in
+        var liveMatches: [Match] = []
+        await withTaskGroup(of: [Match].self) { group in
             for league in leagues {
                 group.addTask {
                     let matches = (try? await SportsRepository.shared.legacyScoreboard(for: league)) ?? []
-                    return matches.compactMap { match in
-                        guard match.state == .live else { return nil }
-                        let sources = Array(SourceMatcher.rank(match: match, channels: channels).prefix(4))
-                        return LiveMatchEntry(match: match, sources: sources)
-                    }
+                    return matches.filter { $0.state == .live }
                 }
             }
-
-            for await entries in group where !entries.isEmpty {
-                liveEntries.append(contentsOf: entries)
-                liveEntries.sort(by: liveEntrySort)
-            }
+            for await matches in group { liveMatches.append(contentsOf: matches) }
         }
+
+        // One batched link pass for every live match, instead of scoring each one
+        // independently — the linker builds its playlist index once and reuses it.
+        await streamStore.scan(matches: liveMatches, channels: channels, epgRepository: epgRepository)
+        liveEntries = liveMatches.map { match in
+            LiveMatchEntry(match: match, sources: streamStore.topRanked(for: match.id, limit: 4))
+        }
+        liveEntries.sort(by: liveEntrySort)
         isLoadingLive = false
     }
 

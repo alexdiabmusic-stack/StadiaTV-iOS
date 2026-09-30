@@ -1,0 +1,1537 @@
+[
+ {
+  "id": "401911182",
+  "name": "Iran at Russia",
+  "date": "2026-09-29T16:00Z",
+  "league": "soccer/fifa.friendly",
+  "options": []
+ },
+ {
+  "id": "401861089",
+  "name": "Belarus at Finland",
+  "date": "2026-09-29T16:00Z",
+  "league": "soccer/uefa.nations",
+  "options": [
+   {
+    "key": "g:foxsports2.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:fox",
+    "streams": 1
+   },
+   {
+    "key": "g:cytavisionsports3.cy",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "GR:cytavision",
+    "streams": 1
+   },
+   {
+    "key": "g:espn2.ar",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "AR:argentina",
+    "streams": 1
+   },
+   {
+    "key": "g:novasportsextra1.gr",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "GR:nova",
+    "streams": 1
+   },
+   {
+    "key": "g:bein_sports5_digital_mono.bi-ar",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "BI-AR:bein",
+    "streams": 7
+   },
+   {
+    "key": "g:polsatsport1.pl",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "PL:polsat",
+    "streams": 2
+   }
+  ]
+ },
+ {
+  "id": "401861090",
+  "name": "Faroe Islands at Moldova",
+  "date": "2026-09-29T16:00Z",
+  "league": "soccer/uefa.nations",
+  "options": [
+   {
+    "key": "g:foxsoccerplus.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:fox",
+    "streams": 1
+   },
+   {
+    "key": "g:ziggosport.nl",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "NL:ziggo",
+    "streams": 3
+   },
+   {
+    "key": "g:bein_sports6_digital_mono.bi-ar",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "BI-AR:bein",
+    "streams": 7
+   },
+   {
+    "key": "g:diemasport2.bg",
+    "tier": "T1",
+    "conf": 0.75,
+    "family": "BG:diema",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "mlb849845",
+  "name": "Philadelphia Phillies at Atlanta Braves",
+  "date": "2026-09-29T18:00Z",
+  "league": "baseball/mlb",
+  "options": [
+   {
+    "key": "n:95699",
+    "tier": "T4",
+    "conf": 0.85,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "t:95724",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "t:95742",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:mlb",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "401861083",
+  "name": "Estonia at Bulgaria",
+  "date": "2026-09-29T18:45Z",
+  "league": "soccer/uefa.nations",
+  "options": [
+   {
+    "key": "g:bein_sports8_digital_mono.bi-ar",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "BI-AR:bein",
+    "streams": 7
+   }
+  ]
+ },
+ {
+  "id": "401861092",
+  "name": "England at Czechia",
+  "date": "2026-09-29T18:45Z",
+  "league": "soccer/uefa.nations",
+  "options": [
+   {
+    "key": "g:itv1london.uk",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "UK:itv",
+    "streams": 1
+   },
+   {
+    "key": "g:cytavisionsports3.cy",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "GR:cytavision",
+    "streams": 1
+   },
+   {
+    "key": "g:stv.uk",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "UK:stv",
+    "streams": 1
+   },
+   {
+    "key": "g:ziggosport3.nl",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "NL:ziggo",
+    "streams": 3
+   },
+   {
+    "key": "g:sporttv2.pt",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "PT:sport",
+    "streams": 2
+   },
+   {
+    "key": "g:bein_sports3_digital_mono.bi-ar",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "BI-AR:bein",
+    "streams": 7
+   }
+  ]
+ },
+ {
+  "id": "401861086",
+  "name": "Iceland at Luxembourg",
+  "date": "2026-09-29T18:45Z",
+  "league": "soccer/uefa.nations",
+  "options": [
+   {
+    "key": "g:diemasport.bg",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "BG:diema",
+    "streams": 1
+   },
+   {
+    "key": "g:bein_sports5_digital_mono.bi-ar",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "BI-AR:bein",
+    "streams": 7
+   }
+  ]
+ },
+ {
+  "id": "401861088",
+  "name": "Albania at San Marino",
+  "date": "2026-09-29T18:45Z",
+  "league": "soccer/uefa.nations",
+  "options": [
+   {
+    "key": "g:bein_sports9_digital_mono.bi-ar",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "BI-AR:bein",
+    "streams": 7
+   }
+  ]
+ },
+ {
+  "id": "401861091",
+  "name": "Switzerland at Scotland",
+  "date": "2026-09-29T18:45Z",
+  "league": "soccer/uefa.nations",
+  "options": [
+   {
+    "key": "g:rsila2.it",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "IT:rsi",
+    "streams": 2
+   },
+   {
+    "key": "g:rsila2.ch",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CH:rsi",
+    "streams": 1
+   },
+   {
+    "key": "g:srfzwei.ch",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CH:srf",
+    "streams": 1
+   },
+   {
+    "key": "g:rts2.ch",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "FR:rts",
+    "streams": 3
+   },
+   {
+    "key": "g:fubosportsnetwork.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:fubo",
+    "streams": 1
+   },
+   {
+    "key": "g:bbctwo.uk",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "UK:bbc",
+    "streams": 2
+   },
+   {
+    "key": "g:bbcscotland.uk",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "UK:bbc",
+    "streams": 1
+   },
+   {
+    "key": "g:bbctwo.nl",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "NL:bbc",
+    "streams": 2
+   },
+   {
+    "key": "g:cytavisionsports6.cy",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "GR:cytavision",
+    "streams": 1
+   },
+   {
+    "key": "g:bein_sports4_digital_mono.bi-ar",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "BI-AR:bein",
+    "streams": 7
+   }
+  ]
+ },
+ {
+  "id": "401861085",
+  "name": "Kazakhstan at Slovakia",
+  "date": "2026-09-29T18:45Z",
+  "league": "soccer/uefa.nations",
+  "options": [
+   {
+    "key": "g:bein_sports7_digital_mono.bi-ar",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "BI-AR:bein",
+    "streams": 7
+   }
+  ]
+ },
+ {
+  "id": "401861087",
+  "name": "North Macedonia at Slovenia",
+  "date": "2026-09-29T18:45Z",
+  "league": "soccer/uefa.nations",
+  "options": [
+   {
+    "key": "g:foxsports2.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:fox",
+    "streams": 1
+   },
+   {
+    "key": "g:novasportsextra2.gr",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "GR:nova",
+    "streams": 1
+   },
+   {
+    "key": "g:sporttv5.pt",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "PT:sport",
+    "streams": 2
+   }
+  ]
+ },
+ {
+  "id": "401861084",
+  "name": "Croatia at Spain",
+  "date": "2026-09-29T18:45Z",
+  "league": "soccer/uefa.nations",
+  "options": [
+   {
+    "key": "g:foxsports1.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:fox",
+    "streams": 1
+   },
+   {
+    "key": "g:skysportarena.it",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "IT:sky",
+    "streams": 2
+   },
+   {
+    "key": "g:cytavisionsports4.cy",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "GR:cytavision",
+    "streams": 1
+   },
+   {
+    "key": "g:espn.ar",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "AR:argentina",
+    "streams": 1
+   },
+   {
+    "key": "g:ziggosport2.nl",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "NL:ziggo",
+    "streams": 3
+   },
+   {
+    "key": "g:mediaset20.it",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "IT:mediaset",
+    "streams": 1
+   },
+   {
+    "key": "g:novasportsextra1.gr",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "GR:nova",
+    "streams": 1
+   },
+   {
+    "key": "g:bein_sports2_digital_mono.bi-ar",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "BI-AR:bein",
+    "streams": 7
+   },
+   {
+    "key": "g:polsatsport1.pl",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "PL:polsat",
+    "streams": 2
+   },
+   {
+    "key": "g:tvpsport.pl",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "PL:tvp",
+    "streams": 2
+   },
+   {
+    "key": "r:1363446",
+    "tier": "T5",
+    "conf": 0.6,
+    "family": "US:fox",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "401900609",
+  "name": "Turks and Caicos Islands at British Virgin Islands",
+  "date": "2026-09-29T19:00Z",
+  "league": "soccer/concacaf.nations.league",
+  "options": [
+   {
+    "key": "g:foxsoccerplus.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:fox",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "401900606",
+  "name": "Bahamas at US Virgin Islands",
+  "date": "2026-09-29T20:00Z",
+  "league": "soccer/concacaf.nations.league",
+  "options": []
+ },
+ {
+  "id": "401877965",
+  "name": "Independiente Santa Fe at Deportivo Pereira",
+  "date": "2026-09-29T20:30Z",
+  "league": "soccer/col.1",
+  "options": []
+ },
+ {
+  "id": "mlb849849",
+  "name": "Chicago White Sox at Houston Astros",
+  "date": "2026-09-29T21:00Z",
+  "league": "baseball/mlb",
+  "options": [
+   {
+    "key": "n:95700",
+    "tier": "T4",
+    "conf": 0.85,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "t:95735",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "t:95744",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:mlb",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "401900607",
+  "name": "Sint Maarten at French Guiana",
+  "date": "2026-09-29T21:00Z",
+  "league": "soccer/concacaf.nations.league",
+  "options": [
+   {
+    "key": "g:foxsports2.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:fox",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "nhl2026020001",
+  "name": "Florida Panthers at Carolina Hurricanes",
+  "date": "2026-09-29T21:00Z",
+  "league": "hockey/nhl",
+  "options": [
+   {
+    "key": "g:espn.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:espn",
+    "streams": 2
+   },
+   {
+    "key": "g:premiersports1.uk",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "UK:premier",
+    "streams": 2
+   },
+   {
+    "key": "g:espn3.nl",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "NL:espn",
+    "streams": 3
+   },
+   {
+    "key": "g:skysportmix.de",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "DE:sky",
+    "streams": 2
+   },
+   {
+    "key": "g:skysporttopevent.de",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "DE:sky",
+    "streams": 4
+   },
+   {
+    "key": "g:sporttv2.pt",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "PT:sport",
+    "streams": 2
+   },
+   {
+    "key": "g:beinsports1.fr",
+    "tier": "T2",
+    "conf": 0.72,
+    "family": "FR:bein",
+    "streams": 4
+   },
+   {
+    "key": "t:877815",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:carolina",
+    "streams": 1
+   },
+   {
+    "key": "t:877829",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:florida",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "401918018",
+  "name": "Las Vegas Aces at Indiana Fever",
+  "date": "2026-09-29T22:30Z",
+  "league": "basketball/wnba",
+  "options": []
+ },
+ {
+  "id": "401860360",
+  "name": "Ponte Preta at Botafogo-SP",
+  "date": "2026-09-29T22:30Z",
+  "league": "soccer/bra.2",
+  "options": []
+ },
+ {
+  "id": "401900608",
+  "name": "Aruba at Anguilla",
+  "date": "2026-09-29T23:00Z",
+  "league": "soccer/concacaf.nations.league",
+  "options": [
+   {
+    "key": "g:foxsports2.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:fox",
+    "streams": 1
+   },
+   {
+    "key": "g:onesoccer.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:one",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "nhl2026020002",
+  "name": "Montréal Canadiens at Toronto Maple Leafs",
+  "date": "2026-09-29T23:00Z",
+  "league": "hockey/nhl",
+  "options": [
+   {
+    "key": "g:tvasports.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CAF:tva",
+    "streams": 1
+   },
+   {
+    "key": "g:sportsnetontario.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:sportsnet",
+    "streams": 2
+   },
+   {
+    "key": "g:sportsneteast.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:sportsnet",
+    "streams": 2
+   },
+   {
+    "key": "g:sportsnetpacific.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:sportsnet",
+    "streams": 2
+   },
+   {
+    "key": "g:sportsnetwest.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:sportsnet",
+    "streams": 2
+   },
+   {
+    "key": "g:premiersports2.uk",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "UK:premier",
+    "streams": 2
+   },
+   {
+    "key": "t:877835",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:montreal",
+    "streams": 1
+   },
+   {
+    "key": "t:877859",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:toronto",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "mlb849851",
+  "name": "Boston Red Sox at New York Yankees",
+  "date": "2026-09-30T00:00Z",
+  "league": "baseball/mlb",
+  "options": [
+   {
+    "key": "g:bostonredsox.mlb",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "g:newyorkyankees.mlb",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "n:95701",
+    "tier": "T4",
+    "conf": 0.85,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "g:sportsgrid.us",
+    "tier": "T6",
+    "conf": 0.35,
+    "family": "US:sports",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "401905189",
+  "name": "Chile at United States",
+  "date": "2026-09-30T00:00Z",
+  "league": "soccer/fifa.friendly",
+  "options": [
+   {
+    "key": "g:universo.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:nbc",
+    "streams": 2
+   },
+   {
+    "key": "g:trutv.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:tru",
+    "streams": 1
+   },
+   {
+    "key": "g:tnt.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:tnt",
+    "streams": 1
+   },
+   {
+    "key": "g:tntpacific.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:tnt",
+    "streams": 1
+   },
+   {
+    "key": "g:trutvpacific.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:tru",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "nhl2026020003",
+  "name": "New York Rangers at Boston Bruins",
+  "date": "2026-09-30T00:00Z",
+  "league": "hockey/nhl",
+  "options": [
+   {
+    "key": "g:espn.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:espn",
+    "streams": 2
+   },
+   {
+    "key": "g:espn3.ar",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "AR:argentina",
+    "streams": 1
+   },
+   {
+    "key": "g:espn3.nl",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "NL:espn",
+    "streams": 3
+   },
+   {
+    "key": "t:877809",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:boston",
+    "streams": 1
+   },
+   {
+    "key": "t:877843",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:new",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "401918017",
+  "name": "Minnesota Lynx at New York Liberty",
+  "date": "2026-09-30T00:30Z",
+  "league": "basketball/wnba",
+  "options": [
+   {
+    "key": "g:tsn3.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:tsn",
+    "streams": 2
+   },
+   {
+    "key": "g:tsn4.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:tsn",
+    "streams": 2
+   },
+   {
+    "key": "g:tsn5.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:tsn",
+    "streams": 2
+   },
+   {
+    "key": "g:usanetwork.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:usa",
+    "streams": 2
+   },
+   {
+    "key": "g:cnbc.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:cnbc",
+    "streams": 2
+   },
+   {
+    "key": "g:skysport2.de",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "DE:sky",
+    "streams": 3
+   },
+   {
+    "key": "g:skysporttopevent.de",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "DE:sky",
+    "streams": 4
+   }
+  ]
+ },
+ {
+  "id": "401877876",
+  "name": "Millonarios at Independiente Medellín",
+  "date": "2026-09-30T01:05Z",
+  "league": "soccer/col.1",
+  "options": []
+ },
+ {
+  "id": "mlb849843",
+  "name": "Chicago Cubs at San Diego Padres",
+  "date": "2026-09-30T02:00Z",
+  "league": "baseball/mlb",
+  "options": [
+   {
+    "key": "g:sandiegopadres.mlb",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "g:chicagocubs.mlb",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "n:95702",
+    "tier": "T4",
+    "conf": 0.85,
+    "family": "US:mlb",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "401900605",
+  "name": "St. Vincent and the Grenadines at Belize",
+  "date": "2026-09-30T02:00Z",
+  "league": "soccer/concacaf.nations.league",
+  "options": [
+   {
+    "key": "g:foxsports2.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:fox",
+    "streams": 1
+   },
+   {
+    "key": "g:onesoccer.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:one",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "nhl2026020004",
+  "name": "Vancouver Canucks at Edmonton Oilers",
+  "date": "2026-09-30T02:00Z",
+  "league": "hockey/nhl",
+  "options": [
+   {
+    "key": "g:sportsnetontario.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:sportsnet",
+    "streams": 2
+   },
+   {
+    "key": "g:sportsneteast.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:sportsnet",
+    "streams": 2
+   },
+   {
+    "key": "g:sportsnetpacific.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:sportsnet",
+    "streams": 2
+   },
+   {
+    "key": "g:sportsnetwest.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:sportsnet",
+    "streams": 2
+   },
+   {
+    "key": "g:premiersports2.uk",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "UK:premier",
+    "streams": 2
+   },
+   {
+    "key": "g:skysportmix.de",
+    "tier": "T1",
+    "conf": 0.8,
+    "family": "DE:sky",
+    "streams": 2
+   },
+   {
+    "key": "t:877827",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:edmonton",
+    "streams": 1
+   },
+   {
+    "key": "t:877861",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:vancouver",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "401903234",
+  "name": "Peru at Mexico",
+  "date": "2026-09-30T02:30Z",
+  "league": "soccer/fifa.friendly",
+  "options": [
+   {
+    "key": "g:univisionkuve.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:univision",
+    "streams": 1
+   },
+   {
+    "key": "g:univisionkmex.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:univision",
+    "streams": 1
+   },
+   {
+    "key": "g:univisionkuvs.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:univision",
+    "streams": 1
+   },
+   {
+    "key": "g:univisionkdtv.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:univision",
+    "streams": 1
+   },
+   {
+    "key": "g:univisionwltv.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:univision",
+    "streams": 1
+   },
+   {
+    "key": "g:univisionwuvg.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:univision",
+    "streams": 1
+   },
+   {
+    "key": "g:univisionwgbo.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:univision",
+    "streams": 1
+   },
+   {
+    "key": "g:univisionwxtv.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:univision",
+    "streams": 1
+   },
+   {
+    "key": "g:univisionkuvn.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:univision",
+    "streams": 1
+   },
+   {
+    "key": "g:univisionkxln.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:univision",
+    "streams": 1
+   },
+   {
+    "key": "g:univisionkwex.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:univision",
+    "streams": 1
+   },
+   {
+    "key": "g:univision.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:univision",
+    "streams": 2
+   }
+  ]
+ },
+ {
+  "id": "nhl2026020005",
+  "name": "Chicago Blackhawks at Vegas Golden Knights",
+  "date": "2026-09-30T02:30Z",
+  "league": "hockey/nhl",
+  "options": [
+   {
+    "key": "g:espn.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:espn",
+    "streams": 2
+   },
+   {
+    "key": "g:tvasports.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CAF:tva",
+    "streams": 1
+   },
+   {
+    "key": "g:espn3.nl",
+    "tier": "T1",
+    "conf": 0.92,
+    "family": "NL:espn",
+    "streams": 3
+   },
+   {
+    "key": "t:877817",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:chicago",
+    "streams": 1
+   },
+   {
+    "key": "t:877863",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:vegas",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "401922308",
+  "name": "Solomon Islands at Papua New Guinea",
+  "date": "2026-09-30T04:00Z",
+  "league": "soccer/fifa.friendly",
+  "options": []
+ },
+ {
+  "id": "401922307",
+  "name": "New Caledonia at Fiji",
+  "date": "2026-09-30T07:00Z",
+  "league": "soccer/fifa.friendly",
+  "options": []
+ },
+ {
+  "id": "401917065",
+  "name": "Sri Lanka at Seychelles",
+  "date": "2026-09-30T13:00Z",
+  "league": "soccer/fifa.friendly",
+  "options": []
+ },
+ {
+  "id": "401922621",
+  "name": "Mozambique at Botswana",
+  "date": "2026-09-30T14:00Z",
+  "league": "soccer/fifa.friendly",
+  "options": []
+ },
+ {
+  "id": "401899825",
+  "name": "Andorra at Lithuania",
+  "date": "2026-09-30T16:00Z",
+  "league": "soccer/fifa.friendly",
+  "options": [
+   {
+    "key": "g:foxsoccerplus.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:fox",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "mlb849841",
+  "name": "Philadelphia Phillies at Atlanta Braves",
+  "date": "2026-09-30T18:00Z",
+  "league": "baseball/mlb",
+  "options": [
+   {
+    "key": "n:95699",
+    "tier": "T4",
+    "conf": 0.85,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "t:95724",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "t:95742",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:mlb",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "401912455",
+  "name": "Djibouti at Mauritius",
+  "date": "2026-09-30T18:00Z",
+  "league": "soccer/fifa.friendly",
+  "options": []
+ },
+ {
+  "id": "401886198",
+  "name": "Los Chankas at Cienciano del Cusco",
+  "date": "2026-09-30T20:00Z",
+  "league": "soccer/per.1",
+  "options": []
+ },
+ {
+  "id": "mlb849846",
+  "name": "Chicago White Sox at Houston Astros",
+  "date": "2026-09-30T21:00Z",
+  "league": "baseball/mlb",
+  "options": [
+   {
+    "key": "n:95700",
+    "tier": "T4",
+    "conf": 0.85,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "t:95735",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "t:95744",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:mlb",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "401918019",
+  "name": "Atlanta Dream at Washington Mystics",
+  "date": "2026-09-30T23:00Z",
+  "league": "basketball/wnba",
+  "options": [
+   {
+    "key": "g:tsn3.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:tsn",
+    "streams": 2
+   },
+   {
+    "key": "g:tsn4.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:tsn",
+    "streams": 2
+   },
+   {
+    "key": "g:tsn5.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:tsn",
+    "streams": 2
+   },
+   {
+    "key": "g:espn.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:espn",
+    "streams": 2
+   }
+  ]
+ },
+ {
+  "id": "401905187",
+  "name": "Peñarol at Montevideo City Torque",
+  "date": "2026-09-30T23:00Z",
+  "league": "soccer/uru.1",
+  "options": []
+ },
+ {
+  "id": "761833",
+  "name": "St. Louis CITY SC at Red Bull New York",
+  "date": "2026-09-30T23:30Z",
+  "league": "soccer/usa.1",
+  "options": [
+   {
+    "key": "g:newyorkredbulls.mls",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:red",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "nhl2026020006",
+  "name": "Pittsburgh Penguins at Philadelphia Flyers",
+  "date": "2026-09-30T23:30Z",
+  "league": "hockey/nhl",
+  "options": [
+   {
+    "key": "g:trutv.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:tru",
+    "streams": 1
+   },
+   {
+    "key": "g:tnt.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:tnt",
+    "streams": 1
+   },
+   {
+    "key": "g:tntpacific.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:tnt",
+    "streams": 1
+   },
+   {
+    "key": "g:trutvpacific.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:tru",
+    "streams": 1
+   },
+   {
+    "key": "t:877847",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:philadelphia",
+    "streams": 1
+   },
+   {
+    "key": "t:877849",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:pittsburgh",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "nhl2026020008",
+  "name": "New York Islanders at Toronto Maple Leafs",
+  "date": "2026-09-30T23:30Z",
+  "league": "hockey/nhl",
+  "options": [
+   {
+    "key": "g:msgsnzone1.us",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:msg",
+    "streams": 1
+   },
+   {
+    "key": "g:premiersports2.uk",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "UK:premier",
+    "streams": 2
+   },
+   {
+    "key": "t:877841",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:new",
+    "streams": 1
+   },
+   {
+    "key": "t:877859",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:toronto",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "mlb849848",
+  "name": "Boston Red Sox at New York Yankees",
+  "date": "2026-10-01T00:00Z",
+  "league": "baseball/mlb",
+  "options": [
+   {
+    "key": "g:bostonredsox.mlb",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "g:newyorkyankees.mlb",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "n:95701",
+    "tier": "T4",
+    "conf": 0.85,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "g:sportsgrid.us",
+    "tier": "T6",
+    "conf": 0.35,
+    "family": "US:sports",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "401921545",
+  "name": "Bolivia at Argentina",
+  "date": "2026-10-01T00:00Z",
+  "league": "soccer/fifa.friendly",
+  "options": []
+ },
+ {
+  "id": "401918020",
+  "name": "Golden State Valkyries at Dallas Wings",
+  "date": "2026-10-01T01:00Z",
+  "league": "basketball/wnba",
+  "options": [
+   {
+    "key": "g:tsn4.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:tsn",
+    "streams": 2
+   },
+   {
+    "key": "g:tsn5.ca",
+    "tier": "T1",
+    "conf": 0.97,
+    "family": "CA:tsn",
+    "streams": 2
+   },
+   {
+    "key": "r:espn.us",
+    "tier": "T5",
+    "conf": 0.6,
+    "family": "US:espn",
+    "streams": 2
+   }
+  ]
+ },
+ {
+  "id": "401877865",
+  "name": "Atlético Junior at Atlético Nacional",
+  "date": "2026-10-01T01:00Z",
+  "league": "soccer/col.1",
+  "options": []
+ },
+ {
+  "id": "mlb849842",
+  "name": "Chicago Cubs at San Diego Padres",
+  "date": "2026-10-01T02:00Z",
+  "league": "baseball/mlb",
+  "options": [
+   {
+    "key": "n:95702",
+    "tier": "T4",
+    "conf": 0.85,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "g:sandiegopadres.mlb",
+    "tier": "T3",
+    "conf": 0.62,
+    "family": "US:mlb",
+    "streams": 1
+   },
+   {
+    "key": "g:chicagocubs.mlb",
+    "tier": "T3",
+    "conf": 0.62,
+    "family": "US:mlb",
+    "streams": 1
+   }
+  ]
+ },
+ {
+  "id": "401924629",
+  "name": "Tahiti at Cook Islands",
+  "date": "2026-10-01T02:00Z",
+  "league": "soccer/fifa.friendly",
+  "options": []
+ },
+ {
+  "id": "nhl2026020007",
+  "name": "Los Angeles Kings at Colorado Avalanche",
+  "date": "2026-10-01T02:00Z",
+  "league": "hockey/nhl",
+  "options": [
+   {
+    "key": "r:trutv.us",
+    "tier": "T5",
+    "conf": 0.6,
+    "family": "US:tru",
+    "streams": 1
+   },
+   {
+    "key": "r:trutvpacific.us",
+    "tier": "T5",
+    "conf": 0.6,
+    "family": "US:tru",
+    "streams": 1
+   },
+   {
+    "key": "r:tnt.us",
+    "tier": "T5",
+    "conf": 0.6,
+    "family": "US:tnt",
+    "streams": 1
+   },
+   {
+    "key": "r:tntpacific.us",
+    "tier": "T5",
+    "conf": 0.6,
+    "family": "US:tnt",
+    "streams": 1
+   },
+   {
+    "key": "t:877819",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:colorado",
+    "streams": 1
+   },
+   {
+    "key": "t:877831",
+    "tier": "T3",
+    "conf": 0.5,
+    "family": "US:los",
+    "streams": 1
+   }
+  ]
+ }
+]

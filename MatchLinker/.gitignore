@@ -1,0 +1,7 @@
+export/
+*.env
+xmltv.*
+streams.json
+cats.json
+guide_window.json
+.build/

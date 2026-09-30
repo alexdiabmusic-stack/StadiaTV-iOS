@@ -676,6 +676,20 @@ nonisolated struct RankedSource: Identifiable, Hashable {
     var epgProgramme: EPGProgramme? = nil
     /// Canonical channel key from the curated lineup, populated by the match-page ranking pass.
     var canonicalChannelId: String? = nil
+    /// `LinkTier.rawValue`, set when this source came from the match-linking engine
+    /// (`MatchLinkService`/`StreamLinker`). Stored as the raw string (not `LinkTier` itself) so
+    /// `RankedSource` stays `Hashable` without adding conformance to the unmodified linker
+    /// package's `LinkTier` type. `isConfirmed` prefers this over `evidenceCategories` when
+    /// present, since it carries the tier's real confidence rather than a coarse evidence bucket.
+    var linkerTierRaw: String? = nil
+    var linkerTier: LinkTier? { linkerTierRaw.flatMap(LinkTier.init(rawValue:)) }
+    var linkerConfidence: Double = 0
+    /// Tier-specific display label, e.g. "Live listing", "Event channel" — see MatchLinker/README.md.
+    var linkerLabel: String? = nil
+    /// The guide line or channel name that earned this tier, for a "why" disclosure in the UI.
+    var linkerEvidence: String? = nil
+    /// Groups look-alike feeds (e.g. a dozen local affiliates) so the UI can collapse them.
+    var linkerFamily: String? = nil
     var id: String { channel.id }
 
     /// The single strongest piece of evidence, used to drive the badge label.
@@ -683,12 +697,14 @@ nonisolated struct RankedSource: Identifiable, Hashable {
         evidenceCategories.max { $0.priority < $1.priority }
     }
 
-    /// True when event-specific evidence exists (EPG match, both team names, or event title).
-    /// False when only broadcaster rights or league keywords matched — those are unconfirmed candidates.
+    /// True when event-specific evidence exists. When this source came from the match-linking
+    /// engine, confidence 0.7+ (T1/T2/T4 — live listing, description listing, event channel with
+    /// a kickoff time) is a real option; T3/T5/T6 are "more options" and read as unconfirmed here.
     var isConfirmed: Bool {
-        evidenceCategories.contains(.guideListsMatch) ||
-        evidenceCategories.contains(.teamNameMatch) ||
-        evidenceCategories.contains(.eventTitleMatch)
+        if linkerTier != nil { return linkerConfidence >= 0.7 }
+        return evidenceCategories.contains(.guideListsMatch) ||
+            evidenceCategories.contains(.teamNameMatch) ||
+            evidenceCategories.contains(.eventTitleMatch)
     }
 
     /// v3 precision status derived from evidence. CONFIRMED maps 1:1 with isConfirmed.

@@ -226,17 +226,16 @@ struct MatchDetailView: View {
         }
     }
 
-    /// Finds streams for this match using the EPG guide as the primary source,
-    /// then appends all team-named channels as backups.
+    /// Finds streams for this match through `StreamAvailabilityStore`/`MatchLinkService`
+    /// (the shared `StreamLinker` engine — see MatchLinker/PROMPTS.md). Delegating to the
+    /// store instead of re-running the guide+backup scan here removes the duplicate matching
+    /// pass this view used to run on its own.
     private func rankSources() async {
         guard match.state != .final else {
             rankedSources = []
             isRankingSources = false
             return
         }
-
-        let channels = playlists.allChannels
-        let match = self.match
 
         // Fast path: background scan already ran for this match — display immediately.
         if let cached = streamStore.sourcesByMatchId[match.id], !cached.isEmpty {
@@ -245,65 +244,9 @@ struct MatchDetailView: View {
             return
         }
 
-        // Primary: channels the EPG guide confirms for this event.
-        let titleHints = [match.name, match.shortName, match.home.displayName, match.away.displayName]
-            .filter { !$0.isEmpty }
-        let broadcastNetworks = match.broadcasts.filter { !$0.isEmpty }
-        let joins = epgRepository.programmesNear(
-            start: match.date,
-            titleHints: titleHints,
-            broadcastNetworks: broadcastNetworks
-        )
-
-        var bestJoinByCanonical: [String: ProgrammeEventJoin] = [:]
-        for join in joins where SourceMatcher.confirms(programme: join.programme, for: match) {
-            if let existing = bestJoinByCanonical[join.canonicalChannelId] {
-                if join.score > existing.score { bestJoinByCanonical[join.canonicalChannelId] = join }
-            } else {
-                bestJoinByCanonical[join.canonicalChannelId] = join
-            }
-        }
-
-        // O(channels) grouping; kept off the main thread for large playlists.
-        let channelToCanonical = epgRepository.channelToCanonicalMap
-        let canonicalToChannels: [String: [Channel]] = await Task.detached(priority: .userInitiated) {
-            var grouped: [String: [Channel]] = [:]
-            for channel in channels {
-                if let cid = channelToCanonical[channel.id] {
-                    grouped[cid, default: []].append(channel)
-                }
-            }
-            return grouped
-        }.value
+        await streamStore.scan(matches: [match], channels: playlists.allChannels, epgRepository: epgRepository)
         guard !Task.isCancelled else { return }
-
-        var primarySources: [RankedSource] = []
-        var primaryIds = Set<String>()
-        for (canonicalId, join) in bestJoinByCanonical {
-            // A canonical channel can merge several mirrors/feeds that don't actually
-            // share content — only confirm streams that actually declare this
-            // programme's guide ID. nil means no stream in the group declared any
-            // guide ID at all, so there's no positive evidence to restrict against.
-            let sharingGuideId = epgRepository.providerChannelIds(forGuideId: join.programme.epgChannelId)
-            for channel in (canonicalToChannels[canonicalId] ?? []) {
-                guard sharingGuideId?.contains(channel.id) ?? true else { continue }
-                guard SourceMatcher.isEligible(channel: channel, for: match) else { continue }
-                var source = RankedSource(channel: channel, score: 100 + Int(join.titleSimilarity * 50))
-                source.evidenceCategories = [.guideListsMatch]
-                source.epgProgramme = join.programme
-                source.canonicalChannelId = canonicalId
-                primarySources.append(source)
-                primaryIds.insert(channel.id)
-            }
-        }
-        primarySources.sort(by: SourceMatcher.ranksBefore)
-
-        // Backup: every channel whose name contains a team name or event/series keyword.
-        let backupSources = await Task.detached(priority: .userInitiated) {
-            SourceMatcher.teamNameBackups(match: match, channels: channels, excludeIds: primaryIds)
-        }.value
-
-        rankedSources = primarySources + backupSources
+        rankedSources = streamStore.sourcesByMatchId[match.id] ?? []
         isRankingSources = false
     }
 

@@ -84,6 +84,9 @@ struct MyApp: App {
                     channels: playlistStore.allChannels,
                     preferredLanguages: preferences.preferredStreamLanguages
                 )
+                // No epgRepository/streamStore yet at this point — RootView, which owns them,
+                // hasn't been created. This early pass just warms the schedule/roster data;
+                // RootView's own forced refresh (onAppear) fills in matchedChannel.
                 async let eventContextRefresh: Void = bannerFantasyStore.refreshEventContexts(
                     channels: playlistStore.allChannels,
                     preferredLanguages: preferences.preferredStreamLanguages
@@ -161,7 +164,7 @@ struct RootView: View {
         .tint(Theme.accent)
         .environmentObject(liveViewModel)
         .environmentObject(epgRepository)
-        .environment(\.playerStores, PlayerStoreReferences(playlistStore: playlistStore, epgRepository: epgRepository))
+        .environment(\.playerStores, PlayerStoreReferences(playlistStore: playlistStore, epgRepository: epgRepository, streamStore: streamStore))
         .environmentObject(guideStore)
         .environmentObject(streamStore)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: podcastStore.nowPlaying != nil)
@@ -212,7 +215,9 @@ struct RootView: View {
         )
         async let eventContextRefresh: Void = bannerFantasyStore.refreshEventContexts(
             channels: playlistStore.allChannels,
-            preferredLanguages: prefs.preferredStreamLanguages
+            preferredLanguages: prefs.preferredStreamLanguages,
+            epgRepository: epgRepository,
+            streamStore: streamStore
         )
         _ = await (espnRefresh, eventContextRefresh)
     }

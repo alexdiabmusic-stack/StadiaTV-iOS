@@ -1,0 +1,1214 @@
+[
+ {
+  "league": "soccer/fifa.friendly",
+  "id": "401911182",
+  "date": "2026-09-29T16:00Z",
+  "name": "Iran at Russia",
+  "home": {
+   "name": "Russia",
+   "short": "Russia",
+   "abbr": "RUS",
+   "nick": "Russia",
+   "city": "Russia"
+  },
+  "away": {
+   "name": "Iran",
+   "short": "Iran",
+   "abbr": "IRN",
+   "nick": "Iran",
+   "city": "Iran"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/uefa.nations",
+  "id": "401861089",
+  "date": "2026-09-29T16:00Z",
+  "name": "Belarus at Finland",
+  "home": {
+   "name": "Finland",
+   "short": "Finland",
+   "abbr": "FIN",
+   "nick": "Finland",
+   "city": "Finland"
+  },
+  "away": {
+   "name": "Belarus",
+   "short": "Belarus",
+   "abbr": "BLR",
+   "nick": "Belarus",
+   "city": "Belarus"
+  },
+  "broadcasts": [
+   "FS2"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/uefa.nations",
+  "id": "401861090",
+  "date": "2026-09-29T16:00Z",
+  "name": "Faroe Islands at Moldova",
+  "home": {
+   "name": "Moldova",
+   "short": "Moldova",
+   "abbr": "MDA",
+   "nick": "Moldova",
+   "city": "Moldova"
+  },
+  "away": {
+   "name": "Faroe Islands",
+   "short": "Faroe Islands",
+   "abbr": "FRO",
+   "nick": "Faroe Islands",
+   "city": "Faroe Islands"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "baseball/mlb",
+  "id": "mlb849845",
+  "date": "2026-09-29T18:00Z",
+  "name": "Philadelphia Phillies at Atlanta Braves",
+  "home": {
+   "name": "Atlanta Braves",
+   "short": "Braves",
+   "abbr": "ATL",
+   "nick": "Braves",
+   "city": "Atlanta"
+  },
+  "away": {
+   "name": "Philadelphia Phillies",
+   "short": "Phillies",
+   "abbr": "PHI",
+   "nick": "Phillies",
+   "city": "Philadelphia"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/uefa.nations",
+  "id": "401861083",
+  "date": "2026-09-29T18:45Z",
+  "name": "Estonia at Bulgaria",
+  "home": {
+   "name": "Bulgaria",
+   "short": "Bulgaria",
+   "abbr": "BUL",
+   "nick": "Bulgaria",
+   "city": "Bulgaria"
+  },
+  "away": {
+   "name": "Estonia",
+   "short": "Estonia",
+   "abbr": "EST",
+   "nick": "Estonia",
+   "city": "Estonia"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/uefa.nations",
+  "id": "401861092",
+  "date": "2026-09-29T18:45Z",
+  "name": "England at Czechia",
+  "home": {
+   "name": "Czechia",
+   "short": "Czechia",
+   "abbr": "CZE",
+   "nick": "Czechia",
+   "city": "Czechia"
+  },
+  "away": {
+   "name": "England",
+   "short": "England",
+   "abbr": "ENG",
+   "nick": "England",
+   "city": "England"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/uefa.nations",
+  "id": "401861086",
+  "date": "2026-09-29T18:45Z",
+  "name": "Iceland at Luxembourg",
+  "home": {
+   "name": "Luxembourg",
+   "short": "Luxembourg",
+   "abbr": "LUX",
+   "nick": "Luxembourg",
+   "city": "Luxembourg"
+  },
+  "away": {
+   "name": "Iceland",
+   "short": "Iceland",
+   "abbr": "ISL",
+   "nick": "Iceland",
+   "city": "Iceland"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/uefa.nations",
+  "id": "401861088",
+  "date": "2026-09-29T18:45Z",
+  "name": "Albania at San Marino",
+  "home": {
+   "name": "San Marino",
+   "short": "San Marino",
+   "abbr": "SMR",
+   "nick": "San Marino",
+   "city": "San Marino"
+  },
+  "away": {
+   "name": "Albania",
+   "short": "Albania",
+   "abbr": "ALB",
+   "nick": "Albania",
+   "city": "Albania"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/uefa.nations",
+  "id": "401861091",
+  "date": "2026-09-29T18:45Z",
+  "name": "Switzerland at Scotland",
+  "home": {
+   "name": "Scotland",
+   "short": "Scotland",
+   "abbr": "SCO",
+   "nick": "Scotland",
+   "city": "Scotland"
+  },
+  "away": {
+   "name": "Switzerland",
+   "short": "Switzerland",
+   "abbr": "SUI",
+   "nick": "Switzerland",
+   "city": "Switzerland"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/uefa.nations",
+  "id": "401861085",
+  "date": "2026-09-29T18:45Z",
+  "name": "Kazakhstan at Slovakia",
+  "home": {
+   "name": "Slovakia",
+   "short": "Slovakia",
+   "abbr": "SVK",
+   "nick": "Slovakia",
+   "city": "Slovakia"
+  },
+  "away": {
+   "name": "Kazakhstan",
+   "short": "Kazakhstan",
+   "abbr": "KAZ",
+   "nick": "Kazakhstan",
+   "city": "Kazakhstan"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/uefa.nations",
+  "id": "401861087",
+  "date": "2026-09-29T18:45Z",
+  "name": "North Macedonia at Slovenia",
+  "home": {
+   "name": "Slovenia",
+   "short": "Slovenia",
+   "abbr": "SVN",
+   "nick": "Slovenia",
+   "city": "Slovenia"
+  },
+  "away": {
+   "name": "North Macedonia",
+   "short": "North Macedonia",
+   "abbr": "MKD",
+   "nick": "North Macedonia",
+   "city": "North Macedonia"
+  },
+  "broadcasts": [
+   "FS2"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/uefa.nations",
+  "id": "401861084",
+  "date": "2026-09-29T18:45Z",
+  "name": "Croatia at Spain",
+  "home": {
+   "name": "Spain",
+   "short": "Spain",
+   "abbr": "ESP",
+   "nick": "Spain",
+   "city": "Spain"
+  },
+  "away": {
+   "name": "Croatia",
+   "short": "Croatia",
+   "abbr": "CRO",
+   "nick": "Croatia",
+   "city": "Croatia"
+  },
+  "broadcasts": [
+   "FS1"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/concacaf.nations.league",
+  "id": "401900609",
+  "date": "2026-09-29T19:00Z",
+  "name": "Turks and Caicos Islands at British Virgin Islands",
+  "home": {
+   "name": "British Virgin Islands",
+   "short": "Br Virgin Isl",
+   "abbr": "BVI",
+   "nick": "British Virgin Islands",
+   "city": "British Virgin Islands"
+  },
+  "away": {
+   "name": "Turks and Caicos Islands",
+   "short": "Turks and Caicos",
+   "abbr": "TCA",
+   "nick": "Turks and Caicos Islands",
+   "city": "Turks and Caicos Islands"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/concacaf.nations.league",
+  "id": "401900606",
+  "date": "2026-09-29T20:00Z",
+  "name": "Bahamas at US Virgin Islands",
+  "home": {
+   "name": "US Virgin Islands",
+   "short": "US Virgin Isl",
+   "abbr": "USVI",
+   "nick": "US Virgin Islands",
+   "city": "US Virgin Islands"
+  },
+  "away": {
+   "name": "Bahamas",
+   "short": "Bahamas",
+   "abbr": "BAH",
+   "nick": "Bahamas",
+   "city": "Bahamas"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/col.1",
+  "id": "401877965",
+  "date": "2026-09-29T20:30Z",
+  "name": "Independiente Santa Fe at Deportivo Pereira",
+  "home": {
+   "name": "Deportivo Pereira",
+   "short": "Pereira",
+   "abbr": "PER",
+   "nick": "Deportivo Pereira",
+   "city": "Deportivo Pereira"
+  },
+  "away": {
+   "name": "Independiente Santa Fe",
+   "short": "Santa Fe",
+   "abbr": "SFE",
+   "nick": "Independiente Santa Fe",
+   "city": "Independiente Santa Fe"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "baseball/mlb",
+  "id": "mlb849849",
+  "date": "2026-09-29T21:00Z",
+  "name": "Chicago White Sox at Houston Astros",
+  "home": {
+   "name": "Houston Astros",
+   "short": "Astros",
+   "abbr": "HOU",
+   "nick": "Astros",
+   "city": "Houston"
+  },
+  "away": {
+   "name": "Chicago White Sox",
+   "short": "White Sox",
+   "abbr": "CWS",
+   "nick": "White Sox",
+   "city": "Chicago"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/concacaf.nations.league",
+  "id": "401900607",
+  "date": "2026-09-29T21:00Z",
+  "name": "Sint Maarten at French Guiana",
+  "home": {
+   "name": "French Guiana",
+   "short": "French Guiana",
+   "abbr": "GUF",
+   "nick": "French Guiana",
+   "city": "French Guiana"
+  },
+  "away": {
+   "name": "Sint Maarten",
+   "short": "Sint Maarten",
+   "abbr": "SMA",
+   "nick": "Sint Maarten",
+   "city": "Sint Maarten"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "hockey/nhl",
+  "id": "nhl2026020001",
+  "date": "2026-09-29T21:00Z",
+  "name": "Florida Panthers at Carolina Hurricanes",
+  "home": {
+   "name": "Carolina Hurricanes",
+   "short": "Hurricanes",
+   "abbr": "CAR",
+   "nick": "Hurricanes",
+   "city": "Carolina"
+  },
+  "away": {
+   "name": "Florida Panthers",
+   "short": "Panthers",
+   "abbr": "FLA",
+   "nick": "Panthers",
+   "city": "Florida"
+  },
+  "broadcasts": [
+   "ESPN"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "basketball/wnba",
+  "id": "401918018",
+  "date": "2026-09-29T22:30Z",
+  "name": "Las Vegas Aces at Indiana Fever",
+  "home": {
+   "name": "Indiana Fever",
+   "short": "Fever",
+   "abbr": "IND",
+   "nick": "Fever",
+   "city": "Indiana"
+  },
+  "away": {
+   "name": "Las Vegas Aces",
+   "short": "Aces",
+   "abbr": "LV",
+   "nick": "Aces",
+   "city": "Las Vegas"
+  },
+  "broadcasts": [
+   "Prime Video"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/bra.2",
+  "id": "401860360",
+  "date": "2026-09-29T22:30Z",
+  "name": "Ponte Preta at Botafogo-SP",
+  "home": {
+   "name": "Botafogo-SP",
+   "short": "Botafogo-SP",
+   "abbr": "BFC",
+   "nick": "Botafogo-SP",
+   "city": "Botafogo-SP"
+  },
+  "away": {
+   "name": "Ponte Preta",
+   "short": "Ponte Preta",
+   "abbr": "PON",
+   "nick": "Ponte Preta",
+   "city": "Ponte Preta"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/concacaf.nations.league",
+  "id": "401900608",
+  "date": "2026-09-29T23:00Z",
+  "name": "Aruba at Anguilla",
+  "home": {
+   "name": "Anguilla",
+   "short": "Anguilla",
+   "abbr": "AIA",
+   "nick": "Anguilla",
+   "city": "Anguilla"
+  },
+  "away": {
+   "name": "Aruba",
+   "short": "Aruba",
+   "abbr": "ARU",
+   "nick": "Aruba",
+   "city": "Aruba"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "hockey/nhl",
+  "id": "nhl2026020002",
+  "date": "2026-09-29T23:00Z",
+  "name": "Montr\u00e9al Canadiens at Toronto Maple Leafs",
+  "home": {
+   "name": "Toronto Maple Leafs",
+   "short": "Maple Leafs",
+   "abbr": "TOR",
+   "nick": "Maple Leafs",
+   "city": "Toronto"
+  },
+  "away": {
+   "name": "Montr\u00e9al Canadiens",
+   "short": "Canadiens",
+   "abbr": "MTL",
+   "nick": "Canadiens",
+   "city": "Montr\u00e9al"
+  },
+  "broadcasts": [
+   "SN",
+   "TVAS"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "baseball/mlb",
+  "id": "mlb849851",
+  "date": "2026-09-30T00:00Z",
+  "name": "Boston Red Sox at New York Yankees",
+  "home": {
+   "name": "New York Yankees",
+   "short": "Yankees",
+   "abbr": "NYY",
+   "nick": "Yankees",
+   "city": "Bronx"
+  },
+  "away": {
+   "name": "Boston Red Sox",
+   "short": "Red Sox",
+   "abbr": "BOS",
+   "nick": "Red Sox",
+   "city": "Boston"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/fifa.friendly",
+  "id": "401905189",
+  "date": "2026-09-30T00:00Z",
+  "name": "Chile at United States",
+  "home": {
+   "name": "United States",
+   "short": "USA",
+   "abbr": "USA",
+   "nick": "United States",
+   "city": "United States"
+  },
+  "away": {
+   "name": "Chile",
+   "short": "Chile",
+   "abbr": "CHI",
+   "nick": "Chile",
+   "city": "Chile"
+  },
+  "broadcasts": [
+   "HBO Max",
+   "Peacock",
+   "TNT",
+   "Universo",
+   "truTV"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "hockey/nhl",
+  "id": "nhl2026020003",
+  "date": "2026-09-30T00:00Z",
+  "name": "New York Rangers at Boston Bruins",
+  "home": {
+   "name": "Boston Bruins",
+   "short": "Bruins",
+   "abbr": "BOS",
+   "nick": "Bruins",
+   "city": "Boston"
+  },
+  "away": {
+   "name": "New York Rangers",
+   "short": "Rangers",
+   "abbr": "NYR",
+   "nick": "Rangers",
+   "city": "New York"
+  },
+  "broadcasts": [
+   "ESPN"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "basketball/wnba",
+  "id": "401918017",
+  "date": "2026-09-30T00:30Z",
+  "name": "Minnesota Lynx at New York Liberty",
+  "home": {
+   "name": "New York Liberty",
+   "short": "Liberty",
+   "abbr": "NY",
+   "nick": "Liberty",
+   "city": "New York"
+  },
+  "away": {
+   "name": "Minnesota Lynx",
+   "short": "Lynx",
+   "abbr": "MIN",
+   "nick": "Lynx",
+   "city": "Minnesota"
+  },
+  "broadcasts": [
+   "CNBC",
+   "USA Net"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/col.1",
+  "id": "401877876",
+  "date": "2026-09-30T01:05Z",
+  "name": "Millonarios at Independiente Medell\u00edn",
+  "home": {
+   "name": "Independiente Medell\u00edn",
+   "short": "Ind. Medell\u00edn",
+   "abbr": "DIM",
+   "nick": "Independiente Medell\u00edn",
+   "city": "Independiente Medell\u00edn"
+  },
+  "away": {
+   "name": "Millonarios",
+   "short": "Millonarios",
+   "abbr": "MIL",
+   "nick": "Millonarios",
+   "city": "Millonarios"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "baseball/mlb",
+  "id": "mlb849843",
+  "date": "2026-09-30T02:00Z",
+  "name": "Chicago Cubs at San Diego Padres",
+  "home": {
+   "name": "San Diego Padres",
+   "short": "Padres",
+   "abbr": "SD",
+   "nick": "Padres",
+   "city": "San Diego"
+  },
+  "away": {
+   "name": "Chicago Cubs",
+   "short": "Cubs",
+   "abbr": "CHC",
+   "nick": "Cubs",
+   "city": "Chicago"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/concacaf.nations.league",
+  "id": "401900605",
+  "date": "2026-09-30T02:00Z",
+  "name": "St. Vincent and the Grenadines at Belize",
+  "home": {
+   "name": "Belize",
+   "short": "Belize",
+   "abbr": "BLZ",
+   "nick": "Belize",
+   "city": "Belize"
+  },
+  "away": {
+   "name": "St. Vincent and the Grenadines",
+   "short": "St. Vincent ",
+   "abbr": "VIN",
+   "nick": "St. Vincent and the Grenadines",
+   "city": "St. Vincent and the Grenadines"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "hockey/nhl",
+  "id": "nhl2026020004",
+  "date": "2026-09-30T02:00Z",
+  "name": "Vancouver Canucks at Edmonton Oilers",
+  "home": {
+   "name": "Edmonton Oilers",
+   "short": "Oilers",
+   "abbr": "EDM",
+   "nick": "Oilers",
+   "city": "Edmonton"
+  },
+  "away": {
+   "name": "Vancouver Canucks",
+   "short": "Canucks",
+   "abbr": "VAN",
+   "nick": "Canucks",
+   "city": "Vancouver"
+  },
+  "broadcasts": [
+   "SN"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/fifa.friendly",
+  "id": "401903234",
+  "date": "2026-09-30T02:30Z",
+  "name": "Peru at Mexico",
+  "home": {
+   "name": "Mexico",
+   "short": "Mexico",
+   "abbr": "MEX",
+   "nick": "Mexico",
+   "city": "Mexico"
+  },
+  "away": {
+   "name": "Peru",
+   "short": "Peru",
+   "abbr": "PER",
+   "nick": "Peru",
+   "city": "Peru"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "hockey/nhl",
+  "id": "nhl2026020005",
+  "date": "2026-09-30T02:30Z",
+  "name": "Chicago Blackhawks at Vegas Golden Knights",
+  "home": {
+   "name": "Vegas Golden Knights",
+   "short": "Golden Knights",
+   "abbr": "VGK",
+   "nick": "Golden Knights",
+   "city": "Vegas"
+  },
+  "away": {
+   "name": "Chicago Blackhawks",
+   "short": "Blackhawks",
+   "abbr": "CHI",
+   "nick": "Blackhawks",
+   "city": "Chicago"
+  },
+  "broadcasts": [
+   "ESPN",
+   "TVAS2"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/fifa.friendly",
+  "id": "401922308",
+  "date": "2026-09-30T04:00Z",
+  "name": "Solomon Islands at Papua New Guinea",
+  "home": {
+   "name": "Papua New Guinea",
+   "short": "Papua New Guinea",
+   "abbr": "PNG",
+   "nick": "Papua New Guinea",
+   "city": "Papua New Guinea"
+  },
+  "away": {
+   "name": "Solomon Islands",
+   "short": "Solomon Islands",
+   "abbr": "SOL",
+   "nick": "Solomon Islands",
+   "city": "Solomon Islands"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/fifa.friendly",
+  "id": "401922307",
+  "date": "2026-09-30T07:00Z",
+  "name": "New Caledonia at Fiji",
+  "home": {
+   "name": "Fiji",
+   "short": "Fiji",
+   "abbr": "FIJ",
+   "nick": "Fiji",
+   "city": "Fiji"
+  },
+  "away": {
+   "name": "New Caledonia",
+   "short": "New Caledonia",
+   "abbr": "NCD",
+   "nick": "New Caledonia",
+   "city": "New Caledonia"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/fifa.friendly",
+  "id": "401917065",
+  "date": "2026-09-30T13:00Z",
+  "name": "Sri Lanka at Seychelles",
+  "home": {
+   "name": "Seychelles",
+   "short": "Seychelles",
+   "abbr": "SEY",
+   "nick": "Seychelles",
+   "city": "Seychelles"
+  },
+  "away": {
+   "name": "Sri Lanka",
+   "short": "Sri Lanka",
+   "abbr": "SRI",
+   "nick": "Sri Lanka",
+   "city": "Sri Lanka"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/fifa.friendly",
+  "id": "401922621",
+  "date": "2026-09-30T14:00Z",
+  "name": "Mozambique at Botswana",
+  "home": {
+   "name": "Botswana",
+   "short": "Botswana",
+   "abbr": "BOT",
+   "nick": "Botswana",
+   "city": "Botswana"
+  },
+  "away": {
+   "name": "Mozambique",
+   "short": "Mozambique",
+   "abbr": "MOZ",
+   "nick": "Mozambique",
+   "city": "Mozambique"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/fifa.friendly",
+  "id": "401899825",
+  "date": "2026-09-30T16:00Z",
+  "name": "Andorra at Lithuania",
+  "home": {
+   "name": "Lithuania",
+   "short": "Lithuania",
+   "abbr": "LTU",
+   "nick": "Lithuania",
+   "city": "Lithuania"
+  },
+  "away": {
+   "name": "Andorra",
+   "short": "Andorra",
+   "abbr": "AND",
+   "nick": "Andorra",
+   "city": "Andorra"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "baseball/mlb",
+  "id": "mlb849841",
+  "date": "2026-09-30T18:00Z",
+  "name": "Philadelphia Phillies at Atlanta Braves",
+  "home": {
+   "name": "Atlanta Braves",
+   "short": "Braves",
+   "abbr": "ATL",
+   "nick": "Braves",
+   "city": "Atlanta"
+  },
+  "away": {
+   "name": "Philadelphia Phillies",
+   "short": "Phillies",
+   "abbr": "PHI",
+   "nick": "Phillies",
+   "city": "Philadelphia"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/fifa.friendly",
+  "id": "401912455",
+  "date": "2026-09-30T18:00Z",
+  "name": "Djibouti at Mauritius",
+  "home": {
+   "name": "Mauritius",
+   "short": "Mauritius",
+   "abbr": "MRI",
+   "nick": "Mauritius",
+   "city": "Mauritius"
+  },
+  "away": {
+   "name": "Djibouti",
+   "short": "Djibouti",
+   "abbr": "DJI",
+   "nick": "Djibouti",
+   "city": "Djibouti"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/per.1",
+  "id": "401886198",
+  "date": "2026-09-30T20:00Z",
+  "name": "Los Chankas at Cienciano del Cusco",
+  "home": {
+   "name": "Cienciano del Cusco",
+   "short": "Cienciano",
+   "abbr": "CIE",
+   "nick": "Cienciano del Cusco",
+   "city": "Cienciano del Cusco"
+  },
+  "away": {
+   "name": "Los Chankas",
+   "short": "Los Chankas",
+   "abbr": "CHAN",
+   "nick": "Los Chankas",
+   "city": "Los Chankas"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "baseball/mlb",
+  "id": "mlb849846",
+  "date": "2026-09-30T21:00Z",
+  "name": "Chicago White Sox at Houston Astros",
+  "home": {
+   "name": "Houston Astros",
+   "short": "Astros",
+   "abbr": "HOU",
+   "nick": "Astros",
+   "city": "Houston"
+  },
+  "away": {
+   "name": "Chicago White Sox",
+   "short": "White Sox",
+   "abbr": "CWS",
+   "nick": "White Sox",
+   "city": "Chicago"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "basketball/wnba",
+  "id": "401918019",
+  "date": "2026-09-30T23:00Z",
+  "name": "Atlanta Dream at Washington Mystics",
+  "home": {
+   "name": "Washington Mystics",
+   "short": "Mystics",
+   "abbr": "WSH",
+   "nick": "Mystics",
+   "city": "Washington"
+  },
+  "away": {
+   "name": "Atlanta Dream",
+   "short": "Dream",
+   "abbr": "ATL",
+   "nick": "Dream",
+   "city": "Atlanta"
+  },
+  "broadcasts": [
+   "ESPN"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/uru.1",
+  "id": "401905187",
+  "date": "2026-09-30T23:00Z",
+  "name": "Pe\u00f1arol at Montevideo City Torque",
+  "home": {
+   "name": "Montevideo City Torque",
+   "short": "MC Torque",
+   "abbr": "MCT",
+   "nick": "Montevideo City Torque",
+   "city": "Montevideo City Torque"
+  },
+  "away": {
+   "name": "Pe\u00f1arol",
+   "short": "Pe\u00f1arol",
+   "abbr": "PEN",
+   "nick": "Pe\u00f1arol",
+   "city": "Pe\u00f1arol"
+  },
+  "broadcasts": [],
+  "state": "post"
+ },
+ {
+  "league": "soccer/usa.1",
+  "id": "761833",
+  "date": "2026-09-30T23:30Z",
+  "name": "St. Louis CITY SC at Red Bull New York",
+  "home": {
+   "name": "Red Bull New York",
+   "short": "Red Bull NY",
+   "abbr": "RBNY",
+   "nick": "Red Bull New York",
+   "city": "Red Bull New York"
+  },
+  "away": {
+   "name": "St. Louis CITY SC",
+   "short": "St. Louis",
+   "abbr": "STL",
+   "nick": "St. Louis CITY SC",
+   "city": "St. Louis CITY SC"
+  },
+  "broadcasts": [
+   "Apple TV"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "hockey/nhl",
+  "id": "nhl2026020006",
+  "date": "2026-09-30T23:30Z",
+  "name": "Pittsburgh Penguins at Philadelphia Flyers",
+  "home": {
+   "name": "Philadelphia Flyers",
+   "short": "Flyers",
+   "abbr": "PHI",
+   "nick": "Flyers",
+   "city": "Philadelphia"
+  },
+  "away": {
+   "name": "Pittsburgh Penguins",
+   "short": "Penguins",
+   "abbr": "PIT",
+   "nick": "Penguins",
+   "city": "Pittsburgh"
+  },
+  "broadcasts": [
+   "TNT",
+   "truTV",
+   "HBO MAX"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "hockey/nhl",
+  "id": "nhl2026020008",
+  "date": "2026-09-30T23:30Z",
+  "name": "New York Islanders at Toronto Maple Leafs",
+  "home": {
+   "name": "Toronto Maple Leafs",
+   "short": "Maple Leafs",
+   "abbr": "TOR",
+   "nick": "Maple Leafs",
+   "city": "Toronto"
+  },
+  "away": {
+   "name": "New York Islanders",
+   "short": "Islanders",
+   "abbr": "NYI",
+   "nick": "Islanders",
+   "city": "New York"
+  },
+  "broadcasts": [
+   "Prime",
+   "MSGSN"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "baseball/mlb",
+  "id": "mlb849848",
+  "date": "2026-10-01T00:00Z",
+  "name": "Boston Red Sox at New York Yankees",
+  "home": {
+   "name": "New York Yankees",
+   "short": "Yankees",
+   "abbr": "NYY",
+   "nick": "Yankees",
+   "city": "Bronx"
+  },
+  "away": {
+   "name": "Boston Red Sox",
+   "short": "Red Sox",
+   "abbr": "BOS",
+   "nick": "Red Sox",
+   "city": "Boston"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/fifa.friendly",
+  "id": "401921545",
+  "date": "2026-10-01T00:00Z",
+  "name": "Bolivia at Argentina",
+  "home": {
+   "name": "Argentina",
+   "short": "Argentina",
+   "abbr": "ARG",
+   "nick": "Argentina",
+   "city": "Argentina"
+  },
+  "away": {
+   "name": "Bolivia",
+   "short": "Bolivia",
+   "abbr": "BOL",
+   "nick": "Bolivia",
+   "city": "Bolivia"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "basketball/wnba",
+  "id": "401918020",
+  "date": "2026-10-01T01:00Z",
+  "name": "Golden State Valkyries at Dallas Wings",
+  "home": {
+   "name": "Dallas Wings",
+   "short": "Wings",
+   "abbr": "DAL",
+   "nick": "Wings",
+   "city": "Dallas"
+  },
+  "away": {
+   "name": "Golden State Valkyries",
+   "short": "Valkyries",
+   "abbr": "GS",
+   "nick": "Valkyries",
+   "city": "Golden State"
+  },
+  "broadcasts": [
+   "ESPN"
+  ],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/col.1",
+  "id": "401877865",
+  "date": "2026-10-01T01:00Z",
+  "name": "Atl\u00e9tico Junior at Atl\u00e9tico Nacional",
+  "home": {
+   "name": "Atl\u00e9tico Nacional",
+   "short": "Atl. Nacional",
+   "abbr": "NAL",
+   "nick": "Atl\u00e9tico Nacional",
+   "city": "Atl\u00e9tico Nacional"
+  },
+  "away": {
+   "name": "Atl\u00e9tico Junior",
+   "short": "Atl. Junior",
+   "abbr": "JUN",
+   "nick": "Atl\u00e9tico Junior",
+   "city": "Atl\u00e9tico Junior"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "baseball/mlb",
+  "id": "mlb849842",
+  "date": "2026-10-01T02:00Z",
+  "name": "Chicago Cubs at San Diego Padres",
+  "home": {
+   "name": "San Diego Padres",
+   "short": "Padres",
+   "abbr": "SD",
+   "nick": "Padres",
+   "city": "San Diego"
+  },
+  "away": {
+   "name": "Chicago Cubs",
+   "short": "Cubs",
+   "abbr": "CHC",
+   "nick": "Cubs",
+   "city": "Chicago"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "soccer/fifa.friendly",
+  "id": "401924629",
+  "date": "2026-10-01T02:00Z",
+  "name": "Tahiti at Cook Islands",
+  "home": {
+   "name": "Cook Islands",
+   "short": "Cook Isl",
+   "abbr": "COK",
+   "nick": "Cook Islands",
+   "city": "Cook Islands"
+  },
+  "away": {
+   "name": "Tahiti",
+   "short": "Tahiti",
+   "abbr": "TAH",
+   "nick": "Tahiti",
+   "city": "Tahiti"
+  },
+  "broadcasts": [],
+  "state": "pre"
+ },
+ {
+  "league": "hockey/nhl",
+  "id": "nhl2026020007",
+  "date": "2026-10-01T02:00Z",
+  "name": "Los Angeles Kings at Colorado Avalanche",
+  "home": {
+   "name": "Colorado Avalanche",
+   "short": "Avalanche",
+   "abbr": "COL",
+   "nick": "Avalanche",
+   "city": "Colorado"
+  },
+  "away": {
+   "name": "Los Angeles Kings",
+   "short": "Kings",
+   "abbr": "LAK",
+   "nick": "Kings",
+   "city": "Los Angeles"
+  },
+  "broadcasts": [
+   "TNT",
+   "truTV",
+   "HBO MAX"
+  ],
+  "state": "pre"
+ }
+]

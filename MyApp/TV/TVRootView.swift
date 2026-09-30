@@ -68,7 +68,9 @@ struct TVRootView: View {
                 )
                 async let eventContextRefresh: Void = bannerFantasyStore.refreshEventContexts(
                     channels: playlistStore.allChannels,
-                    preferredLanguages: prefs.preferredStreamLanguages
+                    preferredLanguages: prefs.preferredStreamLanguages,
+                    epgRepository: epgRepository,
+                    streamStore: streamStore
                 )
                 _ = await (espnRefresh, eventContextRefresh)
             }

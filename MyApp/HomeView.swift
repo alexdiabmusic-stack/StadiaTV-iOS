@@ -1982,7 +1982,10 @@ final class HomeViewModel: ObservableObject {
             // provider/routing bug doesn't masquerade as a network problem.
             //
             // Thrown errors only cover leagues with no valid provider route at all
-            // (e.g. CFL). A provider that's silently succeeding with empty results
+            // (every League.all entry has one — see SportsCatalogProviderCoverageTests —
+            // but a league removed from SportsRepository.init's provider list without
+            // also being removed from League.all would show up this way). A provider
+            // that's silently succeeding with empty results
             // for every league (the thing the ProviderHealthMonitor circuit breaker
             // is meant to catch) never throws, so it wouldn't show up here — check
             // its health snapshot directly so a tripped/degraded provider isn't

@@ -338,7 +338,7 @@ struct TVPlayerView: View {
         let channel = self.channel
         let leagues = ["football/nfl", "basketball/nba", "hockey/nhl", "baseball/mlb",
                        "soccer/eng.1", "soccer/esp.1", "soccer/ger.1", "soccer/ita.1",
-                       "soccer/usa.1", "soccer/mex.1", "racing/f1"]
+                       "soccer/usa.1", "racing/f1"]
             .compactMap { path in League.all.first { $0.path == path } }
 
         var live: [Match] = []

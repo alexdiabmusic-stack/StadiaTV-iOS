@@ -91,8 +91,6 @@ nonisolated struct League: Identifiable, Hashable {
                keywords: ["mlb", "baseball"]),
         League(name: "NHL", shortName: "NHL", path: "hockey/nhl", group: .hockey,
                keywords: ["nhl", "hockey"]),
-        League(name: "Liga MX", shortName: "Liga MX", path: "soccer/mex.1", group: .soccer,
-               keywords: ["liga mx", "mexican", "soccer"]),
         League(name: "Premier League", shortName: "EPL", path: "soccer/eng.1", group: .soccer,
                keywords: ["premier league", "epl", "english", "soccer", "football"]),
         League(name: "MLS", shortName: "MLS", path: "soccer/usa.1", group: .soccer,

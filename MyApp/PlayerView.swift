@@ -1217,7 +1217,7 @@ private enum PlayerLiveMatchLeagueHint {
     static let leaguePaths = [
         "football/nfl", "football/college-football", "football/cfl", "basketball/nba", "basketball/wnba",
         "hockey/nhl", "baseball/mlb", "soccer/eng.1", "soccer/esp.1", "soccer/ger.1",
-        "soccer/ita.1", "soccer/usa.1", "soccer/mex.1", "racing/f1"
+        "soccer/ita.1", "soccer/usa.1", "racing/f1"
     ]
 
     /// Broadcaster and sport words that mark a channel or programme as sports.
@@ -3704,7 +3704,7 @@ private struct PlayerMultiscreenPicker: View {
     private static let highlightPaths: Set<String> = [
         "football/nfl", "basketball/nba", "hockey/nhl", "baseball/mlb",
         "soccer/eng.1", "soccer/esp.1", "soccer/ger.1", "soccer/ita.1",
-        "soccer/fra.1", "soccer/usa.1", "soccer/mex.1", "soccer/uefa.champions",
+        "soccer/fra.1", "soccer/usa.1", "soccer/uefa.champions",
         "racing/f1", "basketball/wnba"
     ]
 

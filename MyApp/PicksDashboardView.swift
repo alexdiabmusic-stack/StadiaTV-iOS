@@ -47,7 +47,7 @@ struct PicksDashboardView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Theme.textSecondary)
                 Text("\(predictions.totalPoints)")
-                    .font(.system(size: 52, weight: .heavy, design: .rounded))
+                    .font(.system(size: 52, weight: .bold, design: .rounded))
                     .foregroundStyle(Theme.accent)
                     .monospacedDigit()
             }
@@ -64,7 +64,7 @@ struct PicksDashboardView: View {
                             .font(.title2)
                     }
                     Text("\(predictions.currentStreak)")
-                        .font(.system(size: 40, weight: .heavy, design: .rounded))
+                        .font(.system(size: 40, weight: .bold, design: .rounded))
                         .foregroundStyle(predictions.currentStreak >= 3 ? Theme.Palette.orange : Theme.textPrimary)
                         .monospacedDigit()
                 }
@@ -72,8 +72,8 @@ struct PicksDashboardView: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     // MARK: Secondary stat grid
@@ -111,8 +111,8 @@ struct PicksDashboardView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     // MARK: Full picks list
@@ -135,8 +135,8 @@ struct PicksDashboardView: View {
                 }
             }
             .padding(16)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
         } else {
             VStack(spacing: 10) {
                 Image(systemName: "trophy")
@@ -149,8 +149,8 @@ struct PicksDashboardView: View {
             }
             .padding(32)
             .frame(maxWidth: .infinity)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
         }
     }
 }

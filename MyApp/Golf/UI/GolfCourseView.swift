@@ -53,7 +53,7 @@ struct GolfCourseView: View {
                             if hole.id != course.holes.last?.id { Divider().overlay(Theme.hairline) }
                         }
                     }
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
                 }
             } else {
                 ProgressView().frame(maxWidth: .infinity).padding(.vertical, 32)

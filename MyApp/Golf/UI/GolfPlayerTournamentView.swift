@@ -92,7 +92,7 @@ struct GolfPlayerTournamentView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
     }
 
     @ViewBuilder

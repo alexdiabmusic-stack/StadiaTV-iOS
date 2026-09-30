@@ -30,14 +30,14 @@ nonisolated struct M3UProviderAdapter: LiveProviderAdapter {
         if let userAgent = provider.userAgent?.trimmingCharacters(in: .whitespaces), !userAgent.isEmpty {
             request.setValue(userAgent, forHTTPHeaderField: StreamHTTPHeaders.userAgentKey)
         }
-        let (data, response) = try await session.data(for: request)
+        // Streamed straight to disk — playlists can run into the tens of MB, and the
+        // old `data(for:)` call held the entire body as a second in-memory copy.
+        let (tempURL, response) = try await session.download(for: request)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw LiveProviderError.badResponse
         }
-        return await Task.detached(priority: .userInitiated) {
-            let text = String(decoding: data, as: UTF8.self)
-            return M3UProviderAdapter.parseM3U(text)
-        }.value
+        return try await M3UProviderAdapter.parseM3U(fileURL: tempURL)
     }
 
     func resolveStream(for channel: LiveChannel) async throws -> StreamDescriptor {
@@ -56,32 +56,54 @@ nonisolated struct M3UProviderAdapter: LiveProviderAdapter {
     /// `#EXTHTTP:{json}`, `user-agent=` / `http-user-agent=` / `referer=` attributes on
     /// `#EXTINF`, and the `url|User-Agent=…&Referer=…` pipe suffix. They apply to the next URL.
     static func parseM3U(_ text: String) -> (epgURL: String?, channels: [AdapterChannel]) {
+        let state = ParseState()
+        for rawLine in text.split(whereSeparator: \.isNewline) {
+            state.processLine(String(rawLine))
+        }
+        return (state.epgURL, state.channels)
+    }
+
+    /// Line-streaming variant used when the playlist has already been downloaded to disk
+    /// (see `loadChannels()`): reads one line at a time via `URL.lines` instead of holding
+    /// the whole file as a single in-memory `String`, so parsing a large playlist doesn't
+    /// require a second full-size copy on top of the file already on disk.
+    static func parseM3U(fileURL: URL) async throws -> (epgURL: String?, channels: [AdapterChannel]) {
+        let state = ParseState()
+        for try await line in fileURL.lines {
+            state.processLine(line)
+        }
+        return (state.epgURL, state.channels)
+    }
+
+    /// Mutable parse state shared by the whole-string and line-streaming entry points,
+    /// so both stay in sync with exactly one copy of the per-line parsing logic.
+    private final class ParseState {
         var channels: [AdapterChannel] = []
         var epgURL: String?
-        var pendingName: String?
-        var pendingLogo: URL?
-        var pendingGroup: String?
-        var pendingTvgID: String?
-        var pendingTvgName: String?
-        var pendingCatchupSource: String?
-        var pendingCatchupDays: Int = 0
-        var pendingCatchupEnabled: Bool = false
-        var pendingHeaders: [String: String] = [:]
+        private var pendingName: String?
+        private var pendingLogo: URL?
+        private var pendingGroup: String?
+        private var pendingTvgID: String?
+        private var pendingTvgName: String?
+        private var pendingCatchupSource: String?
+        private var pendingCatchupDays: Int = 0
+        private var pendingCatchupEnabled: Bool = false
+        private var pendingHeaders: [String: String] = [:]
 
-        for rawLine in text.split(whereSeparator: \.isNewline) {
+        func processLine(_ rawLine: String) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
             if line.hasPrefix("#EXTM3U") {
-                epgURL = attribute("x-tvg-url", in: line)
+                epgURL = M3UProviderAdapter.attribute("x-tvg-url", in: line)
             } else if line.hasPrefix("#EXTINF") {
-                pendingLogo    = attribute("tvg-logo",    in: line).flatMap(URL.init(string:))
-                pendingGroup   = attribute("group-title", in: line)
-                pendingTvgID   = attribute("tvg-id",      in: line)
-                pendingTvgName = attribute("tvg-name",    in: line)
+                pendingLogo    = M3UProviderAdapter.attribute("tvg-logo",    in: line).flatMap(URL.init(string:))
+                pendingGroup   = M3UProviderAdapter.attribute("group-title", in: line)
+                pendingTvgID   = M3UProviderAdapter.attribute("tvg-id",      in: line)
+                pendingTvgName = M3UProviderAdapter.attribute("tvg-name",    in: line)
                 // Catch-up attributes
-                pendingCatchupSource = attribute("catchup-source", in: line)
-                    ?? attribute("catchup-template", in: line)
-                pendingCatchupDays = attribute("catchup-days", in: line).flatMap(Int.init) ?? 0
-                pendingCatchupEnabled = attribute("catchup", in: line) != nil
+                pendingCatchupSource = M3UProviderAdapter.attribute("catchup-source", in: line)
+                    ?? M3UProviderAdapter.attribute("catchup-template", in: line)
+                pendingCatchupDays = M3UProviderAdapter.attribute("catchup-days", in: line).flatMap(Int.init) ?? 0
+                pendingCatchupEnabled = M3UProviderAdapter.attribute("catchup", in: line) != nil
                     || pendingCatchupSource != nil
                 if let commaIdx = line.lastIndex(of: ",") {
                     let after = String(line[line.index(after: commaIdx)...])
@@ -90,7 +112,7 @@ nonisolated struct M3UProviderAdapter: LiveProviderAdapter {
                 }
                 if pendingName?.isEmpty ?? true { pendingName = pendingTvgName }
                 for key in ["user-agent", "http-user-agent", "referer", "referrer", "http-referrer", "http-referer", "origin", "http-origin"] {
-                    if let value = headerAttribute(key, in: line), let name = StreamHTTPHeaders.canonicalName(key) {
+                    if let value = M3UProviderAdapter.headerAttribute(key, in: line), let name = StreamHTTPHeaders.canonicalName(key) {
                         pendingHeaders[name] = value
                     }
                 }
@@ -121,7 +143,7 @@ nonisolated struct M3UProviderAdapter: LiveProviderAdapter {
                     }
                 }
             } else if line.hasPrefix("#") {
-                continue
+                return
             } else if !line.isEmpty,
                       case let (urlString, pipeHeaders) = StreamHTTPHeaders.splitPipeSuffix(line),
                       let streamURL = URL(string: urlString) {
@@ -146,7 +168,6 @@ nonisolated struct M3UProviderAdapter: LiveProviderAdapter {
                 pendingCatchupSource = nil; pendingCatchupDays = 0; pendingCatchupEnabled = false
             }
         }
-        return (epgURL, channels)
     }
 
     /// Like `attribute(_:in:)` but requires the key to start a new attribute (preceded by a

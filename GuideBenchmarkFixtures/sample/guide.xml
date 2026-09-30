@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tv>
+  <channel id="espn.us"><display-name>ESPN</display-name></channel>
+  <channel id="espn2.us"><display-name>ESPN2</display-name></channel>
+  <channel id="tnt.us"><display-name>TNT</display-name></channel>
+  <programme start="20260929120000 +0000" stop="20260929150000 +0000" channel="espn.us">
+    <title>Lakers vs Celtics</title>
+    <desc>NBA regular season game</desc>
+  </programme>
+  <programme start="20260929120000 +0000" stop="20260929150000 +0000" channel="espn2.us">
+    <title>SportsCenter</title>
+  </programme>
+</tv>

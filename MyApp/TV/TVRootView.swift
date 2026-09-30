@@ -49,8 +49,9 @@ struct TVRootView: View {
         .environmentObject(epgRepository)
         .environmentObject(streamStore)
         .task { await liveViewModel.load(favoriteTeams: prefs.favoriteTeams) }
+        .task { epgRepository.xtreamEPGFetcher = playlistStore.fetchXtreamEPG }
         .task { epgRepository.setupWithChannels(playlistStore.allChannels) }
-        .task(id: "\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.channelsRevision)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
+        .task(id: "\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.channelsRevision)-\(epgRepository.programmeRevision)") {
             await streamStore.scanDebounced(
                 matches: liveViewModel.allLive + liveViewModel.startingSoon,
                 channels: playlistStore.allChannels,

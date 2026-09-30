@@ -58,7 +58,7 @@ struct GolfTeeTimesView: View {
                             }
                             .padding(12)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12))
+                            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
                         }
                     }
                 }

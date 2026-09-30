@@ -104,9 +104,9 @@ struct TVOnboardingView: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 32)
                             .background(selected ? Theme.accent : Theme.surface,
-                                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                        in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
                             .overlay(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                                     .strokeBorder(selected ? Color.clear : Theme.hairline)
                             )
                         }
@@ -262,7 +262,7 @@ struct TVOnboardingView: View {
                     .foregroundStyle(Theme.textSecondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 18)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
                     .buttonStyle(.card)
             }
             Button(action: advance) {
@@ -272,7 +272,7 @@ struct TVOnboardingView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 18)
                     .background(canAdvance ? Theme.accent : Theme.accent.opacity(0.4),
-                                in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
             }
             .buttonStyle(.card)
             .disabled(!canAdvance)

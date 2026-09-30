@@ -39,8 +39,8 @@ struct SoccerFormationPitchView: View {
     }
 
     private var pitchBackground: some View {
-        RoundedRectangle(cornerRadius: 12).fill(Color(red: 0.09, green: 0.32, blue: 0.15))
-            .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.3)))
+        RoundedRectangle(cornerRadius: Theme.Radius.md).fill(Color(red: 0.09, green: 0.32, blue: 0.15))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md).strokeBorder(.white.opacity(0.3)))
             .overlay(Circle().strokeBorder(.white.opacity(0.3)).frame(width: 70, height: 70))
     }
 

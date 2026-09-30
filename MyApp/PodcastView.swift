@@ -358,9 +358,9 @@ struct PodcastBrowserView: View {
         }
         .padding(.horizontal, 14)
         .frame(height: 48)
-        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                 .strokeBorder(Theme.hairline, lineWidth: 1)
         )
         .padding(.horizontal, 16)
@@ -537,7 +537,7 @@ struct PodcastBrowserView: View {
         LazyVStack(spacing: 0) {
             ForEach(0..<4, id: \.self) { _ in
                 HStack(spacing: 14) {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                         .fill(Theme.surfaceElevated)
                         .frame(width: 72, height: 72)
 
@@ -732,9 +732,9 @@ struct PodcastRow: View {
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 14) {
-                PodcastArtwork(url: artworkURL, size: 72, cornerRadius: 12)
+                PodcastArtwork(url: artworkURL, size: 72, cornerRadius: Theme.Radius.md)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                             .strokeBorder(Theme.hairline, lineWidth: 1)
                     )
 
@@ -1366,9 +1366,9 @@ struct PodcastEpisodeRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
             // Left thumbnail
-            PodcastArtwork(url: episode.podcastArtworkURL ?? podcastArtworkURL, size: 64, cornerRadius: 12)
+            PodcastArtwork(url: episode.podcastArtworkURL ?? podcastArtworkURL, size: 64, cornerRadius: Theme.Radius.md)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                         .strokeBorder(Theme.hairline, lineWidth: 0.5)
                 )
 
@@ -1573,9 +1573,9 @@ struct PodcastMiniPlayer: View {
                 VStack(spacing: 0) {
                     HStack(spacing: 12) {
                         ZStack(alignment: .bottomTrailing) {
-                            PodcastArtwork(url: episode.podcastArtworkURL, size: 48, cornerRadius: 8)
+                            PodcastArtwork(url: episode.podcastArtworkURL, size: 48, cornerRadius: Theme.Radius.sm)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                                         .strokeBorder(Theme.hairline, lineWidth: 0.5)
                                 )
                             if episode.isVideo {
@@ -1700,7 +1700,7 @@ struct PodcastPlayerSheet: View {
             if episode.isVideo, let avPlayer = store.videoPlayer {
                 VideoPlayer(player: avPlayer)
                     .frame(height: 230)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
                     .shadow(color: .black.opacity(0.3), radius: 20, y: 8)
                     .padding(.horizontal, 20)
             } else {
@@ -1913,9 +1913,9 @@ struct PodcastCardTile: View {
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 6) {
-                PodcastArtwork(url: artworkURL, size: 140, cornerRadius: 12)
+                PodcastArtwork(url: artworkURL, size: 140, cornerRadius: Theme.Radius.md)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                             .strokeBorder(Theme.hairline, lineWidth: 1)
                     )
                 Text(podcast.title)

@@ -84,6 +84,11 @@ final class EPGRepository: ObservableObject {
     private var epgToCanonical: [String: String] = [:]
     // Coverage range per canonical channel, rebuilt on every finalizeProgrammeIndex call
     private var coverageIndex: [String: ProgrammeCoverage] = [:]
+    /// Guide ID (lowercased tvg-id) -> every raw provider channel ID that declares it.
+    /// Replaces the old single-stream `EPGProgramme.scopedProviderChannelId`: a canonical
+    /// channel can merge several mirrors, and a programme should confirm every one of
+    /// them that actually shares its guide ID, not just whichever one a 1:1 map kept.
+    private(set) var guideIdToProviderChannelIds: [String: Set<String>] = [:]
 
     private var config: CuratedGuideConfig?
     private var normalizer: ChannelNormalizer?
@@ -102,6 +107,14 @@ final class EPGRepository: ObservableObject {
 
     private let epgpwMappings = EPGPWMappingRepository()
     private lazy var epgpwProvider = EPGPWProvider(cacheDir: cacheDir)
+
+    /// Fetches a provider channel's Xtream EPG data on demand — wired once at app
+    /// startup (e.g. `epgRepository.xtreamEPGFetcher = playlistStore.fetchXtreamEPG`)
+    /// since this repository has no direct PlaylistStore reference. `fullSchedule: true`
+    /// requests the full multi-day table (`get_simple_data_table`, only for a row
+    /// actually scrolled into view); `false` requests now/next only (`get_short_epg`).
+    var xtreamEPGFetcher: ((_ providerChannelId: String, _ fullSchedule: Bool) async -> [EPGProgramme])?
+    private var xtreamEPGTasks: Set<String> = []
     private let logger = Logger(subsystem: "BannerTV", category: "LiveTVImport")
 
     // Cache keys
@@ -124,16 +137,28 @@ final class EPGRepository: ObservableObject {
     init() {
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
         loadCachedState()
-        loadCuratedConfig()
+        loadCuratedConfigAsync()
     }
 
     // MARK: - Setup
 
-    private func loadCuratedConfig() {
-        guard let cfg = CuratedGuideConfig.load() else { return }
-        config = cfg
-        normalizer = ChannelNormalizer(config: cfg)
-        matcher = CanonicalChannelMatcher(config: cfg, normalizer: normalizer!)
+    /// Decoding the curated channel catalog (~280KB) and building the matcher's alias/fuzzy
+    /// indexes costs 139–444ms — moved off `init()` so constructing this `@StateObject`
+    /// never blocks the first render. `matchEPGChannels`/`matchCustomEPGChannels` already
+    /// guard on `normalizer`/`config` being non-nil, so callers that run before this
+    /// completes simply no-op that pass, same as if the catalog were missing entirely.
+    private func loadCuratedConfigAsync() {
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let cfg = CuratedGuideConfig.load() else { return }
+            let normalizer = ChannelNormalizer(config: cfg)
+            let matcher = CanonicalChannelMatcher(config: cfg, normalizer: normalizer)
+            await MainActor.run {
+                guard let self else { return }
+                self.config = cfg
+                self.normalizer = normalizer
+                self.matcher = matcher
+            }
+        }
     }
 
     /// Called when IPTV channels are available. Rebuilds canonical lineup and refreshes EPG if needed.
@@ -158,6 +183,7 @@ final class EPGRepository: ObservableObject {
         }
         lastChannelFingerprint = fingerprint
         currentIPTVChannels = channels
+        rebuildGuideIdIndex()
 
         setupTask?.cancel()
         let generation = UUID()
@@ -385,13 +411,42 @@ final class EPGRepository: ObservableObject {
 
     private func requestEPGPWIfNeeded(channelId: String, from: Date, to: Date) {
         guard EPGPWSourcePolicy.epgPWEnabled,
-              let channel = canonicalChannels.first(where: { $0.id == channelId }),
+              let channel = canonicalChannelsByID[channelId],
               epgpwMappings.mapping(for: channelId) != nil else { return }
         let hasCoverage = programmeIndex[channelId]?.contains { programme in
             programme.end > from && programme.start < to
         } ?? false
         guard !hasCoverage else { return }
         prefetchProgrammes(for: [channel])
+    }
+
+    /// Same idea as `requestEPGPWIfNeeded`, but against the Xtream per-channel EPG
+    /// endpoints instead of epg.pw. `fullSchedule` picks `get_simple_data_table` (a full
+    /// day, only for a row actually visible) vs `get_short_epg` (now/next only).
+    private func requestXtreamEPGIfNeeded(channelId: String, from: Date, to: Date, fullSchedule: Bool) {
+        guard let fetcher = xtreamEPGFetcher,
+              let canonical = canonicalChannelsByID[channelId],
+              let providerChannelId = canonical.primaryStream?.providerChannelId else { return }
+        let epgId = "xtream:\(providerChannelId)"
+        let hasCoverage = programmeIndex[channelId]?.contains { prog in
+            prog.epgChannelId == epgId && prog.end > from && prog.start < to
+        } ?? false
+        guard !hasCoverage else { return }
+        let taskKey = "\(providerChannelId)-\(fullSchedule)"
+        guard !xtreamEPGTasks.contains(taskKey) else { return }
+        xtreamEPGTasks.insert(taskKey)
+        Task { [weak self] in
+            defer { self?.xtreamEPGTasks.remove(taskKey) }
+            guard let self else { return }
+            let fetched = await fetcher(providerChannelId, fullSchedule)
+            guard !fetched.isEmpty else { return }
+            var merged = self.programmeIndex
+            for var prog in fetched where prog.isValid {
+                prog.canonicalChannelId = channelId
+                merged[channelId, default: []].append(prog)
+            }
+            self.finalizeProgrammeIndex(merged)
+        }
     }
 
     private func loadEPGPWProgrammes(for channels: [CanonicalChannel], forceRefresh: Bool) async {
@@ -427,7 +482,6 @@ final class EPGRepository: ObservableObject {
                 importProgress.programmesRetained = programmeIndex.values.reduce(0) { $0 + $1.count }
                 lastUpdated = Date()
                 persistState()
-                objectWillChange.send()
             }
         }
     }
@@ -455,7 +509,7 @@ final class EPGRepository: ObservableObject {
         
         let staleness: TimeInterval = 6 * 3600
         if !missingCustomSource, let last = lastUpdated, Date().timeIntervalSince(last) < staleness,
-           FileManager.default.fileExists(atPath: programmeCacheURL.path) { return }
+           !programmeIndex.isEmpty { return }
         await forceRefresh()
     }
 
@@ -502,13 +556,14 @@ final class EPGRepository: ObservableObject {
             epgToCanonical.merge(mapping.mapValues(\.canonicalChannelId)) { _, new in new }
             importProgress.epgChannels += mapping.count
 
-            // Scope each programme to the exact raw stream its tvg-id resolved to —
-            // a canonical channel can merge several mirrors/feeds, and this schedule
-            // is only known to apply to the one the playlist's own EPG describes.
+            // Which raw stream(s) this schedule applies to is resolved by
+            // `guideIdToProviderChannelIds` (built from every stream's own tvg-id) —
+            // not stamped onto the programme itself. A canonical channel can merge
+            // several mirrors/feeds; consumers check that index to see which of
+            // them actually share this programme's guide ID.
             for var prog in parseResult.programmes {
                 guard prog.isValid, let match = mapping[prog.epgChannelId] else { continue }
                 prog.canonicalChannelId = match.canonicalChannelId
-                prog.scopedProviderChannelId = match.providerChannelId
                 programmeIndex[match.canonicalChannelId, default: []].append(prog)
             }
         }
@@ -520,7 +575,6 @@ final class EPGRepository: ObservableObject {
             importProgress.programmesRetained = programmeIndex.values.reduce(0) { $0 + $1.count }
             lastUpdated = Date()
             persistState()
-            objectWillChange.send()
         }
 
         // Generic epgshare01 broadcaster feeds — fetched and parsed in parallel since
@@ -597,7 +651,6 @@ final class EPGRepository: ObservableObject {
 
         await MainActor.run {
             self.refreshState = .idle
-            self.objectWillChange.send()
         }
     }
 
@@ -614,13 +667,16 @@ final class EPGRepository: ObservableObject {
             return data
         }
 
-        // Download
+        // Download — streamed straight to a temp file so the response body is never
+        // held as a second in-memory copy on top of whatever URLSession buffers internally.
         do {
             let downloadStart = Date()
-            let (data, _) = try await session.data(from: source.url)
+            let (tempURL, _) = try await session.download(from: source.url)
+            defer { try? FileManager.default.removeItem(at: tempURL) }
             importDiagnostics.epgDownloadDuration += Date().timeIntervalSince(downloadStart)
+            let raw = try Data(contentsOf: tempURL)
             let decompressed = await Task.detached(priority: .utility) {
-                data.tryGunzip()
+                raw.tryGunzip()
             }.value
             try decompressed.write(to: cacheFile)
             return decompressed
@@ -651,10 +707,12 @@ final class EPGRepository: ObservableObject {
 
         do {
             let downloadStart = Date()
-            let (data, _) = try await session.data(from: url)
+            let (tempURL, _) = try await session.download(from: url)
+            defer { try? FileManager.default.removeItem(at: tempURL) }
             importDiagnostics.epgDownloadDuration += Date().timeIntervalSince(downloadStart)
+            let raw = try Data(contentsOf: tempURL)
             let decompressed = await Task.detached(priority: .utility) {
-                data.tryGunzip()
+                raw.tryGunzip()
             }.value
             try decompressed.write(to: cacheFile)
             return decompressed
@@ -709,56 +767,73 @@ final class EPGRepository: ObservableObject {
 
     private func matchEPGChannels(_ epgChannels: [EPGChannel]) {
         guard let normalizer else { return }
-        var newMapping: [String: String] = [:]  // epgChannelId -> canonicalChannelId
 
-        // Build lookup from canonical channel's epg_id, aliases, normalized names
-        var aliasToCanon: [String: String] = [:]
-        for ch in canonicalChannels {
-            let normName = normalizer.normalize(ch.name).lowercased()
-            aliasToCanon[normName] = ch.id
-            if let network = ch.network {
-                aliasToCanon[network.lowercased()] = ch.id
-            }
-        }
-
-        // Also build a lookup from the curated config's aliases and explicit epg_id fields
+        // Authoritative epg_id → canonical map. Built and checked separately from the
+        // alias/name candidate pool below so a curated channel's explicit epg_id can
+        // never be silently clobbered by some other channel's alias that happens to
+        // normalize to the same string — that was the previous bug: both fed one flat
+        // last-writer-wins dictionary, keyed purely by config iteration order.
+        var epgIdToCanon: [String: String] = [:]
         if let config {
             for curatedCh in config.channels {
-                // Direct epg_id match: XMLTV channel id → canonical key
-                if let epgId = curatedCh.epgId {
-                    aliasToCanon[epgId.lowercased()] = curatedCh.key
-                    let normEpgId = normalizer.normalize(epgId).lowercased()
-                    if !normEpgId.isEmpty { aliasToCanon[normEpgId] = curatedCh.key }
-                }
+                guard let epgId = curatedCh.epgId, !epgId.isEmpty else { continue }
+                epgIdToCanon[epgId.lowercased()] = curatedCh.key
+                let normEpgId = normalizer.normalize(epgId).lowercased()
+                if !normEpgId.isEmpty { epgIdToCanon[normEpgId] = curatedCh.key }
+            }
+        }
+
+        // Everything else (canonical channel names/networks, curated aliases,
+        // unresolved streams' own tvg-id) goes into a candidate-array pool, mirroring
+        // CanonicalChannelMatcher.addCandidate/resolveFromCandidates: a key that two
+        // different channels both produce is left ambiguous (unresolved) rather than
+        // resolved to whichever happened to be written last.
+        var candidates: [String: [String]] = [:]
+        func addCandidate(_ key: String, _ canonicalId: String) {
+            let normalized = key.lowercased()
+            guard !normalized.isEmpty else { return }
+            var list = candidates[normalized] ?? []
+            if !list.contains(canonicalId) { list.append(canonicalId) }
+            candidates[normalized] = list
+        }
+
+        for ch in canonicalChannels {
+            addCandidate(normalizer.normalize(ch.name), ch.id)
+            if let network = ch.network { addCandidate(network, ch.id) }
+        }
+        if let config {
+            for curatedCh in config.channels {
                 for alias in curatedCh.aliases {
-                    let norm = normalizer.normalize(alias).lowercased()
-                    aliasToCanon[norm] = curatedCh.key
-                    aliasToCanon[alias.lowercased()] = curatedCh.key
+                    addCandidate(alias, curatedCh.key)
+                    addCandidate(normalizer.normalize(alias), curatedCh.key)
                 }
             }
         }
-
-        // Also build a lookup for unresolved streams using their tvg-id!
         for stream in unresolvedStreams {
-            guard let epgId = stream.tvgId?.lowercased(), !epgId.isEmpty else { continue }
-            if aliasToCanon[epgId] == nil {
-                aliasToCanon[epgId] = stream.id
-            }
+            guard let epgId = stream.tvgId, !epgId.isEmpty else { continue }
+            addCandidate(epgId, stream.id)
         }
 
+        func resolve(_ key: String) -> String? {
+            let normalized = key.lowercased()
+            guard !normalized.isEmpty else { return nil }
+            if let canonical = epgIdToCanon[normalized] { return canonical }
+            guard let list = candidates[normalized], list.count == 1 else { return nil }
+            return list.first
+        }
+
+        var newMapping: [String: String] = [:]  // epgChannelId -> canonicalChannelId
         for epgCh in epgChannels {
+            guard !epgCh.id.isEmpty else { continue }
             var matched: String?
 
-            // 1. Try XMLTV channel id itself against the alias table (catches epg_id matches)
-            let xmltvIdLow = epgCh.id.lowercased()
-            matched = aliasToCanon[xmltvIdLow]
-                ?? aliasToCanon[normalizer.normalize(epgCh.id).lowercased()]
+            // 1. Try XMLTV channel id itself (catches epg_id matches)
+            matched = resolve(epgCh.id) ?? resolve(normalizer.normalize(epgCh.id))
 
             // 2. Try each display name
             if matched == nil {
-                for displayName in epgCh.displayNames {
-                    let norm = normalizer.normalize(displayName).lowercased()
-                    if let canonId = aliasToCanon[norm] ?? aliasToCanon[displayName.lowercased()] {
+                for displayName in epgCh.displayNames where !displayName.isEmpty {
+                    if let canonId = resolve(displayName) ?? resolve(normalizer.normalize(displayName)) {
                         matched = canonId
                         break
                     }
@@ -827,7 +902,21 @@ final class EPGRepository: ObservableObject {
         }
         programmeIndex = finalized
         rebuildCoverageIndex()
-        saveProgrammeIndex()
+        persistProgrammesToStore(finalized)
+    }
+
+    /// Durable guide storage, keyed by guide ID (`EPGProgramme.epgChannelId`/`sourceId`) —
+    /// replaces the old whole-dictionary `programmeIndex.v2.json` cache, which was
+    /// rewritten in full on every update with no retention policy and grew unbounded.
+    /// `programmeIndex` (canonical-channel-keyed, in-memory) stays the synchronous hot-path
+    /// read the rest of this file uses; this is purely the cross-launch durability layer.
+    private func persistProgrammesToStore(_ index: [String: [EPGProgramme]]) {
+        let bySource = Dictionary(grouping: index.values.flatMap { $0 }, by: \.sourceId)
+        Task.detached(priority: .background) {
+            for (sourceId, programmes) in bySource {
+                try? await EPGProgrammeStore.shared.replaceProgrammes(programmes, sourceId: sourceId, retentionDays: 7)
+            }
+        }
     }
 
     private func deduplicate(_ sorted: [EPGProgramme]) -> [EPGProgramme] {
@@ -849,16 +938,22 @@ final class EPGRepository: ObservableObject {
 
     func currentProgramme(for channelId: String, at date: Date = Date()) -> EPGProgramme? {
         requestEPGPWIfNeeded(channelId: channelId, from: date.addingTimeInterval(-3600), to: date.addingTimeInterval(6 * 3600))
+        requestXtreamEPGIfNeeded(channelId: channelId, from: date.addingTimeInterval(-3600), to: date.addingTimeInterval(6 * 3600), fullSchedule: false)
         return programmeIndex[channelId]?.first { $0.isOnNow(at: date) }
     }
 
     func nextProgramme(for channelId: String, after date: Date = Date()) -> EPGProgramme? {
         requestEPGPWIfNeeded(channelId: channelId, from: date, to: date.addingTimeInterval(12 * 3600))
+        requestXtreamEPGIfNeeded(channelId: channelId, from: date, to: date.addingTimeInterval(12 * 3600), fullSchedule: false)
         return programmeIndex[channelId]?.first { $0.start > date }
     }
 
     func programmes(for channelId: String, from: Date, to: Date) -> [EPGProgramme] {
         requestEPGPWIfNeeded(channelId: channelId, from: from, to: to)
+        // A full day, so `get_simple_data_table` — this is only reached for rows the
+        // guide actually renders (TVGuideViewModel.rowLayout / the vertically- and
+        // horizontally-virtualized grid), not the whole channel list.
+        requestXtreamEPGIfNeeded(channelId: channelId, from: from, to: to, fullSchedule: true)
         return programmeIndex[channelId]?.filter { $0.end > from && $0.start < to } ?? []
     }
 
@@ -970,6 +1065,25 @@ final class EPGRepository: ObservableObject {
         canonicalChannelsByID = Dictionary(canonicalChannels.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
+    /// Guide ID -> every raw provider channel that declares it, built from the full
+    /// unfiltered input list so unresolved streams are covered, not just matched ones.
+    /// Empty/missing tvg-ids are skipped — an empty guide ID can't identify anything.
+    private func rebuildGuideIdIndex() {
+        var index: [String: Set<String>] = [:]
+        for channel in currentIPTVChannels {
+            guard let guideId = channel.tvgId?.lowercased(), !guideId.isEmpty else { continue }
+            index[guideId, default: []].insert(channel.id)
+        }
+        guideIdToProviderChannelIds = index
+    }
+
+    /// Every raw provider channel ID that declares the given guide ID, or nil if none do
+    /// (e.g. the provider never sent tvg-ids at all — callers should treat that as
+    /// "no restriction" rather than "confirmed for nobody").
+    func providerChannelIds(forGuideId guideId: String) -> Set<String>? {
+        guideIdToProviderChannelIds[guideId.lowercased()]
+    }
+
     /// The canonical channel a provider channel was matched to, via the prebuilt maps (no scans).
     func canonicalChannel(forProviderChannelID id: String) -> CanonicalChannel? {
         channelToCanonicalMap[id].flatMap { canonicalChannelsByID[$0] }
@@ -1007,53 +1121,19 @@ final class EPGRepository: ObservableObject {
 
     // MARK: - Persistence
 
-    private var programmeCacheURL: URL {
-        cacheDir.appendingPathComponent("programmeIndex.v2.json")
-    }
-
     private func loadCachedState() {
         if let ts = UserDefaults.standard.object(forKey: lastUpdatedKey) as? Date {
             lastUpdated = ts
         }
-        // Load persisted programme index from disk in the background so the guide
-        // can show cached data immediately without blocking the main thread.
-        let url = programmeCacheURL
-        Task { [weak self] in
-            let index = await Task.detached(priority: .userInitiated) {
-                Self.loadIndexFromDisk(url: url)
-            }.value
-            guard let self, !index.isEmpty else { return }
-            self.programmeIndex = index
-            self.objectWillChange.send()
-        }
+        // `programmeIndex` starts empty on cold launch and is repopulated once the
+        // first import/refresh cycle completes (triggered automatically by
+        // `importIfChanged`) — the old JSON blob that used to rehydrate it eagerly
+        // had no retention policy and grew unbounded; guide data now lives in
+        // `EPGProgrammeStore` (SQLite, 7-day retention) instead.
     }
 
     private func persistState() {
         UserDefaults.standard.set(lastUpdated, forKey: lastUpdatedKey)
-    }
-
-    nonisolated private static func loadIndexFromDisk(url: URL) -> [String: [EPGProgramme]] {
-        guard let data = try? Data(contentsOf: url),
-              let index = try? JSONDecoder().decode([String: [EPGProgramme]].self, from: data) else {
-            return [:]
-        }
-        // Discard programmes from more than 14 hours in the past.
-        let cutoff = Date().addingTimeInterval(-14 * 3600)
-        var result: [String: [EPGProgramme]] = [:]
-        for (key, progs) in index {
-            let valid = progs.filter { $0.end > cutoff }
-            if !valid.isEmpty { result[key] = valid }
-        }
-        return result
-    }
-
-    private func saveProgrammeIndex() {
-        let index = programmeIndex
-        let url = programmeCacheURL
-        Task.detached(priority: .background) {
-            guard let data = try? JSONEncoder().encode(index) else { return }
-            try? data.write(to: url, options: .atomic)
-        }
     }
 
     // MARK: - Debug info

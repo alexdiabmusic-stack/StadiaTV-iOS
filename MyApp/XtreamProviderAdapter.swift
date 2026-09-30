@@ -92,6 +92,101 @@ nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
         return stream
     }
 
+    // MARK: - Per-channel EPG
+
+    /// Now/next only (2-4 entries) — cheap enough to call for a channel the moment it
+    /// becomes visible. Reads `start_timestamp`/`stop_timestamp` directly (epoch seconds),
+    /// never a formatted date string, so no string date parsing is needed for this path.
+    func shortEPG(streamID: Int, limit: Int = 4) async throws -> [XtreamEPGListing] {
+        try await epgListings(action: "get_short_epg", streamID: streamID,
+                              extra: [URLQueryItem(name: "limit", value: String(limit))])
+    }
+
+    /// Full multi-day schedule for one channel (~38-74KB, ~0.5-1s per the provider docs) —
+    /// only worth calling for rows actually scrolled into view.
+    func simpleDataTable(streamID: Int) async throws -> [XtreamEPGListing] {
+        try await epgListings(action: "get_simple_data_table", streamID: streamID, extra: [])
+    }
+
+    private func epgListings(action: String, streamID: Int, extra: [URLQueryItem]) async throws -> [XtreamEPGListing] {
+        guard let (base, user, pass) = try baseComponents() else {
+            throw LiveProviderError.missingConfiguration("Host or credentials missing")
+        }
+        var comps = base
+        comps.path = "/player_api.php"
+        comps.queryItems = [
+            URLQueryItem(name: "username", value: user),
+            URLQueryItem(name: "password", value: pass),
+            URLQueryItem(name: "action", value: action),
+            URLQueryItem(name: "stream_id", value: String(streamID)),
+        ] + extra
+        guard let url = comps.url else { return [] }
+        let (data, response) = try await session.data(for: apiRequest(url))
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw LiveProviderError.badResponse
+        }
+        struct Envelope: Decodable { let epg_listings: [XtreamEPGListing]? }
+        let envelope = try await Task.detached(priority: .utility) {
+            try JSONDecoder().decode(Envelope.self, from: data)
+        }.value
+        return envelope.epg_listings ?? []
+    }
+
+    // MARK: - Account / connection-limit status
+
+    /// Reads `user_info`/`server_info` from `player_api.php`. 401/403/429/5xx are reported
+    /// as inconclusive — a probe failure doesn't mean the connection limit is reached, it
+    /// means we don't know, and callers should fall back to the existing reactive handling
+    /// (see `HLSRecorder.RecorderError.connectionLimited`) rather than guessing.
+    func accountStatus() async -> XtreamAccountStatus {
+        guard let (base, user, pass) = try? baseComponents() else {
+            return XtreamAccountStatus(maxConnections: nil, activeConnections: nil, isInconclusive: true)
+        }
+        var comps = base
+        comps.path = "/player_api.php"
+        comps.queryItems = [
+            URLQueryItem(name: "username", value: user),
+            URLQueryItem(name: "password", value: pass),
+        ]
+        guard let url = comps.url else {
+            return XtreamAccountStatus(maxConnections: nil, activeConnections: nil, isInconclusive: true)
+        }
+        do {
+            let (data, response) = try await session.data(for: apiRequest(url))
+            guard let http = response as? HTTPURLResponse else {
+                return XtreamAccountStatus(maxConnections: nil, activeConnections: nil, isInconclusive: true)
+            }
+            if http.statusCode == 401 || http.statusCode == 403 || http.statusCode == 429 || http.statusCode >= 500 {
+                return XtreamAccountStatus(maxConnections: nil, activeConnections: nil, isInconclusive: true)
+            }
+            guard (200..<300).contains(http.statusCode) else {
+                return XtreamAccountStatus(maxConnections: nil, activeConnections: nil, isInconclusive: true)
+            }
+            struct Envelope: Decodable {
+                struct UserInfo: Decodable {
+                    let max_connections: XtreamNumeric?
+                    let active_cons: XtreamNumeric?
+                }
+                // Read alongside user_info as instructed, even though nothing here
+                // currently feeds the connection-limit decision below.
+                struct ServerInfo: Decodable {
+                    let url: String?
+                    let timestamp_now: XtreamNumeric?
+                }
+                let user_info: UserInfo?
+                let server_info: ServerInfo?
+            }
+            let envelope = try JSONDecoder().decode(Envelope.self, from: data)
+            return XtreamAccountStatus(
+                maxConnections: envelope.user_info?.max_connections?.intValue,
+                activeConnections: envelope.user_info?.active_cons?.intValue,
+                isInconclusive: false
+            )
+        } catch {
+            return XtreamAccountStatus(maxConnections: nil, activeConnections: nil, isInconclusive: true)
+        }
+    }
+
     // MARK: - Helpers
 
     /// API request carrying the playlist's User-Agent, so providers that filter on it
@@ -124,6 +219,86 @@ nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
         let (data, _) = try await session.data(for: apiRequest(url))
         let cats = (try? JSONDecoder().decode([XtreamCategory].self, from: data)) ?? []
         return Dictionary(uniqueKeysWithValues: cats.map { ($0.category_id, $0.category_name) })
+    }
+}
+
+// MARK: - Account / connection-limit status
+
+struct XtreamAccountStatus {
+    let maxConnections: Int?
+    let activeConnections: Int?
+    /// True when the probe itself was inconclusive (network error, or a 401/403/429/5xx
+    /// response) — as opposed to a successful response that simply had no connection info.
+    let isInconclusive: Bool
+
+    /// Whether starting one more connection (a second live stream, a recording) risks
+    /// disrupting an existing one. Deliberately restrictive when we can't tell: an unknown
+    /// limit or a limit of exactly one both block without needing to probe further.
+    /// An inconclusive probe does NOT block proactively — the existing reactive handling
+    /// (a 403/429 surfacing as `HLSRecorder.RecorderError.connectionLimited` mid-stream)
+    /// remains the safety net for that case.
+    var blocksAdditionalConnection: Bool {
+        if isInconclusive { return false }
+        guard let max = maxConnections else { return true }
+        if max <= 1 { return true }
+        guard let active = activeConnections else { return true }
+        return active >= max
+    }
+}
+
+/// Xtream panels commonly send numeric fields as either a JSON number or a numeric string
+/// depending on the panel software — this decodes either.
+private struct XtreamNumeric: Decodable {
+    let intValue: Int?
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if let i = try? c.decode(Int.self) {
+            intValue = i
+        } else if let s = try? c.decode(String.self) {
+            intValue = Int(s)
+        } else {
+            intValue = nil
+        }
+    }
+}
+
+// MARK: - Per-channel EPG listing
+
+struct XtreamEPGListing: Decodable {
+    let id: String
+    let epgChannelId: String?
+    let title: String
+    let description: String?
+    let startTimestamp: Date
+    let stopTimestamp: Date
+
+    private enum CodingKeys: String, CodingKey {
+        case id, channel_id, title, description, start_timestamp, stop_timestamp
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        epgChannelId = try? c.decode(String.self, forKey: .channel_id)
+        let titleB64 = (try? c.decode(String.self, forKey: .title)) ?? ""
+        title = Self.decodeBase64(titleB64) ?? titleB64
+        let descB64 = try? c.decode(String.self, forKey: .description)
+        description = descB64.flatMap(Self.decodeBase64)
+        startTimestamp = Self.date(c, .start_timestamp) ?? Date()
+        stopTimestamp = Self.date(c, .stop_timestamp) ?? startTimestamp.addingTimeInterval(1800)
+    }
+
+    private static func decodeBase64(_ s: String) -> String? {
+        guard let data = Data(base64Encoded: s) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    private static func date(_ container: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Date? {
+        if let i = try? container.decode(Int.self, forKey: key) { return Date(timeIntervalSince1970: TimeInterval(i)) }
+        if let s = try? container.decode(String.self, forKey: key), let i = TimeInterval(s) {
+            return Date(timeIntervalSince1970: i)
+        }
+        return nil
     }
 }
 

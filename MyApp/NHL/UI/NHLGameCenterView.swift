@@ -38,7 +38,7 @@ struct NHLGameCenterView<WatchContent: View, RelatedContent: View>: View {
                         ForEach(NHLGameTab.allCases) { tab in
                             Button { model.selectedTab = tab } label: {
                                 Text(tab.rawValue).font(.subheadline.bold()).padding(.horizontal, 14).frame(minHeight: 44)
-                                    .background(model.selectedTab == tab ? Theme.surfaceElevated : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+                                    .background(model.selectedTab == tab ? Theme.surfaceElevated : Color.clear, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
                             }
                             #if os(tvOS)
                             .buttonStyle(.bordered)

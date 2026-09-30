@@ -41,7 +41,7 @@ struct MLBAtBatRow: View {
                     if expanded || expandedByDefault { MLBPitchSequenceView(events: play.events) }
                 }
             }.padding(play.isScoringPlay ? 16 : 8)
-                .background(play.isScoringPlay ? Theme.surfaceElevated : Color.clear, in: RoundedRectangle(cornerRadius: 12))
+                .background(play.isScoringPlay ? Theme.surfaceElevated : Color.clear, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
         }.padding(.horizontal).padding(.vertical, 6)
     }
 }

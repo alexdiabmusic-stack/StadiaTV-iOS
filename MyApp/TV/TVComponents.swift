@@ -37,9 +37,9 @@ struct TVMatchCard: View {
         }
         .padding(18)
         .frame(width: 340, height: 180)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                 .strokeBorder(match.state == .live ? Theme.live.opacity(0.5) : Theme.hairline)
         )
     }
@@ -127,11 +127,11 @@ struct TVHeroCard: View {
 
                     if match.state != .pre {
                         Text("\(match.away.score ?? "0")–\(match.home.score ?? "0")")
-                            .font(.system(size: 56, weight: .black, design: .rounded).monospacedDigit())
+                            .font(.system(size: 56, weight: .bold, design: .rounded).monospacedDigit())
                             .foregroundStyle(.white)
                     } else {
                         Text("VS")
-                            .font(.system(size: 40, weight: .black, design: .rounded))
+                            .font(.system(size: 40, weight: .bold, design: .rounded))
                             .foregroundStyle(.white.opacity(0.45))
                     }
 
@@ -207,9 +207,9 @@ struct TVChannelCard: View {
         }
         .padding(18)
         .frame(width: 220, height: 200)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                 .strokeBorder(isFavorite ? Theme.accent.opacity(0.55) : Theme.hairline)
         )
     }
@@ -252,9 +252,9 @@ struct TVArticleCard: View {
             .frame(width: width, alignment: .leading)
         }
         .frame(width: width)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                 .strokeBorder(Theme.hairline)
         )
         .clipped()
@@ -447,9 +447,9 @@ struct TVSourceTile: View {
             }
             .padding(18)
             .frame(width: 200, height: 220)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                     .strokeBorder(borderColor)
             )
         }

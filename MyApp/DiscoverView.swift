@@ -179,8 +179,8 @@ struct DiscoverView: View {
                             if article.id != teamArticles.last?.id { Divider().overlay(Theme.hairline) }
                         }
                     }
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
                 }
 
                 RecentSportsHighlightsSection(leagues: targetLeagues)
@@ -208,8 +208,8 @@ struct DiscoverView: View {
                                     .frame(maxHeight: .infinity, alignment: .top)
                                 }
                                 .buttonStyle(.plain)
-                                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
                             }
                         }
                     } else {
@@ -238,8 +238,8 @@ struct DiscoverView: View {
                                 if article.id != latestArticles.last?.id { Divider().overlay(Theme.hairline) }
                             }
                         }
-                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
                     }
                 }
             }
@@ -261,8 +261,8 @@ struct DiscoverView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     private var emptyState: some View {
@@ -387,8 +387,8 @@ private struct HeroArticleCard: View {
             }
             .padding(16)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
         .contextMenu { ArticleContextActions(article: article, isSaved: isSaved, onToggleSaved: onToggleSaved, onHide: onHide, onMute: onMute) }
     }
 }
@@ -451,7 +451,7 @@ private struct StandardArticleCard: View {
             Spacer(minLength: 0)
             ArticleImage(url: article.imageURL)
                 .frame(width: 96, height: 72)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         }
         .padding(14)
         .contextMenu { ArticleContextActions(article: article, isSaved: isSaved, onToggleSaved: onToggleSaved, onHide: onHide, onMute: onMute) }
@@ -469,7 +469,7 @@ private struct CompactArticleRow: View {
         HStack(alignment: .center, spacing: 12) {
             ArticleImage(url: article.imageURL)
                 .frame(width: 66, height: 50)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             VStack(alignment: .leading, spacing: 5) {
                 Text(article.headline)
                     .font(.subheadline.weight(.semibold))

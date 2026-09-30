@@ -237,6 +237,14 @@ final class RecordingService: ObservableObject {
             return
         }
 
+        // A single-connection (or unknown-limit) Xtream account can't safely open a new
+        // local recording connection on top of a stream that may already be playing —
+        // caught here proactively rather than only reactively via HTTP 403/429 below.
+        if XtreamAccountStatusStore.shared.blocksAdditionalConnection(forPlaylistID: liveChannel.providerID) {
+            update(id: jobID, state: .partial, error: "Provider connection limit reached. Reduce the number of active streams.")
+            return
+        }
+
         let filename  = "rec-\(jobID.uuidString).ts"
         let outputURL = recordingDirectory().appendingPathComponent(filename)
         updateFilename(id: jobID, filename: filename)

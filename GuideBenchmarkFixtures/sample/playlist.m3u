@@ -1,0 +1,7 @@
+#EXTM3U
+#EXTINF:-1 tvg-id="espn.us" tvg-name="ESPN" group-title="Sports",ESPN
+http://example.com/espn.m3u8
+#EXTINF:-1 tvg-id="espn2.us" tvg-name="ESPN2" group-title="Sports",ESPN2
+http://example.com/espn2.m3u8
+#EXTINF:-1 tvg-id="tnt.us" tvg-name="TNT" group-title="Entertainment",TNT
+http://example.com/tnt.m3u8

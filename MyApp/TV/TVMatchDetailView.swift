@@ -86,7 +86,7 @@ struct TVMatchDetailView: View {
             }
         }
         .navigationTitle(match.shortName)
-        .task(id: "\(match.id)-\(playlistStore.channelsRevision)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))") {
+        .task(id: "\(match.id)-\(playlistStore.channelsRevision)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))-\(epgRepository.programmeRevision)") {
             await rankSources()
         }
         // A launch-time or Following-tab background scan can finish confirming this match's
@@ -210,7 +210,7 @@ struct TVMatchDetailView: View {
                 .foregroundStyle(Theme.textPrimary)
             if let score = side.score {
                 Text(score)
-                    .font(.system(size: 56, weight: .black, design: .rounded))
+                    .font(.system(size: 56, weight: .bold, design: .rounded))
                     .foregroundStyle(side.isWinner ? Theme.accent : Theme.textPrimary)
                     .monospacedDigit()
             }
@@ -258,8 +258,8 @@ struct TVMatchDetailView: View {
             }
         }
         .padding(20)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     // MARK: - Broadcasts
@@ -298,8 +298,8 @@ struct TVMatchDetailView: View {
                     infoRow(label: "Venue", value: venue)
                 }
             }
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.hairline))
         }
     }
 

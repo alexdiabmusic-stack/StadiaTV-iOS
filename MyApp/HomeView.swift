@@ -201,7 +201,7 @@ struct HomeView: View {
 
     private var favoriteStreamScanKey: String {
         let ids = favoriteStreamMatches.map(\.id).sorted().joined(separator: ",")
-        return "\(ids)-\(playlistStore.channelsRevision)-\(Int(epgRepository.lastUpdated?.timeIntervalSince1970 ?? 0))"
+        return "\(ids)-\(playlistStore.channelsRevision)-\(epgRepository.programmeRevision)"
     }
 
     private var loadPreferencesKey: String {
@@ -422,8 +422,8 @@ struct HomeView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
     }
 
     // MARK: - Fantasy Context
@@ -654,7 +654,7 @@ private struct TeamMatchupHero: View {
     private var awaySide: TeamSide { match?.away ?? pick.streamMatch.away }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
         GeometryReader { proxy in
             ZStack {
                 // Background image
@@ -794,7 +794,7 @@ private struct TeamMatchupHero: View {
                     .foregroundStyle(.white.opacity(0.55))
                     .tracking(1)
                 Text("\(m.away.score ?? "—") – \(m.home.score ?? "—")")
-                    .font(.system(size: 26, weight: .black, design: .rounded).monospacedDigit())
+                    .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(.white)
                 Text(m.statusDetail)
                     .font(.caption2.weight(.semibold))
@@ -809,7 +809,7 @@ private struct TeamMatchupHero: View {
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(start, style: .time)
-                        .font(.system(size: 28, weight: .black, design: .rounded))
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                 } else if secsRemaining > 24 * 3600 {
                     Text("DATE")
@@ -817,7 +817,7 @@ private struct TeamMatchupHero: View {
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
-                        .font(.system(size: 22, weight: .black, design: .rounded))
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                 } else {
                     let h = max(0, secsRemaining) / 3600
@@ -827,7 +827,7 @@ private struct TeamMatchupHero: View {
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(secsRemaining < 60 ? "NOW" : h > 0 ? "\(h)h \(mins)m" : "\(mins)m")
-                        .font(.system(size: 28, weight: .black, design: .rounded).monospacedDigit())
+                        .font(.system(size: 28, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(.white)
                 }
             }
@@ -861,10 +861,10 @@ private struct TeamMatchupHero: View {
             .fixedSize(horizontal: true, vertical: false)
             .background(
                 primary ? Theme.accent.opacity(0.9) : Color.white.opacity(0.10),
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                     .strokeBorder(.white.opacity(0.18))
             )
     }
@@ -924,7 +924,7 @@ private struct EventHero: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
         GeometryReader { proxy in
             ZStack(alignment: .topLeading) {
                 // Background image — preserves right-side artwork
@@ -964,7 +964,7 @@ private struct EventHero: View {
                         .padding(.top, 10)
 
                     Text(pick.title)
-                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1052,7 +1052,7 @@ private struct EventHero: View {
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(start, style: .time)
-                        .font(.system(size: 30, weight: .black, design: .rounded))
+                        .font(.system(size: 30, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                 } else if secsRemaining > 24 * 3600 {
                     Text("DATE")
@@ -1060,7 +1060,7 @@ private struct EventHero: View {
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
-                        .font(.system(size: 24, weight: .black, design: .rounded))
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                     Text(start, style: .time)
                         .font(Theme.Typography.caption)
@@ -1073,7 +1073,7 @@ private struct EventHero: View {
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(secsRemaining < 60 ? "NOW" : h > 0 ? "\(h)h \(mins)m" : "\(mins)m")
-                        .font(.system(size: 30, weight: .black, design: .rounded).monospacedDigit())
+                        .font(.system(size: 30, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(.white)
                     Text(start, style: .time)
                         .font(Theme.Typography.caption)
@@ -1094,10 +1094,10 @@ private struct EventHero: View {
             .fixedSize(horizontal: true, vertical: false)
             .background(
                 primary ? Theme.accent.opacity(0.9) : Color.white.opacity(0.10),
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                     .strokeBorder(.white.opacity(0.18))
             )
     }
@@ -1160,10 +1160,10 @@ private struct PrimeHeroCard: View {
                     colors: [Theme.surfaceElevated, Theme.surface],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 ),
-                in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+                in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
                     .strokeBorder(match.state == .live ? Theme.live.opacity(0.4) : Theme.hairline)
             )
         }
@@ -1400,7 +1400,7 @@ private struct SoonTimelineCard: View {
                     .lineLimit(1)
 
                 Text(secs < 60 ? "Starts now" : (h > 0 ? "In \(h)h \(m)m" : "In \(m) min"))
-                    .font(.system(size: 12, weight: .heavy, design: .rounded).monospacedDigit())
+                    .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(urgent ? Theme.live : Theme.starting)
 
                 if !match.broadcasts.isEmpty {
@@ -1412,13 +1412,13 @@ private struct SoonTimelineCard: View {
             }
             .padding(12)
             .frame(width: 150)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
             .overlay(alignment: .top) {
                 Rectangle()
                     .fill(urgent ? Theme.live : Theme.starting)
                     .frame(height: 2)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
             }
         }
     }
@@ -1520,7 +1520,7 @@ private struct ScheduleSection: View {
                     .buttonStyle(.plain)
                 }
             }
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             .overlay(
                 GeometryReader { proxy in
                     let idx = ScheduleDay.allCases.firstIndex(of: selectedDay) ?? 0
@@ -1621,8 +1621,8 @@ private struct ScheduleRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
     }
 }
 
@@ -1733,7 +1733,7 @@ private struct ContinueWatchingCard: View {
                 }
             }
             .frame(width: 150, height: 84)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             .overlay(alignment: .bottomTrailing) {
                 Image(systemName: "play.circle.fill")
                     .font(.title3)

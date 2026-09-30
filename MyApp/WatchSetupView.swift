@@ -144,7 +144,7 @@ private struct ConnectedPlaylistRow: View {
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                     .fill(Color.green.opacity(0.15))
                     .frame(width: 40, height: 40)
                 Image(systemName: "checkmark.circle.fill")

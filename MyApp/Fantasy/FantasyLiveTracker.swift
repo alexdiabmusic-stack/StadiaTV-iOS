@@ -176,9 +176,9 @@ struct FantasyRedZoneToastView: View {
             .buttonStyle(.plain)
         }
         .padding(12)
-        .background(.black.opacity(0.88), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(.black.opacity(0.88), in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                 .strokeBorder(alert.isTouchdown ? Theme.live : Theme.accent, lineWidth: 1.5)
         )
         .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 4)
@@ -287,7 +287,7 @@ struct FantasyMatchupSidebarView: View {
             }
         }
         .padding(4)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         .padding(.horizontal, 16)
         .padding(.top, 12)
     }
@@ -438,8 +438,8 @@ struct FantasyMatchupSidebarView: View {
                         }
                     }
                     .padding(10)
-                    .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Theme.hairline))
+                    .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
                 }
             }
         }
@@ -489,7 +489,7 @@ struct FantasyMatchupSidebarView: View {
             }
         }
         .padding(8)
-        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
     }
 }
 
@@ -572,10 +572,10 @@ struct FantasyWinProbabilityChartView: View {
             }
             .frame(height: 50)
             .background(Color.white.opacity(0.04))
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         }
         .padding(12)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
     }
 }
 
@@ -650,10 +650,10 @@ struct FantasyPlayerPaceWidget: View {
                     }
                 }
                 .padding(8)
-                .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             }
         }
         .padding(12)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
     }
 }

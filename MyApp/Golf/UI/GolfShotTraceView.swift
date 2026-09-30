@@ -85,7 +85,7 @@ struct GolfShotTraceView: View {
             }
         }
         .frame(height: 180)
-        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: 12))
+        .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
         .accessibilityHidden(true) // shot list below is the accessible representation
     }
 }

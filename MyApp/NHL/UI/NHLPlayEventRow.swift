@@ -88,7 +88,7 @@ struct NHLPlayEventRow: View {
             }
             .padding(prominent ? 14 : 8)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(prominent ? Theme.surface : Color.clear, in: RoundedRectangle(cornerRadius: 12))
+            .background(prominent ? Theme.surface : Color.clear, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
             .overlay(alignment: .leading) {
                 if event.eventType == .goal { RoundedRectangle(cornerRadius: 2).fill(Theme.accent).frame(width: 3).padding(.vertical, 12) }
             }

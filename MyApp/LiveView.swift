@@ -541,14 +541,14 @@ struct LiveMatchCard: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
         .overlay(alignment: .top) {
             if showScoreBar {
                 Rectangle()
                     .fill(Theme.live)
                     .frame(height: 2)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
             }
         }
         .contextMenu {
@@ -576,7 +576,7 @@ struct LiveMatchCard: View {
         case .golf:
             VStack(alignment: .leading, spacing: 6) {
                 Text(match.name.isEmpty ? match.league.name : match.name)
-                    .font(.system(size: 18, weight: .heavy))
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(2)
                 golfLeaderLine
@@ -584,7 +584,7 @@ struct LiveMatchCard: View {
         case .motorsport:
             VStack(alignment: .leading, spacing: 6) {
                 Text(match.name.isEmpty ? match.league.name : match.name)
-                    .font(.system(size: 18, weight: .heavy))
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(2)
                 if !match.away.displayName.isEmpty, match.away.displayName != "TBD" {
@@ -595,7 +595,7 @@ struct LiveMatchCard: View {
             }
         case .combatSport:
             Text(match.name.isEmpty ? match.league.name : match.name)
-                .font(.system(size: 18, weight: .heavy))
+                .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(2)
         case .teamSport, .tennis:
@@ -674,7 +674,7 @@ private struct CompactSoonCard: View {
                     .lineLimit(1)
                     .frame(width: 110)
                 Text(h > 0 ? "\(h)h \(m)m" : "\(m) min")
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(m < 10 && h == 0 ? Theme.live : Theme.starting)
                 Text(match.league.shortName)
                     .font(.caption2.weight(.bold))
@@ -683,8 +683,8 @@ private struct CompactSoonCard: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 12)
             .frame(width: 130)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
         }
     }
 }

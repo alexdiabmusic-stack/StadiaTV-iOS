@@ -25,6 +25,18 @@ struct TVGuideView: View {
     @State private var channelForOffset: CanonicalChannel?
     @State private var channelSearchQuery: String = ""
 
+    /// Hashes just the fantasy state the guide grid actually renders, so the grid can
+    /// gate its own cache on this single Int instead of subscribing to either fantasy
+    /// store's full `objectWillChange` (which fires on every unrelated update too).
+    private var guideFantasyRevision: Int {
+        var hasher = Hasher()
+        hasher.combine(fantasyStore.playerGames.count)
+        hasher.combine(fantasyStore.settings.showFantasyIndicatorsInGuide)
+        hasher.combine(nativeFantasyStore.fantasyEventContextsByEventID.count)
+        hasher.combine(nativeFantasyStore.fantasyGamesByChannelID.count)
+        return hasher.finalize()
+    }
+
     var body: some View {
         Group {
             if repository.canonicalChannels.isEmpty {
@@ -126,7 +138,21 @@ struct TVGuideView: View {
             if guideStore.guideMode == .myGuide && !guideStore.hasConfigured {
                 myGuideSetupPrompt
             } else {
-                EPGGuideGrid(vm: vm) { channel in
+                // Computed here (TVGuideView already observes both fantasy stores for
+                // onProgramTap below) and threaded down as plain values, so the grid's
+                // cell-rendering layer doesn't subscribe to either store directly and
+                // re-render on every unrelated fantasy update.
+                let showsFantasyIndicators = fantasyStore.settings.showFantasyIndicatorsInGuide
+                let fantasyRevision = guideFantasyRevision
+                EPGGuideGrid(
+                    vm: vm,
+                    showsFantasyIndicators: showsFantasyIndicators,
+                    fantasyRevision: fantasyRevision,
+                    fantasyIndicatorCount: { programme, channel in
+                        fantasyStore.fantasyIndicatorCount(for: programme, channel: channel)
+                            + nativeFantasyStore.fantasyIndicatorCount(for: programme, channel: channel)
+                    }
+                ) { channel in
                     guard channel.playableChannel != nil else { return }
                     if let onChannelSelected {
                         onChannelSelected(channel)
@@ -362,6 +388,9 @@ private struct DirectionalLockModifier: UIViewRepresentable {
 struct EPGGuideGrid: View {
     @ObservedObject var vm: TVGuideViewModel
     @EnvironmentObject private var repository: EPGRepository
+    let showsFantasyIndicators: Bool
+    let fantasyRevision: Int
+    let fantasyIndicatorCount: (EPGProgramme, CanonicalChannel) -> Int
     let onChannelTap: (CanonicalChannel) -> Void
     let onProgramTap: (EPGProgramme, CanonicalChannel) -> Void
     let onSetOffset: ((CanonicalChannel) -> Void)?
@@ -386,7 +415,10 @@ struct EPGGuideGrid: View {
                     vm: vm,
                     scrollState: scrollState,
                     scrollToNowTrigger: scrollToNowTrigger,
-                    now: now,
+                    isRefreshing: repository.refreshState == .refreshing,
+                    showsFantasyIndicators: showsFantasyIndicators,
+                    fantasyRevision: fantasyRevision,
+                    fantasyIndicatorCount: fantasyIndicatorCount,
                     onProgramTap: onProgramTap
                 )
                 ChannelColumnOverlayView(
@@ -447,32 +479,28 @@ struct EPGGuideGrid: View {
 /// when the offset changes — only the overlay views observe it.
 private struct ProgrammeGridView: View {
     @ObservedObject var vm: TVGuideViewModel
-    @EnvironmentObject var repository: EPGRepository
-    @EnvironmentObject var fantasyStore: FantasyStore
-    @EnvironmentObject var nativeFantasyStore: BannerFantasyStore
     let scrollState: EPGScrollState
     let scrollToNowTrigger: Int
-    let now: Date
+    let isRefreshing: Bool
+    let showsFantasyIndicators: Bool
+    let fantasyRevision: Int
+    let fantasyIndicatorCount: (EPGProgramme, CanonicalChannel) -> Int
     let onProgramTap: (EPGProgramme, CanonicalChannel) -> Void
 
     @State private var scrollPos = ScrollPosition(x: 0, y: 0)
     /// Rows currently rendered: the visible range plus a margin, snapped to chunks so it
     /// only changes (and re-renders the grid) every few rows of scrolling, not every frame.
     @State private var renderedRows: Range<Int> = 0..<24
+    /// Same idea horizontally, in minutes since guideWindowStart — only cells whose time
+    /// range overlaps this window get instantiated as views, not the whole day per row.
+    @State private var renderedMinutes: Range<Int> = 0..<240
 
     private let rowH = TVGuideViewModel.rowHeight
     private let colW = TVGuideViewModel.channelColumnWidth
     private let rulerH = TVGuideViewModel.timeRulerHeight
     private static let rowMargin = 6
-
-    private var fantasyRevision: Int {
-        var hasher = Hasher()
-        hasher.combine(fantasyStore.playerGames.count)
-        hasher.combine(fantasyStore.settings.showFantasyIndicatorsInGuide)
-        hasher.combine(nativeFantasyStore.fantasyEventContextsByEventID.count)
-        hasher.combine(nativeFantasyStore.fantasyGamesByChannelID.count)
-        return hasher.finalize()
-    }
+    private static let minuteChunk = 60
+    private static let minuteMargin = 60
 
     var body: some View {
         let channels = vm.visibleChannels
@@ -504,11 +532,13 @@ private struct ProgrammeGridView: View {
             let firstRow = max(0, Int((offset.y - rulerH) / rowH))
             let visibleRows = max(1, Int(scrollState.viewSize.height / rowH) + 2)
             updateRenderedRows(firstRow: firstRow, visibleRows: visibleRows)
+            updateRenderedMinutes(offsetX: offset.x, viewWidth: scrollState.viewSize.width)
             vm.scrolledTo(firstRow: firstRow, visibleRowCount: visibleRows)
         }
         .contentMargins(.bottom, scrollState.bottomInset + 16, for: .scrollContent)
         .onChange(of: scrollToNowTrigger) { _, _ in
             let target = vm.initialScrollOffset
+            updateRenderedMinutes(offsetX: target, viewWidth: scrollState.viewSize.width)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
                 scrollPos = ScrollPosition(x: target, y: 0)
             }
@@ -523,11 +553,22 @@ private struct ProgrammeGridView: View {
         if range != renderedRows { renderedRows = range }
     }
 
+    private func updateRenderedMinutes(offsetX: CGFloat, viewWidth: CGFloat) {
+        let ptsPerMinute = TVGuideViewModel.ptsPerMinute
+        let chunk = Self.minuteChunk
+        let firstMinute = max(0, Int(offsetX / ptsPerMinute))
+        let visibleMinutes = max(1, Int(viewWidth / ptsPerMinute) + 1)
+        let start = max(0, (firstMinute - Self.minuteMargin) / chunk * chunk)
+        let end = ((firstMinute + visibleMinutes + Self.minuteMargin) / chunk + 1) * chunk
+        let range = start..<end
+        if range != renderedMinutes { renderedMinutes = range }
+    }
+
     @ViewBuilder
     private func programCells(for channel: CanonicalChannel, rowY: CGFloat) -> some View {
         let layout = vm.rowLayout(for: channel)
         if layout.isEmpty {
-            if repository.refreshState == .refreshing {
+            if isRefreshing {
                 Rectangle()
                     .fill(Theme.surface.opacity(0.35))
                     .frame(width: max(120, vm.guideWindowWidth), height: rowH - 2)
@@ -536,16 +577,23 @@ private struct ProgrammeGridView: View {
                 noEPGCell(channel: channel, rowY: rowY)
             }
         } else {
-            let showsFantasy = fantasyStore.settings.showFantasyIndicatorsInGuide
-            ForEach(layout.cells) { cell in
+            let ptsPerMinute = TVGuideViewModel.ptsPerMinute
+            let xStart = CGFloat(renderedMinutes.lowerBound) * ptsPerMinute
+            let xEnd = CGFloat(renderedMinutes.upperBound) * ptsPerMinute
+            let visibleCells = layout.cells.filter { cell in
+                cell.x + cell.width > xStart && cell.x < xEnd
+            }
+            let now = Date()
+            ForEach(visibleCells) { cell in
                 if let prog = cell.programme {
                     ProgrammeCell(
                         programme: prog,
                         width: cell.width,
                         now: now,
+                        timeRangeLabel: cell.timeRangeLabel,
                         hasCatchup: channel.hasCatchup,
-                        fantasyIndicatorCount: showsFantasy ? vm.fantasyIndicatorCount(for: prog, channel: channel, revision: fantasyRevision) {
-                            fantasyStore.fantasyIndicatorCount(for: prog, channel: channel) + nativeFantasyStore.fantasyIndicatorCount(for: prog, channel: channel)
+                        fantasyIndicatorCount: showsFantasyIndicators ? vm.fantasyIndicatorCount(for: prog, channel: channel, revision: fantasyRevision) {
+                            fantasyIndicatorCount(prog, channel)
                         } : 0,
                         streamCount: channel.allStreams.count
                     ) {
@@ -790,6 +838,10 @@ struct ProgrammeCell: View {
     let programme: EPGProgramme
     let width: CGFloat
     let now: Date
+    /// Precomputed "start – end" label (see `TVGuideViewModel.GuideCellLayout`) — a
+    /// past/future programme's range never changes, so it's formatted once at layout
+    /// build time rather than on every render.
+    var timeRangeLabel: String = ""
     var hasCatchup: Bool = false
     var fantasyIndicatorCount: Int = 0
     var streamCount: Int = 0
@@ -801,7 +853,8 @@ struct ProgrammeCell: View {
     private var showFantasyBadge: Bool { fantasyIndicatorCount > 0 && width >= 42 }
     private var showStreamBadge: Bool { isCurrent && streamCount > 0 && width >= 36 }
 
-    // Static formatter to avoid re-creating DateFormatter on every cell render.
+    // Static formatter, used only for the "current" cell's live-updating start/end
+    // label (accessibilityLabel) — the precomputed timeRangeLabel covers everything else.
     nonisolated static let timeFmt: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "h:mm a"
@@ -809,60 +862,61 @@ struct ProgrammeCell: View {
     }()
 
     var body: some View {
-        Button(action: onTap) {
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(isCurrent ? Theme.accent.opacity(0.18) : isPast ? Theme.surface.opacity(0.6) : Theme.surface)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .strokeBorder(isCurrent ? Theme.accent.opacity(0.4) : Theme.hairline)
-                    )
+        ZStack(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(isCurrent ? Theme.accent.opacity(0.18) : isPast ? Theme.surface.opacity(0.6) : Theme.surface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .strokeBorder(isCurrent ? Theme.accent.opacity(0.4) : Theme.hairline)
+                )
 
-                // Thin progress bar for currently-airing programmes
-                if isCurrent {
-                    GeometryReader { g in
-                        Rectangle()
-                            .fill(Theme.accent.opacity(0.15))
-                            .frame(width: g.size.width * programme.progress(at: now))
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            // Thin progress bar for currently-airing programmes
+            if isCurrent {
+                GeometryReader { g in
+                    Rectangle()
+                        .fill(Theme.accent.opacity(0.15))
+                        .frame(width: g.size.width * programme.progress(at: now))
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
 
-                // Text content — responsive to card width
-                if width >= 36 {
-                    cellContent
-                }
+            // Text content — responsive to card width
+            if width >= 36 {
+                cellContent
+            }
 
-                // Catch-up and Fantasy badges stay inside the existing cell height.
-                if showCatchupBadge {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(Theme.Typography.overline)
-                        .foregroundStyle(Theme.accent.opacity(0.8))
-                        .padding(3)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                }
+            // Catch-up and Fantasy badges stay inside the existing cell height.
+            if showCatchupBadge {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(Theme.Typography.overline)
+                    .foregroundStyle(Theme.accent.opacity(0.8))
+                    .padding(3)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            }
 
-                if showStreamBadge {
-                    Image(systemName: "play.tv")
-                        .font(Theme.Typography.overline)
-                        .foregroundStyle(Theme.accent)
-                        .padding(3)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                }
+            if showStreamBadge {
+                Image(systemName: "play.tv")
+                    .font(Theme.Typography.overline)
+                    .foregroundStyle(Theme.accent)
+                    .padding(3)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            }
 
-                if showFantasyBadge {
-                    Text(fantasyIndicatorCount == 1 ? "★" : "★\(fantasyIndicatorCount)")
-                        .font(Theme.Typography.overline)
-                        .foregroundStyle(Theme.accent)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .background(.black.opacity(0.35), in: Capsule())
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: showCatchupBadge ? .bottomTrailing : .topTrailing)
-                        .padding(3)
-                }
+            if showFantasyBadge {
+                Text(fantasyIndicatorCount == 1 ? "★" : "★\(fantasyIndicatorCount)")
+                    .font(Theme.Typography.overline)
+                    .foregroundStyle(Theme.accent)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(.black.opacity(0.35), in: Capsule())
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: showCatchupBadge ? .bottomTrailing : .topTrailing)
+                    .padding(3)
             }
         }
-        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
         .accessibilityLabel(accessibilityLabel)
     }
 
@@ -892,7 +946,7 @@ struct ProgrammeCell: View {
             if mins < 60 { return "\(mins)m left" }
             return "\(mins / 60)h \(mins % 60)m left"
         } else {
-            return "\(Self.timeFmt.string(from: programme.start)) – \(Self.timeFmt.string(from: programme.end))"
+            return timeRangeLabel
         }
     }
 
@@ -913,30 +967,32 @@ struct ChannelLogoCell: View {
     let onTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 4) {
-                if let logoURL = channel.effectiveLogoURL {
-                    CachedImage(url: logoURL) { phase in
-                        if case .success(let img) = phase {
-                            img.resizable().scaledToFit()
-                        } else {
-                            channelInitials
-                        }
+        VStack(spacing: 4) {
+            if let logoURL = channel.effectiveLogoURL {
+                CachedImage(url: logoURL) { phase in
+                    if case .success(let img) = phase {
+                        img.resizable().scaledToFit()
+                    } else {
+                        channelInitials
                     }
-                    .frame(width: 44, height: 28)
-                } else {
-                    channelInitials
-                        .frame(width: 44, height: 28)
                 }
-                Text(channel.name)
-                    .font(Theme.Typography.overline)
-                    .foregroundStyle(Theme.textTertiary)
-                    .lineLimit(1)
-                    .frame(maxWidth: TVGuideViewModel.channelColumnWidth - 8)
+                .frame(width: 44, height: 28)
+            } else {
+                channelInitials
+                    .frame(width: 44, height: 28)
             }
-            .frame(width: TVGuideViewModel.channelColumnWidth, height: TVGuideViewModel.rowHeight)
+            Text(channel.name)
+                .font(Theme.Typography.overline)
+                .foregroundStyle(Theme.textTertiary)
+                .lineLimit(1)
+                .frame(maxWidth: TVGuideViewModel.channelColumnWidth - 8)
         }
-        .buttonStyle(.plain)
+        .frame(width: TVGuideViewModel.channelColumnWidth, height: TVGuideViewModel.rowHeight)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(channel.name)
     }
 
     private var channelInitials: some View {
@@ -1031,7 +1087,7 @@ struct ProgrammeDetailSheet: View {
                     }
                 }
                 .frame(width: 48, height: 48)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 8))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(channel.name)
@@ -1072,7 +1128,7 @@ struct ProgrammeDetailSheet: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 180)
                         .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
                 }
             }
         }
@@ -1139,8 +1195,8 @@ struct ProgrammeDetailSheet: View {
                 }
             }
             .padding(14)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.hairline))
         }
     }
 
@@ -1195,7 +1251,7 @@ struct ProgrammeDetailSheet: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Theme.live.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                    .background(Theme.live.opacity(0.12), in: RoundedRectangle(cornerRadius: Theme.Radius.md))
                     .foregroundStyle(Theme.live)
                 }
                 .buttonStyle(.plain)
@@ -1212,7 +1268,7 @@ struct ProgrammeDetailSheet: View {
                 .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 12))
+                .background(Theme.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
                 .foregroundStyle(.white)
         }
         .buttonStyle(.plain)
@@ -1243,7 +1299,7 @@ struct ProgrammeDetailSheet: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 12))
+                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
                     .foregroundStyle(.white)
             }
             .buttonStyle(.plain)
@@ -1302,7 +1358,7 @@ struct ProgrammeDetailSheet: View {
                 .padding(.vertical, 14)
                 .background(
                     hasReminder ? Theme.surfaceElevated : Theme.accent,
-                    in: RoundedRectangle(cornerRadius: 12)
+                    in: RoundedRectangle(cornerRadius: Theme.Radius.md)
                 )
                 .foregroundStyle(hasReminder ? Theme.textPrimary : .white)
             }
@@ -1589,9 +1645,9 @@ private struct CategoryToggleCard: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(isSelected ? Theme.accent : Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(isSelected ? Theme.accent : Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                     .strokeBorder(isSelected ? Theme.accent : Theme.hairline)
             )
         }
@@ -1951,8 +2007,8 @@ struct WhatsOnCard: View {
                 .frame(height: 3)
             }
             .padding(12)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                 .strokeBorder(Theme.hairline))
         }
         .buttonStyle(.plain)

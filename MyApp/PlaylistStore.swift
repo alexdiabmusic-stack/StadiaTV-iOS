@@ -27,6 +27,51 @@ final class PlaylistStore: ObservableObject {
     @Published private(set) var defaultPlaylistID: UUID?
     @Published var lastError: String?
 
+    /// Connection-limit status per Xtream playlist, refreshed alongside channel data.
+    let xtreamAccountStatus = XtreamAccountStatusStore.shared
+
+    /// Fetches Xtream EPG data for one provider channel — `fullSchedule: true` calls
+    /// `get_simple_data_table` (a full multi-day schedule, ~0.5-1s per the provider docs,
+    /// only worth it for a row actually scrolled into view); `false` calls
+    /// `get_short_epg` (now/next only), reading `start_timestamp`/`stop_timestamp`
+    /// directly rather than a formatted date string. Wired into `EPGRepository` once at
+    /// app startup via `xtreamEPGFetcher` since that repository has no direct
+    /// PlaylistStore reference.
+    func fetchXtreamEPG(forProviderChannelId providerChannelId: String, fullSchedule: Bool) async -> [EPGProgramme] {
+        guard let liveChannel = try? await LiveChannelStore.shared.channel(id: providerChannelId),
+              let streamID = liveChannel.xtreamStreamID,
+              let playlist = playlists.first(where: { $0.id == liveChannel.providerID }) else { return [] }
+        let adapter = XtreamProviderAdapter(provider: LiveProvider(playlist: playlist))
+        do {
+            let listings = fullSchedule
+                ? try await adapter.simpleDataTable(streamID: streamID)
+                : try await adapter.shortEPG(streamID: streamID)
+            let sourceId = "xtream-\(playlist.id.uuidString)"
+            return listings.map { listing in
+                EPGProgramme(
+                    id: "xtream-\(streamID)-\(Int(listing.startTimestamp.timeIntervalSince1970))",
+                    epgChannelId: "xtream:\(providerChannelId)",
+                    canonicalChannelId: nil,
+                    title: listing.title,
+                    subtitle: nil,
+                    description: listing.description,
+                    categories: [],
+                    start: listing.startTimestamp,
+                    end: listing.stopTimestamp,
+                    imageURL: nil,
+                    season: nil,
+                    episode: nil,
+                    rating: nil,
+                    sourceId: sourceId,
+                    sourcePriority: 5,
+                    endTimeIsInferred: false
+                )
+            }
+        } catch {
+            return []
+        }
+    }
+
     private let defaultsKey      = "bannertv.playlists.v1"
     private let defaultPlaylistKey = "bannertv.defaultplaylist.v1"
 
@@ -253,6 +298,9 @@ final class PlaylistStore: ObservableObject {
         guard !loadingPlaylistIDs.contains(playlist.id) else { return }
         loadingPlaylistIDs.insert(playlist.id)
         defer { loadingPlaylistIDs.remove(playlist.id) }
+        // Read user_info/server_info alongside the channel refresh, not on every
+        // multiscreen/recording attempt — a no-op for M3U playlists.
+        Task { await xtreamAccountStatus.refresh(for: playlist) }
         do {
             let result = try await repository.refreshChannels(for: playlist)
             channelsByPlaylist[playlist.id] = result.channels

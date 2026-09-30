@@ -45,7 +45,7 @@ struct GolfOverviewView: View {
                         if entry.id != topLeaders.last?.id { Divider().overlay(Theme.hairline) }
                     }
                 }
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
 
                 Button("View Full Leaderboard", action: onShowFullLeaderboard)
                     .font(.subheadline.bold())
@@ -71,7 +71,7 @@ struct GolfOverviewView: View {
                     }
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
                 }
             }
         }
@@ -97,7 +97,7 @@ struct GolfOverviewView: View {
                     Image(systemName: "chevron.right").foregroundStyle(Theme.textTertiary)
                 }
                 .padding(16)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
             }
             .buttonStyle(.plain)
             .frame(minHeight: 44)

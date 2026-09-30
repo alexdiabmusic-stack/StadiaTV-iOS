@@ -109,7 +109,7 @@ struct TVPaywallView: View {
                     .font(.title2.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
                 Text(product.displayPrice)
-                    .font(.system(size: 36, weight: .black, design: .rounded))
+                    .font(.system(size: 36, weight: .bold, design: .rounded))
                     .foregroundStyle(Theme.accent)
                 if let desc = product.description.split(separator: ".").first {
                     Text(String(desc))
@@ -125,8 +125,8 @@ struct TVPaywallView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 28)
             .padding(.horizontal, 24)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.accent.opacity(0.4), lineWidth: 1.5))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.accent.opacity(0.4), lineWidth: 1.5))
         }
         .buttonStyle(.card)
         .disabled(entitlements.isPurchasing)

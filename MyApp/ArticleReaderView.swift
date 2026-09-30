@@ -432,7 +432,7 @@ struct ArticleReaderView: View {
             .overlay(
                 Group {
                     if prominent {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous)
                             .strokeBorder(Theme.accent.opacity(0.4))
                     }
                 }

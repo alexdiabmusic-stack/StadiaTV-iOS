@@ -247,7 +247,7 @@ struct TVFollowingView: View {
                             .tracking(1.5)
 
                         Text("VS")
-                            .font(.system(size: 32, weight: .black, design: .rounded))
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
                             .foregroundStyle(.white.opacity(0.4))
 
                         Text(match.league.shortName.uppercased())
@@ -432,7 +432,7 @@ private struct TVFollowingLiveHero: View {
                                     Text("–").foregroundStyle(Theme.textTertiary)
                                     Text(match.home.score ?? "-")
                                 }
-                                .font(.system(size: 48, weight: .black, design: .rounded).monospacedDigit())
+                                .font(.system(size: 48, weight: .bold, design: .rounded).monospacedDigit())
                                 .foregroundStyle(Theme.textPrimary)
 
                                 Text(match.statusDetail)

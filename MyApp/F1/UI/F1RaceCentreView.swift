@@ -50,7 +50,7 @@ struct F1RaceCentreView<WatchContent: View, RelatedContent: View>: View {
                     HStack {
                         ForEach(tabs, id: \.self) { item in
                             Button { tab = item } label: { Text(item).font(.subheadline.bold()).frame(minHeight: 44).padding(.horizontal, 8)
-                                .background(tab == item ? Theme.surfaceElevated : .clear, in: RoundedRectangle(cornerRadius: 8))
+                                .background(tab == item ? Theme.surfaceElevated : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
                                 .overlay(alignment: .bottom) { if tab == item { Capsule().fill(Theme.accessibleAccent).frame(height: 3) } } }
                                 .buttonStyle(.bordered).accessibilityAddTraits(tab == item ? .isSelected : [])
                         }
@@ -67,7 +67,7 @@ struct F1RaceCentreView<WatchContent: View, RelatedContent: View>: View {
                     } else if loadError == nil && model.error == nil {
                         VStack(spacing: 18) {
                             ProgressView("Loading Race Centre")
-                            ForEach(0..<4) { _ in RoundedRectangle(cornerRadius: 8).fill(Theme.surfaceElevated).frame(height: 60) }
+                            ForEach(0..<4) { _ in RoundedRectangle(cornerRadius: Theme.Radius.sm).fill(Theme.surfaceElevated).frame(height: 60) }
                         }.padding()
                     } else { ContentUnavailableView("Live timing temporarily unavailable", systemImage: "wifi.exclamationmark") }
                 } else {

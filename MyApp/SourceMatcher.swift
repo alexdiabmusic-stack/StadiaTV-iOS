@@ -8,6 +8,41 @@ import Foundation
 ///  - the ESPN broadcast network (e.g. "ESPN", "TNT") appearing in the channel name
 ///  - league / sport keywords
 ///  - a small bonus for channels sitting in a "sports" group
+/// Precomputed inverted index from a normalized-name word to the channels whose name
+/// contains it, so `SourceMatcher.teamNameBackups` doesn't re-scan every channel per
+/// match. Build once per scan cycle (not once per match) and reuse across every match
+/// in that cycle — turns an O(matches × channels) scan into O(matches × candidates).
+/// Abbreviation-length tokens are dropped from the index: a bare 2-3 letter token
+/// indexed on its own would match far too many unrelated channels (e.g. "US" alone).
+nonisolated struct ChannelNameIndex {
+    private let byToken: [String: [Channel]]
+
+    init(channels: [Channel]) {
+        var map: [String: [Channel]] = [:]
+        for channel in channels {
+            let repaired = EventChannelNameParser.repairBadgeCorruption(channel.name)
+            let tokens = Set(ProviderChannelIdentity(repaired).eventText.split(separator: " ").map(String.init))
+            for token in tokens where token.count >= 4 {
+                map[token, default: []].append(channel)
+            }
+        }
+        byToken = map
+    }
+
+    /// Every distinct channel indexed under any of the given tokens (short tokens are
+    /// ignored, same abbreviation-drop rule as at index-build time).
+    func candidates(forTokens tokens: [String]) -> [Channel] {
+        var seenIds = Set<String>()
+        var result: [Channel] = []
+        for token in tokens where token.count >= 4 {
+            for channel in byToken[token] ?? [] where seenIds.insert(channel.id).inserted {
+                result.append(channel)
+            }
+        }
+        return result
+    }
+}
+
 nonisolated enum SourceMatcher {
 
     /// Words that carry no discriminating value when matching team/channel names.
@@ -30,11 +65,14 @@ nonisolated enum SourceMatcher {
         var rankedByID: [String: RankedSource] = [:]
 
         for channel in channels {
-            let identity = ProviderChannelIdentity(channel.name)
+            // Repair a provider panel's mid-word "US ★" badge-injection corruption
+            // (e.g. "MUS ★kingum" -> "Muskingum") before any name parsing below.
+            let repairedName = EventChannelNameParser.repairBadgeCorruption(channel.name)
+            let identity = ProviderChannelIdentity(repairedName)
             let haystack = identity.eventText
-            guard isEligible(name: channel.name, normalizedName: haystack, for: match,
+            guard isEligible(name: repairedName, normalizedName: haystack, for: match,
                              participants: participants) else { continue }
-            let (homeHit, awayHit) = participants.hits(in: haystack, labelledFixture: hasFixtureSeparator(channel.name))
+            let (homeHit, awayHit) = participants.hits(in: haystack, labelledFixture: hasFixtureSeparator(repairedName))
             var score = 0
             var evidence: Set<StreamEvidenceCategory> = []
             if homeHit && awayHit {
@@ -101,7 +139,8 @@ nonisolated enum SourceMatcher {
 
     /// Shared hard gates also apply when a guide injects a previously unranked channel.
     static func isEligible(channel: Channel, for match: Match) -> Bool {
-        isEligible(name: channel.name, normalizedName: ProviderChannelIdentity(channel.name).eventText,
+        let repairedName = EventChannelNameParser.repairBadgeCorruption(channel.name)
+        return isEligible(name: repairedName, normalizedName: ProviderChannelIdentity(repairedName).eventText,
                    for: match, participants: ParticipantIdentity(match))
     }
 
@@ -144,25 +183,62 @@ nonisolated enum SourceMatcher {
 
     /// A nearby guide entry is a retrieval candidate, not confirmation. Require the
     /// actual fixture/session and substantial overlap with its scheduled window.
+    ///
+    /// Judges from the title and subtitle only — the description is free text and
+    /// too noisy to trust as primary evidence. It's consulted only as a fallback when
+    /// the title+subtitle name neither participant. Placeholder listings ("No Game
+    /// Today", "Next Game:") and generic coverage shows ("In-Game Live") never confirm.
     static func confirms(programme: EPGProgramme, for match: Match) -> Bool {
         guard match.state != .final, programme.isValid,
               programme.start <= match.date.addingTimeInterval(30 * 60),
               programme.end >= match.date.addingTimeInterval(15 * 60) else { return false }
-        let title = [programme.title, programme.subtitle ?? "", programme.description ?? ""].joined(separator: " ")
-        guard !hasStaleOrReplayLabel(title, at: match.date),
-              !SportsOntology.isIncompatible(candidate: SportsOntology.classifyFeedFamily(from: title),
+
+        let title = stripDecorativeBadges(programme.title)
+        guard !isPlaceholderOrCoverageTitle(title) else { return false }
+        let subtitle = programme.subtitle.map(stripDecorativeBadges) ?? ""
+        let primary = "\(title) \(subtitle)"
+        guard !hasStaleOrReplayLabel(primary, at: match.date),
+              !SportsOntology.isIncompatible(candidate: SportsOntology.classifyFeedFamily(from: primary),
                                                with: SportsOntology.feedFamily(for: match.league.path)) else { return false }
         if match.league.group == .racing {
             let expected = RacingSessionKind.detect(from: "\(match.name) \(match.shortName)")
-            let actual = RacingSessionKind.detect(from: title)
+            let actual = RacingSessionKind.detect(from: primary)
             if expected != .unknown && actual != .unknown && expected != actual { return false }
         }
-        let normalized = normalize(title)
-        if usesParticipants(match) {
-            let (home, away) = ParticipantIdentity(match).hits(in: normalized, labelledFixture: hasFixtureSeparator(title))
-            return home && away
+
+        func judges(_ text: String) -> Bool {
+            let normalized = normalize(text)
+            if usesParticipants(match) {
+                let (home, away) = ParticipantIdentity(match).hits(in: normalized, labelledFixture: hasFixtureSeparator(text))
+                return home && away
+            }
+            return eventTitleMatches(match, in: normalized)
         }
-        return eventTitleMatches(match, in: normalized)
+
+        if judges(primary) { return true }
+
+        // Title+subtitle named neither participant — fall back to the description,
+        // where some providers put the actual matchup and nothing else.
+        guard let description = programme.description, !description.isEmpty else { return false }
+        let strippedDescription = stripDecorativeBadges(description)
+        guard !isPlaceholderOrCoverageTitle(strippedDescription) else { return false }
+        return judges(strippedDescription)
+    }
+
+    /// Strips decorative small-caps "Live"/"New" badges some providers append to titles.
+    private static func stripDecorativeBadges(_ text: String) -> String {
+        text.replacingOccurrences(of: "ᴸᶦᵛᵉ", with: "")
+            .replacingOccurrences(of: "ᴺᵉʷ", with: "")
+    }
+
+    /// True for guide placeholder listings ("No Game Today", "Next Game:") and generic
+    /// coverage/studio shows ("In-Game Live") that name no specific fixture at all.
+    private static func isPlaceholderOrCoverageTitle(_ text: String) -> Bool {
+        let lower = text.trimmingCharacters(in: .whitespaces).lowercased()
+        if lower == "no game today" { return true }
+        if lower.hasPrefix("next game:") { return true }
+        if lower.contains("in-game live") || lower.contains("in game live") { return true }
+        return false
     }
 
     /// Language tags detected on a channel name, from whole-word tokens such as
@@ -193,6 +269,12 @@ nonisolated enum SourceMatcher {
     private struct ParticipantIdentity {
         let home: [String]
         let away: [String]
+
+        /// Every individual word across both sides' alias phrases — the query keys
+        /// for `ChannelNameIndex`'s per-word candidate lookup.
+        var allTokens: [String] {
+            (home + away).flatMap { $0.split(separator: " ").map(String.init) }
+        }
 
         init(_ match: Match) {
             let homeAliases = SourceMatcher.teamAliases(for: match.home, league: match.league)
@@ -231,6 +313,9 @@ nonisolated enum SourceMatcher {
                     .flatMap { $0.components(separatedBy: " vs ") }
                     .flatMap { $0.components(separatedBy: " at ") }
                     .flatMap { $0.components(separatedBy: " v ") }
+                    .flatMap { $0.components(separatedBy: " c ") }
+                    .flatMap { $0.components(separatedBy: " - ") }
+                    .flatMap { $0.components(separatedBy: " @ ") }
                 // A listing of several fixtures cannot confirm a synthetic cross-pair.
                 guard segments.count == 2 else { return (false, false) }
                 let forward = segment(segments[0], matches: home) && segment(segments[1], matches: away)
@@ -288,7 +373,7 @@ nonisolated enum SourceMatcher {
     }
 
     private static let fixtureSeparator = try! NSRegularExpression(
-        pattern: #"(?i)\s(?:vs[.]?|versus|v[.]|at|@)\s"#)
+        pattern: #"(?i)\s(?:vs[.]?|versus|v[.]|at|@|-|c)\s"#)
     private static let dateLabel = try! NSRegularExpression(pattern: #"\b(20\d{2})-(\d{2})-(\d{2})\b"#)
     private static let monthDateLabel = try! NSRegularExpression(
         pattern: #"(?i)\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?\b"#)
@@ -366,7 +451,9 @@ nonisolated enum SourceMatcher {
     /// This is the fallback layer when the guide has no confirmed stream: it casts the
     /// widest reasonable net — any channel that mentions either team (or, for racing/golf,
     /// the series name) — without the scoring algorithm.
-    static func teamNameBackups(match: Match, channels: [Channel], excludeIds: Set<String> = []) -> [RankedSource] {
+    static func teamNameBackups(
+        match: Match, channels: [Channel], excludeIds: Set<String> = [], index: ChannelNameIndex? = nil
+    ) -> [RankedSource] {
         guard match.state != .final else { return [] }
 
         var results: [RankedSource] = []
@@ -374,11 +461,13 @@ nonisolated enum SourceMatcher {
 
         if usesParticipants(match) {
             let participants = ParticipantIdentity(match)
-            for channel in channels {
+            let candidates = index?.candidates(forTokens: participants.allTokens) ?? channels
+            for channel in candidates {
                 guard !seen.contains(channel.id) else { continue }
-                let identity = ProviderChannelIdentity(channel.name)
+                let repairedName = EventChannelNameParser.repairBadgeCorruption(channel.name)
+                let identity = ProviderChannelIdentity(repairedName)
                 let haystack = identity.eventText
-                let (homeHit, awayHit) = participants.hits(in: haystack, labelledFixture: hasFixtureSeparator(channel.name))
+                let (homeHit, awayHit) = participants.hits(in: haystack, labelledFixture: hasFixtureSeparator(repairedName))
                 guard homeHit || awayHit else { continue }
                 seen.insert(channel.id)
                 let score = homeHit && awayHit ? 200 : 35
@@ -389,9 +478,11 @@ nonisolated enum SourceMatcher {
         } else {
             let tokens = eventSeriesTokens(for: match)
             guard !tokens.isEmpty else { return [] }
-            for channel in channels {
+            let candidates = index?.candidates(forTokens: tokens) ?? channels
+            for channel in candidates {
                 guard !seen.contains(channel.id) else { continue }
-                let identity = ProviderChannelIdentity(channel.name)
+                let repairedName = EventChannelNameParser.repairBadgeCorruption(channel.name)
+                let identity = ProviderChannelIdentity(repairedName)
                 let haystack = " \(identity.eventText) "
                 guard tokens.contains(where: { !$0.isEmpty && haystack.contains(" \($0) ") }) else { continue }
                 seen.insert(channel.id)

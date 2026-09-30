@@ -80,7 +80,7 @@ struct FootballDriveView: View {
                     Text([drive.startQuarter.map { $0 > 4 ? "OT \($0 - 4)" : "Q\($0)" }, drive.playCount.map { "\($0) plays" }, drive.yards.map { "\($0) yards" }, drive.timeOfPossession].compactMap { $0 }.joined(separator: " • ")).font(.subheadline)
                     if let result = drive.result { Text(result.uppercased()).font(.subheadline.bold()) }
                     if let start = drive.startField, let end = drive.endField { Text("\(start) → \(end)").font(.caption) }
-                }.frame(maxWidth: .infinity, alignment: .leading).padding().background(Theme.surface, in: RoundedRectangle(cornerRadius: 12))
+                }.frame(maxWidth: .infinity, alignment: .leading).padding().background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md))
             }.buttonStyle(.plain).accessibilityHint("Show or hide drive plays")
             if expanded { ForEach(plays.reversed()) { FootballPlayRow(play: $0) } }
         }

@@ -206,7 +206,7 @@ struct TVMatchDetailView: View {
                 Text("No matching streams found")
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
-                Text("The source matcher didn't find a channel that matches this match.")
+                Text(noStreamReason)
                     .font(.subheadline)
                     .foregroundStyle(Theme.textSecondary)
             }
@@ -214,6 +214,15 @@ struct TVMatchDetailView: View {
         .padding(20)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.hairline))
+    }
+
+    /// Most guide ids in a real Xtream playlist only reach 12-72h ahead (see MatchLinker/
+    /// README.md) — a match further out than that hasn't necessarily been snubbed by the
+    /// provider's guide, it just hasn't been published yet.
+    private var noStreamReason: String {
+        match.date.timeIntervalSinceNow > 48 * 3600
+            ? "Listings appear closer to kickoff"
+            : "No listing in your playlist's guide"
     }
 
     // MARK: - Broadcasts

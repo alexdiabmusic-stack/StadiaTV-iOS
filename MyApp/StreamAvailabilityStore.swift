@@ -37,6 +37,52 @@ final class StreamAvailabilityStore: ObservableObject {
     /// Used by `scanDebounced` to bound worst-case staleness — see below.
     private var lastScanAttemptAt: Date?
 
+    /// Per-league confidence history for "Not on your playlist" collapsing (MatchLinker/
+    /// PROMPTS.md, Prompt 7 step 3): one record per match id seen in the last 14 days, updated
+    /// (not appended) every time that match is scanned again, so re-scanning a still-upcoming
+    /// match doesn't double-count it. Persisted so the signal survives app relaunches instead of
+    /// needing 14 days of continuous runtime to build up.
+    struct LeagueVisibilityRecord: Codable { var date: Date; var leaguePath: String; var confirmed: Bool }
+    private var leagueVisibilityLog: [String: LeagueVisibilityRecord] = [:] {
+        didSet { persistLeagueVisibilityLog() }
+    }
+    private let leagueVisibilityKey = "streamAvailability.leagueVisibilityLog.v1"
+    private let leagueVisibilityWindow: TimeInterval = 14 * 86400
+
+    private func loadLeagueVisibilityLog() {
+        guard let data = UserDefaults.standard.data(forKey: leagueVisibilityKey),
+              let decoded = try? JSONDecoder().decode([String: LeagueVisibilityRecord].self, from: data) else { return }
+        leagueVisibilityLog = decoded
+    }
+
+    private func persistLeagueVisibilityLog() {
+        guard let data = try? JSONEncoder().encode(leagueVisibilityLog) else { return }
+        UserDefaults.standard.set(data, forKey: leagueVisibilityKey)
+    }
+
+    init() { loadLeagueVisibilityLog() }
+
+    /// Not private: `StreamAvailabilityStoreVisibilityTests` seeds records directly rather than
+    /// running a full `scan()` (which needs a real playlist + guide).
+    func recordLeagueVisibility(matches: [Match], confirmedCounts: [String: Int]) {
+        let cutoff = Date().addingTimeInterval(-leagueVisibilityWindow)
+        var log = leagueVisibilityLog
+        log = log.filter { $0.value.date >= cutoff }
+        for match in matches {
+            log[match.id] = LeagueVisibilityRecord(date: Date(), leaguePath: match.league.path, confirmed: (confirmedCounts[match.id] ?? 0) > 0)
+        }
+        leagueVisibilityLog = log
+    }
+
+    /// False when this league has 10+ matches in the last 14 days and not one had a confident
+    /// stream — the playlist's guide plainly doesn't carry it. A league with fewer than 10
+    /// matches always stays visible: that's too little evidence either way.
+    func isLeagueOnPlaylist(_ league: League) -> Bool {
+        let records = leagueVisibilityLog.values.filter { $0.leaguePath == league.path }
+        guard records.count >= 10 else { return true }
+        return records.contains { $0.confirmed }
+    }
+
     /// Debounced entry point for `.task(id:)`-driven callers, whose id includes
     /// `EPGRepository.lastUpdated`. That timestamp is bumped not just by a real full/custom
     /// EPG merge but also by every tiny single-channel EPG.pw background prefetch — each of
@@ -152,6 +198,7 @@ final class StreamAvailabilityStore: ObservableObject {
         countByMatchId = mergedCounts
         confirmedCountByMatchId = mergedConfirmed
         sourcesByMatchId = mergedSources
+        recordLeagueVisibility(matches: nonFinal.filter { winningIds.contains($0.id) }, confirmedCounts: freshConfirmedCounts)
     }
 
     func count(for matchId: String) -> Int { countByMatchId[matchId] ?? 0 }

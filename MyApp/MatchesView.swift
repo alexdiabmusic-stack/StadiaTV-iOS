@@ -178,6 +178,12 @@ struct MatchesView: View {
         upcomingAll.sort { $0.date < $1.date }
         let nextUp = upcomingAll.first
         let comingUp = comingUpSportFilter.map { f in upcomingAll.filter { $0.league.group == f } } ?? upcomingAll
+        // A league with 10+ matches in the last 14 days and none confident isn't on this
+        // playlist's guide — collapse it out of the main list instead of cluttering it with
+        // matches that will never show a stream. Never hide a league the user actively follows.
+        let notOnPlaylist = comingUp.filter { !isFollowedLeague($0.league) && !streamStore.isLeagueOnPlaylist($0.league) }
+        let notOnPlaylistIDs = Set(notOnPlaylist.map(\.id))
+        let comingUpVisible = comingUp.filter { !notOnPlaylistIDs.contains($0.id) }
 
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
@@ -211,11 +217,12 @@ struct MatchesView: View {
                 .padding(.bottom, 28)
 
                 FollowingComingUpSection(
-                    matches: Array(comingUp.prefix(6)),
-                    fullScheduleMatches: comingUp,
+                    matches: Array(comingUpVisible.prefix(6)),
+                    fullScheduleMatches: comingUpVisible,
                     sportFilter: $comingUpSportFilter,
                     availableSports: availableSports,
-                    streamCountByMatchId: streamStore.countByMatchId
+                    streamCountByMatchId: streamStore.countByMatchId,
+                    notOnPlaylistMatches: notOnPlaylist
                 )
                 .padding(.bottom, 28)
 
@@ -328,6 +335,10 @@ struct MatchesView: View {
         let favLeagueIDs = Set(prefs.favoriteTeams.flatMap { [$0.leaguePath, $0.leagueBannerKey] })
         let explicitIDs = Set(prefs.explicitlyFollowedLeagues.flatMap { [$0.id, $0.bannerKey] })
         return League.all.filter { favLeagueIDs.contains($0.id) || favLeagueIDs.contains($0.bannerKey) || explicitIDs.contains($0.id) || explicitIDs.contains($0.bannerKey) }
+    }
+
+    private func isFollowedLeague(_ league: League) -> Bool {
+        prefs.isLeagueSelected(league) || prefs.favoriteTeams.contains { $0.leaguePath == league.path }
     }
 
     private func isTBDMatch(_ match: Match) -> Bool {
@@ -763,6 +774,9 @@ private struct FollowingComingUpSection: View {
     @Binding var sportFilter: SportGroup?
     let availableSports: [SportGroup]
     var streamCountByMatchId: [String: Int] = [:]
+    /// Matches whose league has 10+ matches in the last 14 days and none confident — the
+    /// playlist's guide doesn't carry it. Shown collapsed instead of cluttering the main list.
+    var notOnPlaylistMatches: [Match] = []
 
     private struct DateGroup: Identifiable {
         let title: String
@@ -859,6 +873,24 @@ private struct FollowingComingUpSection: View {
                     .padding(.top, 2)
                 }
                 .buttonStyle(.plain)
+
+                if !notOnPlaylistMatches.isEmpty {
+                    DisclosureGroup("Not on your playlist (\(notOnPlaylistMatches.count))") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(notOnPlaylistMatches.prefix(20)) { match in
+                                NavigationLink(value: match) {
+                                    FollowingEventRow(match: match, streamCount: 0)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+                }
             }
         }
     }

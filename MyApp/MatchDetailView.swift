@@ -1738,7 +1738,7 @@ struct MatchDetailView: View {
                     .buttonStyle(.plain)
                 }
             } else {
-                Text("No matching stream in your playlist")
+                Text(noStreamReason)
                     .font(.callout)
                     .foregroundStyle(Theme.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -1748,6 +1748,15 @@ struct MatchDetailView: View {
             }
         }
         .sheet(isPresented: $isShowingMoreSources) { moreSourcesSheet }
+    }
+
+    /// Most guide ids in a real Xtream playlist only reach 12-72h ahead (see MatchLinker/
+    /// README.md) — a match further out than that hasn't necessarily been snubbed by the
+    /// provider's guide, it just hasn't been published yet.
+    private var noStreamReason: String {
+        match.date.timeIntervalSinceNow > 48 * 3600
+            ? "Listings appear closer to kickoff"
+            : "No listing in your playlist's guide"
     }
 
     private var moreSourcesSheet: some View {

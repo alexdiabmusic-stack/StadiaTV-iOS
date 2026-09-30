@@ -256,11 +256,12 @@ final class EPGRepository: ObservableObject {
             await self.loadInitialEPGPWProgrammes(for: canonicals)
             guard !Task.isCancelled, self.importGeneration == generation else { return }
             self.importProgress.state = .ready
-            if EPGPWSourcePolicy.epgShareFallbackEnabled {
-                self.refreshTask?.cancel()
-                self.refreshTask = Task(priority: .utility) { [weak self] in
-                    await self?.refreshIfNeeded()
-                }
+            // Always scheduled: this is what (re-)parses the playlist's own custom EPG
+            // (customEPGURLs) on a 6-hour cadence, independent of whether the generic
+            // epgshare01 fallback feeds (gated inside forceRefresh) are enabled.
+            self.refreshTask?.cancel()
+            self.refreshTask = Task(priority: .utility) { [weak self] in
+                await self?.refreshIfNeeded()
             }
         }
     }
@@ -496,8 +497,6 @@ final class EPGRepository: ObservableObject {
     // MARK: - Refresh
 
     func refreshIfNeeded() async {
-        guard EPGPWSourcePolicy.epgShareFallbackEnabled else { return }
-        
         var missingCustomSource = false
         for (i, _) in customEPGURLs.enumerated() {
             let cacheFile = cacheDir.appendingPathComponent("custom-\(i).xml")
@@ -514,7 +513,6 @@ final class EPGRepository: ObservableObject {
     }
 
     func forceRefresh() async {
-        guard EPGPWSourcePolicy.epgShareFallbackEnabled else { return }
         guard !isRefreshing else { return }
         isRefreshing = true
         refreshState = .refreshing
@@ -522,7 +520,9 @@ final class EPGRepository: ObservableObject {
         defer { isRefreshing = false }
 
         let activeCategoryIds = Set(canonicalChannels.map(\.categoryId))
-        let sources = EPGSourceRegistry.sources(for: activeCategoryIds)
+        // Off by default — see EPGPWSourcePolicy. `sources` empty makes both task groups
+        // below no-ops without touching their control flow.
+        let sources = EPGPWSourcePolicy.epgShareFallbackEnabled ? EPGSourceRegistry.sources(for: activeCategoryIds) : []
 
         let now = Date()
         // Keep 14h of past data so the guide shows programmes from midnight today

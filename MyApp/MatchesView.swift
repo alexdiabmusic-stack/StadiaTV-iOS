@@ -265,7 +265,7 @@ struct MatchesView: View {
                 }
                 Button { showingTeamEditor = true } label: {
                     Image(systemName: "plus")
-                        .font(.caption.weight(.heavy))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
                         .frame(width: 32, height: 32)
                         .background(Theme.surface, in: Capsule())
@@ -297,7 +297,7 @@ struct MatchesView: View {
             HStack(spacing: 5) {
                 if let logoURL { TeamLogo(url: logoURL, size: 18) }
                 Text(title)
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(isSelected ? .white : Theme.textPrimary)
                     .lineLimit(1)
             }
@@ -384,7 +384,7 @@ private struct FollowingSportsSummary: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("YOUR SPORTS")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
                 .tracking(0.5)
 
@@ -470,13 +470,13 @@ private struct FollowingLiveHero: View {
                     HStack(spacing: 6) {
                         PulsingLiveBadge()
                         Text("LIVE")
-                            .font(.caption.weight(.heavy))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(Theme.live)
                             .tracking(1.5)
                     }
                     Spacer()
                     Text(match.league.shortName.uppercased())
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
                         .tracking(0.5)
                 }
@@ -583,12 +583,12 @@ private struct FollowingUpNextHero: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("UP NEXT")
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.accent)
                     .tracking(1.5)
                 Spacer()
                 Text(match.league.shortName.uppercased())
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                     .tracking(0.5)
             }
@@ -806,7 +806,7 @@ private struct FollowingComingUpSection: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("COMING UP")
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                     .tracking(0.5)
                 Spacer()
@@ -823,7 +823,7 @@ private struct FollowingComingUpSection: View {
                 ForEach(dateGroups) { group in
                     VStack(alignment: .leading, spacing: 6) {
                         Text(group.title)
-                            .font(.caption2.weight(.heavy))
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(Theme.textSecondary)
                             .tracking(0.5)
                             .padding(.horizontal, 20)
@@ -942,7 +942,7 @@ private struct FollowingFullScheduleView: View {
                 LazyVStack(alignment: .leading, spacing: 14) {
                     HStack {
                         Text("COMING UP")
-                            .font(.caption.weight(.heavy))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(Theme.textSecondary)
                             .tracking(0.5)
                         Spacer()
@@ -960,7 +960,7 @@ private struct FollowingFullScheduleView: View {
                         ForEach(dateGroups) { group in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(group.title)
-                                    .font(.caption2.weight(.heavy))
+                                    .font(.caption2.weight(.bold))
                                     .foregroundStyle(Theme.textSecondary)
                                     .tracking(0.5)
                                     .padding(.horizontal, 20)
@@ -1076,7 +1076,7 @@ private struct FollowingEventRow: View {
                     HStack(spacing: 4) {
                         PulsingLiveBadge()
                         Text("LIVE")
-                            .font(.caption2.weight(.heavy))
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(Theme.live)
                     }
                 } else {
@@ -1132,7 +1132,7 @@ private struct FollowingNewsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("FROM YOUR TEAMS")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
                 .tracking(0.5)
                 .padding(.horizontal, 20)
@@ -1182,7 +1182,7 @@ private struct FollowingNewsCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 4) {
                     Text(article.league.shortName.uppercased())
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.accent)
                     if let pub = article.published {
                         Text("·").font(.caption2).foregroundStyle(Theme.textTertiary)
@@ -1247,7 +1247,7 @@ private struct FollowingStandingsSnapshot: View {
     private func standingsBlock(league: League, highlightTeamID: String?) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("YOUR STANDINGS")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
                 .tracking(0.5)
             FollowingStandingsPanelView(league: league, highlightTeamID: highlightTeamID)
@@ -1304,7 +1304,7 @@ private struct FollowingStandingsPanelView: View {
         let rows = contextRows(group: group)
         return VStack(alignment: .leading, spacing: 8) {
             Text(group.name.uppercased())
-                .font(.caption2.weight(.heavy))
+                .font(.caption2.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
                 .tracking(0.5)
 
@@ -1459,7 +1459,7 @@ struct MatchRow: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Text(match.league.shortName)
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                     .lineLimit(1)
                 Spacer(minLength: 8)
@@ -1541,7 +1541,7 @@ struct PickResultCard: View {
             HStack(spacing: 6) {
                 Image(systemName: statusIcon).font(.caption.weight(.bold)).foregroundStyle(statusColor)
                 Text(prediction.leagueName)
-                    .font(.caption2.weight(.heavy)).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                    .font(.caption2.weight(.bold)).foregroundStyle(Theme.textSecondary).lineLimit(1)
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.caption2.weight(.semibold))

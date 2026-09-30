@@ -273,7 +273,7 @@ struct ArticleReaderView: View {
 
                 HStack(spacing: 6) {
                     Text(article.league.shortName.uppercased())
-                        .font(.caption.weight(.heavy))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
@@ -281,7 +281,7 @@ struct ArticleReaderView: View {
 
                     if let badgeText = article.badgeText {
                         Text(badgeText)
-                            .font(.caption.weight(.heavy))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)

@@ -421,7 +421,7 @@ private struct BannerStatusCard: View {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 7) {
                     Text("BANNER TV")
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .tracking(1.6)
                         .foregroundStyle(Theme.accent)
 

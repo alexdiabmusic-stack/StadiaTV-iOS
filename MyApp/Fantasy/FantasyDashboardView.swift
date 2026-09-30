@@ -135,7 +135,7 @@ struct FantasyDashboardView: View {
     private var leagueSelector: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("LEAGUE")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
             if fantasyStore.leagues.count > 1 {
                 Menu {
@@ -195,7 +195,7 @@ struct FantasyDashboardView: View {
                 Text("\(contexts.reduce(0) { $0 + $1.playerGames.count })")
                     .font(.caption.weight(.bold).monospacedDigit())
             }
-            .font(.caption.weight(.heavy))
+            .font(.caption.weight(.bold))
             .foregroundStyle(prominent ? Theme.live : Theme.textSecondary)
 
             LazyVStack(spacing: 10) {
@@ -217,7 +217,7 @@ struct FantasyDashboardView: View {
                 Text("\(games.count)")
                     .font(.caption.weight(.bold).monospacedDigit())
             }
-            .font(.caption.weight(.heavy))
+            .font(.caption.weight(.bold))
             .foregroundStyle(prominent ? Theme.live : Theme.textSecondary)
 
             LazyVStack(spacing: 10) {
@@ -233,7 +233,7 @@ struct FantasyDashboardView: View {
     private var rosterSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("MY TEAM")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
             if fantasyStore.players.isEmpty {
                 FantasyInlineState(systemImage: "person.3", title: "Roster unavailable", subtitle: "This provider did not return roster players for this league.")
@@ -253,7 +253,7 @@ struct FantasyDashboardView: View {
     private var standingsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("STANDINGS")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
             if fantasyStore.standings.isEmpty {
                 FantasyInlineState(systemImage: "list.number", title: "Standings unavailable", subtitle: "This provider did not return enough ranking data.")
@@ -506,7 +506,7 @@ private struct FantasyMatchupHero: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(periodTitle)
-                        .font(.caption.weight(.heavy))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(Theme.accent)
                     if let scoringPeriod = league?.currentScoringPeriodLabel {
                         Text(scoringPeriod)
@@ -531,7 +531,7 @@ private struct FantasyMatchupHero: View {
             HStack(alignment: .center, spacing: 12) {
                 teamBlock(name: matchup?.userTeam.team?.displayName ?? roster?.team?.displayName ?? "My Team", record: roster?.record?.displayRecord, points: pointTotal(matchup?.userTeam.effectivePoints))
                 Text("vs")
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.textTertiary)
                 teamBlock(name: matchup?.opponentTeam?.team?.displayName ?? "Opponent", record: nil, points: pointTotal(matchup?.opponentTeam?.effectivePoints))
             }
@@ -627,7 +627,7 @@ private struct FantasyEventContextCard: View {
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 5) {
                     Text("\(context.playerGames.count) Fantasy")
-                        .font(.caption.weight(.heavy))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(Theme.accent)
                     if context.starterCount > 0 {
                         Text("\(context.starterCount) starting")
@@ -641,7 +641,7 @@ private struct FantasyEventContextCard: View {
                 ForEach(context.playerGames.prefix(4)) { game in
                     HStack(spacing: 8) {
                         Text(slotLabel(for: game))
-                            .font(.caption2.weight(.heavy))
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(game.isFantasyStarter ? Theme.accent : Theme.textSecondary)
                             .frame(width: 48, alignment: .leading)
                         Text(game.fantasyPlayer.fullName)
@@ -707,7 +707,7 @@ private struct FantasyPlayerGameRow: View {
                         .lineLimit(2)
                         .minimumScaleFactor(0.85)
                     Text(game.fantasyPlayer.position ?? "")
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
                 }
                 Text(subtitle)
@@ -724,7 +724,7 @@ private struct FantasyPlayerGameRow: View {
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 8) {
                 Text(game.fantasyPoints.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "--")
-                    .font(.headline.weight(.black).monospacedDigit())
+                    .font(.headline.weight(.bold).monospacedDigit())
                     .foregroundStyle(game.fantasyPoints == nil ? Theme.textSecondary : Theme.textPrimary)
                 if let channel = game.matchedChannel?.channel {
                     Button { onWatch(channel) } label: {
@@ -772,7 +772,7 @@ private struct FantasyRosterRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(row.slot.kind.shortLabel)
-                .font(.caption2.weight(.heavy))
+                .font(.caption2.weight(.bold))
                 .foregroundStyle(row.slot.kind.tint)
                 .frame(width: 48, alignment: .leading)
             VStack(alignment: .leading, spacing: 2) {
@@ -788,7 +788,7 @@ private struct FantasyRosterRow: View {
             Spacer()
             if let injury = row.player.injuryStatus, !injury.isEmpty {
                 Text(injury.uppercased())
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.starting)
             }
         }
@@ -928,7 +928,7 @@ struct FantasyDashboardStateHarness: View {
             }
             VStack(alignment: .leading, spacing: 10) {
                 Text(isLive ? "PLAYERS LIVE" : "TODAY")
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(isLive ? Theme.live : Theme.textSecondary)
                 ForEach(isLive ? sampleLiveGames : sampleTodayGames) { game in
                     FantasyPlayerGameRow(game: game) { _ in }

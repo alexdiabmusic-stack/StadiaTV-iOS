@@ -66,7 +66,7 @@ struct TVFollowingView: View {
                     if let live = liveMatches.first {
                     VStack(alignment: .leading, spacing: 20) {
                         Label("Live Now", systemImage: "dot.radiowaves.left.and.right")
-                            .font(.title2.weight(.heavy))
+                            .font(.title2.weight(.bold))
                             .foregroundStyle(Theme.live)
                             .padding(.horizontal, 52)
                         NavigationLink(value: live) {
@@ -242,7 +242,7 @@ struct TVFollowingView: View {
 
                     VStack(spacing: 14) {
                         Text("UP NEXT")
-                            .font(.caption.weight(.heavy))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(Theme.accent)
                             .tracking(1.5)
 
@@ -402,7 +402,7 @@ private struct TVFollowingLiveHero: View {
                     HStack(spacing: 8) {
                         TVLiveBadge()
                         Text(match.league.shortName.uppercased())
-                            .font(.caption.weight(.heavy))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(Theme.textSecondary)
                             .tracking(0.5)
                     }

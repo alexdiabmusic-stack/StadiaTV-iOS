@@ -297,7 +297,7 @@ private struct StatsSectionPicker: View {
                         selected = section
                     } label: {
                         Label(section.rawValue, systemImage: section.systemImage)
-                            .font(.caption.weight(.heavy))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(section == selected ? .white : Theme.textPrimary)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
@@ -329,7 +329,7 @@ private struct StatsLeagueHeader: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(league.name)
-                    .font(.title3.weight(.heavy))
+                    .font(.title3.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
                 Text(subtitle)
                     .font(.caption.weight(.semibold))
@@ -398,7 +398,7 @@ private struct StatsFavoriteTeamsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("FAVOURITES")
-                .font(.footnote.weight(.heavy))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(Theme.accent)
             ForEach(teams) { team in
                 NavigationLink {
@@ -438,7 +438,7 @@ private struct StatsTeamSection: View {
         if !teams.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 Text(title.uppercased())
-                    .font(.footnote.weight(.heavy))
+                    .font(.footnote.weight(.bold))
                     .foregroundStyle(Theme.accent)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 ForEach(teams) { team in
@@ -477,7 +477,7 @@ private struct StatsFormatCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label(title, systemImage: league.group.systemImage)
-                .font(.headline.weight(.heavy))
+                .font(.headline.weight(.bold))
                 .foregroundStyle(Theme.textPrimary)
             ForEach(items, id: \.self) { item in
                 HStack(alignment: .top, spacing: 8) {
@@ -542,7 +542,7 @@ private struct StatsGolfCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("Tournament Field", systemImage: "figure.golf")
-                .font(.headline.weight(.heavy))
+                .font(.headline.weight(.bold))
                 .foregroundStyle(Theme.textPrimary)
             Text("Golf events are loaded from ESPN scoreboards as tournaments, with player standings surfaced through the match detail and leaders views when ESPN publishes them.")
                 .font(.subheadline)

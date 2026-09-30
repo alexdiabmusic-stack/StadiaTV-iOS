@@ -424,7 +424,7 @@ struct SavedArticlesSettingsView: View {
                             HStack(alignment: .top, spacing: 12) {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(article.league.shortName)
-                                        .font(.caption.weight(.heavy))
+                                        .font(.caption.weight(.bold))
                                         .foregroundStyle(Theme.accent)
                                     Text(article.headline)
                                         .font(.subheadline.weight(.semibold))

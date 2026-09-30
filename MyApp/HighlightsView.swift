@@ -93,7 +93,7 @@ struct RecentSportsHighlightsSection: View {
                     .foregroundStyle(Theme.textSecondary)
                 Spacer()
                 Text("RECENT")
-                    .font(.caption2.weight(.black))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.accent)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)

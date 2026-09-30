@@ -373,7 +373,7 @@ struct HomeView: View {
         if !matches.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
                 Text("YOUR SPORTS DAY")
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
 
                 ForEach(matches) { match in
@@ -395,7 +395,7 @@ struct HomeView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Theme.accent)
                 Text("YOUR SPORTS DAY")
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
             }
 
@@ -437,7 +437,7 @@ struct HomeView: View {
                     .foregroundStyle(summary.isLive ? Theme.live : Theme.accent)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(summary.title)
-                        .font(.caption.weight(.heavy))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(summary.isLive ? Theme.live : Theme.accent)
                     Text(summary.subtitle)
                         .font(.subheadline.weight(.semibold))
@@ -769,7 +769,7 @@ private struct TeamMatchupHero: View {
             HStack(spacing: 5) {
                 PulsingLiveBadge()
                 Text("LIVE")
-                    .font(.caption.weight(.black))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(.white)
             }
             .padding(.horizontal, 10)
@@ -777,7 +777,7 @@ private struct TeamMatchupHero: View {
             .background(Theme.live, in: Capsule())
         } else {
             Text("FEATURED")
-                .font(.caption.weight(.black))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
@@ -959,7 +959,7 @@ private struct EventHero: View {
                     heroBadge
 
                     Text(pick.league)
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(.white.opacity(0.65))
                         .padding(.top, 10)
 
@@ -1019,7 +1019,7 @@ private struct EventHero: View {
             HStack(spacing: 5) {
                 PulsingLiveBadge()
                 Text("LIVE")
-                    .font(.caption.weight(.black))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(.white)
             }
             .padding(.horizontal, 10)
@@ -1027,7 +1027,7 @@ private struct EventHero: View {
             .background(Theme.live, in: Capsule())
         } else {
             Text("FEATURED")
-                .font(.caption.weight(.black))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
@@ -1116,14 +1116,14 @@ private struct PrimeHeroCard: View {
                         if match.state == .live {
                             PulsingLiveBadge()
                             Text("LIVE")
-                                .font(.caption2.weight(.black))
+                                .font(.caption2.weight(.bold))
                                 .foregroundStyle(Theme.live)
                         } else {
                             Image(systemName: "sparkles")
                                 .font(.caption2)
                                 .foregroundStyle(Theme.accent)
                             Text("TOP MATCH")
-                                .font(.caption2.weight(.heavy))
+                                .font(.caption2.weight(.bold))
                                 .foregroundStyle(Theme.accent)
                         }
                         Spacer()
@@ -1382,14 +1382,14 @@ private struct SoonTimelineCard: View {
                         .foregroundStyle(Theme.textPrimary)
                     Spacer()
                     Text(match.league.shortName)
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
                 }
 
                 HStack(spacing: 6) {
                     TeamLogo(url: match.away.logoURL, size: 28)
                     Text("vs")
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
                     TeamLogo(url: match.home.logoURL, size: 28)
                 }

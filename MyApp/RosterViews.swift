@@ -159,7 +159,7 @@ struct PlayerDetailView: View {
             PlayerHeadshot(url: athlete.headshotURL, size: 76)
             VStack(alignment: .leading, spacing: 4) {
                 Text(athlete.displayName)
-                    .font(.title3.weight(.heavy))
+                    .font(.title3.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
                 HStack(spacing: 8) {
                     if let jersey = athlete.jersey, !jersey.isEmpty {
@@ -222,7 +222,7 @@ struct PlayerDetailView: View {
                 ForEach(stats) { stat in
                     VStack(spacing: 2) {
                         Text(stat.value)
-                            .font(.title3.weight(.heavy).monospacedDigit())
+                            .font(.title3.weight(.bold).monospacedDigit())
                             .foregroundStyle(Theme.textPrimary)
                         Text(stat.label)
                             .font(.caption2.weight(.semibold))

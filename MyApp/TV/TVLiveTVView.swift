@@ -84,7 +84,7 @@ struct TVLiveTVView: View {
                 Divider().background(Theme.hairline).padding(.vertical, 6)
 
                 Text("CATEGORIES")
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                     .padding(.horizontal, 20)
 

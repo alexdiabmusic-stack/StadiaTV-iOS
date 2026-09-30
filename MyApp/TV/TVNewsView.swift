@@ -126,7 +126,7 @@ private struct TVArticleDetailView: View {
                     }
 
                     Text(article.league.name.uppercased())
-                        .font(.headline.weight(.heavy))
+                        .font(.headline.weight(.bold))
                         .foregroundStyle(Theme.accent)
 
                     Text(article.headline)

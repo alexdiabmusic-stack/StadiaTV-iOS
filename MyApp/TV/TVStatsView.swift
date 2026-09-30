@@ -80,7 +80,7 @@ struct TVStatsView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 4) {
                 Text("LEAGUES")
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                     .padding(.horizontal, 20)
                     .padding(.top, 24)

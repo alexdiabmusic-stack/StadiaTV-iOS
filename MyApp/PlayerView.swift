@@ -1918,12 +1918,12 @@ private struct LiveScoreBug: View {
             HStack(spacing: 10) {
                 scoreTeam(match.away, alignment: .leading)
                 Text(match.away.score ?? "–")
-                    .font(.title3.weight(.black).monospacedDigit())
+                    .font(.title3.weight(.bold).monospacedDigit())
                 Text("–")
-                    .font(.headline.weight(.heavy))
+                    .font(.headline.weight(.bold))
                     .foregroundStyle(.white.opacity(0.44))
                 Text(match.home.score ?? "–")
-                    .font(.title3.weight(.black).monospacedDigit())
+                    .font(.title3.weight(.bold).monospacedDigit())
                 scoreTeam(match.home, alignment: .trailing)
             }
             .foregroundStyle(.white)
@@ -1939,7 +1939,7 @@ private struct LiveScoreBug: View {
                         PulsingDot(color: Theme.live)
                         Text("LIVE")
                     }
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.live)
                 }
             }
@@ -1965,7 +1965,7 @@ private struct LiveScoreBug: View {
                 Text(team.abbreviation)
             }
         }
-        .font(.subheadline.weight(.black))
+        .font(.subheadline.weight(.bold))
         .frame(maxWidth: .infinity, alignment: alignment == .leading ? .leading : .trailing)
         .lineLimit(1)
     }
@@ -2009,7 +2009,7 @@ private struct MatchMetadataHeader: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 8) {
                 Text(match.map { "\($0.league.shortName.uppercased()) · \($0.state.label.uppercased())" } ?? "LIVE STREAM")
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(match?.state == .live ? Theme.live : Theme.textSecondary)
                 if match?.state == .live {
                     PulsingDot(color: Theme.live)
@@ -2017,7 +2017,7 @@ private struct MatchMetadataHeader: View {
             }
 
             Text(match?.name ?? channel.name)
-                .font(match == nil ? .headline.weight(.heavy) : .title3.weight(.heavy))
+                .font(match == nil ? .headline.weight(.bold) : .title3.weight(.bold))
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(2)
 
@@ -2431,7 +2431,7 @@ private struct GameCentreCard<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
                 .textCase(.uppercase)
             content
@@ -2474,7 +2474,7 @@ private struct ScoreboardRow: View {
         VStack(alignment: alignment, spacing: 6) {
             TeamLogo(url: side?.logoURL, size: 34)
             Text(side?.abbreviation ?? "TBD")
-                .font(.subheadline.weight(.heavy))
+                .font(.subheadline.weight(.bold))
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(1)
         }
@@ -2497,7 +2497,7 @@ private struct SituationGrid: View {
                 ForEach(visibleItems, id: \.0) { item in
                     VStack(alignment: .leading, spacing: 3) {
                         Text(item.0)
-                            .font(.caption2.weight(.heavy))
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(Theme.textTertiary)
                             .textCase(.uppercase)
                         Text(item.1)
@@ -2639,11 +2639,11 @@ private struct LineupsPlaceholder: View {
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(formations) { formation in
                         Text([formation.teamAbbreviation, formation.formationName].compactMap { $0 }.joined(separator: " · "))
-                            .font(.subheadline.weight(.heavy))
+                            .font(.subheadline.weight(.bold))
                             .foregroundStyle(Theme.textPrimary)
                         ForEach(formation.groups) { group in
                             Text(group.title)
-                                .font(.caption.weight(.heavy))
+                                .font(.caption.weight(.bold))
                                 .foregroundStyle(Theme.textSecondary)
                             Text(group.players.map(\.displayName).joined(separator: "  "))
                                 .font(.caption.weight(.semibold))
@@ -2678,11 +2678,11 @@ private struct DrivesPlaceholder: View {
                         VStack(alignment: .leading, spacing: 5) {
                             HStack {
                                 Text(drive.teamAbbreviation ?? "Drive")
-                                    .font(.subheadline.weight(.heavy))
+                                    .font(.subheadline.weight(.bold))
                                     .foregroundStyle(Theme.textPrimary)
                                 if drive.isCurrent {
                                     Text("LIVE")
-                                        .font(.caption2.weight(.heavy))
+                                        .font(.caption2.weight(.bold))
                                         .foregroundStyle(Theme.live)
                                 }
                                 Spacer()
@@ -2718,7 +2718,7 @@ private struct LandscapeGameCentrePanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(panelTitle)
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
                 .textCase(.uppercase)
             if let match {
@@ -2811,7 +2811,7 @@ private struct LeaderSummaryRow: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(leader.displayName)
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.textTertiary)
                         .textCase(.uppercase)
                     Text(first.displayName)
@@ -2821,7 +2821,7 @@ private struct LeaderSummaryRow: View {
                 }
                 Spacer()
                 Text(first.stats.first?.value ?? "")
-                    .font(.title3.weight(.black).monospacedDigit())
+                    .font(.title3.weight(.bold).monospacedDigit())
                     .foregroundStyle(Theme.textPrimary)
             }
         }
@@ -2834,7 +2834,7 @@ private struct PlayTimelineRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Text(play.clock?.displayValue ?? play.period?.displayName ?? "")
-                .font(.caption.weight(.heavy).monospacedDigit())
+                .font(.caption.weight(.bold).monospacedDigit())
                 .foregroundStyle(play.isScoringPlay ? Theme.live : Theme.textTertiary)
                 .frame(width: 48, alignment: .leading)
             VStack(alignment: .leading, spacing: 3) {
@@ -3272,7 +3272,7 @@ private struct StreamTile: View {
                             Image(systemName: isPrimary ? "speaker.wave.2.fill" : "speaker.slash.fill")
                                 .font(.caption2)
                             Text(isPrimary ? "AUDIO LIVE" : "MUTED")
-                                .font(.caption2.weight(.heavy))
+                                .font(.caption2.weight(.bold))
                         }
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
@@ -3644,7 +3644,7 @@ private struct PlayerSourceBar: View {
             .buttonStyle(.plain)
             .accessibilityLabel(watchStore.isFavorite(channel) ? "Remove from favourites" : "Add to favourites")
             Text("LIVE")
-                .font(.caption2.weight(.heavy))
+                .font(.caption2.weight(.bold))
                 .foregroundStyle(.white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -3762,7 +3762,7 @@ private struct PlayerMultiscreenPicker: View {
                         HStack(spacing: 5) {
                             Circle().fill(Theme.live).frame(width: 7, height: 7)
                             Text("Live Now")
-                                .font(.footnote.weight(.heavy))
+                                .font(.footnote.weight(.bold))
                                 .foregroundStyle(Theme.live)
                             Spacer()
                             if !liveEntries.isEmpty {
@@ -3802,7 +3802,7 @@ private struct PlayerMultiscreenPicker: View {
                     }
                 } header: {
                     Text("All Sources")
-                        .font(.footnote.weight(.heavy))
+                        .font(.footnote.weight(.bold))
                 }
             }
             .navigationTitle("Add to Multiscreen")
@@ -3921,7 +3921,7 @@ private struct LiveMatchPickerRow: View {
             // League + live status badge
             HStack(spacing: 6) {
                 Text(match.league.shortName)
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                 Spacer(minLength: 4)
                 Label(match.statusDetail, systemImage: "dot.radiowaves.left.and.right")

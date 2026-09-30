@@ -17,7 +17,7 @@ struct TVPaywallView: View {
                         .font(.system(size: 60, weight: .bold))
                         .foregroundStyle(Theme.accent)
                     Text("BannerTV Premium")
-                        .font(.largeTitle.weight(.black))
+                        .font(.largeTitle.weight(.bold))
                         .foregroundStyle(Theme.textPrimary)
                     Text("Unlock standings, leaders, injury reports, and multiscreen.")
                         .font(.title2)
@@ -100,7 +100,7 @@ struct TVPaywallView: View {
             VStack(spacing: 10) {
                 if let badge {
                     Text(badge.uppercased())
-                        .font(.caption2.weight(.black))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10).padding(.vertical, 4)
                         .background(Theme.accent, in: Capsule())

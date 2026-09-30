@@ -31,10 +31,10 @@ struct BannerFantasyHubView: View {
     private var hero: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label("Fantasy", systemImage: "trophy.fill")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.accent)
             Text("Build your team. Compete with friends. Watch your players live in Banner.")
-                .font(.title2.weight(.black))
+                .font(.title2.weight(.bold))
                 .foregroundStyle(Theme.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -70,7 +70,7 @@ struct BannerFantasyHubView: View {
     private var myLeagues: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("MY LEAGUES")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
             if nativeStore.isLoading && nativeStore.leagues.isEmpty {
                 ProgressView().tint(Theme.accent)
@@ -116,7 +116,7 @@ struct BannerFantasyHubView: View {
     private func importedSection(_ importedContent: AnyView) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("IMPORTED LEAGUE")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
             importedContent
         }
@@ -125,7 +125,7 @@ struct BannerFantasyHubView: View {
     private var importSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("IMPORT OR CONNECT")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
             VStack(spacing: 0) {
                 Button(action: onConnectESPN) { BannerFantasyDisclosureRow(title: "ESPN Fantasy", subtitle: "Import Football, Hockey, Basketball or Baseball") }
@@ -191,7 +191,7 @@ struct BannerFantasyNativeDashboardView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(bundle.league.name)
-                        .font(.title3.weight(.black))
+                        .font(.title3.weight(.bold))
                         .foregroundStyle(Theme.textPrimary)
                     Text("\(bundle.league.sport.displayName) · \(bundle.league.source.displayName) · \(bundle.league.scoringRules.type.displayName)")
                         .font(.caption)
@@ -199,7 +199,7 @@ struct BannerFantasyNativeDashboardView: View {
                 }
                 Spacer()
                 Text(bundle.league.phase.rawValue.uppercased())
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.accent)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
@@ -219,7 +219,7 @@ struct BannerFantasyNativeDashboardView: View {
     private func lobby(_ bundle: BannerFantasyLeagueBundle) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("LEAGUE LOBBY")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
             HStack {
                 Text("\(bundle.teams.count) / \(bundle.league.maxTeams) teams joined")
@@ -227,7 +227,7 @@ struct BannerFantasyNativeDashboardView: View {
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
                 Text(bundle.league.inviteCode)
-                    .font(.caption.weight(.black).monospaced())
+                    .font(.caption.weight(.bold).monospaced())
                     .foregroundStyle(Theme.accent)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
@@ -270,7 +270,7 @@ struct BannerFantasyNativeDashboardView: View {
     private func fantasyEventSection(title: String, systemImage: String, contexts: [FantasyEventContext]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label(title, systemImage: systemImage)
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(title.contains("LIVE") ? Theme.live : Theme.textSecondary)
             VStack(spacing: 0) {
                 ForEach(contexts) { context in
@@ -293,7 +293,7 @@ struct BannerFantasyNativeDashboardView: View {
                             Text("\(context.playerGames.count) players")
                             if context.matchedChannel != nil { Text("Watch available") }
                         }
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.accent)
                     }
                     .padding(12)
@@ -320,7 +320,7 @@ struct BannerFantasyNativeDashboardView: View {
     private func roster(_ bundle: BannerFantasyLeagueBundle) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("MY TEAM")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
             let entries = nativeStore.selectedRoster?.entries ?? []
             if entries.isEmpty {
@@ -330,7 +330,7 @@ struct BannerFantasyNativeDashboardView: View {
                     ForEach(entries) { entry in
                         HStack(spacing: 10) {
                             Text(entry.primaryPosition ?? "--")
-                                .font(.caption2.weight(.heavy))
+                                .font(.caption2.weight(.bold))
                                 .foregroundStyle(Theme.accent)
                                 .frame(width: 42, alignment: .leading)
                             VStack(alignment: .leading, spacing: 2) {
@@ -345,7 +345,7 @@ struct BannerFantasyNativeDashboardView: View {
                             Spacer()
                             if let injury = entry.injuryStatus {
                                 Text(injury.uppercased())
-                                    .font(.caption2.weight(.heavy))
+                                    .font(.caption2.weight(.bold))
                                     .foregroundStyle(Theme.starting)
                             }
                             Menu {
@@ -376,7 +376,7 @@ struct BannerFantasyNativeDashboardView: View {
     private func standings(_ bundle: BannerFantasyLeagueBundle) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("STANDINGS")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
             VStack(spacing: 0) {
                 ForEach(bundle.standings.sorted { $0.rank < $1.rank }) { standing in
@@ -405,7 +405,7 @@ struct BannerFantasyNativeDashboardView: View {
     private func activity(_ bundle: BannerFantasyLeagueBundle) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("ACTIVITY")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
             if bundle.transactions.isEmpty {
                 BannerFantasyInfoCard(systemImage: "list.bullet.rectangle", title: "No activity yet", subtitle: "Draft picks, adds, drops, waivers and trades will appear here.")
@@ -450,10 +450,10 @@ struct BannerFantasyCreateLeagueFlow: View {
                     LazyVStack(alignment: .leading, spacing: 16) {
                         VStack(alignment: .leading, spacing: 8) {
                             Label("BANNER FANTASY", systemImage: selectedSport.symbolName)
-                                .font(.caption.weight(.heavy))
+                                .font(.caption.weight(.bold))
                                 .foregroundStyle(Theme.accent)
                             Text(selectedMode == .personalTeam ? "Create your fantasy team" : "Create a simulated league")
-                                .font(.title2.weight(.black))
+                                .font(.title2.weight(.bold))
                                 .foregroundStyle(Theme.textPrimary)
                                 .fixedSize(horizontal: false, vertical: true)
                             Text("Choose a sport, draft real ESPN-backed players, then track points and games inside Banner.")
@@ -508,7 +508,7 @@ struct BannerFantasyCreateLeagueFlow: View {
                                 ForEach(BannerFantasyScoringRules.bannerDefault(sport: selectedSport, type: scoringType).rules.prefix(12)) { rule in
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(rule.stat.abbreviation)
-                                            .font(.caption2.weight(.heavy))
+                                            .font(.caption2.weight(.bold))
                                             .foregroundStyle(Theme.textSecondary)
                                         Text(rule.points.formatted(.number.precision(.fractionLength(1))))
                                             .font(.headline.weight(.bold).monospacedDigit())
@@ -584,7 +584,7 @@ struct BannerFantasyCreateLeagueFlow: View {
     private func setupCard<Content: View>(title: String, systemImage: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(title.uppercased(), systemImage: systemImage)
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
             content()
         }
@@ -776,7 +776,7 @@ private struct BannerFantasyDraftPlayerRow: View {
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 6) {
                 Text(player.lastSeasonFantasyPoints.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "--")
-                    .font(.caption.weight(.heavy).monospacedDigit())
+                    .font(.caption.weight(.bold).monospacedDigit())
                     .foregroundStyle(player.lastSeasonFantasyPoints == nil ? Theme.textTertiary : Theme.accent)
                 Button("Draft", action: onDraft)
                     .buttonStyle(.borderedProminent)
@@ -804,7 +804,7 @@ private struct BannerFantasyPlayerStatsSheet: View {
                             BannerFantasyPlayerHeadshot(url: player.headshotURL, name: player.fullName, size: 72)
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(player.fullName)
-                                    .font(.title2.weight(.black))
+                                    .font(.title2.weight(.bold))
                                     .foregroundStyle(Theme.textPrimary)
                                     .lineLimit(2)
                                 Text([player.teamAbbreviation, player.position].compactMap { $0 }.joined(separator: " · "))
@@ -818,7 +818,7 @@ private struct BannerFantasyPlayerStatsSheet: View {
 
                         VStack(alignment: .leading, spacing: 10) {
                             Text("LAST SEASON")
-                                .font(.caption.weight(.heavy))
+                                .font(.caption.weight(.bold))
                                 .foregroundStyle(Theme.textSecondary)
                             HStack {
                                 Text("Fantasy points")
@@ -833,7 +833,7 @@ private struct BannerFantasyPlayerStatsSheet: View {
                                     ForEach(statLine.values.sorted { $0.key.abbreviation < $1.key.abbreviation }, id: \.key) { stat, value in
                                         VStack(alignment: .leading, spacing: 3) {
                                             Text(stat.abbreviation)
-                                                .font(.caption2.weight(.heavy))
+                                                .font(.caption2.weight(.bold))
                                                 .foregroundStyle(Theme.textSecondary)
                                             Text(value.formatted(.number.precision(.fractionLength(value.rounded() == value ? 0 : 2))))
                                                 .font(.headline.weight(.bold).monospacedDigit())
@@ -877,7 +877,7 @@ private struct BannerFantasyPlayerHeadshot: View {
                 }
             } else {
                 Text(initials)
-                    .font(.caption.weight(.black))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
             }
         }

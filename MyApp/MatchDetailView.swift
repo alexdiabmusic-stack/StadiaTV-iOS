@@ -344,7 +344,7 @@ struct MatchDetailView: View {
                     } else if prefs.spoilerFreeMode && match.state == .final && !spoilerRevealed {
                         VStack(spacing: 6) {
                             Text("? – ?")
-                                .font(.title.weight(.heavy).monospacedDigit())
+                                .font(.title.weight(.bold).monospacedDigit())
                                 .foregroundStyle(Theme.textSecondary)
                             Button("Reveal Score") {
                                 withAnimation(Theme.Motion.snappy) { spoilerRevealed = true }
@@ -354,7 +354,7 @@ struct MatchDetailView: View {
                         }
                     } else {
                         Text("\(match.away.score ?? "-")  –  \(match.home.score ?? "-")")
-                            .font(.title.weight(.heavy).monospacedDigit())
+                            .font(.title.weight(.bold).monospacedDigit())
                             .foregroundStyle(Theme.textPrimary)
                     }
                 }
@@ -386,7 +386,7 @@ struct MatchDetailView: View {
                     Image(systemName: "star.fill")
                         .foregroundStyle(Theme.accent)
                     Text("YOUR FANTASY PLAYERS")
-                        .font(.caption.weight(.heavy))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(Theme.accent)
                     Spacer()
                     Text("\(context.playerGames.count)")
@@ -398,7 +398,7 @@ struct MatchDetailView: View {
                     ForEach(context.playerGames) { game in
                         HStack(spacing: 10) {
                             Text(game.lineupPosition ?? game.fantasyPlayer.position ?? "--")
-                                .font(.caption2.weight(.heavy))
+                                .font(.caption2.weight(.bold))
                                 .foregroundStyle(game.isFantasyStarter ? Theme.accent : Theme.textSecondary)
                                 .frame(width: 42, alignment: .leading)
                             VStack(alignment: .leading, spacing: 2) {
@@ -516,7 +516,7 @@ struct MatchDetailView: View {
         var body: some View {
             HStack(spacing: 8) {
                 Text("ML")
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                 ForEach(moneylineColumns) { column in
                     HStack(spacing: 3) {
@@ -596,7 +596,7 @@ struct MatchDetailView: View {
                 Spacer()
                 if match.state == .live {
                     Text("LIVE")
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.live)
                 }
             }
@@ -621,12 +621,12 @@ struct MatchDetailView: View {
             HStack(spacing: 6) {
                 TeamLogo(url: match.away.logoURL, size: 20)
                 Text(match.away.shortName)
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
                 Spacer()
                 Text(match.home.shortName)
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
                 TeamLogo(url: match.home.logoURL, size: 20)
@@ -796,7 +796,7 @@ struct MatchDetailView: View {
                             VStack(alignment: .trailing, spacing: 2) {
                                 if pts > 0 {
                                     Text("+\(pts) pts")
-                                        .font(.subheadline.weight(.heavy))
+                                        .font(.subheadline.weight(.bold))
                                         .foregroundStyle(Theme.Palette.positive)
                                 }
                                 if let streak = p.streakAtTime, streak >= 2 {
@@ -913,7 +913,7 @@ struct MatchDetailView: View {
     private func h2hStatColumn(value: String, label: String) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.title2.weight(.heavy).monospacedDigit())
+                .font(.title2.weight(.bold).monospacedDigit())
                 .foregroundStyle(Theme.textPrimary)
             Text(label)
                 .font(.caption2.weight(.semibold))
@@ -1092,7 +1092,7 @@ struct MatchDetailView: View {
                     TeamLogo(url: team.logoURL, size: 42)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(team.displayName)
-                            .font(.headline.weight(.heavy))
+                            .font(.headline.weight(.bold))
                             .foregroundStyle(Theme.textPrimary)
                             .lineLimit(1)
                         if let record = team.record, !record.isEmpty {
@@ -1154,7 +1154,7 @@ struct MatchDetailView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     Label("Players", systemImage: "person.3.fill")
-                        .font(.caption.weight(.heavy))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
                     Spacer()
                     NavigationLink("Full Roster") {
@@ -1296,11 +1296,11 @@ struct MatchDetailView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Label("Player Positions", systemImage: sport.systemImage)
-                        .font(.caption.weight(.heavy))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
                     Spacer()
                     Text(sport.rawValue.uppercased())
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.accent)
                 }
 
@@ -1399,7 +1399,7 @@ struct MatchDetailView: View {
         var body: some View {
             VStack(spacing: 2) {
                 Text(initials)
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(.white)
                     .frame(width: 28, height: 28)
                     .background(Theme.accent, in: Circle())
@@ -1904,7 +1904,7 @@ struct MatchDetailView: View {
                     Image(systemName: "newspaper.fill")
                         .foregroundStyle(Theme.accent)
                     Text("RELATED NEWS")
-                        .font(.caption.weight(.heavy))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(Theme.accent)
                 }
                 VStack(spacing: 10) {
@@ -2011,7 +2011,7 @@ struct MatchStandingsPreview: View {
             Text("Strk")
                 .frame(width: 38, alignment: .trailing)
         }
-        .font(.caption2.weight(.heavy))
+        .font(.caption2.weight(.bold))
         .foregroundStyle(Theme.textSecondary)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -2203,7 +2203,7 @@ private struct ScoringPlayRow: View {
         HStack(alignment: .top, spacing: 10) {
             VStack(spacing: 2) {
                 Text(play.period ?? "Game")
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                     .lineLimit(1)
                 if let clock = play.clock {
@@ -2222,7 +2222,7 @@ private struct ScoringPlayRow: View {
 
                 if let away = play.awayScore, let home = play.homeScore {
                     Text("\(match.away.abbreviation) \(away) – \(home) \(match.home.abbreviation)")
-                        .font(.caption.weight(.heavy).monospacedDigit())
+                        .font(.caption.weight(.bold).monospacedDigit())
                         .foregroundStyle(Theme.accent)
                 }
             }
@@ -2270,7 +2270,7 @@ private struct PlayByPlaySectionView: View {
                     Spacer()
                     if match.state == .live {
                         Text("LIVE")
-                            .font(.caption2.weight(.heavy))
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(Theme.live)
                     }
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
@@ -2326,7 +2326,7 @@ private struct PlayRowView: View {
             VStack(spacing: 2) {
                 if let clock = play.clock {
                     Text(clock)
-                        .font(.caption2.weight(.heavy).monospacedDigit())
+                        .font(.caption2.weight(.bold).monospacedDigit())
                         .foregroundStyle(play.isScoringPlay ? Theme.textPrimary : Theme.textSecondary)
                 }
             }
@@ -2347,7 +2347,7 @@ private struct PlayRowView: View {
 
                 if play.isScoringPlay, let away = play.awayScore, let home = play.homeScore {
                     Text("\(match.away.abbreviation) \(away) – \(home) \(match.home.abbreviation)")
-                        .font(.caption2.weight(.heavy).monospacedDigit())
+                        .font(.caption2.weight(.bold).monospacedDigit())
                         .foregroundStyle(Theme.accent)
                 }
             }
@@ -2550,7 +2550,7 @@ private struct LegacyBaseballPlayByPlayView: View {
                 Spacer()
                 if match.state == .live {
                     Text("LIVE")
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.live)
                         .padding(.horizontal, 6).padding(.vertical, 2)
                         .background(Theme.live.opacity(0.12), in: Capsule())
@@ -2601,12 +2601,12 @@ private struct MLBHalfInningSection: View {
                         .frame(width: 14)
 
                     Text(group.label.uppercased())
-                        .font(.caption.weight(.heavy))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(isActive ? Theme.accent : Theme.textSecondary)
 
                     if isActive {
                         Text("NOW BATTING")
-                            .font(.caption2.weight(.heavy))
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(Theme.live)
                             .padding(.horizontal, 5).padding(.vertical, 1)
                             .background(Theme.live.opacity(0.12), in: Capsule())
@@ -2618,7 +2618,7 @@ private struct MLBHalfInningSection: View {
                         HStack(spacing: 6) {
                             if group.runsScored > 0 {
                                 Text("\(group.runsScored) R")
-                                    .font(.caption2.weight(.heavy))
+                                    .font(.caption2.weight(.bold))
                                     .foregroundStyle(Theme.accent)
                             }
                             if group.hitsCount > 0 {
@@ -2698,7 +2698,7 @@ private struct MLBPlayRow: View {
                             .font(.system(size: 7))
                             .foregroundStyle(Theme.accent)
                         Text("\(match.away.abbreviation) \(away)  –  \(home) \(match.home.abbreviation)")
-                            .font(.caption2.weight(.heavy).monospacedDigit())
+                            .font(.caption2.weight(.bold).monospacedDigit())
                             .foregroundStyle(Theme.accent)
                     }
                     .padding(.top, 1)

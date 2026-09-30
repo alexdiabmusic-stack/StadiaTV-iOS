@@ -217,7 +217,7 @@ struct PaywallView: View {
     private var planSelectorSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Choose your plan")
-                .font(.footnote.weight(.heavy))
+                .font(.footnote.weight(.bold))
                 .foregroundStyle(.white.opacity(0.45))
                 .textCase(.uppercase)
 
@@ -465,7 +465,7 @@ struct PaywallView: View {
                     ProgressView().tint(.white)
                 } else {
                     Text(ctaLabel)
-                        .font(.headline.weight(.black))
+                        .font(.headline.weight(.bold))
                         .foregroundStyle(.black)
                 }
             }
@@ -555,7 +555,7 @@ struct PremiumGateOverlay: View {
 
                 VStack(spacing: 5) {
                     Text(title)
-                        .font(.headline.weight(.black))
+                        .font(.headline.weight(.bold))
                         .foregroundStyle(.white)
                     Text(description)
                         .font(.footnote)
@@ -571,7 +571,7 @@ struct PremiumGateOverlay: View {
                     #endif
                 } label: {
                     Text("Unlock Premium")
-                        .font(.subheadline.weight(.black))
+                        .font(.subheadline.weight(.bold))
                         .foregroundStyle(.black)
                         .padding(.horizontal, 28)
                         .padding(.vertical, 10)
@@ -775,7 +775,7 @@ struct PremiumSectionGate: View {
                 }
                 VStack(spacing: 6) {
                     Text(title)
-                        .font(.title3.weight(.black))
+                        .font(.title3.weight(.bold))
                         .foregroundStyle(Theme.textPrimary)
                     Text(description)
                         .font(.callout)
@@ -790,7 +790,7 @@ struct PremiumSectionGate: View {
                     #endif
                 } label: {
                     Label("Unlock Premium", systemImage: "lock.open.fill")
-                        .font(.headline.weight(.black))
+                        .font(.headline.weight(.bold))
                         .foregroundStyle(.black)
                         .padding(.horizontal, 32)
                         .padding(.vertical, 12)

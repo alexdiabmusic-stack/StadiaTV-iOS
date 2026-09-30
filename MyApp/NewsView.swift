@@ -316,18 +316,18 @@ struct NewsArticleCard: View {
                 VStack(alignment: .leading, spacing: 7) {
                     HStack(spacing: 6) {
                         Text(article.league.shortName)
-                            .font(.caption2.weight(.heavy))
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(Theme.accent)
                         if article.isPremium {
                             Text("ESPN+")
-                                .font(.caption2.weight(.heavy))
+                                .font(.caption2.weight(.bold))
                                 .foregroundStyle(.black)
                                 .padding(.horizontal, 5).padding(.vertical, 1)
                                 .background(Theme.Palette.amber, in: Capsule())
                         }
                         if let type = article.type, !type.isEmpty, type != "Story" {
                             Text(type.uppercased())
-                                .font(.caption2.weight(.heavy))
+                                .font(.caption2.weight(.bold))
                                 .foregroundStyle(Theme.textSecondary)
                         }
                         if let published = article.published {

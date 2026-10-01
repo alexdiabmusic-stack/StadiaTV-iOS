@@ -115,6 +115,12 @@ final class EPGRepository: ObservableObject {
     /// actually scrolled into view); `false` requests now/next only (`get_short_epg`).
     var xtreamEPGFetcher: ((_ providerChannelId: String, _ fullSchedule: Bool) async -> [EPGProgramme])?
     private var xtreamEPGTasks: Set<String> = []
+    /// Last successful fetch per (providerChannelId, fullSchedule) key — see
+    /// `requestXtreamEPGIfNeeded`'s 6-hour freshness window.
+    private var xtreamEPGFetchedAt: [String: Date] = [:]
+    /// Shared across every `EPGRepository` instance (there's normally one): caps concurrent
+    /// Xtream per-channel EPG fetches at 2.
+    private static let xtreamEPGGate = AsyncGate(limit: 2)
     private let logger = Logger(subsystem: "BannerTV", category: "LiveTVImport")
 
     // Cache keys
@@ -424,22 +430,32 @@ final class EPGRepository: ObservableObject {
     /// Same idea as `requestEPGPWIfNeeded`, but against the Xtream per-channel EPG
     /// endpoints instead of epg.pw. `fullSchedule` picks `get_simple_data_table` (a full
     /// day, only for a row actually visible) vs `get_short_epg` (now/next only).
+    ///
+    /// A fetch is only trusted for 6 hours (`xtreamEPGFetchedAt`) — after that it's refetched
+    /// even if the stored programmes still nominally cover `[from, to]`, since the provider's
+    /// own schedule can change. Concurrency across all channels is capped at 2
+    /// (`xtreamEPGGate`): these fire from scrolling, and an unbounded burst of newly-visible
+    /// rows would hammer the provider for no benefit. See MatchLinker/PROMPTS.md, Prompt 4 step 5.
     private func requestXtreamEPGIfNeeded(channelId: String, from: Date, to: Date, fullSchedule: Bool) {
         guard let fetcher = xtreamEPGFetcher,
               let canonical = canonicalChannelsByID[channelId],
               let providerChannelId = canonical.primaryStream?.providerChannelId else { return }
         let epgId = "xtream:\(providerChannelId)"
-        let hasCoverage = programmeIndex[channelId]?.contains { prog in
-            prog.epgChannelId == epgId && prog.end > from && prog.start < to
-        } ?? false
-        guard !hasCoverage else { return }
         let taskKey = "\(providerChannelId)-\(fullSchedule)"
+        let fetchedRecently = xtreamEPGFetchedAt[taskKey].map { Date().timeIntervalSince($0) < 6 * 3600 } ?? false
+        let hasCoverage = fetchedRecently && (programmeIndex[channelId]?.contains { prog in
+            prog.epgChannelId == epgId && prog.end > from && prog.start < to
+        } ?? false)
+        guard !hasCoverage else { return }
         guard !xtreamEPGTasks.contains(taskKey) else { return }
         xtreamEPGTasks.insert(taskKey)
         Task { [weak self] in
             defer { self?.xtreamEPGTasks.remove(taskKey) }
+            await Self.xtreamEPGGate.acquire()
+            defer { Task { await Self.xtreamEPGGate.release() } }
             guard let self else { return }
             let fetched = await fetcher(providerChannelId, fullSchedule)
+            self.xtreamEPGFetchedAt[taskKey] = Date()
             guard !fetched.isEmpty else { return }
             var merged = self.programmeIndex
             for var prog in fetched where prog.isValid {

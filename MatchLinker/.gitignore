@@ -4,4 +4,8 @@ xmltv.*
 streams.json
 cats.json
 guide_window.json
+events.json
+account.json
+channels.csv
+SUMMARY.txt
 .build/

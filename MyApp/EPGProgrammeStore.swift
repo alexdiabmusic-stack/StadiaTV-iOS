@@ -103,6 +103,8 @@ actor EPGProgrammeStore {
     /// Atomically replaces all rows for one guide source, then prunes anything that
     /// ended more than `retentionDays` ago (across all sources).
     func replaceProgrammes(_ programmes: [EPGProgramme], sourceId: String, retentionDays: Int = 7) throws {
+        let signpost = GuideMatchingSignposts.beginStoreWrite()
+        defer { GuideMatchingSignposts.endStoreWrite(signpost) }
         try exec("BEGIN EXCLUSIVE TRANSACTION")
         do {
             try withStatement("DELETE FROM epg_programmes WHERE source_id = ?") { stmt in

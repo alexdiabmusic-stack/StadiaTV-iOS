@@ -116,6 +116,33 @@ enum GuideBenchmark {
         print(String(format: "guide coverage: %.1f%% (%d/%d channels)", guideCoveragePct, coveredChannels, totalChannels))
         print(String(format: "games with confirmed stream: %.1f%% (%d/%d matches)", confirmedPct, confirmedMatches, matches.count))
         print("========================")
+
+        writeJSONReport(
+            to: dir.appendingPathComponent("benchmark.json"), stages: stages, stalls: stalls,
+            totalChannels: totalChannels, coveredChannels: coveredChannels,
+            programmesRetained: repository.importProgress.programmesRetained,
+            matchesTotal: matches.count, matchesConfirmed: confirmedMatches
+        )
+    }
+
+    private static func writeJSONReport(
+        to url: URL, stages: [StageResult], stalls: [Double],
+        totalChannels: Int, coveredChannels: Int, programmesRetained: Int,
+        matchesTotal: Int, matchesConfirmed: Int
+    ) {
+        let report: [String: Any] = [
+            "stages": stages.map { ["name": $0.name, "seconds": $0.seconds, "residentMemoryMB": $0.residentMemoryMB] },
+            "mainThreadStallsMs": stalls,
+            "coverage": [
+                "channels": totalChannels,
+                "channelsWithProgrammes": coveredChannels,
+                "programmesRetained": programmesRetained,
+                "matchesTotal": matchesTotal,
+                "matchesConfirmed": matchesConfirmed,
+            ],
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) else { return }
+        try? data.write(to: url)
     }
 
     private static func parsePlaylist(directory: URL) -> [Channel] {

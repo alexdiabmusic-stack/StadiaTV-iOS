@@ -56,6 +56,8 @@ nonisolated final class EPGXMLParser: NSObject, XMLParserDelegate {
         programmeWindow: ClosedRange<Date>? = nil,
         channelsOnly: Bool = false
     ) -> EPGParseResult {
+        let signpost = GuideMatchingSignposts.beginGuideParse()
+        defer { GuideMatchingSignposts.endGuideParse(signpost) }
         self.allowedChannelIds = allowedChannelIds
         self.programmeWindow = programmeWindow
         self.channelsOnly = channelsOnly

@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 
 // MARK: - Entity filter
 
@@ -35,6 +36,7 @@ struct MatchesView: View {
     @State private var newsLoading = false
     @State private var notificationAlertMessage = ""
     @State private var showingNotificationAlert = false
+    @State private var openSignpost: OSSignpostIntervalState?
 
     var body: some View {
         NavigationStack {
@@ -71,8 +73,18 @@ struct MatchesView: View {
                 channels: playlists.allChannels,
                 epgRepository: epgRepository
             )
+            // Approximates "first drawn option" as "first scan completion" — that's when
+            // sourcesByMatchId actually populates and the list redraws with real counts.
+            // See MatchLinker/PROMPTS.md, Prompt 8 step 3.
+            if let signpost = openSignpost {
+                GuideMatchingSignposts.endMatchesTabToFirstOption(signpost)
+                openSignpost = nil
+            }
         }
-        .onAppear { viewModel.startAutoRefresh() }
+        .onAppear {
+            viewModel.startAutoRefresh()
+            openSignpost = GuideMatchingSignposts.beginMatchesTabToFirstOption()
+        }
         .onDisappear { viewModel.stopAutoRefresh() }
         .onChange(of: prefs.favoriteTeams) { _, _ in
             withAnimation(.snappy) { selectedSelection = .all }

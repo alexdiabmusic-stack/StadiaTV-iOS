@@ -20,7 +20,9 @@ actor MatchLinkService {
         guard signature != builtSignature else { return }
         let streams = channels.map(StreamLinkerAdapters.stream)
         let progs = await programmes().map(StreamLinkerAdapters.programme)
+        let signpost = GuideMatchingSignposts.beginLinkerBuild()
         linker = StreamLinker(streams: streams, programmes: progs)
+        GuideMatchingSignposts.endLinkerBuild(signpost)
         builtSignature = signature
         revision += 1
         cache.removeAll(keepingCapacity: true)
@@ -31,7 +33,9 @@ actor MatchLinkService {
     func options(for match: Match) -> [LinkedFamily] {
         guard let linker, match.state != .final else { return [] }
         if let hit = cache[match.id], hit.revision == revision { return hit.families }
+        let signpost = GuideMatchingSignposts.beginLink()
         let families = linker.link(StreamLinkerAdapters.event(match)).groupedByFamily()
+        GuideMatchingSignposts.endLink(signpost)
         cache[match.id] = (revision, families)
         return families
     }

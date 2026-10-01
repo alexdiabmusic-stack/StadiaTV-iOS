@@ -707,7 +707,9 @@ final class EPGRepository: ObservableObject {
 
         do {
             let downloadStart = Date()
+            let signpost = GuideMatchingSignposts.beginGuideDownload()
             let (tempURL, _) = try await session.download(from: url)
+            GuideMatchingSignposts.endGuideDownload(signpost)
             defer { try? FileManager.default.removeItem(at: tempURL) }
             importDiagnostics.epgDownloadDuration += Date().timeIntervalSince(downloadStart)
             let raw = try Data(contentsOf: tempURL)

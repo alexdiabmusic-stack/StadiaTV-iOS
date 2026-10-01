@@ -622,6 +622,20 @@ nonisolated struct Channel: Identifiable, Hashable {
     /// HTTP headers the provider expects on stream requests (User-Agent, Referer, Origin…),
     /// parsed from #EXTVLCOPT / #KODIPROP / pipe-suffix syntax or the playlist's default User-Agent.
     var httpHeaders: [String: String]? = nil
+    /// Raw Xtream identifiers, when this channel came from an Xtream playlist — used by
+    /// `EventChannelRefreshService` to poll `get_live_streams&category_id=` and diff by
+    /// `stream_id`. Nil for M3U channels.
+    var xtreamCategoryID: String? = nil
+    var xtreamStreamID: Int? = nil
+
+    /// A copy with just the display name changed — event-slot channels (e.g. "US ★ MLB 01:
+    /// PHILADELPHIA PHILLIES @ ATLANTA BRAVES 2:00 PM ET") carry the fixture in their name and
+    /// the provider renames them during the day; see `EventChannelRefreshService`.
+    func renamed(to newName: String) -> Channel {
+        Channel(id: id, name: newName, streamURL: streamURL, logoURL: logoURL, group: group,
+                playlistID: playlistID, playlistName: playlistName, tvgId: tvgId, httpHeaders: httpHeaders,
+                xtreamCategoryID: xtreamCategoryID, xtreamStreamID: xtreamStreamID)
+    }
 }
 
 /// Named evidence signals that explain why a stream was surfaced for an event.

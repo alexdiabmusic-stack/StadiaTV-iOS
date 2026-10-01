@@ -46,6 +46,14 @@ actor MatchLinkService {
         }
     }
 
+    /// Forces the next `rebuildIfNeeded` call to actually rebuild even if its cheap signature
+    /// (channel count + guide revision) hasn't changed — used when an event-slot channel's name
+    /// changes in place (`EventChannelRefreshService`), which changes what the linker should
+    /// find without changing either of those two numbers.
+    func invalidate() {
+        builtSignature = nil
+    }
+
     /// Sizes of the current index, for logs and the Prompt 8 performance budgets.
     var stats: StreamLinker.Stats? { linker?.stats }
 }

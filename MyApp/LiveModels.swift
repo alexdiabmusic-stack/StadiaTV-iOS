@@ -177,7 +177,9 @@ nonisolated struct LiveChannel: Identifiable, Codable, Sendable, Hashable {
             playlistID: providerID,
             playlistName: playlistName,
             tvgId: tvgID,
-            httpHeaders: StreamHTTPHeaders.merged(primaryStream?.httpHeaders, defaultUserAgent: defaultUserAgent)
+            httpHeaders: StreamHTTPHeaders.merged(primaryStream?.httpHeaders, defaultUserAgent: defaultUserAgent),
+            xtreamCategoryID: xtreamCategoryID,
+            xtreamStreamID: xtreamStreamID
         )
     }
 

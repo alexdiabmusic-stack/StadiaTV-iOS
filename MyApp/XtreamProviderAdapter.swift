@@ -1,5 +1,14 @@
 import Foundation
 
+#if DEBUG
+/// Test-only seam: lets a test substitute a stubbed `URLSession` into adapters constructed
+/// internally by app code (e.g. `EventChannelRefreshService`, which builds its own
+/// `XtreamProviderAdapter` per playlist and has no injection point in its public API).
+enum XtreamProviderAdapterTestHooks {
+    nonisolated(unsafe) static var session: URLSession?
+}
+#endif
+
 /// Loads live channels from an Xtream Codes server.
 /// Category and stream fetches are parallel-friendly; decoding runs on a background thread.
 nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
@@ -33,14 +42,41 @@ nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
             throw LiveProviderError.missingConfiguration("Host or credentials missing")
         }
         let categories = try await fetchCategoryMap(base: base, user: user, pass: pass)
+        let channels = try await liveStreams(base: base, user: user, pass: pass, categories: categories, categoryID: nil)
 
+        var epgComps = base
+        epgComps.path = "/xmltv.php"
+        epgComps.queryItems = [
+            URLQueryItem(name: "username", value: user),
+            URLQueryItem(name: "password", value: pass)
+        ]
+        return (epgComps.url?.absoluteString, channels)
+    }
+
+    /// `get_live_streams`, optionally scoped to one category (~16 KB / 0.35s per the provider's
+    /// own docs vs. 6.9 MB for the full list) — an API call, not a stream connection, so this is
+    /// safe to poll even on a single-connection account. Used by `EventChannelRefreshService`
+    /// to keep event-slot channel names (which carry the fixture and change during the day)
+    /// current without re-downloading the whole playlist. See MatchLinker/PROMPTS.md, Prompt 5.
+    func liveStreams(categoryID: String) async throws -> [AdapterChannel] {
+        guard let (base, user, pass) = try baseComponents() else {
+            throw LiveProviderError.missingConfiguration("Host or credentials missing")
+        }
+        return try await liveStreams(base: base, user: user, pass: pass, categories: [categoryID: ""], categoryID: categoryID)
+    }
+
+    private func liveStreams(
+        base: URLComponents, user: String, pass: String, categories: [String: String], categoryID: String?
+    ) async throws -> [AdapterChannel] {
         var comps = base
         comps.path = "/player_api.php"
-        comps.queryItems = [
+        var queryItems = [
             URLQueryItem(name: "username", value: user),
             URLQueryItem(name: "password", value: pass),
             URLQueryItem(name: "action",   value: "get_live_streams"),
         ]
+        if let categoryID { queryItems.append(URLQueryItem(name: "category_id", value: categoryID)) }
+        comps.queryItems = queryItems
         guard let url = comps.url else {
             throw LiveProviderError.missingConfiguration("Could not build stream request URL")
         }
@@ -58,15 +94,7 @@ nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
         hostBase?.path = ""
         let hostString = hostBase?.string ?? (provider.host ?? "")
 
-        var epgComps = base
-        epgComps.path = "/xmltv.php"
-        epgComps.queryItems = [
-            URLQueryItem(name: "username", value: user),
-            URLQueryItem(name: "password", value: pass)
-        ]
-        let epgURL = epgComps.url?.absoluteString
-
-        let channels = await Task.detached(priority: .userInitiated) {
+        return await Task.detached(priority: .userInitiated) {
             streams.map { stream in
                 let urlString  = "\(hostString)/live/\(user)/\(pass)/\(stream.stream_id).m3u8"
                 let groupTitle = stream.category_id.flatMap { categories[$0] }
@@ -84,7 +112,6 @@ nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
                 )
             }
         }.value
-        return (epgURL, channels)
     }
 
     func resolveStream(for channel: LiveChannel) async throws -> StreamDescriptor {

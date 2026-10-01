@@ -88,6 +88,22 @@ final class PlaylistStore: ObservableObject {
         load()
     }
 
+    /// Patches channels in place for one playlist — used by `EventChannelRefreshService` to
+    /// apply a renamed event-slot channel without re-downloading or re-matching the whole
+    /// playlist. Bumps `channelsRevision` like any other channel-list change.
+    func updateChannels(_ channels: [Channel], for playlistID: UUID) {
+        channelsByPlaylist[playlistID] = channels
+    }
+
+    #if DEBUG
+    /// Test-only: sets `playlists` directly, bypassing `load()`'s UserDefaults/Keychain
+    /// round trip, so tests can exercise code that reads `playlists` without touching real
+    /// persisted state.
+    func seedPlaylistsForTesting(_ playlists: [Playlist]) {
+        self.playlists = playlists
+    }
+    #endif
+
     // MARK: - Channel indexes
 
     private func rebuildChannelIndexes() {

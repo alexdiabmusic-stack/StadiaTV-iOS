@@ -116,6 +116,7 @@ enum AppTab: String, Hashable {
 }
 
 struct RootView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var podcastStore: PodcastStore
     @EnvironmentObject private var playlistStore: PlaylistStore
@@ -171,6 +172,9 @@ struct RootView: View {
         .environmentObject(eventChannelRefresh)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: podcastStore.nowPlaying != nil)
         .task { updateFavoriteNotificationPrompt() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await playlistStore.refreshAccountStatus() } }
+        }
         .task { epgRepository.xtreamEPGFetcher = playlistStore.fetchXtreamEPG }
         .task { await liveViewModel.load(favoriteTeams: prefs.favoriteTeams) }
         .task(id: playlistStore.playlists) {

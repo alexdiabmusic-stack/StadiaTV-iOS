@@ -2,6 +2,7 @@
 import SwiftUI
 
 struct TVRootView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var playlistStore: PlaylistStore
     @EnvironmentObject private var fantasyStore: FantasyStore
@@ -51,6 +52,9 @@ struct TVRootView: View {
         .environmentObject(streamStore)
         .environmentObject(eventChannelRefresh)
         .task { await liveViewModel.load(favoriteTeams: prefs.favoriteTeams) }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await playlistStore.refreshAccountStatus() } }
+        }
         .task { epgRepository.xtreamEPGFetcher = playlistStore.fetchXtreamEPG }
         .task { epgRepository.setupWithChannels(playlistStore.allChannels) }
         .task(id: "\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.channelsRevision)-\(epgRepository.programmeRevision)") {

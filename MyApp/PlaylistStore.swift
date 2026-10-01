@@ -305,6 +305,18 @@ final class PlaylistStore: ObservableObject {
         await repository.liveChannel(for: id)
     }
 
+    /// Re-checks connection-limit status for every Xtream playlist without re-downloading
+    /// channels — called when the app becomes active, since `active_cons` changes on the
+    /// server's side independent of anything this app does. See MatchLinker/PROMPTS.md,
+    /// Prompt 6 step 1.
+    func refreshAccountStatus() async {
+        await withTaskGroup(of: Void.self) { group in
+            for playlist in playlists where playlist.kind == .xtream {
+                group.addTask { await self.xtreamAccountStatus.refresh(for: playlist) }
+            }
+        }
+    }
+
     // MARK: - Channel loading
 
     /// Fetches fresh channels from the provider via the appropriate adapter,

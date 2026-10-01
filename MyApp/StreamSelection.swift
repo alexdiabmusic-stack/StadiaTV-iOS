@@ -400,8 +400,15 @@ final class StreamSelectionState: ObservableObject {
 
     /// Probes the next two Auto candidates in parallel and marks dead ones unavailable,
     /// so a failover skips them instead of waiting out the start-up watchdog.
+    ///
+    /// Skipped on a single-connection (or unknown-limit, or already-at-limit) account: opening
+    /// a second connection to probe a candidate while the main stream is live is exactly what
+    /// kicks the viewer on those accounts. See MatchLinker/PROMPTS.md, Prompt 6.
     func preflightAlternates() async {
-        let activeID = activeStream?.id
+        guard let active = activeStream else { return }
+        let activePlaylistID = channel(for: active).playlistID
+        guard !XtreamAccountStatusStore.shared.blocksAdditionalConnection(forPlaylistID: activePlaylistID) else { return }
+        let activeID = active.id
         let targets = autoOrderedStreams()
             .filter { $0.id != activeID && !isUnavailable($0.id) }
             .prefix(2)

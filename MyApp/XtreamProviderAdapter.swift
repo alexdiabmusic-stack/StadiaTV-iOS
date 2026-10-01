@@ -193,6 +193,8 @@ nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
                 struct UserInfo: Decodable {
                     let max_connections: XtreamNumeric?
                     let active_cons: XtreamNumeric?
+                    let status: String?
+                    let exp_date: XtreamNumeric?
                 }
                 // Read alongside user_info as instructed, even though nothing here
                 // currently feeds the connection-limit decision below.
@@ -204,9 +206,12 @@ nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
                 let server_info: ServerInfo?
             }
             let envelope = try JSONDecoder().decode(Envelope.self, from: data)
+            let expDate = envelope.user_info?.exp_date?.intValue.map { Date(timeIntervalSince1970: TimeInterval($0)) }
             return XtreamAccountStatus(
                 maxConnections: envelope.user_info?.max_connections?.intValue,
                 activeConnections: envelope.user_info?.active_cons?.intValue,
+                status: envelope.user_info?.status,
+                expiresAt: expDate,
                 isInconclusive: false
             )
         } catch {
@@ -254,6 +259,9 @@ nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
 struct XtreamAccountStatus {
     let maxConnections: Int?
     let activeConnections: Int?
+    /// Raw `user_info.status` ("Active", "Expired", "Banned", "Disabled"...), for Settings.
+    var status: String? = nil
+    var expiresAt: Date? = nil
     /// True when the probe itself was inconclusive (network error, or a 401/403/429/5xx
     /// response) — as opposed to a successful response that simply had no connection info.
     let isInconclusive: Bool

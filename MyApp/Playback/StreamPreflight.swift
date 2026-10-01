@@ -42,6 +42,11 @@ nonisolated enum StreamPreflight {
         do {
             let (bytes, response) = try await session.bytes(for: request)
             guard let http = response as? HTTPURLResponse else { return .inconclusive }
+            // 401/403/429/5xx don't mean the stream is down — they're as likely to be the
+            // account's own connection limit rejecting this probe (see MatchLinker/PROMPTS.md,
+            // Prompt 6), which must never mark a healthy mirror dead.
+            let inconclusiveCodes: Set<Int> = [401, 403, 429]
+            if inconclusiveCodes.contains(http.statusCode) || http.statusCode >= 500 { return .inconclusive }
             guard (200..<400).contains(http.statusCode) else { return .dead }
             let contentType = (http.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased()
             if contentType.hasPrefix("video/") || contentType.contains("mpegurl") || contentType.contains("mp2t") {
@@ -61,8 +66,13 @@ nonisolated enum StreamPreflight {
         } catch let error as URLError {
             switch error.code {
             case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .badURL, .unsupportedURL,
-                 .badServerResponse, .userAuthenticationRequired, .fileDoesNotExist, .resourceUnavailable:
+                 .badServerResponse, .fileDoesNotExist, .resourceUnavailable:
                 return .dead
+            // A 401/403-style challenge surfacing as a URLError rather than a plain
+            // HTTPURLResponse is the same connection-limit-rejection case handled above —
+            // never grounds for marking the mirror dead.
+            case .userAuthenticationRequired:
+                return .inconclusive
             default:
                 return .inconclusive
             }

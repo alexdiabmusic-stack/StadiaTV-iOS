@@ -884,6 +884,13 @@ struct PlayerView: View {
         subtitleGroup = nil
         activeStreamMetadata = nil
         playback.load(streamSelection.activeChannel)
+        // The server reports the connection limit is actually reached right now (not just a
+        // single-connection account playing normally) — tell the viewer failover won't be
+        // pre-warmed, instead of silently doing nothing. See MatchLinker/PROMPTS.md, Prompt 6.
+        if let status = XtreamAccountStatusStore.shared.statusByPlaylistID[activePlaybackChannel.playlistID],
+           let max = status.maxConnections, let active = status.activeConnections, active >= max {
+            failoverNotice = "Connection limit reached — failover unavailable"
+        }
         Task { await streamSelection.preflightAlternates() }
     }
 

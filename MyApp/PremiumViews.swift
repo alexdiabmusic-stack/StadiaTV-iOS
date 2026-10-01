@@ -231,7 +231,7 @@ struct StandingsGroupCard: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(group.name.uppercased())
-                        .font(.footnote.weight(.heavy))
+                        .font(.footnote.weight(.bold))
                         .foregroundStyle(Theme.textPrimary)
                     Text("\(group.rows.count) \(participantCountLabel)")
                         .font(.caption2.weight(.semibold))
@@ -253,7 +253,7 @@ struct StandingsGroupCard: View {
                         .frame(width: col.width, alignment: .trailing)
                 }
             }
-            .font(.caption2.weight(.heavy))
+            .font(.caption2.weight(.bold))
             .foregroundStyle(Theme.textSecondary)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
@@ -388,7 +388,7 @@ private struct LeaderRowView: View {
     var body: some View {
         HStack(spacing: 12) {
             Text("\(row.rank)")
-                .font(.subheadline.weight(.heavy).monospacedDigit())
+                .font(.subheadline.weight(.bold).monospacedDigit())
                 .foregroundStyle(row.rank == 1 ? Theme.accent : Theme.textSecondary)
                 .frame(width: 22, alignment: .center)
             PlayerHeadshot(url: row.headshotURL, size: 34)
@@ -477,7 +477,7 @@ private struct InjuryRowView: View {
             }
             Spacer()
             Text(injury.status.uppercased())
-                .font(.caption2.weight(.heavy))
+                .font(.caption2.weight(.bold))
                 .foregroundStyle(injury.isOut ? Theme.live : Theme.Palette.amber)
                 .padding(.horizontal, 8).padding(.vertical, 4)
                 .background((injury.isOut ? Theme.live : Theme.Palette.amber).opacity(0.15), in: Capsule())

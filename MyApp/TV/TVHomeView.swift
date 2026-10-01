@@ -102,7 +102,7 @@ struct TVHomeView: View {
         if !todayMatches.isEmpty {
             VStack(alignment: .leading, spacing: 16) {
                 Text("YOUR SPORTS DAY")
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                     .tracking(0.5)
 
@@ -253,7 +253,7 @@ private struct TVScheduleRow: View {
             TVLiveBadge()
         case .final:
             Text("FT")
-                .font(.caption2.weight(.heavy))
+                .font(.caption2.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
                 .frame(width: 44)
         case .pre:

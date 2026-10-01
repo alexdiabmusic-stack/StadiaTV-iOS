@@ -12,7 +12,7 @@ struct TVMatchCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(match.league.shortName.uppercased())
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.accent)
                 Spacer()
                 if streamCount > 0 && match.state != .final {
@@ -58,7 +58,7 @@ struct TVMatchCard: View {
         VStack(spacing: 6) {
             if match.state != .pre {
                 Text("\(match.away.score ?? "-")–\(match.home.score ?? "-")")
-                    .font(.title2.weight(.black).monospacedDigit())
+                    .font(.title2.weight(.bold).monospacedDigit())
                     .foregroundStyle(.white)
             } else {
                 Text(match.statusDetail)
@@ -121,7 +121,7 @@ struct TVHeroCard: View {
 
                 VStack(spacing: 16) {
                     Text(match.league.name.uppercased())
-                        .font(.caption.weight(.heavy))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(Theme.accent)
                         .lineLimit(1)
 
@@ -170,7 +170,7 @@ struct TVHeroCard: View {
         VStack(spacing: 14) {
             TVTeamLogo(url: side.logoURL, size: 108)
             Text(side.displayName)
-                .font(.title3.weight(.heavy))
+                .font(.title3.weight(.bold))
                 .foregroundStyle(dimmed ? .white.opacity(0.5) : .white)
                 .multilineTextAlignment(.center)
             if let record = side.record {
@@ -240,7 +240,7 @@ struct TVArticleCard: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(article.league.shortName.uppercased())
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.accent)
                 Text(article.headline)
                     .font(.subheadline.weight(.bold))
@@ -327,7 +327,7 @@ struct TVShelfRow<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Label(title, systemImage: systemImage)
-                .font(.title2.weight(.heavy))
+                .font(.title2.weight(.bold))
                 .foregroundStyle(Theme.textPrimary)
                 .padding(.leading, 4)
 
@@ -355,7 +355,7 @@ struct TVLiveBadge: View {
                 .opacity(pulsing ? 0.3 : 1)
                 .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: pulsing)
             Text("LIVE")
-                .font(.caption2.weight(.heavy))
+                .font(.caption2.weight(.bold))
                 .foregroundStyle(.white)
         }
         .padding(.horizontal, 9)

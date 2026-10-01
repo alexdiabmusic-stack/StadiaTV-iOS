@@ -6,7 +6,7 @@ xcuserdata/
 
 # Stray URLCache disk cache written relative to cwd when a *CoreTests run-tests.sh
 # is invoked from the repo root (e.g. NBALiveCDNClient's "BannerTV/NBA/http-cache").
-BannerTV/
+/BannerTV/
 
 # Local API keys (see Config/Secrets.example.xcconfig)
 Config/Secrets.xcconfig

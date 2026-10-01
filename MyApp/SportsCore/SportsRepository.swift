@@ -17,6 +17,10 @@ nonisolated struct SportsRepository: Sendable {
         guard let provider = providers[league.path] else { throw SportsDataError.noProviderAvailable(capability, league.name) }
         return provider
     }
+    /// Every `League.all` entry must resolve here — see `SportsCatalogProviderCoverageTests`.
+    /// A league with no provider throws `noProviderAvailable` wherever it's selected (this is
+    /// exactly how Liga MX went dead: MatchLinker/PROMPTS.md, Prompt 7).
+    func hasProvider(for league: League) -> Bool { providers[league.path] != nil }
     func legacyScoreboard(for league: League, on date: Date? = nil) async throws -> [Match] {
         try await provider(league, .liveScores).scores(on: date)
     }

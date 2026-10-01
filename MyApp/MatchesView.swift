@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 
 // MARK: - Entity filter
 
@@ -35,6 +36,7 @@ struct MatchesView: View {
     @State private var newsLoading = false
     @State private var notificationAlertMessage = ""
     @State private var showingNotificationAlert = false
+    @State private var openSignpost: OSSignpostIntervalState?
 
     var body: some View {
         NavigationStack {
@@ -71,8 +73,18 @@ struct MatchesView: View {
                 channels: playlists.allChannels,
                 epgRepository: epgRepository
             )
+            // Approximates "first drawn option" as "first scan completion" — that's when
+            // sourcesByMatchId actually populates and the list redraws with real counts.
+            // See MatchLinker/PROMPTS.md, Prompt 8 step 3.
+            if let signpost = openSignpost {
+                GuideMatchingSignposts.endMatchesTabToFirstOption(signpost)
+                openSignpost = nil
+            }
         }
-        .onAppear { viewModel.startAutoRefresh() }
+        .onAppear {
+            viewModel.startAutoRefresh()
+            openSignpost = GuideMatchingSignposts.beginMatchesTabToFirstOption()
+        }
         .onDisappear { viewModel.stopAutoRefresh() }
         .onChange(of: prefs.favoriteTeams) { _, _ in
             withAnimation(.snappy) { selectedSelection = .all }
@@ -178,6 +190,12 @@ struct MatchesView: View {
         upcomingAll.sort { $0.date < $1.date }
         let nextUp = upcomingAll.first
         let comingUp = comingUpSportFilter.map { f in upcomingAll.filter { $0.league.group == f } } ?? upcomingAll
+        // A league with 10+ matches in the last 14 days and none confident isn't on this
+        // playlist's guide — collapse it out of the main list instead of cluttering it with
+        // matches that will never show a stream. Never hide a league the user actively follows.
+        let notOnPlaylist = comingUp.filter { !isFollowedLeague($0.league) && !streamStore.isLeagueOnPlaylist($0.league) }
+        let notOnPlaylistIDs = Set(notOnPlaylist.map(\.id))
+        let comingUpVisible = comingUp.filter { !notOnPlaylistIDs.contains($0.id) }
 
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
@@ -211,11 +229,12 @@ struct MatchesView: View {
                 .padding(.bottom, 28)
 
                 FollowingComingUpSection(
-                    matches: Array(comingUp.prefix(6)),
-                    fullScheduleMatches: comingUp,
+                    matches: Array(comingUpVisible.prefix(6)),
+                    fullScheduleMatches: comingUpVisible,
                     sportFilter: $comingUpSportFilter,
                     availableSports: availableSports,
-                    streamCountByMatchId: streamStore.countByMatchId
+                    streamCountByMatchId: streamStore.countByMatchId,
+                    notOnPlaylistMatches: notOnPlaylist
                 )
                 .padding(.bottom, 28)
 
@@ -265,7 +284,7 @@ struct MatchesView: View {
                 }
                 Button { showingTeamEditor = true } label: {
                     Image(systemName: "plus")
-                        .font(.caption.weight(.heavy))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
                         .frame(width: 32, height: 32)
                         .background(Theme.surface, in: Capsule())
@@ -297,7 +316,7 @@ struct MatchesView: View {
             HStack(spacing: 5) {
                 if let logoURL { TeamLogo(url: logoURL, size: 18) }
                 Text(title)
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(isSelected ? .white : Theme.textPrimary)
                     .lineLimit(1)
             }
@@ -328,6 +347,10 @@ struct MatchesView: View {
         let favLeagueIDs = Set(prefs.favoriteTeams.flatMap { [$0.leaguePath, $0.leagueBannerKey] })
         let explicitIDs = Set(prefs.explicitlyFollowedLeagues.flatMap { [$0.id, $0.bannerKey] })
         return League.all.filter { favLeagueIDs.contains($0.id) || favLeagueIDs.contains($0.bannerKey) || explicitIDs.contains($0.id) || explicitIDs.contains($0.bannerKey) }
+    }
+
+    private func isFollowedLeague(_ league: League) -> Bool {
+        prefs.isLeagueSelected(league) || prefs.favoriteTeams.contains { $0.leaguePath == league.path }
     }
 
     private func isTBDMatch(_ match: Match) -> Bool {
@@ -384,7 +407,7 @@ private struct FollowingSportsSummary: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("YOUR SPORTS")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
                 .tracking(0.5)
 
@@ -470,13 +493,13 @@ private struct FollowingLiveHero: View {
                     HStack(spacing: 6) {
                         PulsingLiveBadge()
                         Text("LIVE")
-                            .font(.caption.weight(.heavy))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(Theme.live)
                             .tracking(1.5)
                     }
                     Spacer()
                     Text(match.league.shortName.uppercased())
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
                         .tracking(0.5)
                 }
@@ -583,12 +606,12 @@ private struct FollowingUpNextHero: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text("UP NEXT")
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.accent)
                     .tracking(1.5)
                 Spacer()
                 Text(match.league.shortName.uppercased())
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                     .tracking(0.5)
             }
@@ -763,6 +786,9 @@ private struct FollowingComingUpSection: View {
     @Binding var sportFilter: SportGroup?
     let availableSports: [SportGroup]
     var streamCountByMatchId: [String: Int] = [:]
+    /// Matches whose league has 10+ matches in the last 14 days and none confident — the
+    /// playlist's guide doesn't carry it. Shown collapsed instead of cluttering the main list.
+    var notOnPlaylistMatches: [Match] = []
 
     private struct DateGroup: Identifiable {
         let title: String
@@ -806,7 +832,7 @@ private struct FollowingComingUpSection: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("COMING UP")
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                     .tracking(0.5)
                 Spacer()
@@ -823,7 +849,7 @@ private struct FollowingComingUpSection: View {
                 ForEach(dateGroups) { group in
                     VStack(alignment: .leading, spacing: 6) {
                         Text(group.title)
-                            .font(.caption2.weight(.heavy))
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(Theme.textSecondary)
                             .tracking(0.5)
                             .padding(.horizontal, 20)
@@ -859,6 +885,24 @@ private struct FollowingComingUpSection: View {
                     .padding(.top, 2)
                 }
                 .buttonStyle(.plain)
+
+                if !notOnPlaylistMatches.isEmpty {
+                    DisclosureGroup("Not on your playlist (\(notOnPlaylistMatches.count))") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(notOnPlaylistMatches.prefix(20)) { match in
+                                NavigationLink(value: match) {
+                                    FollowingEventRow(match: match, streamCount: 0)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+                }
             }
         }
     }
@@ -942,7 +986,7 @@ private struct FollowingFullScheduleView: View {
                 LazyVStack(alignment: .leading, spacing: 14) {
                     HStack {
                         Text("COMING UP")
-                            .font(.caption.weight(.heavy))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(Theme.textSecondary)
                             .tracking(0.5)
                         Spacer()
@@ -960,7 +1004,7 @@ private struct FollowingFullScheduleView: View {
                         ForEach(dateGroups) { group in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(group.title)
-                                    .font(.caption2.weight(.heavy))
+                                    .font(.caption2.weight(.bold))
                                     .foregroundStyle(Theme.textSecondary)
                                     .tracking(0.5)
                                     .padding(.horizontal, 20)
@@ -1076,7 +1120,7 @@ private struct FollowingEventRow: View {
                     HStack(spacing: 4) {
                         PulsingLiveBadge()
                         Text("LIVE")
-                            .font(.caption2.weight(.heavy))
+                            .font(.caption2.weight(.bold))
                             .foregroundStyle(Theme.live)
                     }
                 } else {
@@ -1132,7 +1176,7 @@ private struct FollowingNewsSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("FROM YOUR TEAMS")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
                 .tracking(0.5)
                 .padding(.horizontal, 20)
@@ -1182,7 +1226,7 @@ private struct FollowingNewsCard: View {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 4) {
                     Text(article.league.shortName.uppercased())
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.accent)
                     if let pub = article.published {
                         Text("·").font(.caption2).foregroundStyle(Theme.textTertiary)
@@ -1247,7 +1291,7 @@ private struct FollowingStandingsSnapshot: View {
     private func standingsBlock(league: League, highlightTeamID: String?) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("YOUR STANDINGS")
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
                 .tracking(0.5)
             FollowingStandingsPanelView(league: league, highlightTeamID: highlightTeamID)
@@ -1304,7 +1348,7 @@ private struct FollowingStandingsPanelView: View {
         let rows = contextRows(group: group)
         return VStack(alignment: .leading, spacing: 8) {
             Text(group.name.uppercased())
-                .font(.caption2.weight(.heavy))
+                .font(.caption2.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
                 .tracking(0.5)
 
@@ -1459,7 +1503,7 @@ struct MatchRow: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Text(match.league.shortName)
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                     .lineLimit(1)
                 Spacer(minLength: 8)
@@ -1541,7 +1585,7 @@ struct PickResultCard: View {
             HStack(spacing: 6) {
                 Image(systemName: statusIcon).font(.caption.weight(.bold)).foregroundStyle(statusColor)
                 Text(prediction.leagueName)
-                    .font(.caption2.weight(.heavy)).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                    .font(.caption2.weight(.bold)).foregroundStyle(Theme.textSecondary).lineLimit(1)
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.caption2.weight(.semibold))

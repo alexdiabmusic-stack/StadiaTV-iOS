@@ -136,7 +136,7 @@ struct FantasyRedZoneToastView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(alert.title)
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(alert.isTouchdown ? Theme.live : Theme.accent)
                     Spacer()
                     Text("NOW")
@@ -253,7 +253,7 @@ struct FantasyMatchupSidebarView: View {
                     .font(.subheadline)
                     .foregroundStyle(Theme.accent)
                 Text("FANTASY TRACKER")
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(.white)
             }
 
@@ -303,7 +303,7 @@ struct FantasyMatchupSidebarView: View {
                     )
 
                     Text("VS")
-                        .font(.caption.weight(.black))
+                        .font(.caption.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
 
                     teamScoreBlock(
@@ -348,7 +348,7 @@ struct FantasyMatchupSidebarView: View {
                 .foregroundStyle(isUser ? Theme.accent : .white)
                 .lineLimit(1)
             Text(points.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "--")
-                .font(.title3.weight(.black).monospacedDigit())
+                .font(.title3.weight(.bold).monospacedDigit())
                 .foregroundStyle(.white)
         }
         .frame(maxWidth: .infinity)
@@ -357,7 +357,7 @@ struct FantasyMatchupSidebarView: View {
     private var startersSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("STARTERS")
-                .font(.caption2.weight(.heavy))
+                .font(.caption2.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
 
             let starters = fantasyStore.playerGames.filter { $0.isFantasyStarter }
@@ -414,7 +414,7 @@ struct FantasyMatchupSidebarView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text(alert.title)
-                                .font(.caption2.weight(.heavy))
+                                .font(.caption2.weight(.bold))
                                 .foregroundStyle(Theme.accent)
                             Spacer()
                             Text(alert.timestamp, style: .time)
@@ -470,7 +470,7 @@ struct FantasyMatchupSidebarView: View {
 
             if let pts = game.fantasyPoints {
                 Text("\(pts, specifier: "%.1f") pts")
-                    .font(.caption.weight(.black).monospacedDigit())
+                    .font(.caption.weight(.bold).monospacedDigit())
                     .foregroundStyle(Theme.accent)
             }
 
@@ -520,7 +520,7 @@ struct FantasyWinProbabilityChartView: View {
                         .fill(winProbability >= 0.5 ? Color.green : Color.red)
                         .frame(width: 6, height: 6)
                     Text(String(format: "%.0f%% Chance", winProbability * 100))
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(winProbability >= 0.5 ? Color.green : Color.red)
                 }
                 .padding(.horizontal, 6)
@@ -632,7 +632,7 @@ struct FantasyPlayerPaceWidget: View {
                     VStack(alignment: .trailing, spacing: 2) {
                         HStack(spacing: 4) {
                             Text(String(format: "%.1f", current))
-                                .font(.caption.weight(.heavy))
+                                .font(.caption.weight(.bold))
                                 .foregroundStyle(.white)
                             Text(String(format: "/ %.1f proj", proj))
                                 .font(Theme.Typography.overline)

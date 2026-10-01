@@ -13,6 +13,8 @@ struct TVPlayerView: View {
     @EnvironmentObject private var entitlements: EntitlementStore
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var fantasyStore: FantasyStore
+    @EnvironmentObject private var epgRepository: EPGRepository
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
 
     /// Same playback engine as iOS: fast-start tuning, provider headers, watchdog and stall recovery.
     @StateObject private var playback = PlaybackController()
@@ -336,7 +338,7 @@ struct TVPlayerView: View {
         let channel = self.channel
         let leagues = ["football/nfl", "basketball/nba", "hockey/nhl", "baseball/mlb",
                        "soccer/eng.1", "soccer/esp.1", "soccer/ger.1", "soccer/ita.1",
-                       "soccer/usa.1", "soccer/mex.1", "racing/f1"]
+                       "soccer/usa.1", "racing/f1"]
             .compactMap { path in League.all.first { $0.path == path } }
 
         var live: [Match] = []
@@ -348,9 +350,10 @@ struct TVPlayerView: View {
         }
         guard !Task.isCancelled, !live.isEmpty else { return }
 
+        let allChannels = playlistStore.allChannels
         var best: Match?; var bestScore = 0
         for match in live {
-            let s = SourceMatcher.rank(match: match, channels: [channel], preferredLanguages: []).first?.score ?? 0
+            let s = await streamStore.confidenceScore(match: match, channel: channel, channels: allChannels, epgRepository: epgRepository)
             if s > bestScore { bestScore = s; best = match }
         }
         guard !Task.isCancelled, let match = best, bestScore >= 35 else { return }

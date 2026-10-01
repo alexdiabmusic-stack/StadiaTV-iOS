@@ -133,6 +133,22 @@ struct PlaylistDetailSettingsView: View {
                     }
                 }
 
+                if currentPlaylist.kind == .xtream, let status = playlists.xtreamAccountStatus.statusByPlaylistID[currentPlaylist.id] {
+                    Section("CONNECTION") {
+                        if let accountStatus = status.status {
+                            DetailValueRow(title: "Account status", value: accountStatus)
+                        }
+                        if let max = status.maxConnections {
+                            DetailValueRow(title: "Connections", value: "\(status.activeConnections ?? 0) of \(max) in use")
+                        } else if !status.isInconclusive {
+                            DetailValueRow(title: "Connections", value: "Unknown limit")
+                        }
+                        if let expiry = status.expiresAt {
+                            DetailValueRow(title: "Expires", value: expiry.formatted(date: .abbreviated, time: .omitted))
+                        }
+                    }
+                }
+
                 Section("ACTIONS") {
                     Button { Task { await playlists.refresh(currentPlaylist) } } label: {
                         Label("Refresh playlist", systemImage: "arrow.clockwise")
@@ -424,7 +440,7 @@ struct SavedArticlesSettingsView: View {
                             HStack(alignment: .top, spacing: 12) {
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(article.league.shortName)
-                                        .font(.caption.weight(.heavy))
+                                        .font(.caption.weight(.bold))
                                         .foregroundStyle(Theme.accent)
                                     Text(article.headline)
                                         .font(.subheadline.weight(.semibold))

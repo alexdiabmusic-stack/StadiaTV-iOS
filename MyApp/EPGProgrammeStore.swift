@@ -103,6 +103,8 @@ actor EPGProgrammeStore {
     /// Atomically replaces all rows for one guide source, then prunes anything that
     /// ended more than `retentionDays` ago (across all sources).
     func replaceProgrammes(_ programmes: [EPGProgramme], sourceId: String, retentionDays: Int = 7) throws {
+        let signpost = GuideMatchingSignposts.beginStoreWrite()
+        defer { GuideMatchingSignposts.endStoreWrite(signpost) }
         try exec("BEGIN EXCLUSIVE TRANSACTION")
         do {
             try withStatement("DELETE FROM epg_programmes WHERE source_id = ?") { stmt in
@@ -215,6 +217,29 @@ actor EPGProgrammeStore {
             }
             sqlite3_bind_double(stmt, col, from.timeIntervalSince1970); col += 1
             sqlite3_bind_double(stmt, col, to.timeIntervalSince1970)
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                results.append(programme(from: stmt))
+            }
+        }
+        return results
+    }
+
+    /// Every programme overlapping `[from, to]`, across every guide ID — the raw snapshot
+    /// `MatchLinkService` indexes into a `StreamLinker`. Unlike `programmes(epgChannelId:from:to:)`,
+    /// this is not scoped to a single channel: the linker maps guide IDs to playlist streams itself.
+    func snapshot(from: Date, to: Date) throws -> [EPGProgramme] {
+        let sql = """
+        SELECT id, epg_channel_id, title, subtitle, description, categories_json,
+               start_time, end_time, image_url, season, episode, rating,
+               source_id, source_priority, end_time_inferred
+          FROM epg_programmes
+         WHERE end_time > ? AND start_time < ?
+         ORDER BY epg_channel_id, start_time
+        """
+        var results: [EPGProgramme] = []
+        try withStatement(sql) { stmt in
+            sqlite3_bind_double(stmt, 1, from.timeIntervalSince1970)
+            sqlite3_bind_double(stmt, 2, to.timeIntervalSince1970)
             while sqlite3_step(stmt) == SQLITE_ROW {
                 results.append(programme(from: stmt))
             }

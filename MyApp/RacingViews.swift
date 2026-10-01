@@ -19,7 +19,7 @@ struct RacersSection: View {
                 Text("Racers")
                 Spacer()
                 Text(league.shortName)
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
             }
             .font(.headline.weight(.bold))
@@ -55,7 +55,7 @@ struct RacersSection: View {
         VStack(spacing: 0) {
             HStack {
                 Text(name.uppercased())
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                 Spacer()
             }

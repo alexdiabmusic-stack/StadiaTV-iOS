@@ -88,6 +88,22 @@ final class PlaylistStore: ObservableObject {
         load()
     }
 
+    /// Patches channels in place for one playlist — used by `EventChannelRefreshService` to
+    /// apply a renamed event-slot channel without re-downloading or re-matching the whole
+    /// playlist. Bumps `channelsRevision` like any other channel-list change.
+    func updateChannels(_ channels: [Channel], for playlistID: UUID) {
+        channelsByPlaylist[playlistID] = channels
+    }
+
+    #if DEBUG
+    /// Test-only: sets `playlists` directly, bypassing `load()`'s UserDefaults/Keychain
+    /// round trip, so tests can exercise code that reads `playlists` without touching real
+    /// persisted state.
+    func seedPlaylistsForTesting(_ playlists: [Playlist]) {
+        self.playlists = playlists
+    }
+    #endif
+
     // MARK: - Channel indexes
 
     private func rebuildChannelIndexes() {
@@ -287,6 +303,18 @@ final class PlaylistStore: ObservableObject {
     /// Returns the LiveChannel from the SQLite cache for a given stable channel ID.
     func liveChannel(for id: String) async -> LiveChannel? {
         await repository.liveChannel(for: id)
+    }
+
+    /// Re-checks connection-limit status for every Xtream playlist without re-downloading
+    /// channels — called when the app becomes active, since `active_cons` changes on the
+    /// server's side independent of anything this app does. See MatchLinker/PROMPTS.md,
+    /// Prompt 6 step 1.
+    func refreshAccountStatus() async {
+        await withTaskGroup(of: Void.self) { group in
+            for playlist in playlists where playlist.kind == .xtream {
+                group.addTask { await self.xtreamAccountStatus.refresh(for: playlist) }
+            }
+        }
     }
 
     // MARK: - Channel loading

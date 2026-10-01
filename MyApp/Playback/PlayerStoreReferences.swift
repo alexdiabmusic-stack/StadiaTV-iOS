@@ -8,9 +8,11 @@ import SwiftUI
 struct PlayerStoreReferences: Equatable {
     let playlistStore: PlaylistStore
     let epgRepository: EPGRepository
+    let streamStore: StreamAvailabilityStore
 
     static func == (lhs: PlayerStoreReferences, rhs: PlayerStoreReferences) -> Bool {
         lhs.playlistStore === rhs.playlistStore && lhs.epgRepository === rhs.epgRepository
+            && lhs.streamStore === rhs.streamStore
     }
 }
 

@@ -103,11 +103,10 @@ struct TVMatchDetailView: View {
         }
     }
 
+    /// Finds streams for this match through `StreamAvailabilityStore`/`MatchLinkService`
+    /// (the shared `StreamLinker` engine — see MatchLinker/PROMPTS.md).
     private func rankSources() async {
         guard match.state != .final else { rankedSources = []; return }
-
-        let channels = playlistStore.allChannels
-        let match = self.match
 
         // Fast path: background scan already ran for this match — display immediately.
         if let cached = streamStore.sourcesByMatchId[match.id], !cached.isEmpty {
@@ -115,54 +114,9 @@ struct TVMatchDetailView: View {
             return
         }
 
-        // Primary: channels confirmed by the EPG programme guide.
-        let titleHints = [match.name, match.shortName, match.home.displayName, match.away.displayName]
-            .filter { !$0.isEmpty }
-        let broadcastNetworks = match.broadcasts.filter { !$0.isEmpty }
-        let joins = epgRepository.programmesNear(
-            start: match.date,
-            titleHints: titleHints,
-            broadcastNetworks: broadcastNetworks
-        )
-
-        var bestJoinByCanonical: [String: ProgrammeEventJoin] = [:]
-        for join in joins where SourceMatcher.confirms(programme: join.programme, for: match) {
-            if let existing = bestJoinByCanonical[join.canonicalChannelId] {
-                if join.score > existing.score { bestJoinByCanonical[join.canonicalChannelId] = join }
-            } else {
-                bestJoinByCanonical[join.canonicalChannelId] = join
-            }
-        }
-
-        let channelToCanonical = epgRepository.channelToCanonicalMap
-        var canonicalToChannels: [String: [Channel]] = [:]
-        for channel in channels {
-            if let cid = channelToCanonical[channel.id] {
-                canonicalToChannels[cid, default: []].append(channel)
-            }
-        }
-
-        var primarySources: [RankedSource] = []
-        var primaryIds = Set<String>()
-        for (canonicalId, join) in bestJoinByCanonical {
-            for channel in (canonicalToChannels[canonicalId] ?? []) {
-                guard SourceMatcher.isEligible(channel: channel, for: match) else { continue }
-                var source = RankedSource(channel: channel, score: 100 + Int(join.titleSimilarity * 50))
-                source.evidenceCategories = [.guideListsMatch]
-                source.epgProgramme = join.programme
-                source.canonicalChannelId = canonicalId
-                primarySources.append(source)
-                primaryIds.insert(channel.id)
-            }
-        }
-        primarySources.sort(by: SourceMatcher.ranksBefore)
-
-        // Backup: every channel whose name contains a team name or event/series keyword.
-        let backupSources = await Task.detached(priority: .userInitiated) {
-            SourceMatcher.teamNameBackups(match: match, channels: channels, excludeIds: primaryIds)
-        }.value
-
-        rankedSources = primarySources + backupSources
+        await streamStore.scan(matches: [match], channels: playlistStore.allChannels, epgRepository: epgRepository)
+        guard !Task.isCancelled else { return }
+        rankedSources = streamStore.sourcesByMatchId[match.id] ?? []
     }
 
     // MARK: - Hero scoreboard
@@ -252,7 +206,7 @@ struct TVMatchDetailView: View {
                 Text("No matching streams found")
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
-                Text("The source matcher didn't find a channel that matches this match.")
+                Text(noStreamReason)
                     .font(.subheadline)
                     .foregroundStyle(Theme.textSecondary)
             }
@@ -260,6 +214,15 @@ struct TVMatchDetailView: View {
         .padding(20)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous).strokeBorder(Theme.hairline))
+    }
+
+    /// Most guide ids in a real Xtream playlist only reach 12-72h ahead (see MatchLinker/
+    /// README.md) — a match further out than that hasn't necessarily been snubbed by the
+    /// provider's guide, it just hasn't been published yet.
+    private var noStreamReason: String {
+        match.date.timeIntervalSinceNow > 48 * 3600
+            ? "Listings appear closer to kickoff"
+            : "No listing in your playlist's guide"
     }
 
     // MARK: - Broadcasts

@@ -371,7 +371,7 @@ private struct HeroArticleCard: View {
                             .background(badge == "BREAKING" ? Theme.live : Theme.accent, in: Capsule())
                     }
                 }
-                .font(.caption.weight(.heavy))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(.white)
 
                 Text(article.headline)

@@ -91,8 +91,6 @@ nonisolated struct League: Identifiable, Hashable {
                keywords: ["mlb", "baseball"]),
         League(name: "NHL", shortName: "NHL", path: "hockey/nhl", group: .hockey,
                keywords: ["nhl", "hockey"]),
-        League(name: "Liga MX", shortName: "Liga MX", path: "soccer/mex.1", group: .soccer,
-               keywords: ["liga mx", "mexican", "soccer"]),
         League(name: "Premier League", shortName: "EPL", path: "soccer/eng.1", group: .soccer,
                keywords: ["premier league", "epl", "english", "soccer", "football"]),
         League(name: "MLS", shortName: "MLS", path: "soccer/usa.1", group: .soccer,
@@ -624,6 +622,20 @@ nonisolated struct Channel: Identifiable, Hashable {
     /// HTTP headers the provider expects on stream requests (User-Agent, Referer, Origin…),
     /// parsed from #EXTVLCOPT / #KODIPROP / pipe-suffix syntax or the playlist's default User-Agent.
     var httpHeaders: [String: String]? = nil
+    /// Raw Xtream identifiers, when this channel came from an Xtream playlist — used by
+    /// `EventChannelRefreshService` to poll `get_live_streams&category_id=` and diff by
+    /// `stream_id`. Nil for M3U channels.
+    var xtreamCategoryID: String? = nil
+    var xtreamStreamID: Int? = nil
+
+    /// A copy with just the display name changed — event-slot channels (e.g. "US ★ MLB 01:
+    /// PHILADELPHIA PHILLIES @ ATLANTA BRAVES 2:00 PM ET") carry the fixture in their name and
+    /// the provider renames them during the day; see `EventChannelRefreshService`.
+    func renamed(to newName: String) -> Channel {
+        Channel(id: id, name: newName, streamURL: streamURL, logoURL: logoURL, group: group,
+                playlistID: playlistID, playlistName: playlistName, tvgId: tvgId, httpHeaders: httpHeaders,
+                xtreamCategoryID: xtreamCategoryID, xtreamStreamID: xtreamStreamID)
+    }
 }
 
 /// Named evidence signals that explain why a stream was surfaced for an event.
@@ -676,6 +688,20 @@ nonisolated struct RankedSource: Identifiable, Hashable {
     var epgProgramme: EPGProgramme? = nil
     /// Canonical channel key from the curated lineup, populated by the match-page ranking pass.
     var canonicalChannelId: String? = nil
+    /// `LinkTier.rawValue`, set when this source came from the match-linking engine
+    /// (`MatchLinkService`/`StreamLinker`). Stored as the raw string (not `LinkTier` itself) so
+    /// `RankedSource` stays `Hashable` without adding conformance to the unmodified linker
+    /// package's `LinkTier` type. `isConfirmed` prefers this over `evidenceCategories` when
+    /// present, since it carries the tier's real confidence rather than a coarse evidence bucket.
+    var linkerTierRaw: String? = nil
+    var linkerTier: LinkTier? { linkerTierRaw.flatMap(LinkTier.init(rawValue:)) }
+    var linkerConfidence: Double = 0
+    /// Tier-specific display label, e.g. "Live listing", "Event channel" — see MatchLinker/README.md.
+    var linkerLabel: String? = nil
+    /// The guide line or channel name that earned this tier, for a "why" disclosure in the UI.
+    var linkerEvidence: String? = nil
+    /// Groups look-alike feeds (e.g. a dozen local affiliates) so the UI can collapse them.
+    var linkerFamily: String? = nil
     var id: String { channel.id }
 
     /// The single strongest piece of evidence, used to drive the badge label.
@@ -683,12 +709,14 @@ nonisolated struct RankedSource: Identifiable, Hashable {
         evidenceCategories.max { $0.priority < $1.priority }
     }
 
-    /// True when event-specific evidence exists (EPG match, both team names, or event title).
-    /// False when only broadcaster rights or league keywords matched — those are unconfirmed candidates.
+    /// True when event-specific evidence exists. When this source came from the match-linking
+    /// engine, confidence 0.7+ (T1/T2/T4 — live listing, description listing, event channel with
+    /// a kickoff time) is a real option; T3/T5/T6 are "more options" and read as unconfirmed here.
     var isConfirmed: Bool {
-        evidenceCategories.contains(.guideListsMatch) ||
-        evidenceCategories.contains(.teamNameMatch) ||
-        evidenceCategories.contains(.eventTitleMatch)
+        if linkerTier != nil { return linkerConfidence >= 0.7 }
+        return evidenceCategories.contains(.guideListsMatch) ||
+            evidenceCategories.contains(.teamNameMatch) ||
+            evidenceCategories.contains(.eventTitleMatch)
     }
 
     /// v3 precision status derived from evidence. CONFIRMED maps 1:1 with isConfirmed.

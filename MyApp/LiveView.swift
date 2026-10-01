@@ -487,14 +487,14 @@ struct LiveMatchCard: View {
             HStack {
                 PulsingLiveBadge()
                 Text(match.league.shortName)
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                 if let label = intelligenceLabel {
                     Text("·")
                         .font(.caption2)
                         .foregroundStyle(Theme.textSecondary)
                     Text(label)
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.starting)
                 }
                 if let fantasyLabel {
@@ -502,7 +502,7 @@ struct LiveMatchCard: View {
                         .font(.caption2)
                         .foregroundStyle(Theme.textSecondary)
                     Text(fantasyLabel)
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.accent)
                         .lineLimit(1)
                 }
@@ -665,7 +665,7 @@ private struct CompactSoonCard: View {
             VStack(spacing: 8) {
                 HStack(spacing: 4) {
                     TeamLogo(url: match.away.logoURL, size: 26)
-                    Text("vs").font(.caption2.weight(.heavy)).foregroundStyle(Theme.textSecondary)
+                    Text("vs").font(.caption2.weight(.bold)).foregroundStyle(Theme.textSecondary)
                     TeamLogo(url: match.home.logoURL, size: 26)
                 }
                 Text(match.shortName)

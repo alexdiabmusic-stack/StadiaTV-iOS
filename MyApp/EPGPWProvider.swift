@@ -60,10 +60,30 @@ nonisolated struct EPGPWConfiguration: Sendable {
     static let `default` = EPGPWConfiguration()
 }
 
+/// Third-party guide sources (EPG.pw's per-channel enrichment, the epgshare01 generic
+/// broadcaster feeds) are off by default — see MatchLinker/PROMPTS.md, Prompt 3. The
+/// playlist's own guide (Xtream `xmltv.php` / M3U `url-tvg`, via `customEPGURLs`) already
+/// covers the large majority of curated channels and isn't gated by either flag: see
+/// `EPGRepository.forceRefresh()`, where the custom-EPG block runs unconditionally and only
+/// the generic epgshare01 fetch is wrapped in `epgShareFallbackEnabled`.
+///
+/// DEBUG builds can flip either on at runtime (e.g. from a developer settings screen) via
+/// the matching UserDefaults key, for comparing coverage against the third-party feeds.
 nonisolated enum EPGPWSourcePolicy {
-    static var epgPWEnabled: Bool { true }
-    static var providerEPGEnabled: Bool { true }
-    static var epgShareFallbackEnabled: Bool { true }
+    static var epgPWEnabled: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "debug.epgPWEnabled")
+        #else
+        false
+        #endif
+    }
+    static var epgShareFallbackEnabled: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "debug.epgShareFallbackEnabled")
+        #else
+        false
+        #endif
+    }
 }
 
 // MARK: - EPG.pw Response Models

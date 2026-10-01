@@ -111,7 +111,14 @@ final class BannerFantasyStore: ObservableObject {
         }
     }
 
-    func refreshEventContexts(channels: [Channel], preferredLanguages: Set<String>) async {
+    /// `epgRepository`/`streamStore` are optional: the app-launch fantasy refresh fires before
+    /// `RootView` (which owns those stores) exists, so it calls this without them and just skips
+    /// channel matching for that pass — `RootView`'s own forced refresh (which has both) fills
+    /// `matchedChannel` in shortly after.
+    func refreshEventContexts(
+        channels: [Channel], preferredLanguages: Set<String>,
+        epgRepository: EPGRepository? = nil, streamStore: StreamAvailabilityStore? = nil
+    ) async {
         guard let bundle = selectedBundle, let roster = selectedRoster else {
             fantasyEventContextsByEventID = [:]
             fantasyGamesByChannelID = [:]
@@ -120,10 +127,20 @@ final class BannerFantasyStore: ObservableObject {
         let sport = bundle.league.sport
         let start = Calendar.current.startOfDay(for: Date())
         let matches = (try? await sportsDataProvider.currentSchedule(for: sport, starting: start, days: 8)) ?? []
-        let games = roster.entries.map { entry -> FantasyPlayerGame in
-            let match = Self.match(for: entry, in: matches)
+
+        let entryMatches = roster.entries.map { Self.match(for: $0, in: matches) }
+        if let epgRepository, let streamStore {
+            var distinctMatches: [Match] = []
+            var seenMatchIDs = Set<String>()
+            for match in entryMatches where match != nil {
+                if seenMatchIDs.insert(match!.id).inserted { distinctMatches.append(match!) }
+            }
+            await streamStore.scan(matches: distinctMatches, channels: channels, epgRepository: epgRepository)
+        }
+
+        let games = zip(roster.entries, entryMatches).map { entry, match -> FantasyPlayerGame in
             let opponent = match.flatMap { Self.opponent(for: entry, match: $0) }
-            let ranked = match.map { SourceMatcher.rank(match: $0, channels: channels, preferredLanguages: preferredLanguages) } ?? []
+            let ranked = match.flatMap { m in streamStore?.topRanked(for: m.id, limit: 4) } ?? []
             let player = FantasyPlayer(
                 id: "native-\(entry.id)",
                 provider: .banner,

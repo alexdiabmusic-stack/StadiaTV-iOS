@@ -35,7 +35,7 @@ struct TVLiveSportsView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 4) {
                 Text("SPORTS")
-                    .font(.caption2.weight(.heavy))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                     .padding(.horizontal, 20)
                     .padding(.top, 24)
@@ -56,7 +56,7 @@ struct TVLiveSportsView: View {
                 if !liveViewModel.startingSoon.isEmpty {
                     Divider().background(Theme.hairline).padding(.vertical, 4)
                     Text("STARTING SOON")
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
                         .padding(.horizontal, 20)
                         .padding(.top, 4)

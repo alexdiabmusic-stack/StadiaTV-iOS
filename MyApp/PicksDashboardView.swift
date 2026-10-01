@@ -101,7 +101,7 @@ struct PicksDashboardView: View {
     private func statCell(label: String, value: String) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.title3.weight(.heavy).monospacedDigit())
+                .font(.title3.weight(.bold).monospacedDigit())
                 .foregroundStyle(Theme.textPrimary)
             Text(label)
                 .font(.caption2.weight(.semibold))
@@ -192,7 +192,7 @@ private struct PickHistoryRow: View {
                 if let pts = prediction.pointsEarned {
                     if pts > 0 {
                         Text("+\(pts) pts")
-                            .font(.footnote.weight(.heavy))
+                            .font(.footnote.weight(.bold))
                             .foregroundStyle(Theme.Palette.positive)
                     } else {
                         Text("0 pts")

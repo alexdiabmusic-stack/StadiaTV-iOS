@@ -288,7 +288,7 @@ private struct TeamSportEventHero: View {
                     } else if spoilerFreeMode && match.state == .final && !spoilerRevealed {
                         VStack(spacing: 6) {
                             Text("? - ?")
-                                .font(.title.weight(.heavy).monospacedDigit())
+                                .font(.title.weight(.bold).monospacedDigit())
                                 .foregroundStyle(Theme.textSecondary)
                             Button("Reveal Score", action: revealScore)
                                 .font(.caption.weight(.bold))
@@ -296,7 +296,7 @@ private struct TeamSportEventHero: View {
                         }
                     } else {
                         Text("\(match.away.score ?? "-")  -  \(match.home.score ?? "-")")
-                            .font(.title.weight(.heavy).monospacedDigit())
+                            .font(.title.weight(.bold).monospacedDigit())
                             .foregroundStyle(Theme.textPrimary)
                     }
                 }
@@ -355,13 +355,13 @@ private struct GolfTournamentHero: View {
             HStack(spacing: 6) {
                 if match.state == .live { Circle().fill(Theme.live).frame(width: 7, height: 7) }
                 Text(statusText)
-                    .font(.subheadline.weight(.heavy))
+                    .font(.subheadline.weight(.bold))
                     .foregroundStyle(match.state == .live ? Theme.live : Theme.textSecondary)
                 Spacer()
             }
 
             Text(tournament?.tournamentName ?? (match.name.isEmpty ? match.league.name : match.name))
-                .font(.headline.weight(.heavy))
+                .font(.headline.weight(.bold))
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(2)
 
@@ -421,10 +421,10 @@ private struct MotorsportEventHero: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(match.state == .live ? "LIVE · \(match.statusDetail)" : match.statusDetail, systemImage: "flag.checkered")
-                .font(.subheadline.weight(.heavy))
+                .font(.subheadline.weight(.bold))
                 .foregroundStyle(match.state == .live ? Theme.live : Theme.textSecondary)
             Text(match.name.isEmpty ? match.league.name : match.name)
-                .font(.title3.weight(.heavy))
+                .font(.title3.weight(.bold))
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(2)
             if !match.broadcasts.isEmpty {
@@ -446,10 +446,10 @@ private struct CombatEventHero: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(match.statusDetail, systemImage: "figure.boxing")
-                .font(.subheadline.weight(.heavy))
+                .font(.subheadline.weight(.bold))
                 .foregroundStyle(match.state == .live ? Theme.live : Theme.textSecondary)
             Text(match.name.isEmpty ? match.league.name : match.name)
-                .font(.title3.weight(.heavy))
+                .font(.title3.weight(.bold))
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(2)
             if !match.broadcasts.isEmpty {
@@ -545,7 +545,7 @@ private struct TeamSportGameCentre: View {
                     TeamLogo(url: selectedSide.logoURL, size: 42)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(selectedSide.displayName)
-                            .font(.headline.weight(.heavy))
+                            .font(.headline.weight(.bold))
                             .foregroundStyle(Theme.textPrimary)
                             .lineLimit(1)
                         if let record = selectedSide.record, !record.isEmpty {
@@ -657,12 +657,12 @@ private struct TeamSportStatsTab: View {
             HStack(spacing: 6) {
                 TeamLogo(url: match.away.logoURL, size: 20)
                 Text(match.away.shortName)
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
                 Spacer()
                 Text(match.home.shortName)
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
                 TeamLogo(url: match.home.logoURL, size: 20)
@@ -760,7 +760,7 @@ private struct GameCentreTeamRosterPreview: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Label("Players", systemImage: "person.3.fill")
-                    .font(.caption.weight(.heavy))
+                    .font(.caption.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                 Spacer()
                 NavigationLink("Full Roster") {
@@ -1009,7 +1009,7 @@ private struct GolfLeaderboardTab: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Leaderboard")
-                    .font(.subheadline.weight(.heavy))
+                    .font(.subheadline.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
                 if data.leaderboard.count > 8 {
@@ -1076,7 +1076,7 @@ private struct GolfCourseTab: View {
         if let course = data.courseName, !course.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 Text(course)
-                    .font(.headline.weight(.heavy))
+                    .font(.headline.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
                 if let location = data.courseLocation, !location.isEmpty {
                     Text(location)
@@ -1118,7 +1118,7 @@ private struct GolfLeaderboardTable: View {
                     Text("THRU").frame(width: 42, alignment: .trailing)
                     Text("TOTAL").frame(width: 54, alignment: .trailing)
                 }
-                .font(.caption2.weight(.heavy))
+                .font(.caption2.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -1152,7 +1152,7 @@ private struct GolfLeaderboardCompactRow: View {
                 .lineLimit(1)
             Spacer()
             Text(entry.total)
-                .font(.subheadline.weight(.heavy).monospacedDigit())
+                .font(.subheadline.weight(.bold).monospacedDigit())
                 .foregroundStyle(Theme.accent)
         }
         .padding(.vertical, 7)
@@ -1182,7 +1182,7 @@ private struct LegacyGolfLeaderboardRow: View {
                 .foregroundStyle(Theme.textSecondary)
                 .frame(width: 42, alignment: .trailing)
             Text(entry.total)
-                .font(.subheadline.weight(.heavy).monospacedDigit())
+                .font(.subheadline.weight(.bold).monospacedDigit())
                 .foregroundStyle(Theme.accent)
                 .frame(width: 54, alignment: .trailing)
         }
@@ -1214,7 +1214,7 @@ private struct GolfPlayerFieldRow: View {
             }
             Spacer()
             Text(entry.total)
-                .font(.subheadline.weight(.heavy).monospacedDigit())
+                .font(.subheadline.weight(.bold).monospacedDigit())
                 .foregroundStyle(Theme.accent)
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.bold))
@@ -1233,10 +1233,10 @@ private struct GolfTournamentCards: View {
             ForEach(cards) { card in
                 VStack(alignment: .leading, spacing: 5) {
                     Text(card.title.uppercased())
-                        .font(.caption2.weight(.heavy))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
                     Text(card.value)
-                        .font(.headline.weight(.heavy))
+                        .font(.headline.weight(.bold))
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -1284,7 +1284,7 @@ private struct GolfPlayerTournamentDetailView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(entry.playerName)
-                            .font(.title2.weight(.heavy))
+                            .font(.title2.weight(.bold))
                             .foregroundStyle(Theme.textPrimary)
                         HStack(spacing: 8) {
                             Text(entry.position ?? "-")
@@ -1327,7 +1327,7 @@ private struct GolfRoundTable: View {
                 }
                 Text("Total").frame(maxWidth: .infinity)
             }
-            .font(.caption2.weight(.heavy))
+            .font(.caption2.weight(.bold))
             .foregroundStyle(Theme.textSecondary)
             .padding(.vertical, 8)
             .background(Theme.surfaceElevated)
@@ -1444,7 +1444,7 @@ private struct TennisMatchTab: View {
                 .lineLimit(1)
             Spacer()
             Text(side.score ?? "-")
-                .font(.title3.weight(.heavy).monospacedDigit())
+                .font(.title3.weight(.bold).monospacedDigit())
                 .foregroundStyle(Theme.accent)
         }
         .padding(12)
@@ -1494,7 +1494,7 @@ private struct CombatEventDetails: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(match.name.isEmpty ? match.league.name : match.name)
-                .font(.headline.weight(.heavy))
+                .font(.headline.weight(.bold))
                 .foregroundStyle(Theme.textPrimary)
             if let venue = match.venue, !venue.isEmpty {
                 Label(venue, systemImage: "mappin.and.ellipse")

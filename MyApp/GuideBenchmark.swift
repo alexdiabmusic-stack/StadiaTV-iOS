@@ -61,19 +61,20 @@ enum GuideBenchmark {
             return result
         }
 
+        let isXtreamExport = FileManager.default.fileExists(atPath: dir.appendingPathComponent("streams.json").path)
         let channels: [Channel] = await measure("playlist parse") {
-            parsePlaylist(directory: dir)
+            isXtreamExport ? await parseXtreamExport(directory: dir) : parsePlaylist(directory: dir)
         }
 
         let repository = EPGRepository()
-        let guideFileURL = dir.appendingPathComponent("guide.xml")
+        let guideFileURL = dir.appendingPathComponent(isXtreamExport ? "xmltv.xml" : "guide.xml")
         await measure("guide import") {
             repository.setupWithChannels(channels, customEPGURLs: [guideFileURL])
             await waitForImportSettled(repository)
         }
 
         let matches: [Match] = await measure("load matches") {
-            loadMatches(directory: dir)
+            isXtreamExport ? loadRealEvents(directory: dir) : loadMatches(directory: dir)
         }
 
         let streamStore = StreamAvailabilityStore()
@@ -115,6 +116,33 @@ enum GuideBenchmark {
         print(String(format: "guide coverage: %.1f%% (%d/%d channels)", guideCoveragePct, coveredChannels, totalChannels))
         print(String(format: "games with confirmed stream: %.1f%% (%d/%d matches)", confirmedPct, confirmedMatches, matches.count))
         print("========================")
+
+        writeJSONReport(
+            to: dir.appendingPathComponent("benchmark.json"), stages: stages, stalls: stalls,
+            totalChannels: totalChannels, coveredChannels: coveredChannels,
+            programmesRetained: repository.importProgress.programmesRetained,
+            matchesTotal: matches.count, matchesConfirmed: confirmedMatches
+        )
+    }
+
+    private static func writeJSONReport(
+        to url: URL, stages: [StageResult], stalls: [Double],
+        totalChannels: Int, coveredChannels: Int, programmesRetained: Int,
+        matchesTotal: Int, matchesConfirmed: Int
+    ) {
+        let report: [String: Any] = [
+            "stages": stages.map { ["name": $0.name, "seconds": $0.seconds, "residentMemoryMB": $0.residentMemoryMB] },
+            "mainThreadStallsMs": stalls,
+            "coverage": [
+                "channels": totalChannels,
+                "channelsWithProgrammes": coveredChannels,
+                "programmesRetained": programmesRetained,
+                "matchesTotal": matchesTotal,
+                "matchesConfirmed": matchesConfirmed,
+            ],
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) else { return }
+        try? data.write(to: url)
     }
 
     private static func parsePlaylist(directory: URL) -> [Channel] {
@@ -158,6 +186,77 @@ enum GuideBenchmark {
                 away: TeamSide(displayName: fixture.away.displayName, shortName: fixture.away.shortName, abbreviation: fixture.away.abbreviation, logoURL: nil, score: nil, record: nil, isWinner: false),
                 broadcasts: fixture.broadcasts,
                 venue: nil
+            )
+        }
+    }
+
+    /// Real `MatchLinker/Scripts/export_playlist.sh` + `export_events.py` output: `streams.json`
+    /// / `cats.json` (Xtream `get_live_streams` / `get_live_categories`), `xmltv.xml` (the
+    /// provider's own guide) and `events.json`. Drives the real `XtreamProviderAdapter` with a
+    /// stub `URLProtocol` that answers only the two `player_api.php` calls from those two JSON
+    /// files — no network, no credentials beyond a throwaway Keychain entry deleted right after.
+    private static func parseXtreamExport(directory: URL) async -> [Channel] {
+        guard let catsData = try? Data(contentsOf: directory.appendingPathComponent("cats.json")),
+              let streamsData = try? Data(contentsOf: directory.appendingPathComponent("streams.json")) else {
+            print("GuideBenchmark: could not read cats.json/streams.json in \(directory.path)")
+            return []
+        }
+        GuideBenchmarkStubURLProtocol.catsData = catsData
+        GuideBenchmarkStubURLProtocol.streamsData = streamsData
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [GuideBenchmarkStubURLProtocol.self]
+        let session = URLSession(configuration: config)
+
+        let credentialID = UUID()
+        try? KeychainStore.saveXtreamCredentials(XtreamCredentials(username: "stub", password: "stub"), for: credentialID)
+        defer { KeychainStore.deleteXtreamCredentials(for: credentialID) }
+
+        let playlist = Playlist(name: "GuideBenchmark", kind: .xtream, host: "http://benchmark.invalid", credentialID: credentialID)
+        let provider = LiveProvider(playlist: playlist)
+        let adapter = XtreamProviderAdapter(provider: provider, session: session)
+        guard let (_, adapterChannels) = try? await adapter.loadChannels() else {
+            print("GuideBenchmark: XtreamProviderAdapter.loadChannels() failed")
+            return []
+        }
+        let liveChannels = adapterChannels.map { LiveChannel.make(from: $0, providerID: provider.id, kind: provider.kind) }
+        return liveChannels.map { $0.asChannel(playlistName: playlist.name, defaultUserAgent: playlist.userAgent) }
+    }
+
+    /// `export_events.py`'s real shape: `{league, id, date, name, home:{name,short,abbr,nick,
+    /// city}, away:{...}, broadcasts, state}`, dates as `yyyy-MM-dd'T'HH:mm'Z'` (no seconds) —
+    /// the same shape `linker-cli` reads, so results are directly comparable to it.
+    private static func loadRealEvents(directory: URL) -> [Match] {
+        struct EventFixture: Decodable {
+            struct TeamFixture: Decodable { let name: String; let short: String?; let abbr: String? }
+            let league: String
+            let id: String
+            let date: String
+            let name: String
+            let home: TeamFixture
+            let away: TeamFixture
+            let broadcasts: [String]
+            let state: String?
+        }
+        let eventsURL = directory.appendingPathComponent("events.json")
+        guard let data = try? Data(contentsOf: eventsURL),
+              let fixtures = try? JSONDecoder().decode([EventFixture].self, from: data) else {
+            print("GuideBenchmark: could not read/decode events.json at \(eventsURL.path)")
+            return []
+        }
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX"); fmt.timeZone = TimeZone(identifier: "UTC")
+        fmt.dateFormat = "yyyy-MM-dd'T'HH:mm'Z'"
+        return fixtures.compactMap { fixture in
+            guard let date = fmt.date(from: fixture.date) else { return nil }
+            let league = League.all.first { $0.path == fixture.league } ?? League.all[0]
+            let state: GameState = fixture.state == "live" ? .live : (fixture.state == "final" ? .final : .pre)
+            return Match(
+                id: fixture.id, league: league, date: date, name: fixture.name,
+                shortName: "\(fixture.away.abbr ?? "") @ \(fixture.home.abbr ?? "")", state: state,
+                statusDetail: "",
+                home: TeamSide(displayName: fixture.home.name, shortName: fixture.home.short ?? fixture.home.name, abbreviation: fixture.home.abbr ?? "", logoURL: nil, score: nil, record: nil, isWinner: false),
+                away: TeamSide(displayName: fixture.away.name, shortName: fixture.away.short ?? fixture.away.name, abbreviation: fixture.away.abbr ?? "", logoURL: nil, score: nil, record: nil, isWinner: false),
+                broadcasts: fixture.broadcasts, venue: nil
             )
         }
     }
@@ -245,6 +344,38 @@ private final class MainThreadStallMonitor {
         }
         lock.unlock()
     }
+}
+
+/// Answers `player_api.php?...action=get_live_categories` / `get_live_streams` from
+/// pre-loaded export data, so `XtreamProviderAdapter` runs against a real playlist export
+/// with no network and no live account. `xmltv.php` is not stubbed: the guide is instead
+/// handed to `EPGRepository` directly as a local `file://` URL via `customEPGURLs`.
+private final class GuideBenchmarkStubURLProtocol: URLProtocol {
+    nonisolated(unsafe) static var catsData = Data()
+    nonisolated(unsafe) static var streamsData = Data()
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        request.url?.path == "/player_api.php"
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let url = request.url else { client?.urlProtocolDidFinishLoading(self); return }
+        let action = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "action" }?.value
+        let data: Data
+        switch action {
+        case "get_live_categories": data = Self.catsData
+        case "get_live_streams": data = Self.streamsData
+        default: data = Data("[]".utf8)
+        }
+        let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: data)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }
 
 struct GuideBenchmarkRunnerView: View {

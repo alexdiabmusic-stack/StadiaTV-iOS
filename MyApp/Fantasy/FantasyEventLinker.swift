@@ -28,11 +28,25 @@ struct FantasyEventLinker: FantasyEventLinking {
 
         let pointsByPlayerID = fantasyPointsByPlayerID(from: matchup)
 
+        // This linker has no access to the app's EPG store, so it builds a name/broadcast-only
+        // StreamLinker (no guide programmes) once, off the main actor, and reuses it for every
+        // player — still gets team-channel, event-channel and broadcast-rights tiers, just not
+        // the guide-listing ones (which need EPGRepository/EPGProgrammeStore; see
+        // MatchLinkService, used instead wherever those are available).
+        let streamAdapters = channels.map(StreamLinkerAdapters.stream)
+        var channelByID: [String: Channel] = [:]
+        for channel in channels { channelByID[StreamLinkerAdapters.streamID(channel)] = channel }
+        let linker = await Task.detached(priority: .utility) {
+            StreamLinker(streams: streamAdapters, programmes: [])
+        }.value
+
         return players.map { player in
             let identity = resolutions[player.id]?.identity
             let match = self.match(for: player, identity: identity, in: matches)
             let opponent = match.flatMap { self.opponent(for: player, identity: identity, match: $0) }
-            let ranked = match.map { SourceMatcher.rank(match: $0, channels: channels, preferredLanguages: preferredLanguages) } ?? []
+            let ranked = match.map {
+                StreamLinkerAdapters.rankedSources(for: linker.link(StreamLinkerAdapters.event($0)).groupedByFamily(), channelByID: channelByID)
+            } ?? []
             return FantasyPlayerGame(
                 id: "\(player.id)-\(match?.id ?? "none")",
                 fantasyPlayer: player,

@@ -146,6 +146,7 @@ struct TVGuideView: View {
                 let fantasyRevision = guideFantasyRevision
                 EPGGuideGrid(
                     vm: vm,
+                    isRefreshing: repository.refreshState == .refreshing,
                     showsFantasyIndicators: showsFantasyIndicators,
                     fantasyRevision: fantasyRevision,
                     fantasyIndicatorCount: { programme, channel in
@@ -387,7 +388,12 @@ private struct DirectionalLockModifier: UIViewRepresentable {
 
 struct EPGGuideGrid: View {
     @ObservedObject var vm: TVGuideViewModel
-    @EnvironmentObject private var repository: EPGRepository
+    /// Plain value, not `@EnvironmentObject private var repository: EPGRepository` — this cell-
+    /// rendering layer only ever needs one bit of it, and subscribing to the whole repository
+    /// re-renders the grid on every unrelated guide-import publish (see the fantasy-store
+    /// comment at this view's call site for the same pattern). See MatchLinker/PROMPTS.md,
+    /// Prompt 4 step 4.
+    let isRefreshing: Bool
     let showsFantasyIndicators: Bool
     let fantasyRevision: Int
     let fantasyIndicatorCount: (EPGProgramme, CanonicalChannel) -> Int
@@ -415,7 +421,7 @@ struct EPGGuideGrid: View {
                     vm: vm,
                     scrollState: scrollState,
                     scrollToNowTrigger: scrollToNowTrigger,
-                    isRefreshing: repository.refreshState == .refreshing,
+                    isRefreshing: isRefreshing,
                     showsFantasyIndicators: showsFantasyIndicators,
                     fantasyRevision: fantasyRevision,
                     fantasyIndicatorCount: fantasyIndicatorCount,

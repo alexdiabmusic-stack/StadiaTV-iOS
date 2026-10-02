@@ -701,6 +701,8 @@ final class EPGRepository: ObservableObject {
         // held as a second in-memory copy on top of whatever URLSession buffers internally.
         do {
             let downloadStart = Date()
+            let signpost = GuideMatchingSignposts.beginGuideDownload()
+            defer { GuideMatchingSignposts.endGuideDownload(signpost) }
             let (tempURL, _) = try await session.download(from: source.url)
             defer { try? FileManager.default.removeItem(at: tempURL) }
             importDiagnostics.epgDownloadDuration += Date().timeIntervalSince(downloadStart)
@@ -750,8 +752,8 @@ final class EPGRepository: ObservableObject {
         do {
             let downloadStart = Date()
             let signpost = GuideMatchingSignposts.beginGuideDownload()
+            defer { GuideMatchingSignposts.endGuideDownload(signpost) }
             let (tempURL, response) = try await session.download(for: request)
-            GuideMatchingSignposts.endGuideDownload(signpost)
             importDiagnostics.epgDownloadDuration += Date().timeIntervalSince(downloadStart)
 
             if let http = response as? HTTPURLResponse, http.statusCode == 304 {

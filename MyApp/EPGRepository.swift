@@ -254,8 +254,13 @@ final class EPGRepository: ObservableObject {
 
             guard !Task.isCancelled, self.importGeneration == generation else { return }
             self.canonicalChannels = canonicals
-            self.rebuildChannelToCanonicalMap()
+            // unresolvedStreams must be set before rebuildChannelToCanonicalMap() runs — it
+            // reads unresolvedStreams to map those streams' own guide ids too, not just
+            // matched/canonical ones. Getting this backwards (as a prior version of this
+            // method did) meant every "unresolved" stream kept a stale or empty mapping for an
+            // entire import cycle. See MatchLinker/PROMPTS.md, Prompt 3.
             self.unresolvedStreams = buildResult.unresolvedStreams
+            self.rebuildChannelToCanonicalMap()
             self.importProgress.state = .loadingEPG
             self.importProgress.canonicalChannels = canonicals.count
             self.logger.info("Live TV lineup ready filtered=\(buildResult.filteredStreams, privacy: .public) matched=\(buildResult.matchedStreams, privacy: .public) canonical=\(canonicals.count, privacy: .public)")
@@ -541,8 +546,11 @@ final class EPGRepository: ObservableObject {
         let sources = EPGPWSourcePolicy.epgShareFallbackEnabled ? EPGSourceRegistry.sources(for: activeCategoryIds) : []
 
         let now = Date()
-        // Keep 14h of past data so the guide shows programmes from midnight today
-        let programmeWindow = now.addingTimeInterval(-14 * 3600)...now.addingTimeInterval(36 * 3600)
+        // -6h/+72h per MatchLinker/PROMPTS.md, Prompt 3 step 2 — the old -14h/+36h window is
+        // exactly what Prompt 2's "Why" calls out as a bug: most guide ids in a real Xtream
+        // playlist reach 12-72h ahead, and a game starting later than +36h had its own listing
+        // silently discarded even when the provider's guide carried it.
+        let programmeWindow = now.addingTimeInterval(-6 * 3600)...now.addingTimeInterval(72 * 3600)
 
         var programmeIndex = self.programmeIndex
 
@@ -667,6 +675,12 @@ final class EPGRepository: ObservableObject {
 
         await MainActor.run {
             self.refreshState = .idle
+            // forceRefresh() sets .loadingEPG at the top and, before this fix, never set
+            // anything but .cancelled afterward — every UI gated on importProgress.state
+            // == .ready got stuck showing "loading" after the first scheduled refresh fired
+            // (which happens automatically moments after the initial import; see
+            // setupWithChannels). See MatchLinker/PROMPTS.md, Prompt 3 step 5.
+            self.importProgress.state = .ready
         }
     }
 
@@ -687,6 +701,8 @@ final class EPGRepository: ObservableObject {
         // held as a second in-memory copy on top of whatever URLSession buffers internally.
         do {
             let downloadStart = Date()
+            let signpost = GuideMatchingSignposts.beginGuideDownload()
+            defer { GuideMatchingSignposts.endGuideDownload(signpost) }
             let (tempURL, _) = try await session.download(from: source.url)
             defer { try? FileManager.default.removeItem(at: tempURL) }
             importDiagnostics.epgDownloadDuration += Date().timeIntervalSince(downloadStart)
@@ -710,8 +726,13 @@ final class EPGRepository: ObservableObject {
     /// Downloads (or serves from cache) the XMLTV file a playlist advertises via
     /// `x-tvg-url` (M3U) or `xmltv.php` (Xtream). Cache filename matches the
     /// `custom-N.xml` convention `refreshIfNeeded()` checks for staleness.
+    ///
+    /// Once the TTL expires, still sends `If-None-Match`/`If-Modified-Since` from the last
+    /// response (sidecar `custom-N.etag.json`) — an 86 MB+ guide that hasn't actually changed
+    /// costs a 304 instead of a full re-download. See MatchLinker/PROMPTS.md, Prompt 3 step 2.
     private func customEPGData(url: URL, index: Int) async -> Data? {
         let cacheFile = cacheDir.appendingPathComponent("custom-\(index).xml")
+        let metaFile = cacheDir.appendingPathComponent("custom-\(index).etag.json")
         let ttl: TimeInterval = 6 * 3600
 
         if let attrs = try? FileManager.default.attributesOfItem(atPath: cacheFile.path),
@@ -721,18 +742,40 @@ final class EPGRepository: ObservableObject {
             return data
         }
 
+        struct CacheValidators: Codable { var etag: String?; var lastModified: String? }
+        let validators = (try? Data(contentsOf: metaFile)).flatMap { try? JSONDecoder().decode(CacheValidators.self, from: $0) }
+
+        var request = URLRequest(url: url)
+        if let etag = validators?.etag { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
+        if let lastModified = validators?.lastModified { request.setValue(lastModified, forHTTPHeaderField: "If-Modified-Since") }
+
         do {
             let downloadStart = Date()
             let signpost = GuideMatchingSignposts.beginGuideDownload()
-            let (tempURL, _) = try await session.download(from: url)
-            GuideMatchingSignposts.endGuideDownload(signpost)
-            defer { try? FileManager.default.removeItem(at: tempURL) }
+            defer { GuideMatchingSignposts.endGuideDownload(signpost) }
+            let (tempURL, response) = try await session.download(for: request)
             importDiagnostics.epgDownloadDuration += Date().timeIntervalSince(downloadStart)
+
+            if let http = response as? HTTPURLResponse, http.statusCode == 304 {
+                try? FileManager.default.removeItem(at: tempURL)
+                // Reset the TTL clock without touching the (unchanged) cached content.
+                try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: cacheFile.path)
+                return try? Data(contentsOf: cacheFile)
+            }
+
+            defer { try? FileManager.default.removeItem(at: tempURL) }
             let raw = try Data(contentsOf: tempURL)
             let decompressed = await Task.detached(priority: .utility) {
                 raw.tryGunzip()
             }.value
             try decompressed.write(to: cacheFile)
+            if let http = response as? HTTPURLResponse {
+                let newValidators = CacheValidators(
+                    etag: http.value(forHTTPHeaderField: "ETag"),
+                    lastModified: http.value(forHTTPHeaderField: "Last-Modified")
+                )
+                try? JSONEncoder().encode(newValidators).write(to: metaFile)
+            }
             return decompressed
         } catch {
             return try? Data(contentsOf: cacheFile)

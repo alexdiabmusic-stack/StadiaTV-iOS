@@ -14,6 +14,7 @@ struct MatchDetailView: View {
     @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
     @EnvironmentObject private var epgRepository: EPGRepository
     @EnvironmentObject private var streamStore: StreamAvailabilityStore
+    @EnvironmentObject private var eventChannelRefresh: EventChannelRefreshService
     @State private var isShowingMoreSources = false
     @State private var spoilerRevealed = false
     @State private var playbackContext: MatchPlaybackContext?
@@ -1702,11 +1703,14 @@ struct MatchDetailView: View {
             } else if let top = rankedSources.first {
                 Button { handleSourceTap(top.channel) } label: {
                     VStack(alignment: .leading, spacing: 4) {
-                        Label(
-                            match.state == .live ? "Watch on \(top.channel.name)" : "Watch \(top.channel.name) when live",
-                            systemImage: "play.fill"
-                        )
-                        .font(.subheadline.weight(.bold))
+                        HStack(spacing: 6) {
+                            Label(
+                                match.state == .live ? "Watch on \(top.channel.name)" : "Watch \(top.channel.name) when live",
+                                systemImage: "play.fill"
+                            )
+                            .font(.subheadline.weight(.bold))
+                            if isNewlyRenamed(top.channel) { newChannelBadge }
+                        }
                         Text(top.isConfirmed ? (top.epgProgramme?.title ?? "Confirmed match") : "Possible match")
                             .font(.caption)
                             .opacity(0.85)
@@ -1767,6 +1771,7 @@ struct MatchDetailView: View {
                           logoURL: source.channel.logoURL,
                           score: source.score,
                           evidenceCategories: source.evidenceCategories,
+                          isNew: isNewlyRenamed(source.channel),
                           isPicking: false,
                           isSelected: false) {
                     isShowingMoreSources = false
@@ -1787,6 +1792,21 @@ struct MatchDetailView: View {
                 }
             }
         }
+    }
+
+    /// True for the first hour after an event-slot channel's current name was first observed
+    /// — see MatchLinker/PROMPTS.md, Prompt 5 step 4.
+    private func isNewlyRenamed(_ channel: Channel) -> Bool {
+        guard let streamID = channel.xtreamStreamID else { return false }
+        return eventChannelRefresh.isNew(streamID: streamID, name: channel.name)
+    }
+
+    private var newChannelBadge: some View {
+        Text("NEW")
+            .font(.caption2.weight(.bold))
+            .padding(.horizontal, 5).padding(.vertical, 2)
+            .background(Theme.live, in: Capsule())
+            .foregroundStyle(.white)
     }
 
     private func handleSourceTap(_ channel: Channel) {
@@ -2104,6 +2124,7 @@ private struct SourceRow: View {
     let logoURL: URL?
     let score: Int?
     var evidenceCategories: Set<StreamEvidenceCategory> = []
+    var isNew: Bool = false
     let isPicking: Bool
     let isSelected: Bool
     let action: () -> Void
@@ -2123,10 +2144,19 @@ private struct SourceRow: View {
                 .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.textPrimary)
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(name)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.textPrimary)
+                            .lineLimit(1)
+                        if isNew {
+                            Text("NEW")
+                                .font(.caption2.weight(.bold))
+                                .padding(.horizontal, 5).padding(.vertical, 2)
+                                .background(Theme.live, in: Capsule())
+                                .foregroundStyle(.white)
+                        }
+                    }
                     Text(subtitle)
                         .font(.caption2)
                         .foregroundStyle(Theme.textSecondary)

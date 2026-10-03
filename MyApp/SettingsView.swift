@@ -1123,6 +1123,10 @@ struct FantasySettingsView: View {
                 SettingsToggleRow(title: "Fantasy Indicators in Guide", isOn: fantasyBinding(\.showFantasyIndicatorsInGuide) { await fantasyStore.setShowFantasyIndicatorsInGuide($0) })
                 Divider().overlay(Theme.hairline)
                 SettingsToggleRow(title: "Fantasy Player Overlay", isOn: fantasyBinding(\.showFantasyPlayerOverlay) { await fantasyStore.setShowFantasyPlayerOverlay($0) })
+                #if !os(tvOS)
+                Divider().overlay(Theme.hairline)
+                SettingsToggleRow(title: "Fantasy Notifications", isOn: fantasyBinding(\.enableNotifications) { await fantasyStore.setEnableNotifications($0) })
+                #endif
             }
 
             SettingsPanel(title: "DIAGNOSTICS") {
@@ -1230,6 +1234,10 @@ struct ESPNFantasyConnectSheet: View {
     @State private var espnS2 = ""
     @State private var swid = ""
     @State private var includePrivateCredentials = false
+    @State private var webAuthenticator = ESPNWebAuthenticator()
+    @State private var isSigningIn = false
+    @State private var signedInViaWeb = false
+    @State private var webAuthError: String?
 
     var body: some View {
         NavigationStack {
@@ -1254,17 +1262,64 @@ struct ESPNFantasyConnectSheet: View {
                     }
 
                     Section("Private League") {
-                        Toggle("Use ESPN session cookies", isOn: $includePrivateCredentials)
-                        if includePrivateCredentials {
-                            SecureField("espn_s2", text: $espnS2)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                            SecureField("SWID", text: $swid)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                            Text("These values are stored in Keychain and sent only as ESPN Cookie headers. Never enter your ESPN password.")
+                        if signedInViaWeb {
+                            Label("Signed in to ESPN", systemImage: "checkmark.seal.fill")
+                                .foregroundStyle(.green)
+                            Button("Sign in with a different ESPN account") {
+                                signedInViaWeb = false
+                                includePrivateCredentials = false
+                                espnS2 = ""
+                                swid = ""
+                            }
+                        } else {
+                            Button {
+                                Task {
+                                    isSigningIn = true
+                                    webAuthError = nil
+                                    do {
+                                        let credentials = try await webAuthenticator.signIn()
+                                        espnS2 = credentials.espnS2
+                                        swid = credentials.swid
+                                        includePrivateCredentials = true
+                                        signedInViaWeb = true
+                                    } catch {
+                                        webAuthError = error.localizedDescription
+                                    }
+                                    isSigningIn = false
+                                }
+                            } label: {
+                                HStack {
+                                    Text(isSigningIn ? "Signing in…" : "Sign in with ESPN")
+                                    if isSigningIn {
+                                        Spacer()
+                                        ProgressView()
+                                    }
+                                }
+                            }
+                            .disabled(isSigningIn)
+
+                            if let webAuthError {
+                                Text(webAuthError)
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.starting)
+                            }
+
+                            Text("Sign in with ESPN to connect a private league without finding or pasting cookie values yourself. Banner only reads the resulting session cookies — never your ESPN password.")
                                 .font(.footnote)
                                 .foregroundStyle(Theme.textSecondary)
+
+                            Toggle("Enter session cookies manually instead", isOn: $includePrivateCredentials)
+                            if includePrivateCredentials {
+                                SecureField("espn_s2", text: $espnS2)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                SecureField("SWID", text: $swid)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                Text("These values are stored in Keychain and sent only as ESPN Cookie headers. Never enter your ESPN password.")
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
                         }
                     }
 

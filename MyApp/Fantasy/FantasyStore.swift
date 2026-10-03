@@ -19,6 +19,8 @@ final class FantasyStore: ObservableObject {
     @Published private(set) var fantasyGamesByEventID: [String: [FantasyPlayerGame]] = [:]
     @Published private(set) var fantasyGamesByChannelID: [String: [FantasyPlayerGame]] = [:]
     @Published private(set) var fantasyEventContextsByEventID: [String: FantasyEventContext] = [:]
+    @Published private(set) var availablePlayers: [FantasyPlayerPoolEntry] = []
+    @Published private(set) var recentTransactions: [FantasyTransaction] = []
     @Published private(set) var lastError: String?
     @Published private(set) var refreshedAt: Date?
     @Published private(set) var isStale = false
@@ -91,6 +93,18 @@ final class FantasyStore: ObservableObject {
             refreshedAt: refreshedAt,
             isStale: isStale
         )
+    }
+
+    /// Whether the connected provider exposes a free-agent/waiver player pool (currently ESPN only).
+    var supportsPlayerPool: Bool {
+        guard let connection = currentConnection, let service = try? providerRegistry.service(for: connection.provider) else { return false }
+        return service.capabilities.playerPool
+    }
+
+    /// Whether the connected provider exposes a league activity/transactions feed (currently ESPN only).
+    var supportsTransactions: Bool {
+        guard let connection = currentConnection, let service = try? providerRegistry.service(for: connection.provider) else { return false }
+        return service.capabilities.transactions
     }
 
     func connect(provider: FantasyProvider, usernameOrUserID: String, channels: [Channel] = [], preferredLanguages: Set<String> = []) async {
@@ -251,6 +265,48 @@ final class FantasyStore: ObservableObject {
         await persistSettings()
     }
 
+    func setEnableNotifications(_ enabled: Bool) async {
+        await awaitInitialRestore()
+        settings.enableNotifications = enabled
+        await persistSettings()
+        if enabled {
+            _ = await FantasyNotificationService.shared.requestAuthorization()
+        } else {
+            FantasyNotificationService.shared.removeAllFantasyNotifications()
+        }
+    }
+
+    /// Loads the connected provider's free-agent/waiver pool for the selected league. No-op for
+    /// providers without `capabilities.playerPool` (e.g. Sleeper) — Banner never writes back.
+    func loadAvailablePlayers(limit: Int = 40) async {
+        guard let league = selectedLeague, let connection = currentConnection,
+              let service = try? providerRegistry.service(for: connection.provider),
+              service.capabilities.playerPool else {
+            availablePlayers = []
+            return
+        }
+        do {
+            availablePlayers = try await service.freeAgents(leagueID: league.id, sport: league.sport, limit: limit)
+        } catch {
+            availablePlayers = []
+        }
+    }
+
+    /// Loads the connected provider's recent league activity (adds/drops/trades/waivers).
+    func loadRecentTransactions(limit: Int = 20) async {
+        guard let league = selectedLeague, let connection = currentConnection,
+              let service = try? providerRegistry.service(for: connection.provider),
+              service.capabilities.transactions else {
+            recentTransactions = []
+            return
+        }
+        do {
+            recentTransactions = try await service.transactions(leagueID: league.id, limit: limit)
+        } catch {
+            recentTransactions = []
+        }
+    }
+
     func disconnect(provider: FantasyProvider? = nil) async {
         await awaitInitialRestore()
         refreshGeneration += 1
@@ -276,9 +332,12 @@ final class FantasyStore: ObservableObject {
         fantasyGamesByEventID = [:]
         fantasyGamesByChannelID = [:]
         fantasyEventContextsByEventID = [:]
+        availablePlayers = []
+        recentTransactions = []
         refreshedAt = nil
         isStale = false
         lastError = nil
+        FantasyNotificationService.shared.removeAllFantasyNotifications()
     }
 
     func disconnectSleeper() async {
@@ -389,6 +448,8 @@ final class FantasyStore: ObservableObject {
             try Task.checkCancellation()
             guard generation == refreshGeneration else { return }
 
+            let previousInjuryStatusByPlayerID = Dictionary(uniqueKeysWithValues: self.players.map { ($0.id, $0.injuryStatus) })
+
             self.userRoster = ownedRoster
             self.matchup = matchup
             self.standings = standings
@@ -398,6 +459,11 @@ final class FantasyStore: ObservableObject {
             rebuildFantasyIndexes(from: games)
             self.refreshedAt = Date()
             self.contentState = contentState(for: league, matchup: matchup, playerGames: games)
+
+            if settings.enableNotifications {
+                await FantasyNotificationService.shared.syncTonightPlayers(games, leagueName: league.name)
+                await FantasyNotificationService.shared.notifyInjuryChanges(roster: ownedRoster, previousInjuryStatusByPlayerID: previousInjuryStatusByPlayerID, players: loadedPlayers, leagueName: league.name)
+            }
 
             snapshot.connection = FantasyConnection(
                 provider: connection.provider,
@@ -523,8 +589,11 @@ final class FantasyStore: ObservableObject {
                 event: game.event,
                 opponent: game.opponent,
                 gameState: game.gameState,
-                fantasyPoints: game.fantasyPoints,
-                projectedPoints: game.projectedPoints,
+                // The roster slot carries the provider's current-period score (e.g. ESPN's
+                // appliedStatTotal, which updates live during games); the linker never sets
+                // this on `game` itself, so prefer the slot's value over the always-nil default.
+                fantasyPoints: slot.fantasyPoints ?? game.fantasyPoints,
+                projectedPoints: slot.projectedPoints ?? game.projectedPoints,
                 matchedChannel: game.matchedChannel,
                 rosterSlotKind: slot.kind,
                 lineupPosition: slot.lineupPosition

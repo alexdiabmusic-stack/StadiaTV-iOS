@@ -65,6 +65,14 @@ enum GuideBenchmark {
         let channels: [Channel] = await measure("playlist parse") {
             isXtreamExport ? await parseXtreamExport(directory: dir) : parsePlaylist(directory: dir)
         }
+        guard !channels.isEmpty else {
+            // EPGRepository.setupWithChannels silently no-ops on an empty channel list
+            // (`guard !channels.isEmpty else { return }`), so importProgress.state never
+            // reaches .ready and waitForImportSettled would otherwise burn its full 60s
+            // timeout before reporting a misleading all-zero benchmark.
+            print("GuideBenchmark: 0 channels parsed — aborting (see the parse error printed above)")
+            return
+        }
 
         let repository = EPGRepository()
         let guideFileURL = dir.appendingPathComponent(isXtreamExport ? "xmltv.xml" : "guide.xml")
@@ -262,18 +270,24 @@ enum GuideBenchmark {
     }
 
     /// `setupWithChannels` kicks off a fire-and-forget import task with no awaitable
-    /// completion signal, so this polls the two published state machines it drives.
+    /// completion signal, so this polls the published state it drives.
     private static func waitForImportSettled(_ repository: EPGRepository, timeout: TimeInterval = 60) async {
         let deadline = Date().addingTimeInterval(timeout)
         while repository.importProgress.state != .ready, Date() < deadline {
             try? await Task.sleep(nanoseconds: 50_000_000)
         }
-        var sawRefreshing = false
-        while Date() < deadline {
-            if repository.refreshState == .refreshing { sawRefreshing = true }
-            if sawRefreshing, repository.refreshState != .refreshing { break }
+        // The scheduled custom-EPG refresh (which is what actually parses customEPGURLs,
+        // right after the initial import reaches .ready) always bumps lastUpdated exactly
+        // once when it completes — a one-shot, unambiguous signal. Polling refreshState
+        // == .refreshing instead was a race: a refresh fast enough to start and finish
+        // between two 50ms polls could flip through that value without ever being observed,
+        // burning the full timeout.
+        let initialLastUpdated = repository.lastUpdated
+        while repository.lastUpdated == initialLastUpdated, Date() < deadline {
             try? await Task.sleep(nanoseconds: 50_000_000)
         }
+        // Give any in-flight finalize/persist a brief moment to land.
+        try? await Task.sleep(nanoseconds: 200_000_000)
     }
 
     private static func residentMemoryMB() -> Double {

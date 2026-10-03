@@ -35,7 +35,10 @@ final class SportsCatalogRepository {
         "basketball:wnba",
         "baseball:major-league-baseball",
         "hockey:national-hockey-league",
-        "soccer:liga-mx",
+        // Liga MX ("soccer:liga-mx") is deliberately absent: League.all has no entry for it
+        // (no SportsRepository provider — see SportsCatalogProviderCoverageTests), so leaving
+        // it selectable here let a user pick it in onboarding/the team picker only to have it
+        // silently vanish everywhere else. See MatchLinker/PROMPTS.md, Prompt 7.
         "soccer:premier-league",
         "soccer:major-league-soccer",
         "racing:formula-1",

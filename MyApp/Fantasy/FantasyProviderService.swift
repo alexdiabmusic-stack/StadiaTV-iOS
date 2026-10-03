@@ -7,6 +7,7 @@ struct FantasyProviderCapabilities: Hashable, Sendable {
     let standings: Bool
     let liveScoring: Bool
     let projections: Bool
+    let playerPool: Bool
     let transactions: Bool
     let waiversWrite: Bool
     let tradesWrite: Bool
@@ -19,6 +20,7 @@ struct FantasyProviderCapabilities: Hashable, Sendable {
         standings: true,
         liveScoring: false,
         projections: false,
+        playerPool: false,
         transactions: false,
         waiversWrite: false,
         tradesWrite: false,
@@ -42,6 +44,20 @@ protocol FantasyProviderService: Sendable {
     func players(ids: Set<String>, sport: FantasySport) async throws -> [String: FantasyPlayer]
     func disconnect(connection: FantasyConnection) async
     func refreshCachedData() async
+    func freeAgents(leagueID: String, sport: FantasySport, limit: Int) async throws -> [FantasyPlayerPoolEntry]
+    func transactions(leagueID: String, limit: Int) async throws -> [FantasyTransaction]
+}
+
+/// Providers that don't support a player pool or transaction feed (e.g. Sleeper) inherit these
+/// "unsupported" defaults instead of each having to redeclare a throwing stub.
+extension FantasyProviderService {
+    func freeAgents(leagueID: String, sport: FantasySport, limit: Int) async throws -> [FantasyPlayerPoolEntry] {
+        throw FantasyProviderError.unsupportedProvider
+    }
+
+    func transactions(leagueID: String, limit: Int) async throws -> [FantasyTransaction] {
+        throw FantasyProviderError.unsupportedProvider
+    }
 }
 
 struct FantasyProviderRegistry: Sendable {

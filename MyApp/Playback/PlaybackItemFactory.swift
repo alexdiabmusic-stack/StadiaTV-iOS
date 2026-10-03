@@ -67,8 +67,15 @@ nonisolated enum PlaybackItemFactory {
         peakBitRate: Double = 0
     ) -> AVPlayerItem {
         let item = AVPlayerItem(asset: makeAsset(url: url, headers: headers))
-        // Start on the first variant listed instead of probing for the "best" one first.
-        item.startsOnFirstEligibleVariant = true
+        // NOTE: `startsOnFirstEligibleVariant` used to be forced on here to skip AVPlayer's
+        // initial bandwidth probe. With no peak-bitrate/resolution cap set (the default,
+        // `.auto`), "first eligible variant" means "whichever rendition is listed first in
+        // the master playlist" with nothing to fall back to — for genuine multi-bitrate
+        // streams (e.g. a real 4K ABR ladder) that's often the highest-bitrate rendition,
+        // which hangs forever if the network can't sustain it. Single-variant IPTV feeds
+        // (the majority of channels) have no choice to force either way, so leaving this at
+        // AVPlayer's default adaptive selection only affects genuine multi-variant streams,
+        // restoring the ability to step down to a sustainable bitrate.
         item.preferredForwardBufferDuration = profile.forwardBufferDuration
         item.preferredPeakBitRate = peakBitRate
         return item

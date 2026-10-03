@@ -64,9 +64,21 @@ final class ESPNWebAuthenticator: NSObject {
             self.pollTask = Task { [weak self] in
                 while !Task.isCancelled {
                     if let credentials = await Self.readESPNCredentials() {
-                        resume(.success(credentials))
-                        self?.session?.cancel()
-                        return
+                        // ESPN's login goes through several redirects (Disney ID -> ESPN -> fantasy
+                        // home); espn_s2/SWID can appear mid-chain before the session is fully
+                        // established. Closing the browser the instant they're first seen cuts that
+                        // chain short and ESPN reports the login as incomplete. Wait for the same
+                        // cookies to still be present a couple seconds later before auto-closing.
+                        try? await Task.sleep(nanoseconds: 2_500_000_000)
+                        guard !Task.isCancelled else { return }
+                        if let confirmed = await Self.readESPNCredentials(),
+                           confirmed.espnS2 == credentials.espnS2, confirmed.swid == credentials.swid {
+                            resume(.success(confirmed))
+                            self?.session?.cancel()
+                            return
+                        }
+                        // Cookies changed or disappeared during the settle window (still mid-redirect,
+                        // or the user is retrying a failed login) — keep polling instead of giving up.
                     }
                     try? await Task.sleep(nanoseconds: 1_500_000_000)
                 }

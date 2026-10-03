@@ -103,6 +103,10 @@ final class EventChannelRefreshService: ObservableObject {
             if let streamID = channel.xtreamStreamID { indexByStreamID[streamID] = i }
         }
         let now = Date()
+        // Prune (stream id, name) pairings last seen over a day ago — only the first hour
+        // matters for the "New" tag, so this is pure hygiene against unbounded growth over a
+        // long-running session as event slots rotate through many names.
+        firstSeenByKey = firstSeenByKey.filter { now.timeIntervalSince($0.value) < 86400 }
         var changed = false
         for freshChannel in fresh {
             guard let streamID = freshChannel.xtreamStreamID, let index = indexByStreamID[streamID] else { continue }

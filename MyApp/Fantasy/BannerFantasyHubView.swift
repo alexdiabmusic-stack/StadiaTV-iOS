@@ -12,13 +12,14 @@ struct BannerFantasyHubView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 22) {
                 hero
-                actions
-                myLeagues
+                // Native Banner-league create/join is parked for now — ESPN/Sleeper import is
+                // the only path surfaced here until that integration is fully built out.
                 if let importedContent, nativeStore.leagues.isEmpty {
                     importedSection(importedContent)
                 } else {
                     importSection
                 }
+                myLeagues
                 Spacer(minLength: 80)
             }
             .padding(20)
@@ -45,7 +46,10 @@ struct BannerFantasyHubView: View {
     }
 
     private var actions: some View {
-        VStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("OR START A BANNER LEAGUE")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Theme.textSecondary)
             Button(action: onCreateLeague) {
                 Label("Create Fantasy Team", systemImage: "plus.circle.fill")
                     .font(.headline.weight(.bold))
@@ -68,17 +72,14 @@ struct BannerFantasyHubView: View {
 
     @ViewBuilder
     private var myLeagues: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("MY LEAGUES")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Theme.textSecondary)
-            if nativeStore.isLoading && nativeStore.leagues.isEmpty {
-                ProgressView().tint(Theme.accent)
-                    .frame(maxWidth: .infinity)
-                    .padding(18)
-            } else if nativeStore.leagues.isEmpty {
-                BannerFantasyInfoCard(systemImage: "person.3", title: "No Banner leagues yet", subtitle: "Create a native Fantasy league or join one with an invite code.")
-            } else {
+        // No create/join entry point is shown right now, so skip this section entirely
+        // when there's nothing to display — an empty "no leagues yet" card with no way
+        // to act on it would just be a dead end.
+        if !nativeStore.leagues.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("MY LEAGUES")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Theme.textSecondary)
                 VStack(spacing: 0) {
                     ForEach(nativeStore.leagues, id: \.league.id) { bundle in
                         Button { nativeStore.selectLeague(id: bundle.league.id) } label: {
@@ -124,20 +125,33 @@ struct BannerFantasyHubView: View {
 
     private var importSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("IMPORT OR CONNECT")
+            Text("CONNECT YOUR LEAGUE")
                 .font(.caption.weight(.bold))
                 .foregroundStyle(Theme.textSecondary)
-            VStack(spacing: 0) {
-                Button(action: onConnectESPN) { BannerFantasyDisclosureRow(title: "ESPN Fantasy", subtitle: "Import Football, Hockey, Basketball or Baseball") }
-                    .buttonStyle(.plain)
-                if AppConfiguration.isSleeperFantasyProviderEnabled {
-                    Divider().overlay(Theme.hairline)
-                    Button(action: onConnectSleeper) { BannerFantasyDisclosureRow(title: "Sleeper", subtitle: "Import Football league") }
-                        .buttonStyle(.plain)
+            if AppConfiguration.isESPNFantasyProviderEnabled {
+                Button(action: onConnectESPN) {
+                    Label("Connect ESPN Fantasy", systemImage: "link")
+                        .font(.headline.weight(.bold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.accent)
+                Text("Football, Hockey, Basketball or Baseball — public or private leagues.")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
             }
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
+            if AppConfiguration.isSleeperFantasyProviderEnabled {
+                Button(action: onConnectSleeper) {
+                    Label("Connect Sleeper", systemImage: "link")
+                        .font(.headline.weight(.bold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.bordered)
+                .tint(Theme.accent)
+                .padding(.top, AppConfiguration.isESPNFantasyProviderEnabled ? 4 : 0)
+            }
         }
     }
 }

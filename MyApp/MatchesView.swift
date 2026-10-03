@@ -17,6 +17,15 @@ private enum FollowingSelection: Hashable {
     }
 }
 
+// MARK: - Following / Fantasy page switch
+
+private enum FollowingPage: String, CaseIterable, Identifiable {
+    case matches = "Matches"
+    case fantasy = "Fantasy"
+
+    var id: String { rawValue }
+}
+
 // MARK: - Main view
 
 struct MatchesView: View {
@@ -27,6 +36,7 @@ struct MatchesView: View {
     @EnvironmentObject private var streamStore: StreamAvailabilityStore
     @EnvironmentObject private var epgRepository: EPGRepository
 
+    @State private var selectedPage: FollowingPage = .matches
     @State private var selectedSelection: FollowingSelection = .all
     @State private var comingUpSportFilter: SportGroup? = nil
     @State private var showingTeamEditor = false
@@ -42,9 +52,15 @@ struct MatchesView: View {
         NavigationStack {
             ZStack {
                 Theme.background.ignoresSafeArea()
-                content
+                VStack(spacing: 0) {
+                    pageSelector
+                    switch selectedPage {
+                    case .matches: content
+                    case .fantasy: FantasyDashboardView()
+                    }
+                }
             }
-            .navigationTitle("Following")
+            .navigationTitle(selectedPage == .matches ? "Following" : "Fantasy")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
             #endif
@@ -52,10 +68,12 @@ struct MatchesView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
             .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Edit") { showingTeamEditor = true }
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(Theme.accent)
+                if selectedPage == .matches {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Edit") { showingTeamEditor = true }
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(Theme.accent)
+                    }
                 }
             }
             .sheet(isPresented: $showingTeamEditor) { TeamEditorView() }
@@ -89,6 +107,19 @@ struct MatchesView: View {
         .onChange(of: prefs.favoriteTeams) { _, _ in
             withAnimation(.snappy) { selectedSelection = .all }
         }
+    }
+
+    private var pageSelector: some View {
+        Picker("Following page", selection: $selectedPage.animation(.snappy)) {
+            ForEach(FollowingPage.allCases) { page in
+                Text(page.rawValue).tag(page)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
     }
 
     private var loadKey: String {

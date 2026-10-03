@@ -66,6 +66,17 @@ enum FantasySport: String, Codable, CaseIterable, Identifiable, Sendable {
         case .mlb: return "baseball.fill"
         }
     }
+
+    /// ESPN's fantasy.espn.com site segment for this sport, used to deep-link to ESPN
+    /// for actions Banner deliberately doesn't implement (waivers, adds, trades).
+    nonisolated var espnFantasySiteSegment: String {
+        switch self {
+        case .nfl: return "football"
+        case .nhl: return "hockey"
+        case .nba: return "basketball"
+        case .mlb: return "baseball"
+        }
+    }
 }
 
 enum FantasyLeagueStatus: String, Codable, Sendable {
@@ -271,6 +282,40 @@ struct FantasyRecord: Codable, Hashable, Sendable {
 
 struct FantasyScoringSettings: Codable, Hashable, Sendable {
     let values: [String: Double]
+}
+
+/// A free agent / waiver-wire candidate from a provider's player pool (ESPN's `kona_player_info`).
+/// Banner surfaces this as research only — adding/dropping stays on the provider's own site/app.
+struct FantasyPlayerPoolEntry: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let player: FantasyPlayer
+    let percentOwned: Double?
+    let percentStarted: Double?
+
+    var displayOwnership: String? {
+        percentOwned.map { "\($0.formatted(.number.precision(.fractionLength(0))))% owned" }
+    }
+}
+
+enum FantasyTransactionType: String, Codable, Sendable {
+    case add
+    case drop
+    case addDrop
+    case trade
+    case waiver
+    case draftPick
+    case unknown
+}
+
+/// A single league activity entry (ESPN's `mTransactions2`). ESPN's transaction payload only
+/// carries provider player IDs, not names, so the description is team/type-level, not per-player.
+struct FantasyTransaction: Identifiable, Codable, Hashable, Sendable {
+    let id: String
+    let leagueID: String
+    let type: FantasyTransactionType
+    let teamName: String?
+    let description: String
+    let date: Date
 }
 
 struct BannerPlayerIdentity: Identifiable, Codable, Hashable, Sendable {
@@ -531,23 +576,26 @@ struct FantasySettings: Codable, Equatable, Sendable {
     var showFantasyIndicatorsInLive: Bool
     var showFantasyIndicatorsInGuide: Bool
     var showFantasyPlayerOverlay: Bool
+    var enableNotifications: Bool
 
     nonisolated init(
         selectedLeagueID: String? = nil,
         showFantasyOnHome: Bool = true,
         showFantasyIndicatorsInLive: Bool = true,
         showFantasyIndicatorsInGuide: Bool = true,
-        showFantasyPlayerOverlay: Bool = true
+        showFantasyPlayerOverlay: Bool = true,
+        enableNotifications: Bool = true
     ) {
         self.selectedLeagueID = selectedLeagueID
         self.showFantasyOnHome = showFantasyOnHome
         self.showFantasyIndicatorsInLive = showFantasyIndicatorsInLive
         self.showFantasyIndicatorsInGuide = showFantasyIndicatorsInGuide
         self.showFantasyPlayerOverlay = showFantasyPlayerOverlay
+        self.enableNotifications = enableNotifications
     }
 
     enum CodingKeys: String, CodingKey {
-        case selectedLeagueID, showFantasyOnHome, showFantasyIndicatorsInLive, showFantasyIndicatorsInGuide, showFantasyPlayerOverlay
+        case selectedLeagueID, showFantasyOnHome, showFantasyIndicatorsInLive, showFantasyIndicatorsInGuide, showFantasyPlayerOverlay, enableNotifications
     }
 
     init(from decoder: Decoder) throws {
@@ -557,6 +605,7 @@ struct FantasySettings: Codable, Equatable, Sendable {
         showFantasyIndicatorsInLive = try container.decodeIfPresent(Bool.self, forKey: .showFantasyIndicatorsInLive) ?? true
         showFantasyIndicatorsInGuide = try container.decodeIfPresent(Bool.self, forKey: .showFantasyIndicatorsInGuide) ?? true
         showFantasyPlayerOverlay = try container.decodeIfPresent(Bool.self, forKey: .showFantasyPlayerOverlay) ?? true
+        enableNotifications = try container.decodeIfPresent(Bool.self, forKey: .enableNotifications) ?? true
     }
 }
 

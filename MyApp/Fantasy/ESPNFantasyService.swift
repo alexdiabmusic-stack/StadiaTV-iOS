@@ -10,7 +10,8 @@ struct ESPNFantasyService: FantasyProviderService, ESPNFantasyCredentialSaving {
         standings: true,
         liveScoring: true,
         projections: false,
-        transactions: false,
+        playerPool: true,
+        transactions: true,
         waiversWrite: false,
         tradesWrite: false,
         draftWrite: false
@@ -183,6 +184,37 @@ struct ESPNFantasyService: FantasyProviderService, ESPNFantasyCredentialSaving {
 
     func refreshCachedData() async {}
 
+    /// ESPN's `kona_player_info` view with an `X-Fantasy-Filter` targeting free agents/waivers,
+    /// sorted by ownership%. Research only — Banner does not submit adds/drops against this data.
+    func freeAgents(leagueID: String, sport: FantasySport, limit: Int) async throws -> [FantasyPlayerPoolEntry] {
+        let descriptor = try ESPNFantasyConnectionInput(leagueIdentifier: leagueID)
+        let response = try await client.league(
+            gameCode: descriptor.gameCode,
+            seasonID: descriptor.seasonID,
+            leagueID: descriptor.leagueID,
+            views: [.playerInfo],
+            scoringPeriodID: nil,
+            filter: .freeAgents(limit: limit),
+            credentials: await credentialStore.credentials(for: descriptor.connectionKey)
+        )
+        return ESPNFantasyMapper.playerPool(from: response, descriptor: descriptor)
+    }
+
+    /// ESPN's `mTransactions2` view: recent adds/drops/trades/waiver claims for the league.
+    func transactions(leagueID: String, limit: Int) async throws -> [FantasyTransaction] {
+        let descriptor = try ESPNFantasyConnectionInput(leagueIdentifier: leagueID)
+        let response = try await client.league(
+            gameCode: descriptor.gameCode,
+            seasonID: descriptor.seasonID,
+            leagueID: descriptor.leagueID,
+            views: [.transactions, .team],
+            scoringPeriodID: nil,
+            filter: nil,
+            credentials: await credentialStore.credentials(for: descriptor.connectionKey)
+        )
+        return Array(ESPNFantasyMapper.transactions(from: response, descriptor: descriptor).prefix(limit))
+    }
+
     func saveESPNFantasyCredentials(espnS2: String, swid: String, sport: FantasySport, leagueID: String, seasonID: Int) async throws {
         let key = ESPNFantasyConnectionInput(sport: sport, seasonID: seasonID, leagueID: leagueID, teamID: nil, scoringPeriodID: nil, matchupPeriodID: nil).connectionKey
         try await credentialStore.save(ESPNFantasyCredentials(espnS2: espnS2, swid: swid), for: key)
@@ -335,11 +367,13 @@ enum ESPNFantasyView: String, Sendable {
     case liveScoring = "mLiveScoring"
     case playerInfo = "kona_player_info"
     case playerCard = "kona_playercard"
+    case transactions = "mTransactions2"
 }
 
 enum ESPNFantasyFilter: Sendable {
     case matchupPeriods([Int])
     case playerIDs([Int])
+    case freeAgents(limit: Int)
 
     func headerValue() throws -> String {
         let object: [String: Any]
@@ -348,6 +382,14 @@ enum ESPNFantasyFilter: Sendable {
             object = ["schedule": ["filterMatchupPeriodIds": ["value": ids]]]
         case .playerIDs(let ids):
             object = ["players": ["filterIds": ["value": ids]]]
+        case .freeAgents(let limit):
+            object = [
+                "players": [
+                    "filterStatus": ["value": ["FREEAGENT", "WAIVERS"]],
+                    "limit": limit,
+                    "sortPercOwned": ["sortPriority": 1, "sortAsc": false]
+                ]
+            ]
         }
         let data = try JSONSerialization.data(withJSONObject: object, options: [])
         return String(decoding: data, as: UTF8.self)
@@ -512,12 +554,14 @@ struct ESPNLeagueResponseDTO: Decodable, Sendable {
     let members: [ESPNMemberDTO]?
     let teams: [ESPNTeamDTO]?
     let schedule: [ESPNMatchupDTO]?
+    let players: [ESPNPlayerPoolEntryDTO]?
+    let transactions: [ESPNTransactionDTO]?
 
     enum CodingKeys: String, CodingKey {
         case id
         case seasonID = "seasonId"
         case scoringPeriodID = "scoringPeriodId"
-        case status, settings, members, teams, schedule
+        case status, settings, members, teams, schedule, players, transactions
     }
 }
 
@@ -617,6 +661,11 @@ struct ESPNPlayerPoolEntryDTO: Decodable, Sendable {
     let player: ESPNPlayerDTO?
 }
 
+struct ESPNPlayerOwnershipDTO: Decodable, Sendable {
+    let percentOwned: Double?
+    let percentStarted: Double?
+}
+
 struct ESPNPlayerDTO: Decodable, Sendable {
     let id: Int?
     let fullName: String?
@@ -627,9 +676,10 @@ struct ESPNPlayerDTO: Decodable, Sendable {
     let defaultPositionID: Int?
     let eligibleSlots: [Int]?
     let injuryStatus: String?
+    let ownership: ESPNPlayerOwnershipDTO?
 
     enum CodingKeys: String, CodingKey {
-        case id, fullName, firstName, lastName, active, eligibleSlots, injuryStatus
+        case id, fullName, firstName, lastName, active, eligibleSlots, injuryStatus, ownership
         case proTeamID = "proTeamId"
         case defaultPositionID = "defaultPositionId"
     }
@@ -656,6 +706,31 @@ struct ESPNMatchupSideDTO: Decodable, Sendable {
     enum CodingKeys: String, CodingKey {
         case teamID = "teamId"
         case totalPoints, pointsByScoringPeriod
+    }
+}
+
+struct ESPNTransactionItemDTO: Decodable, Sendable {
+    let playerID: Int?
+    let type: String?
+
+    enum CodingKeys: String, CodingKey {
+        case playerID = "playerId"
+        case type
+    }
+}
+
+struct ESPNTransactionDTO: Decodable, Sendable {
+    let id: String?
+    let type: String?
+    let status: String?
+    let teamID: Int?
+    let items: [ESPNTransactionItemDTO]?
+    let proposedDate: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, status
+        case teamID = "teamId"
+        case items, proposedDate
     }
 }
 
@@ -820,6 +895,57 @@ nonisolated enum ESPNFantasyMapper {
         return output
     }
 
+    /// Maps `kona_player_info`'s top-level `players` array (free agents/waivers) to domain entries.
+    static func playerPool(from response: ESPNLeagueResponseDTO, descriptor: ESPNFantasyConnectionInput) -> [FantasyPlayerPoolEntry] {
+        (response.players ?? []).compactMap { entry -> FantasyPlayerPoolEntry? in
+            guard let player = entry.player, let id = player.id else { return nil }
+            let fantasyPlayer = FantasyPlayer(
+                id: String(id),
+                provider: .espn,
+                sport: descriptor.sport,
+                firstName: player.firstName,
+                lastName: player.lastName,
+                fullName: player.fullName ?? [player.firstName, player.lastName].compactMap { $0 }.joined(separator: " "),
+                teamAbbreviation: ESPNFantasyTeamResolver.shared.abbreviation(for: player.proTeamID, sport: descriptor.sport),
+                position: player.defaultPositionID.flatMap { ESPNFantasyPositionMapper.positionAbbreviation(for: $0, sport: descriptor.sport) },
+                fantasyPositions: (player.eligibleSlots ?? []).compactMap { ESPNFantasyPositionMapper.abbreviation(for: $0, sport: descriptor.sport) },
+                status: player.active == false ? "Inactive" : "Active",
+                injuryStatus: player.injuryStatus,
+                jerseyNumber: nil,
+                externalIDs: FantasyPlayerExternalIDs(espnID: String(id), sportradarID: nil, yahooID: nil, fantasyDataID: nil, statsID: nil, rotowireID: nil)
+            )
+            return FantasyPlayerPoolEntry(
+                id: "\(descriptor.connectionKey)-pool-\(id)",
+                player: fantasyPlayer,
+                percentOwned: player.ownership?.percentOwned,
+                percentStarted: player.ownership?.percentStarted
+            )
+        }
+        .sorted { ($0.percentOwned ?? 0) > ($1.percentOwned ?? 0) }
+    }
+
+    /// Maps `mTransactions2`'s `transactions` array. ESPN only returns provider player IDs here
+    /// (not names), so descriptions stay team/type-level rather than guessing player identity.
+    static func transactions(from response: ESPNLeagueResponseDTO, descriptor: ESPNFantasyConnectionInput) -> [FantasyTransaction] {
+        let teams = self.teams(from: response, descriptor: descriptor)
+        let teamByRosterID = Dictionary(uniqueKeysWithValues: teams.compactMap { team in team.rosterID.map { ($0, team) } })
+        return (response.transactions ?? []).compactMap { tx -> FantasyTransaction? in
+            guard let id = tx.id else { return nil }
+            let team = tx.teamID.flatMap { teamByRosterID[$0] }
+            let type = transactionType(from: tx.type)
+            let date = tx.proposedDate.map { Date(timeIntervalSince1970: $0 / 1000) } ?? Date()
+            return FantasyTransaction(
+                id: "\(descriptor.connectionKey)-tx-\(id)",
+                leagueID: descriptor.connectionKeyWithTeam(descriptor.teamID),
+                type: type,
+                teamName: team?.displayName,
+                description: transactionDescription(type: type, teamName: team?.displayName, itemCount: tx.items?.count ?? 0),
+                date: date
+            )
+        }
+        .sorted { $0.date > $1.date }
+    }
+
     static func ownerTeamID(from response: ESPNLeagueResponseDTO, swid: String) -> Int? {
         response.teams?.first { team in
             team.owners?.map(normalizeSWID(_:)).contains(swid) == true
@@ -864,6 +990,29 @@ nonisolated enum ESPNFantasyMapper {
             points: side.totalPoints,
             customPoints: nil
         )
+    }
+
+    private static func transactionType(from raw: String?) -> FantasyTransactionType {
+        switch raw?.uppercased() {
+        case "WAIVER": return .waiver
+        case "FREEAGENT": return .add
+        case "TRADE": return .trade
+        case "DRAFT": return .draftPick
+        default: return .unknown
+        }
+    }
+
+    private static func transactionDescription(type: FantasyTransactionType, teamName: String?, itemCount: Int) -> String {
+        let team = teamName ?? "A team"
+        switch type {
+        case .waiver: return "\(team) processed a waiver claim"
+        case .add: return "\(team) added a free agent"
+        case .drop: return "\(team) dropped a player"
+        case .addDrop: return "\(team) made a roster move"
+        case .trade: return "\(team) completed a trade"
+        case .draftPick: return "\(team) made a draft pick"
+        case .unknown: return "\(team) made a transaction"
+        }
     }
 }
 

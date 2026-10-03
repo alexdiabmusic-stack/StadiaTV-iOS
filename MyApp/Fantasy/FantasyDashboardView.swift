@@ -5,6 +5,7 @@ struct FantasyDashboardView: View {
     @EnvironmentObject private var playlists: PlaylistStore
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
+    @Environment(\.openURL) private var openURL
     @State private var showingConnect = false
     @State private var showingESPNConnect = false
     @State private var showingCreateLeague = false
@@ -129,6 +130,8 @@ struct FantasyDashboardView: View {
         }
         rosterSection
         standingsSection
+        playerPoolSection
+        transactionsSection
         unresolvedSection
     }
 
@@ -270,6 +273,71 @@ struct FantasyDashboardView: View {
         }
     }
 
+    /// ESPN-only: free agents/waivers from `kona_player_info`. Research only — Banner never
+    /// submits adds/drops, so the header links out to ESPN's own team page for that action.
+    @ViewBuilder
+    private var playerPoolSection: some View {
+        if fantasyStore.supportsPlayerPool {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 8) {
+                    Text("AVAILABLE PLAYERS")
+                    Spacer()
+                    if let league = fantasyStore.selectedLeague, let url = espnFantasyURL(for: league) {
+                        Button {
+                            openURL(url)
+                        } label: {
+                            Label("Open in ESPN", systemImage: "arrow.up.right.square")
+                                .font(.caption2.weight(.bold))
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(Theme.accent)
+                    }
+                }
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Theme.textSecondary)
+
+                if fantasyStore.availablePlayers.isEmpty {
+                    FantasyInlineState(systemImage: "person.badge.plus", title: "No free agents loaded", subtitle: "Pull to refresh to check the waiver wire.")
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(Array(fantasyStore.availablePlayers.prefix(10).enumerated()), id: \.element.id) { index, entry in
+                            FantasyPlayerPoolRow(entry: entry)
+                            if index < min(fantasyStore.availablePlayers.count, 10) - 1 { Divider().overlay(Theme.hairline) }
+                        }
+                    }
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
+                }
+            }
+            .task { await fantasyStore.loadAvailablePlayers() }
+        }
+    }
+
+    /// ESPN-only: recent league activity from `mTransactions2`.
+    @ViewBuilder
+    private var transactionsSection: some View {
+        if fantasyStore.supportsTransactions {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("LEAGUE ACTIVITY")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Theme.textSecondary)
+                if fantasyStore.recentTransactions.isEmpty {
+                    FantasyInlineState(systemImage: "list.bullet.rectangle", title: "No recent activity", subtitle: "Adds, drops, waivers and trades will appear here.")
+                } else {
+                    VStack(spacing: 0) {
+                        ForEach(Array(fantasyStore.recentTransactions.prefix(8).enumerated()), id: \.element.id) { index, transaction in
+                            FantasyTransactionRow(transaction: transaction)
+                            if index < min(fantasyStore.recentTransactions.count, 8) - 1 { Divider().overlay(Theme.hairline) }
+                        }
+                    }
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
+                }
+            }
+            .task { await fantasyStore.loadRecentTransactions() }
+        }
+    }
+
     @ViewBuilder
     private var unresolvedSection: some View {
         let count = fantasyStore.liveContext.unresolvedPlayerIDs.count
@@ -294,6 +362,22 @@ struct FantasyDashboardView: View {
         guard let league = fantasyStore.selectedLeague else { return "Not selected" }
         let teams = league.totalRosters.map { "\($0) teams" } ?? "League"
         return "\(league.provider.displayName) · \(league.sport.displayName) · \(league.season) · \(teams) · \(league.status.displayName)"
+    }
+
+    /// ESPN's stable fantasy.espn.com "my team" URL, used so actions Banner doesn't implement
+    /// (adds, drops, waiver claims) can be completed on ESPN's own site instead of guessed at.
+    private func espnFantasyURL(for league: FantasyLeague) -> URL? {
+        guard league.provider == .espn, let leagueID = league.providerMetadata["leagueID"] else { return nil }
+        var components = URLComponents(string: "https://fantasy.espn.com/\(league.sport.espnFantasySiteSegment)/team")
+        var items = [URLQueryItem(name: "leagueId", value: leagueID)]
+        if let seasonID = league.providerMetadata["seasonID"] {
+            items.append(URLQueryItem(name: "seasonId", value: seasonID))
+        }
+        if let teamID = league.providerMetadata["selectedTeamID"] {
+            items.append(URLQueryItem(name: "teamId", value: teamID))
+        }
+        components?.queryItems = items
+        return components?.url
     }
 }
 
@@ -827,6 +911,75 @@ private struct FantasyStandingRow: View {
         .background(highlighted ? Theme.accent.opacity(0.10) : Color.clear)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Rank \(standing.rank.map(String.init) ?? "unknown"), \(standing.team?.displayName ?? "Roster \(standing.rosterID)"), record \(standing.record.displayRecord), points for \(standing.record.pointsFor.map { $0.formatted(.number.precision(.fractionLength(1))) } ?? "unavailable")")
+    }
+}
+
+private struct FantasyPlayerPoolRow: View {
+    let entry: FantasyPlayerPoolEntry
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.player.fullName)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
+                Text([entry.player.teamAbbreviation, entry.player.position].compactMap { $0 }.joined(separator: " · "))
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            Spacer()
+            if let injury = entry.player.injuryStatus, !injury.isEmpty {
+                Text(injury.uppercased())
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(Theme.starting)
+            }
+            if let ownership = entry.displayOwnership {
+                Text(ownership)
+                    .font(.caption.weight(.bold).monospacedDigit())
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        }
+        .padding(12)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(entry.player.fullName), \([entry.player.teamAbbreviation, entry.player.position].compactMap { $0 }.joined(separator: ", ")), \(entry.displayOwnership ?? "ownership unavailable")")
+    }
+}
+
+private struct FantasyTransactionRow: View {
+    let transaction: FantasyTransaction
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: iconName)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Theme.textSecondary)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(transaction.description)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                Text(transaction.date, style: .date)
+                    .font(.caption2)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            Spacer()
+        }
+        .padding(12)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(transaction.description), \(transaction.date.formatted(date: .abbreviated, time: .omitted))")
+    }
+
+    private var iconName: String {
+        switch transaction.type {
+        case .add: return "plus.circle"
+        case .drop: return "minus.circle"
+        case .addDrop: return "arrow.triangle.2.circlepath"
+        case .trade: return "arrow.left.arrow.right"
+        case .waiver: return "tray.and.arrow.down"
+        case .draftPick: return "list.clipboard"
+        case .unknown: return "ellipsis.circle"
+        }
     }
 }
 

@@ -629,8 +629,8 @@ struct LiveMatchCard: View {
     private var headToHeadScoreRow: some View {
         HStack(spacing: 0) {
             HStack(spacing: 8) {
-                TeamLogo(url: match.away.logoURL, size: 36)
-                Text(match.away.shortName)
+                TeamLogo(url: match.leadingSide.logoURL, size: 36)
+                Text(match.leadingSide.shortName)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
@@ -638,19 +638,19 @@ struct LiveMatchCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 6) {
-                Text(match.away.score ?? "-")
+                Text(match.leadingSide.score ?? "-")
                 Text("–").foregroundStyle(Theme.textSecondary)
-                Text(match.home.score ?? "-")
+                Text(match.trailingSide.score ?? "-")
             }
             .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
             .foregroundStyle(Theme.textPrimary)
 
             HStack(spacing: 8) {
-                Text(match.home.shortName)
+                Text(match.trailingSide.shortName)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
-                TeamLogo(url: match.home.logoURL, size: 36)
+                TeamLogo(url: match.trailingSide.logoURL, size: 36)
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
@@ -669,9 +669,9 @@ private struct CompactSoonCard: View {
 
             VStack(spacing: 8) {
                 HStack(spacing: 4) {
-                    TeamLogo(url: match.away.logoURL, size: 26)
+                    TeamLogo(url: match.leadingSide.logoURL, size: 26)
                     Text("vs").font(.caption2.weight(.bold)).foregroundStyle(Theme.textSecondary)
-                    TeamLogo(url: match.home.logoURL, size: 26)
+                    TeamLogo(url: match.trailingSide.logoURL, size: 26)
                 }
                 Text(match.shortName)
                     .font(.caption.weight(.semibold))

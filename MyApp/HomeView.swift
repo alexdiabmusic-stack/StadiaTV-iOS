@@ -51,6 +51,7 @@ struct HomeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var playingChannel: Channel?
+    @State private var quickStreamMatch: Match?
     @State private var selectedLiveSport: SportGroup?
     @State private var selectedScheduleDay: ScheduleDay = .today
     @State private var showingNotificationAlert = false
@@ -78,6 +79,15 @@ struct HomeView: View {
             .toolbarBackground(.visible, for: .navigationBar)
             .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
             .fullScreenCover(item: $playingChannel) { PlayerView(channel: $0) }
+            .sheet(item: $quickStreamMatch) { match in
+                #if os(tvOS)
+                TVMatchDetailView(match: match)
+                #else
+                QuickStreamSheet(match: match, sources: streamStore.topRanked(for: match.id))
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                #endif
+            }
         }
         .tint(Theme.accent)
         .task(id: loadPreferencesKey) {
@@ -352,9 +362,14 @@ struct HomeView: View {
                 return end > ctx.date
             }
             if let pick {
-                FeaturedHero(pick: pick, match: viewModel.featuredMatchesByPickID[pick.id]) { match in
-                    Task { await setAlert(for: match) }
-                }
+                let heroMatch = viewModel.featuredMatchesByPickID[pick.id]
+                FeaturedHero(
+                    pick: pick,
+                    match: heroMatch,
+                    hasStreams: heroMatch.map { streamStore.count(for: $0.id) > 0 } ?? false,
+                    onWatch: { quickStreamMatch = $0 },
+                    onSetAlert: { match in Task { await setAlert(for: match) } }
+                )
             } else if let prime = viewModel.primeMatch {
                 PrimeHeroCard(match: prime)
             }
@@ -474,7 +489,7 @@ struct HomeView: View {
             let points = total.map { " · \($0.formatted(.number.precision(.fractionLength(1)))) pts" } ?? ""
             return HomeFantasySummary(
                 title: "FANTASY LIVE",
-                subtitle: "\(playerCount) player\(playerCount == 1 ? "" : "s") · \(liveContexts.count) NHL game\(liveContexts.count == 1 ? "" : "s")\(points)",
+                subtitle: "\(playerCount) player\(playerCount == 1 ? "" : "s") · \(gameCountLabel(for: liveContexts))\(points)",
                 isLive: true,
                 watchChannel: liveContexts.first(where: { $0.watchAvailable })?.matchedChannel?.channel
             )
@@ -484,12 +499,20 @@ struct HomeView: View {
             let playerCount = todayContexts.reduce(0) { $0 + $1.playerGames.count }
             return HomeFantasySummary(
                 title: "FANTASY TONIGHT",
-                subtitle: "\(playerCount) player\(playerCount == 1 ? "" : "s") · \(todayContexts.count) NHL game\(todayContexts.count == 1 ? "" : "s")",
+                subtitle: "\(playerCount) player\(playerCount == 1 ? "" : "s") · \(gameCountLabel(for: todayContexts))",
                 isLive: false,
                 watchChannel: nil
             )
         }
         return nil
+    }
+
+    /// "2 NHL games", or just "3 games" when the contexts span more than one league.
+    private func gameCountLabel(for contexts: [FantasyEventContext]) -> String {
+        let leagues = Set(contexts.map { $0.event.league.shortName })
+        let noun = contexts.count == 1 ? "game" : "games"
+        if leagues.count == 1, let league = leagues.first { return "\(contexts.count) \(league) \(noun)" }
+        return "\(contexts.count) \(noun)"
     }
 
     // MARK: - Live Now
@@ -630,14 +653,17 @@ private struct HomeFilterBar: View {
 private struct FeaturedHero: View {
     let pick: FeaturedEventPick
     let match: Match?
+    /// True when at least one playlist channel is linked to the match, so "Watch Live" has somewhere to go.
+    let hasStreams: Bool
+    let onWatch: (Match) -> Void
     let onSetAlert: (Match) -> Void
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { ctx in
             if pick.isTeamMatchup {
-                TeamMatchupHero(pick: pick, match: match, now: ctx.date)
+                TeamMatchupHero(pick: pick, match: match, now: ctx.date, hasStreams: hasStreams, onWatch: onWatch, onSetAlert: onSetAlert)
             } else {
-                EventHero(pick: pick, match: match, now: ctx.date)
+                EventHero(pick: pick, match: match, now: ctx.date, hasStreams: hasStreams, onWatch: onWatch)
             }
         }
     }
@@ -649,12 +675,16 @@ private struct TeamMatchupHero: View {
     let pick: FeaturedEventPick
     let match: Match?
     let now: Date
+    let hasStreams: Bool
+    let onWatch: (Match) -> Void
+    let onSetAlert: (Match) -> Void
 
     private static var cardHeight: CGFloat { Theme.isPad ? 400 : 300 }
     private var isLive: Bool { match?.state == .live }
     private var eventDate: Date? { match?.date ?? pick.startDate }
-    private var homeSide: TeamSide { match?.home ?? pick.streamMatch.home }
-    private var awaySide: TeamSide { match?.away ?? pick.streamMatch.away }
+    private var displayMatch: Match { match ?? pick.streamMatch }
+    private var leadingSide: TeamSide { displayMatch.leadingSide }
+    private var trailingSide: TeamSide { displayMatch.trailingSide }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
@@ -703,8 +733,8 @@ private struct TeamMatchupHero: View {
                     HStack(spacing: 0) {
                         Spacer()
                         VStack(spacing: 4) {
-                            TeamLogo(url: awaySide.logoURL, size: 48)
-                            Text(awaySide.shortName)
+                            TeamLogo(url: leadingSide.logoURL, size: 48)
+                            Text(leadingSide.shortName)
                                 .font(Theme.Typography.caption)
                                 .foregroundStyle(.white.opacity(0.80))
                                 .lineLimit(1)
@@ -716,8 +746,8 @@ private struct TeamMatchupHero: View {
                             .frame(width: 28)
                         Spacer()
                         VStack(spacing: 4) {
-                            TeamLogo(url: homeSide.logoURL, size: 48)
-                            Text(homeSide.shortName)
+                            TeamLogo(url: trailingSide.logoURL, size: 48)
+                            Text(trailingSide.shortName)
                                 .font(Theme.Typography.caption)
                                 .foregroundStyle(.white.opacity(0.80))
                                 .lineLimit(1)
@@ -796,7 +826,7 @@ private struct TeamMatchupHero: View {
                     .font(Theme.Typography.overline)
                     .foregroundStyle(.white.opacity(0.55))
                     .tracking(1)
-                Text("\(m.away.score ?? "—") – \(m.home.score ?? "—")")
+                Text("\(m.leadingSide.score ?? "—") – \(m.trailingSide.score ?? "—")")
                     .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(.white)
                 Text(m.statusDetail)
@@ -837,20 +867,41 @@ private struct TeamMatchupHero: View {
         }
     }
 
+    /// Every button does something: Watch Live opens the match's streams, Remind Me schedules an
+    /// alert, the rest open the match. Before the match resolves there is nothing to open, so none show.
     @ViewBuilder
     private var buttonsView: some View {
         if let m = match {
-            NavigationLink(value: m) {
-                heroButton(m.state == .final ? "Highlights" : m.state == .live ? "Watch Live" : "Match Info", icon: "play.fill", primary: true)
+            switch m.state {
+            case .live where hasStreams:
+                Button { onWatch(m) } label: {
+                    heroButton("Watch Live", icon: "play.fill", primary: true)
+                }
+                .buttonStyle(.plain)
+                NavigationLink(value: m) {
+                    heroButton("Matchup", icon: "sportscourt", primary: false)
+                }
+                .buttonStyle(.plain)
+            case .live:
+                NavigationLink(value: m) {
+                    heroButton("Match Info", icon: "info.circle", primary: true)
+                }
+                .buttonStyle(.plain)
+            case .pre:
+                NavigationLink(value: m) {
+                    heroButton("Match Info", icon: "info.circle", primary: true)
+                }
+                .buttonStyle(.plain)
+                Button { onSetAlert(m) } label: {
+                    heroButton("Remind Me", icon: "bell", primary: false)
+                }
+                .buttonStyle(.plain)
+            case .final:
+                NavigationLink(value: m) {
+                    heroButton("Highlights", icon: "play.fill", primary: true)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
-            NavigationLink(value: m) {
-                heroButton("Matchup", icon: "sportscourt", primary: false)
-            }
-            .buttonStyle(.plain)
-        } else {
-            heroButton("Watch Live", icon: "play.fill", primary: true)
-            heroButton("Matchup", icon: "sportscourt", primary: false)
         }
     }
 
@@ -894,6 +945,8 @@ private struct EventHero: View {
     let pick: FeaturedEventPick
     let match: Match?
     let now: Date
+    let hasStreams: Bool
+    let onWatch: (Match) -> Void
 
     private static var cardHeight: CGFloat { Theme.isPad ? 400 : 300 }
     private var isLive: Bool { match?.state == .live }
@@ -985,22 +1038,27 @@ private struct EventHero: View {
 
                     countdownView
 
-                    HStack(spacing: 8) {
-                        if let m = match {
-                            NavigationLink(value: m) {
-                                eventButton(m.state == .final ? "Highlights" : m.state == .live ? "Watch Live" : "Match Info", icon: "play.fill", primary: true)
+                    // Before the match resolves there is nothing to open, so no buttons show.
+                    if let m = match {
+                        HStack(spacing: 8) {
+                            if m.state == .live, hasStreams {
+                                Button { onWatch(m) } label: {
+                                    eventButton("Watch Live", icon: "play.fill", primary: true)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                NavigationLink(value: m) {
+                                    eventButton(m.state == .final ? "Highlights" : "Match Info", icon: m.state == .final ? "play.fill" : "info.circle", primary: true)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                             NavigationLink(value: m) {
                                 eventButton(secondaryLabel, icon: secondaryIcon, primary: false)
                             }
                             .buttonStyle(.plain)
-                        } else {
-                            eventButton("Watch Live", icon: "play.fill", primary: true)
-                            eventButton(secondaryLabel, icon: secondaryIcon, primary: false)
                         }
+                        .padding(.top, 10)
                     }
-                    .padding(.top, 10)
                 }
                 .padding(16)
                 .frame(maxWidth: min(proxy.size.width * 0.62, 240), minHeight: Self.cardHeight, alignment: .topLeading)
@@ -1136,11 +1194,11 @@ private struct PrimeHeroCard: View {
                     }
 
                     HStack(spacing: 12) {
-                        teamColumn(match.away)
+                        teamColumn(match.leadingSide)
                         VStack(spacing: 4) {
                             Text(match.state == .pre
                                  ? "VS"
-                                 : "\(match.away.score ?? "-") – \(match.home.score ?? "-")")
+                                 : "\(match.leadingSide.score ?? "-") – \(match.trailingSide.score ?? "-")")
                                 .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
                                 .foregroundStyle(Theme.textPrimary)
                             Text(primeHeroStatusText(for: match))
@@ -1149,7 +1207,7 @@ private struct PrimeHeroCard: View {
                                 .lineLimit(1)
                         }
                         .frame(minWidth: 80)
-                        teamColumn(match.home)
+                        teamColumn(match.trailingSide)
                     }
                 }
 
@@ -1390,11 +1448,11 @@ private struct SoonTimelineCard: View {
                 }
 
                 HStack(spacing: 6) {
-                    TeamLogo(url: match.away.logoURL, size: 28)
+                    TeamLogo(url: match.leadingSide.logoURL, size: 28)
                     Text("vs")
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
-                    TeamLogo(url: match.home.logoURL, size: 28)
+                    TeamLogo(url: match.trailingSide.logoURL, size: 28)
                 }
 
                 Text(match.shortName)
@@ -1601,7 +1659,7 @@ private struct ScheduleRow: View {
                 .frame(width: 1, height: 36)
 
             HStack(spacing: 10) {
-                TeamLogo(url: match.away.logoURL, size: 28)
+                TeamLogo(url: match.leadingSide.logoURL, size: 28)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(match.shortName)
                         .font(.system(size: 14, weight: .semibold))
@@ -1615,7 +1673,7 @@ private struct ScheduleRow: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                TeamLogo(url: match.home.logoURL, size: 28)
+                TeamLogo(url: match.trailingSide.logoURL, size: 28)
             }
 
             Image(systemName: "chevron.right")

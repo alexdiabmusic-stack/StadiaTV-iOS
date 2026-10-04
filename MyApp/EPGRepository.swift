@@ -168,12 +168,14 @@ final class EPGRepository: ObservableObject {
     }
 
     /// Called when IPTV channels are available. Rebuilds canonical lineup and refreshes EPG if needed.
-    func setupWithChannels(_ channels: [Channel], customEPGURLs: [URL] = []) {
-        self.customEPGURLs = customEPGURLs
+    /// - Parameter customEPGURLs: the playlists' own XMLTV guides. `nil` keeps the URLs from the
+    ///   previous call, so a caller that only has channels can't wipe them.
+    func setupWithChannels(_ channels: [Channel], customEPGURLs: [URL]? = nil) {
+        if let customEPGURLs { self.customEPGURLs = customEPGURLs }
         guard !channels.isEmpty else { return }
         // Hashing every channel is O(n) over a potentially 50k-channel playlist, so the
         // fingerprint is computed off the main thread before deciding whether to re-import.
-        let urlSuffix = customEPGURLs.map { $0.absoluteString }.joined()
+        let urlSuffix = self.customEPGURLs.map { $0.absoluteString }.joined()
         fingerprintTask?.cancel()
         fingerprintTask = Task { [weak self] in
             let hash = await Task.detached(priority: .userInitiated) { Self.channelFingerprint(channels) }.value

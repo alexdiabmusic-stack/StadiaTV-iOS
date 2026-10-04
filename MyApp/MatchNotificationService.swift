@@ -277,7 +277,8 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
             awayScore: match.away.score,
             homeScore: match.home.score,
             statusDetail: match.statusDetail,
-            closeMargin: closeMargin(for: match.league.group)
+            closeMargin: closeMargin(for: match.league.group),
+            homeFirst: match.listsHomeSideFirst
         )
     }
 

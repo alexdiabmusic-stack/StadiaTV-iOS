@@ -123,12 +123,9 @@ enum AppTab: String, Hashable {
 }
 
 struct RootView: View {
-    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var podcastStore: PodcastStore
     @EnvironmentObject private var playlistStore: PlaylistStore
-    @EnvironmentObject private var fantasyStore: FantasyStore
-    @EnvironmentObject private var bannerFantasyStore: BannerFantasyStore
     @StateObject private var liveViewModel = LiveViewModel()
     @StateObject private var epgRepository = EPGRepository()
     @StateObject private var guideStore = GuideChannelStore()
@@ -181,58 +178,12 @@ struct RootView: View {
         .environmentObject(eventChannelRefresh)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: podcastStore.nowPlaying != nil)
         .task { updateFavoriteNotificationPrompt() }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await playlistStore.refreshAccountStatus() } }
-        }
-        .task { epgRepository.xtreamEPGFetcher = playlistStore.fetchXtreamEPG }
-        .task { await liveViewModel.load(favoriteTeams: prefs.favoriteTeams) }
-        .task(id: playlistStore.playlists) {
-            epgRepository.setupWithChannels(
-                playlistStore.allChannels,
-                customEPGURLs: playlistStore.playlists.compactMap(\.epgURL).compactMap(URL.init(string:))
-            )
-        }
-        .task(id: "\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.channelsRevision)-\(epgRepository.programmeRevision)") {
-            await streamStore.scanDebounced(
-                matches: liveViewModel.allLive + liveViewModel.startingSoon,
-                channels: playlistStore.allChannels,
-                epgRepository: epgRepository
-            )
-        }
-        .task(id: playlistStore.channelsRevision) {
-            for playlist in playlistStore.playlists {
-                eventChannelRefresh.noteChannelsLoaded(
-                    playlistID: playlist.id, channels: playlistStore.channelsByPlaylist[playlist.id] ?? []
-                )
-            }
-        }
-        // Keeps event-slot channel names (which carry the fixture and change during the day)
-        // current while the app is active — see MatchLinker/PROMPTS.md, Prompt 5.
-        .task {
-            while !Task.isCancelled {
-                let upcoming = liveViewModel.allLive + liveViewModel.startingSoon
-                let hot = upcoming.contains { match in
-                    abs(match.date.timeIntervalSinceNow) <= 30 * 60 && streamStore.confirmedCount(for: match.id) == 0
-                }
-                if await eventChannelRefresh.refreshIfDue(playlists: playlistStore, hot: hot) {
-                    await streamStore.linkService.invalidate()
-                    let horizon = Date().addingTimeInterval(12 * 3600)
-                    await streamStore.scan(
-                        matches: upcoming.filter { $0.date <= horizon },
-                        channels: playlistStore.allChannels,
-                        epgRepository: epgRepository
-                    )
-                }
-                try? await Task.sleep(nanoseconds: UInt64(hot ? 60 : 600) * 1_000_000_000)
-            }
-        }
-        .onChange(of: playlistStore.channelsRevision) {
-            epgRepository.setupWithChannels(
-                playlistStore.allChannels,
-                customEPGURLs: playlistStore.playlists.compactMap(\.epgURL).compactMap(URL.init(string:))
-            )
-            Task { await refreshFantasyContexts(force: true) }
-        }
+        .appOrchestration(
+            liveViewModel: liveViewModel,
+            epgRepository: epgRepository,
+            streamStore: streamStore,
+            eventChannelRefresh: eventChannelRefresh
+        )
         .onChange(of: prefs.favoriteTeams) { updateFavoriteNotificationPrompt() }
         .onChange(of: prefs.matchNotificationsEnabled) { updateFavoriteNotificationPrompt() }
         // A tapped notification or bannertv:// URL. `initial` picks up a link that arrived
@@ -265,23 +216,6 @@ struct RootView: View {
         case .discover: selectedTab = .discover
         case .settings: selectedTab = .settings
         }
-    }
-
-    private func refreshFantasyContexts(force: Bool = false) async {
-        await bannerFantasyStore.load()
-        await PlaybackPriority.waitForBackgroundSlot()
-        async let espnRefresh: Void = fantasyStore.refresh(
-            channels: playlistStore.allChannels,
-            preferredLanguages: prefs.preferredStreamLanguages,
-            force: force
-        )
-        async let eventContextRefresh: Void = bannerFantasyStore.refreshEventContexts(
-            channels: playlistStore.allChannels,
-            preferredLanguages: prefs.preferredStreamLanguages,
-            epgRepository: epgRepository,
-            streamStore: streamStore
-        )
-        _ = await (espnRefresh, eventContextRefresh)
     }
 
     private func updateFavoriteNotificationPrompt() {

@@ -17,6 +17,13 @@ nonisolated struct NotificationCandidate: Equatable, Sendable {
     let statusDetail: String
     /// Largest score gap that still counts as a close game; nil where the sport has no such notion.
     let closeMargin: Int?
+    /// Soccer reads home side first ("Arsenal vs Chelsea · 2-1"); other sports read away first.
+    var homeFirst = false
+
+    var leadingShortName: String { homeFirst ? homeShortName : awayShortName }
+    var trailingShortName: String { homeFirst ? awayShortName : homeShortName }
+    var leadingScore: String? { homeFirst ? homeScore : awayScore }
+    var trailingScore: String? { homeFirst ? awayScore : homeScore }
 
     var isClose: Bool {
         guard let closeMargin, let away = Int(awayScore ?? ""), let home = Int(homeScore ?? "") else { return false }
@@ -153,7 +160,7 @@ nonisolated enum MatchNotificationPlanner {
     static func liveAlert(for match: NotificationCandidate, origin: String) -> PlannedNotification {
         PlannedNotification(
             identifier: liveIdentifier(match.matchID),
-            title: "\(match.awayShortName) vs \(match.homeShortName) is live",
+            title: "\(match.leadingShortName) vs \(match.trailingShortName) is live",
             body: match.statusDetail,
             fireDate: nil,
             userInfo: userInfo(for: match, type: "gameLive", origin: origin)
@@ -163,8 +170,8 @@ nonisolated enum MatchNotificationPlanner {
     static func closeGameAlert(for match: NotificationCandidate, origin: String) -> PlannedNotification {
         PlannedNotification(
             identifier: closeIdentifier(match.matchID),
-            title: "Close game: \(match.awayShortName) vs \(match.homeShortName)",
-            body: "\(match.awayScore ?? "-")-\(match.homeScore ?? "-") · \(match.statusDetail)",
+            title: "Close game: \(match.leadingShortName) vs \(match.trailingShortName)",
+            body: "\(match.leadingScore ?? "-")-\(match.trailingScore ?? "-") · \(match.statusDetail)",
             fireDate: nil,
             userInfo: userInfo(for: match, type: "closeGame", origin: origin)
         )

@@ -96,6 +96,8 @@ struct PlayerView: View {
     @State private var isShowingMultiscreenPicker = false
     @State private var selectedMultiChannelIDs: Set<String> = []
     @State private var multiscreenSession: PlayerMultiscreenSession?
+    /// Chosen in the picker; presented once the picker sheet has finished dismissing.
+    @State private var pendingMultiscreenSession: PlayerMultiscreenSession?
     #if os(iOS)
     @State private var brightnessDragStart: CGFloat?
     @State private var volumeDragStart: Float?
@@ -364,7 +366,13 @@ struct PlayerView: View {
         }
         .animation(Theme.Motion.snappy, value: showGestureHint)
         #endif
-        .sheet(isPresented: $isShowingMultiscreenPicker, onDismiss: { multiscreenChannels = [] }) {
+        .sheet(isPresented: $isShowingMultiscreenPicker, onDismiss: {
+            multiscreenChannels = []
+            if let session = pendingMultiscreenSession {
+                pendingMultiscreenSession = nil
+                multiscreenSession = session
+            }
+        }) {
             PlayerMultiscreenPicker(currentChannel: currentZapChannel,
                                     allChannels: multiscreenChannels,
                                     selectedChannelIDs: $selectedMultiChannelIDs,
@@ -709,13 +717,9 @@ struct PlayerView: View {
     private func startMultiscreen() {
         let channels = multiscreenChannels.filter { selectedMultiChannelIDs.contains($0.id) }
         guard channels.count >= 2 else { return }
-        let session = PlayerMultiscreenSession(channels: Array(channels.prefix(4)))
-        isShowingMultiscreenPicker = false
+        pendingMultiscreenSession = PlayerMultiscreenSession(channels: Array(channels.prefix(4)))
         selectedMultiChannelIDs.removeAll()
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 250_000_000)
-            multiscreenSession = session
-        }
+        isShowingMultiscreenPicker = false
     }
 
     private func requestOrientation(_ orientation: PlayerOrientation) {

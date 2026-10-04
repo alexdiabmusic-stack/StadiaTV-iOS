@@ -81,15 +81,22 @@ final class ChannelBrowserModel: ObservableObject {
         }
         if Task.isCancelled { return [] }
 
-        // Sort keys are computed once per channel, not once per comparison.
+        // Sort keys are computed once per channel, not once per comparison, and only when a search
+        // or a name-based order reads them: folding 20,000 names isn't free.
         struct Keyed { let channel: Channel; let key: String; let number: Int? }
         let query = input.query.trimmingCharacters(in: .whitespacesAndNewlines)
         let needle = query.isEmpty ? nil : sortKey(query)
+        let sortsByName: Bool
+        switch input.sortOrder {
+        case .nameAZ, .nameZA, .favoritesFirst: sortsByName = true
+        case .providerOrder, .channelNumber, .custom: sortsByName = false
+        }
+        let needsKey = needle != nil || sortsByName
         var keyed: [Keyed] = []
         keyed.reserveCapacity(base.count)
         for channel in base {
             let name = input.customNames[channel.id] ?? channel.name
-            let key = sortKey(name)
+            let key = needsKey ? sortKey(name) : ""
             if let needle, !key.contains(needle) { continue }
             let number = input.sortOrder == .channelNumber ? channelNumber(name) : nil
             keyed.append(Keyed(channel: channel, key: key, number: number))
@@ -121,11 +128,20 @@ final class ChannelBrowserModel: ObservableObject {
         name.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
     }
 
+    /// The number a provider puts in front of a channel name: "12. ESPN", "7 - BBC", "103| TNT", "5) Sky".
+    /// A scan of the first few characters rather than two regular-expression searches per channel, which
+    /// dominated sorting a large playlist by number. Spacing and digits follow ICU's `\s` (Unicode
+    /// White_Space) and `\d` (decimal digits), as the pattern `^\s*(\d+)\s*[.\-|)]` did.
     nonisolated static func channelNumber(_ name: String) -> Int? {
-        guard let match = name.range(of: #"^\s*(\d+)\s*[.\-|)]\s*"#, options: .regularExpression),
-              let numRange = name.range(of: #"\d+"#, options: .regularExpression, range: match)
-        else { return nil }
-        return Int(name[numRange])
+        var rest = name.unicodeScalars[...]
+        while let first = rest.first, first.properties.isWhitespace { rest = rest.dropFirst() }
+        let digitsStart = rest.startIndex
+        while let first = rest.first, first.properties.generalCategory == .decimalNumber { rest = rest.dropFirst() }
+        let digits = name.unicodeScalars[digitsStart..<rest.startIndex]
+        guard !digits.isEmpty else { return nil }
+        while let first = rest.first, first.properties.isWhitespace { rest = rest.dropFirst() }
+        guard let separator = rest.first, ".-|)".unicodeScalars.contains(separator) else { return nil }
+        return Int(String(digits))
     }
 }
 

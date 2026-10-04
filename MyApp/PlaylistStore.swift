@@ -95,6 +95,33 @@ final class PlaylistStore: ObservableObject {
         channelsByPlaylist[playlistID] = channels
     }
 
+    /// Rebuilds a playable channel from a saved snapshot (watch history, recents).
+    ///
+    /// The stream URL, headers and Xtream identifiers come from live provider data, never from
+    /// the snapshot (see `SavedChannel`), so a changed host or password is picked up and no
+    /// credentials are persisted with history. Display fields stay as the user last saw them.
+    /// Returns nil until the channel's playlist has loaded, or when the provider no longer lists it.
+    func channel(for saved: SavedChannel) -> Channel? {
+        guard let indexed = channelsByID[saved.id] else { return nil }
+        // The ID index keeps one channel per ID; prefer the saved playlist's own copy if another shadows it.
+        let live = indexed.playlistID == saved.playlistID
+            ? indexed
+            : (channelsByPlaylist[saved.playlistID]?.first { $0.id == saved.id } ?? indexed)
+        return Channel(
+            id: live.id,
+            name: saved.name,
+            streamURL: live.streamURL,
+            logoURL: saved.logoURLString.flatMap(URL.init(string:)) ?? live.logoURL,
+            group: saved.group,
+            playlistID: live.playlistID,
+            playlistName: live.playlistName,
+            tvgId: live.tvgId,
+            httpHeaders: live.httpHeaders,
+            xtreamCategoryID: live.xtreamCategoryID,
+            xtreamStreamID: live.xtreamStreamID
+        )
+    }
+
     #if DEBUG
     /// Test-only: sets `playlists` directly, bypassing `load()`'s UserDefaults/Keychain
     /// round trip, so tests can exercise code that reads `playlists` without touching real

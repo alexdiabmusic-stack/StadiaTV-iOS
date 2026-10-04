@@ -4696,6 +4696,7 @@ private struct PlayerRecentsSheet: View {
     let onSelect: (Channel) -> Void
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var watchStore: WatchStore
+    @EnvironmentObject private var playlistStore: PlaylistStore
 
     var body: some View {
         NavigationStack {
@@ -4707,7 +4708,7 @@ private struct PlayerRecentsSheet: View {
                 } else {
                     List {
                         ForEach(watchStore.recents) { entry in
-                            if let ch = entry.saved.channel {
+                            if let ch = playlistStore.channel(for: entry.saved) {
                                 Button {
                                     onSelect(ch)
                                     dismiss()

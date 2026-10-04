@@ -4,12 +4,12 @@ import SwiftUI
 struct MyApp: App {
     @StateObject private var playlistStore = PlaylistStore()
     @StateObject private var preferences = PreferencesStore()
-    @StateObject private var watchStore = WatchStore()
+    @StateObject private var watchStore: WatchStore
     @StateObject private var entitlements = EntitlementStore()
     @StateObject private var predictions = PredictionsStore()
     @StateObject private var articleLibrary = ArticleLibraryStore()
     @StateObject private var podcastStore = PodcastStore()
-    @StateObject private var channelPrefsStore = ChannelPreferencesStore()
+    @StateObject private var channelPrefsStore: ChannelPreferencesStore
     @StateObject private var customGroupStore = CustomGroupStore()
     @StateObject private var groupPrefsStore = GroupPreferencesStore()
     @StateObject private var fantasyStore = FantasyStore.shared
@@ -17,6 +17,10 @@ struct MyApp: App {
     @StateObject private var launchCoordinator = StartupCoordinator()
 
     init() {
+        // WatchStore forwards favourites to the channel preferences store, so build them together.
+        let channelPrefs = ChannelPreferencesStore()
+        _channelPrefsStore = StateObject(wrappedValue: channelPrefs)
+        _watchStore = StateObject(wrappedValue: WatchStore(channelPreferences: channelPrefs))
         PlaybackPriority.launchDate = Date()
         AudioSessionManager.configureAtLaunch()
         LegacyFeatureCleanup.runIfNeeded()
@@ -67,7 +71,6 @@ struct MyApp: App {
             .environmentObject(bannerFantasyStore)
             .environmentObject(ProgrammeReminderStore.shared)
             .environmentObject(launchCoordinator)
-            .task { channelPrefsStore.migrateLegacyFavorites(watchStore.favorites) }
             #if !os(tvOS)
             .dynamicTypeSize(Theme.isPad ? DynamicTypeSize.xLarge... : DynamicTypeSize.xSmall...)
             #endif

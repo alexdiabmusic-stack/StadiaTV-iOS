@@ -22,12 +22,16 @@ struct LiveBrowserView: View {
     @State private var renameText = ""
     @StateObject private var model = LiveBrowserModel()
 
+    private var continueWatchingItems: [ContinueWatchingItem] {
+        watchStore.continueWatchingItems(using: store)
+    }
+
     var body: some View {
         List {
             // Continue Watching (only when not editing)
-            if editMode == .inactive, !watchStore.history.isEmpty {
+            if editMode == .inactive, !continueWatchingItems.isEmpty {
                 Section {
-                    ContinueWatchingSection(entries: watchStore.history) { channel in
+                    ContinueWatchingSection(items: continueWatchingItems) { channel in
                         onPlay(channel, [channel])
                     }
                     .listRowInsets(.init())

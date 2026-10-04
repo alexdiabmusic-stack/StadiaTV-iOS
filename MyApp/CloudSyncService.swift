@@ -55,6 +55,30 @@ final class CloudSyncService {
         return try? JSONDecoder().decode(T.self, from: data)
     }
 
+    /// Deletes a synced value regardless of whether sync is currently enabled.
+    func removeValue(for key: CloudSyncKey) {
+        guard store.object(forKey: key.rawValue) != nil else { return }
+        store.removeObject(forKey: key.rawValue)
+        store.synchronize()
+    }
+
+    /// Older builds synced favourites and watch history as channel snapshots that embedded
+    /// each stream's URL — which, for Xtream providers, carries the account's username and
+    /// password. Deletes any such blob still in iCloud so credentials don't linger there;
+    /// callers re-save their sanitized value when sync is on. Returns the keys removed.
+    @discardableResult
+    func purgeLegacyStreamURLBlobs() -> Set<CloudSyncKey> {
+        let marker = Data("streamURLString".utf8)
+        var purged: Set<CloudSyncKey> = []
+        for key in [CloudSyncKey.favoriteChannels, .watchHistory] {
+            guard let data = store.data(forKey: key.rawValue), data.range(of: marker) != nil else { continue }
+            store.removeObject(forKey: key.rawValue)
+            purged.insert(key)
+        }
+        if !purged.isEmpty { store.synchronize() }
+        return purged
+    }
+
     private func recordSync() {
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastSyncDateKey)
     }
@@ -67,7 +91,10 @@ final class CloudSyncService {
 
 enum CloudSyncKey: String {
     case preferences = "bannertv.preferences.v1"
+    /// Legacy: `[SavedChannel]` snapshots written by older builds. Read once to migrate, then removed.
     case favoriteChannels = "bannertv.favoritechannels.v1"
+    /// Ordered IDs of favourite channels (no stream URLs).
+    case favoriteChannelIDs = "bannertv.favoritechannelids.v1"
     case watchHistory = "bannertv.watchhistory.v1"
 }
 

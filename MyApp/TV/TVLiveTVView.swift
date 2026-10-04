@@ -17,7 +17,7 @@ struct TVLiveTVView: View {
             buildFilter(),
             query: query,
             to: base,
-            favoriteChannelIDs: Set(watchStore.favorites.map(\.id))
+            favoriteChannelIDs: watchStore.favoriteChannelIDs
         )
     }
 

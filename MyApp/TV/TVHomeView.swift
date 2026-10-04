@@ -4,6 +4,7 @@ import SwiftUI
 struct TVHomeView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var watchStore: WatchStore
+    @EnvironmentObject private var playlistStore: PlaylistStore
     @EnvironmentObject private var streamStore: StreamAvailabilityStore
     @StateObject private var viewModel = HomeViewModel()
     @State private var selectedChannel: Channel?
@@ -185,15 +186,14 @@ struct TVHomeView: View {
     }
 
     @ViewBuilder private var continueWatchingShelf: some View {
-        if !watchStore.history.isEmpty {
+        let items = Array(watchStore.continueWatchingItems(using: playlistStore).prefix(8))
+        if !items.isEmpty {
             TVShelfRow(title: "Continue Watching", systemImage: "play.circle.fill") {
-                ForEach(watchStore.history.prefix(8)) { entry in
-                    if let channel = entry.saved.channel {
-                        Button { selectedChannel = channel } label: {
-                            TVChannelCard(channel: channel, isFavorite: watchStore.isFavorite(channel))
-                        }
-                        .buttonStyle(.card)
+                ForEach(items) { item in
+                    Button { selectedChannel = item.channel } label: {
+                        TVChannelCard(channel: item.channel, isFavorite: watchStore.isFavorite(item.channel))
                     }
+                    .buttonStyle(.card)
                 }
             }
         }

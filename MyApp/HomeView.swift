@@ -307,8 +307,8 @@ struct HomeView: View {
 
                 // Straight back into what you were watching — placed last so it doesn't
                 // compete with today's live/upcoming content for top-of-page attention.
-                if !watchStore.history.isEmpty {
-                    ContinueWatchingSection(entries: watchStore.history) { PlaybackTapClock.record(); playingChannel = $0 }
+                if !continueWatchingItems.isEmpty {
+                    ContinueWatchingSection(items: continueWatchingItems) { PlaybackTapClock.record(); playingChannel = $0 }
                         .opacity(showRemaining ? 1 : 0)
                         .offset(y: (showRemaining || reduceMotion) ? 0 : 40)
                         .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.45), value: showRemaining)
@@ -318,6 +318,10 @@ struct HomeView: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 104)
         }
+    }
+
+    private var continueWatchingItems: [ContinueWatchingItem] {
+        watchStore.continueWatchingItems(using: playlistStore)
     }
 
     /// Favourite channels in the user's order, resolved through the channel index.
@@ -1687,8 +1691,26 @@ struct FavouriteChannelsRail: View {
     }
 }
 
+/// A watch-history entry paired with the playable channel rebuilt from live provider data.
+struct ContinueWatchingItem: Identifiable {
+    let entry: WatchHistoryEntry
+    let channel: Channel
+
+    var id: String { entry.id }
+}
+
+extension WatchStore {
+    /// History entries that can be played right now, most recent first. Entries whose playlist
+    /// hasn't loaded yet, or whose channel the provider no longer lists, are left out.
+    func continueWatchingItems(using playlists: PlaylistStore) -> [ContinueWatchingItem] {
+        history.compactMap { entry in
+            playlists.channel(for: entry.saved).map { ContinueWatchingItem(entry: entry, channel: $0) }
+        }
+    }
+}
+
 struct ContinueWatchingSection: View {
-    let entries: [WatchHistoryEntry]
+    let items: [ContinueWatchingItem]
     let onPlay: (Channel) -> Void
 
     var body: some View {
@@ -1702,13 +1724,11 @@ struct ContinueWatchingSection: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(entries) { entry in
-                        if let channel = entry.saved.channel {
-                            Button { onPlay(channel) } label: {
-                                ContinueWatchingCard(entry: entry)
-                            }
-                            .buttonStyle(.plain)
+                    ForEach(items) { item in
+                        Button { onPlay(item.channel) } label: {
+                            ContinueWatchingCard(item: item)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -1717,13 +1737,13 @@ struct ContinueWatchingSection: View {
 }
 
 private struct ContinueWatchingCard: View {
-    let entry: WatchHistoryEntry
+    let item: ContinueWatchingItem
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack {
                 Theme.surfaceElevated
-                CachedImage(url: entry.saved.channel?.logoURL) { phase in
+                CachedImage(url: item.channel.logoURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFit().padding(10)
                     } else {
@@ -1742,11 +1762,11 @@ private struct ContinueWatchingCard: View {
                     .padding(6)
             }
 
-            Text(entry.saved.name)
+            Text(item.channel.name)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(1)
-            Text(entry.lastWatched.formatted(.relative(presentation: .named)))
+            Text(item.entry.lastWatched.formatted(.relative(presentation: .named)))
                 .font(.caption2)
                 .foregroundStyle(Theme.textSecondary)
                 .lineLimit(1)

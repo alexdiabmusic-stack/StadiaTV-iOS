@@ -21,6 +21,18 @@ enum PodcastSpeed: Float, CaseIterable, Identifiable {
     }
 }
 
+// MARK: - Playback clock
+
+/// Where playback is, and how long the episode runs. These change twice a second while a podcast
+/// plays, so they live on their own object instead of on `PodcastStore`: published there they
+/// redrew every view that observes the store (each episode row, Discover, Search...). Only the
+/// views that draw a progress line or a time label observe the clock.
+@MainActor
+final class PodcastPlaybackClock: ObservableObject {
+    @Published fileprivate(set) var currentTime: TimeInterval = 0
+    @Published fileprivate(set) var totalDuration: TimeInterval = 0
+}
+
 // MARK: - PodcastStore
 
 @MainActor
@@ -30,8 +42,22 @@ final class PodcastStore: ObservableObject {
 
     @Published private(set) var nowPlaying: PodcastEpisode?
     @Published private(set) var isPlaying = false
-    @Published private(set) var currentTime: TimeInterval = 0
-    @Published private(set) var totalDuration: TimeInterval = 0
+    let clock = PodcastPlaybackClock()
+    /// Whole minutes of the current episode played. "12m left" labels change about once a minute,
+    /// so this is what the store publishes; the clock carries every tick.
+    @Published private(set) var playbackMinute = 0
+    private(set) var currentTime: TimeInterval {
+        get { clock.currentTime }
+        set {
+            clock.currentTime = newValue
+            let minute = Int(max(0, newValue)) / 60
+            if minute != playbackMinute { playbackMinute = minute }
+        }
+    }
+    private(set) var totalDuration: TimeInterval {
+        get { clock.totalDuration }
+        set { if clock.totalDuration != newValue { clock.totalDuration = newValue } }
+    }
     @Published private(set) var isBuffering = false
     @Published var speed: PodcastSpeed = .x1
 
@@ -50,7 +76,12 @@ final class PodcastStore: ObservableObject {
 
     @Published private(set) var episodesByFeed: [String: [PodcastEpisode]] = [:]
     @Published private(set) var loadingFeedIDs: Set<String> = []
-    @Published private(set) var podcastMetaCache: [String: Podcast] = [:]  // feedURL -> Podcast
+    @Published private(set) var podcastMetaCache: [String: Podcast] = [:] {  // feedURL -> Podcast
+        didSet { metaCacheNeedsWrite = true }
+    }
+    /// Progress is saved every few seconds while an episode plays in the background; the
+    /// metadata cache is only worth re-encoding when it has changed.
+    private var metaCacheNeedsWrite = false
 
     // MARK: - Private internals
 
@@ -791,8 +822,10 @@ final class PodcastStore: ObservableObject {
         defaults.set(Array(subscribedIDs), forKey: subscribedKey)
         if let data = try? JSONEncoder().encode(episodeProgress) { defaults.set(data, forKey: progressKey) }
         defaults.set(Array(playedEpisodeIDs), forKey: playedKey)
-        if let data = try? JSONEncoder().encode(Dictionary(uniqueKeysWithValues: podcastMetaCache.map { ($0.key, $0.value) })) {
+        if metaCacheNeedsWrite,
+           let data = try? JSONEncoder().encode(Dictionary(uniqueKeysWithValues: podcastMetaCache.map { ($0.key, $0.value) })) {
             defaults.set(data, forKey: "bannertv.podcasts.meta.v1")
+            metaCacheNeedsWrite = false
         }
     }
 
@@ -807,6 +840,7 @@ final class PodcastStore: ObservableObject {
         if let data = defaults.data(forKey: "bannertv.podcasts.meta.v1"),
            let decoded = try? JSONDecoder().decode([String: Podcast].self, from: data) {
             podcastMetaCache = decoded
+            metaCacheNeedsWrite = false   // just read from the same place
         }
     }
 }

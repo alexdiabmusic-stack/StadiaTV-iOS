@@ -56,6 +56,13 @@ struct CachedImage<Content: View>: View {
             phase = .empty
             return
         }
+        // This task can start before layout has reported the size. Waiting a moment keeps the
+        // image from being decoded at the 1,200 px fallback (about 5 MB for a 48 pt logo). A view
+        // with no intrinsic size never reports one, so the wait is capped.
+        for _ in 0..<10 where renderedSize == .zero {
+            try? await Task.sleep(nanoseconds: 10_000_000)
+            if Task.isCancelled { return }
+        }
         let maxPixelSize = ImagePipeline.pixelSize(for: renderedSize, scale: displayScale)
         if let cached = ImagePipeline.shared.cachedImage(for: url, maxPixelSize: maxPixelSize) {
             phase = .success(cached)

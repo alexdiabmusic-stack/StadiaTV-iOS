@@ -44,23 +44,34 @@ final class StreamAvailabilityStore: ObservableObject {
     /// needing 14 days of continuous runtime to build up.
     struct LeagueVisibilityRecord: Codable { var date: Date; var leaguePath: String; var confirmed: Bool }
     private var leagueVisibilityLog: [String: LeagueVisibilityRecord] = [:] {
-        didSet { persistLeagueVisibilityLog() }
+        didSet { schedulePersistOfLeagueVisibilityLog() }
     }
+    private var leagueVisibilityPersistTask: Task<Void, Never>?
     private let leagueVisibilityKey = "streamAvailability.leagueVisibilityLog.v1"
     private let leagueVisibilityWindow: TimeInterval = 14 * 86400
 
-    private func loadLeagueVisibilityLog() {
-        guard let data = UserDefaults.standard.data(forKey: leagueVisibilityKey),
-              let decoded = try? JSONDecoder().decode([String: LeagueVisibilityRecord].self, from: data) else { return }
-        leagueVisibilityLog = decoded
+    private func loadLeagueVisibilityLog() -> [String: LeagueVisibilityRecord]? {
+        guard let data = UserDefaults.standard.data(forKey: leagueVisibilityKey) else { return nil }
+        return try? JSONDecoder().decode([String: LeagueVisibilityRecord].self, from: data)
     }
 
-    private func persistLeagueVisibilityLog() {
-        guard let data = try? JSONEncoder().encode(leagueVisibilityLog) else { return }
-        UserDefaults.standard.set(data, forKey: leagueVisibilityKey)
+    /// The log is a rolling confidence signal, not user data, so it's written once a burst of scans
+    /// settles rather than re-encoding the whole fourteen days after every one. A write lost to
+    /// the app being killed in that window costs a few seconds of history.
+    private func schedulePersistOfLeagueVisibilityLog() {
+        leagueVisibilityPersistTask?.cancel()
+        leagueVisibilityPersistTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            guard !Task.isCancelled, let self else { return }
+            guard let data = try? JSONEncoder().encode(self.leagueVisibilityLog) else { return }
+            UserDefaults.standard.set(data, forKey: self.leagueVisibilityKey)
+        }
     }
 
-    init() { loadLeagueVisibilityLog() }
+    // Assigned here rather than from a method so loading it doesn't trigger a write straight back.
+    init() {
+        if let decoded = loadLeagueVisibilityLog() { leagueVisibilityLog = decoded }
+    }
 
     /// Not private: `StreamAvailabilityStoreVisibilityTests` seeds records directly rather than
     /// running a full `scan()` (which needs a real playlist + guide).

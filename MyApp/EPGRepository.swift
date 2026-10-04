@@ -36,6 +36,8 @@ final class EPGRepository: ObservableObject {
     private(set) var channelToCanonicalMap: [String: String] = [:]
     /// Canonical channels keyed by ID, rebuilt alongside `channelToCanonicalMap`.
     private(set) var canonicalChannelsByID: [String: CanonicalChannel] = [:]
+    /// Lowercased broadcast network per canonical channel ID, for `programmesNear`.
+    private var channelNetworkByID: [String: String] = [:]
     private var fingerprintTask: Task<Void, Never>?
     /// Streams that passed the hide filter but matched no curated channel.
     /// Available for global event-to-stream matching so uncatalogued feeds are not silently dropped.
@@ -1126,19 +1128,13 @@ final class EPGRepository: ObservableObject {
         let networkSet    = Set(broadcastNetworks.map { $0.lowercased() })
         let hintTokenSets = titleHints.map { epgTokenize($0) }.filter { !$0.isEmpty }
 
-        // Build O(1) channel-network lookup for this call.
-        var channelNetworks: [String: String] = [:]
-        for ch in canonicalChannels {
-            if let net = ch.network { channelNetworks[ch.id] = net.lowercased() }
-        }
-
         var joins: [ProgrammeEventJoin] = []
-        for (channelId, programmes) in programmeIndex {
-            let channelNet    = channelNetworks[channelId]
+        for (channelId, schedule) in programmeIndex {
+            let channelNet    = channelNetworkByID[channelId]
             let networkMatches = channelNet.map { networkSet.contains($0) } ?? false
 
-            for programme in programmes {
-                guard programme.end > windowStart && programme.start < windowEnd else { continue }
+            // Schedules are sorted, so only the window's slice of each is visited.
+            for programme in GuideProgrammeIndexing.overlapping(schedule, from: windowStart, to: windowEnd) {
                 let overlapStart = max(programme.start, start)
                 let overlapEnd   = min(programme.end, searchEnd)
                 let overlap      = max(0, overlapEnd.timeIntervalSince(overlapStart))
@@ -1164,6 +1160,11 @@ final class EPGRepository: ObservableObject {
     // MARK: - Coverage rebuild
 
     private func rebuildChannelToCanonicalMap() {
+        var networks: [String: String] = [:]
+        for channel in canonicalChannels {
+            if let network = channel.network { networks[channel.id] = network.lowercased() }
+        }
+        channelNetworkByID = networks
         var map: [String: String] = [:]
         map.reserveCapacity(canonicalChannels.count * 2)
         for canonical in canonicalChannels {

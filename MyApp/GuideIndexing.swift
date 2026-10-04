@@ -79,6 +79,21 @@ nonisolated enum GuideProgrammeIndexing {
         return result
     }
 
+    /// The programmes of a schedule that overlap `from..<to`. Schedules are sorted by start and,
+    /// after `deduplicated`, don't overlap one another, so ends are sorted too and the first
+    /// programme still on at `from` is found by binary search instead of scanning from the top.
+    static func overlapping(_ schedule: [EPGProgramme], from: Date, to: Date) -> ArraySlice<EPGProgramme> {
+        var low = 0
+        var high = schedule.count
+        while low < high {
+            let mid = (low + high) / 2
+            if schedule[mid].end > from { high = mid } else { low = mid + 1 }
+        }
+        var end = low
+        while end < schedule.count, schedule[end].start < to { end += 1 }
+        return schedule[low..<end]
+    }
+
     /// One channel's schedule with `programmes` folded in: sorted by start and de-overlapped.
     static func merged(_ existing: [EPGProgramme], adding programmes: [EPGProgramme]) -> [EPGProgramme] {
         deduplicated((existing + programmes).sorted { $0.start < $1.start })

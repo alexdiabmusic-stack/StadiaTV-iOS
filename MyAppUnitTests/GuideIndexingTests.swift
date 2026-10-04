@@ -62,6 +62,46 @@ struct GuideIndexingTests {
         #expect(GuideProgrammeIndexing.removing(sourceId: "nobody", from: index).count == 2)
     }
 
+    @Test("A window query returns exactly what a linear filter would, including at the edges")
+    func overlappingWindow() {
+        let schedule = [programme("A", at: 0), programme("B", at: 60), programme("C", at: 120, for: 30), programme("D", at: 200)]
+        func titles(_ from: Double, _ to: Double) -> [String] {
+            GuideProgrammeIndexing.overlapping(schedule, from: base.addingTimeInterval(from * 60), to: base.addingTimeInterval(to * 60)).map(\.title)
+        }
+        #expect(titles(-100, -10).isEmpty, "before everything")
+        #expect(titles(400, 500).isEmpty, "after everything")
+        #expect(titles(0, 1) == ["A"])
+        #expect(titles(60, 61) == ["B"], "A ends exactly as the window starts")
+        #expect(titles(59, 60) == ["A"], "B starts exactly as the window ends")
+        #expect(titles(30, 130) == ["A", "B", "C"])
+        #expect(titles(155, 195).isEmpty, "a gap")
+        #expect(titles(-1000, 1000) == ["A", "B", "C", "D"])
+        #expect(GuideProgrammeIndexing.overlapping([], from: base, to: base.addingTimeInterval(60)).isEmpty)
+    }
+
+    @Test("On schedules built the way the repository builds them, the window query matches a linear filter")
+    func overlappingMatchesLinearFilter() {
+        struct Generator: RandomNumberGenerator {
+            var state: UInt64
+            mutating func next() -> UInt64 { state = state &* 6364136223846793005 &+ 1442695040888963407; return state }
+        }
+        var rng = Generator(state: 7)
+        for _ in 0..<300 {
+            // Overlapping programmes from sources of different priority, as one channel can get.
+            let raw = (0..<Int.random(in: 0...60, using: &rng)).map { index in
+                programme("P\(index)", priority: Int.random(in: 0...2, using: &rng),
+                          at: Double.random(in: 0...2000, using: &rng), for: Double.random(in: 2...180, using: &rng))
+            }
+            let schedule = GuideProgrammeIndexing.deduplicated(raw.sorted { $0.start < $1.start })
+            #expect(zip(schedule, schedule.dropFirst()).allSatisfy { $0.end <= $1.start }, "deduplicated schedules don't overlap")
+            for _ in 0..<20 {
+                let from = base.addingTimeInterval(Double.random(in: -100...2100, using: &rng) * 60)
+                let to = from.addingTimeInterval(Double.random(in: 1...400, using: &rng) * 60)
+                #expect(Array(GuideProgrammeIndexing.overlapping(schedule, from: from, to: to)) == schedule.filter { $0.end > from && $0.start < to })
+            }
+        }
+    }
+
     @Test("Coverage spans the first start to the last end")
     func coverage() {
         #expect(GuideProgrammeIndexing.coverage(of: [], channelId: "c1") == nil)

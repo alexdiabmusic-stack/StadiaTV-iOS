@@ -20,6 +20,7 @@ struct PlaylistsView: View {
                     Button { showingAdd = true } label: {
                         Image(systemName: "plus")
                     }
+                    .accessibilityLabel("Add playlist")
                 }
             }
             .sheet(isPresented: $showingAdd) {

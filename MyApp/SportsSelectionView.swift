@@ -324,6 +324,7 @@ private struct LeagueSearchField: View {
                         .foregroundStyle(Theme.textSecondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
             }
         }
         .padding(.horizontal, 10)

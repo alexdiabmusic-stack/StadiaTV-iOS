@@ -277,7 +277,7 @@ struct ArticleReaderView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Theme.accent, in: Capsule())
+                        .background(Theme.actionFill, in: Capsule())
 
                     if let badgeText = article.badgeText {
                         Text(badgeText)
@@ -637,6 +637,7 @@ private extension View {
 }
 
 private struct ShimmerView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase: CGFloat = -1
     var body: some View {
         GeometryReader { _ in
@@ -650,6 +651,7 @@ private struct ShimmerView: View {
                 endPoint: .init(x: phase + 1, y: 0.5)
             )
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) {
                     phase = 1
                 }

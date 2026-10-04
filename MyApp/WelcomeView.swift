@@ -105,7 +105,7 @@ struct WelcomeView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .background(Theme.actionFill, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Get Started")

@@ -954,7 +954,7 @@ struct MatchDetailView: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
-            .background(Theme.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .background(Theme.actionFill, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(match.state != .pre)
@@ -1316,10 +1316,11 @@ struct MatchDetailView: View {
                     .foregroundStyle(isSelected ? .white : Theme.textSecondary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
-                    .background(isSelected ? Theme.accent : Theme.surfaceElevated, in: Capsule())
-                    .overlay(Capsule().strokeBorder(isSelected ? Theme.accent : Theme.hairline))
+                    .background(isSelected ? Theme.actionFill : Theme.surfaceElevated, in: Capsule())
+                    .overlay(Capsule().strokeBorder(isSelected ? Theme.actionFill : Theme.hairline))
             }
             .buttonStyle(.plain)
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
         }
 
         private func positionLabel(for athlete: RosterAthlete) -> String {
@@ -1483,7 +1484,7 @@ struct MatchDetailView: View {
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.white)
                     .frame(width: 28, height: 28)
-                    .background(Theme.accent, in: Circle())
+                    .background(Theme.actionFill, in: Circle())
                     .overlay(Circle().strokeBorder(.white.opacity(0.45)))
                 Text(label)
                     .font(.system(size: 8, weight: .bold))

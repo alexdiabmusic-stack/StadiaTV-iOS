@@ -75,9 +75,10 @@ struct QuickStreamSheet: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
-                    .background(Theme.accent, in: Capsule())
+                    .background(Theme.actionFill, in: Capsule())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Play \(source.channel.name)")
         }
         .padding(.vertical, 4)
     }

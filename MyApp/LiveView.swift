@@ -697,6 +697,7 @@ private struct CompactSoonCard: View {
 // MARK: - Pulsing Live Badge
 
 struct PulsingLiveBadge: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulsing = false
 
     var body: some View {
@@ -704,8 +705,8 @@ struct PulsingLiveBadge: View {
             .fill(Theme.live)
             .frame(width: 8, height: 8)
             .opacity(pulsing ? 0.3 : 1)
-            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulsing)
-            .onAppear { pulsing = true }
+            .animation(Theme.Motion.respecting(reduceMotion, .easeInOut(duration: 0.9).repeatForever(autoreverses: true)), value: pulsing)
+            .onAppear { if !reduceMotion { pulsing = true } }
     }
 }
 

@@ -3638,7 +3638,7 @@ private struct PlayerSourceBar: View {
                             .font(.system(size: 8, weight: .bold))
                             .foregroundStyle(.white)
                             .padding(3)
-                            .background(Theme.accent, in: Circle())
+                            .background(Theme.actionFill, in: Circle())
                             .offset(x: 4, y: -4)
                     }
                 }
@@ -3663,7 +3663,7 @@ private struct PlayerSourceBar: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Theme.live, in: Capsule())
+                .background(Theme.liveFill, in: Capsule())
         }
         .padding(12)
         .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
@@ -3945,7 +3945,7 @@ private struct LiveMatchPickerRow: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                     .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(Theme.live, in: Capsule())
+                    .background(Theme.liveFill, in: Capsule())
             }
 
             // Teams with logos and scores
@@ -3980,10 +3980,11 @@ private struct LiveMatchPickerRow: View {
                                 }
                                 .foregroundStyle(isSelected ? .white : Theme.textPrimary)
                                 .padding(.horizontal, 10).padding(.vertical, 6)
-                                .background(isSelected ? Theme.accent : Theme.surfaceElevated, in: Capsule())
+                                .background(isSelected ? Theme.actionFill : Theme.surfaceElevated, in: Capsule())
                                 .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Theme.hairline))
                             }
                             .buttonStyle(.plain)
+                            .accessibilityAddTraits(isSelected ? .isSelected : [])
                             .disabled(!isSelected && isAtCapacity)
                         }
                     }
@@ -4142,12 +4143,13 @@ private struct PlayerCloseButton: View {
 
 private struct PulsingDot: View {
     let color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulsing = false
     var body: some View {
         Circle().fill(color).frame(width: 8, height: 8)
             .opacity(pulsing ? 0.4 : 1)
-            .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: pulsing)
-            .onAppear { pulsing = true }
+            .animation(Theme.Motion.respecting(reduceMotion, .easeInOut(duration: 0.85).repeatForever(autoreverses: true)), value: pulsing)
+            .onAppear { if !reduceMotion { pulsing = true } }
     }
 }
 
@@ -4807,7 +4809,7 @@ private struct PlayerGestureHint: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 8)
-                .background(Theme.accent, in: Capsule())
+                .background(Theme.actionFill, in: Capsule())
         }
         .padding(24)
         .background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: 18, style: .continuous))

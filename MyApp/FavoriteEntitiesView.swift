@@ -61,6 +61,7 @@ struct FavoriteEntitiesView: View {
                         .foregroundStyle(Theme.textSecondary)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
             }
         }
         .padding(12)

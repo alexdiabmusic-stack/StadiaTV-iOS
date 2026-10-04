@@ -37,7 +37,7 @@ struct Chip: View {
             .foregroundStyle(isSelected ? Color.white : Theme.textPrimary)
             .padding(.horizontal, Theme.Spacing.sm)
             .frame(minHeight: 32)
-            .background(isSelected ? Theme.accent : Theme.surfaceElevated,
+            .background(isSelected ? Theme.actionFill : Theme.surfaceElevated,
                         in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             .contentShape(Rectangle())
         }
@@ -60,7 +60,7 @@ struct LiveBadge: View {
         .foregroundStyle(.white)
         .padding(.horizontal, Theme.Spacing.xs)
         .padding(.vertical, Theme.Spacing.xxs)
-        .background(Theme.live, in: Capsule())
+        .background(Theme.liveFill, in: Capsule())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Live")
     }
@@ -309,7 +309,7 @@ struct DesignGallery: View {
 
     private var swatches: [(String, Color)] {
         [("bg", Theme.background), ("surface", Theme.surface), ("elevated", Theme.surfaceElevated),
-         ("accent", Theme.accent), ("action", Theme.actionFill), ("live", Theme.live),
+         ("accent", Theme.accent), ("action", Theme.actionFill), ("live", Theme.live), ("live fill", Theme.liveFill),
          ("starting", Theme.starting), ("upcoming", Theme.upcoming), ("text", Theme.textPrimary),
          ("text 2", Theme.textSecondary), ("text 3", Theme.textTertiary)]
     }

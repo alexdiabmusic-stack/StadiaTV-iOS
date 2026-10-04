@@ -355,11 +355,12 @@ struct MatchesView: View {
             }
             .padding(.horizontal, logoURL == nil ? 12 : 8)
             .frame(height: 32)
-            .background(isSelected ? Theme.accent : Theme.surface, in: Capsule())
+            .background(isSelected ? Theme.actionFill : Theme.surface, in: Capsule())
             .overlay(Capsule().strokeBorder(isSelected ? Theme.accent.opacity(0.4) : Theme.hairline))
             .shadow(color: isSelected ? Theme.accent.opacity(0.28) : .clear, radius: 8, y: 3)
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: Derived data
@@ -725,7 +726,7 @@ private struct FollowingUpNextHero: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .background(Theme.actionFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 .buttonStyle(.plain)
 
@@ -1476,7 +1477,7 @@ private struct FollowingEmptyStateView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                    .background(Theme.actionFill, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 36)
@@ -1489,6 +1490,7 @@ private struct FollowingEmptyStateView: View {
 // MARK: - Skeleton
 
 private struct FollowingSkeletonView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase: Double = 0
 
     var body: some View {
@@ -1522,6 +1524,7 @@ private struct FollowingSkeletonView: View {
             }
         }
         .onAppear {
+            guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { phase = 1 }
         }
     }
@@ -1601,7 +1604,7 @@ struct MatchRow: View {
                     .foregroundStyle(.white)
                     .lineLimit(1).minimumScaleFactor(0.75)
                     .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(Theme.live, in: Capsule())
+                    .background(Theme.liveFill, in: Capsule())
             case .pre:
                 Text(match.statusDetail)
                     .font(.caption2.weight(.semibold))

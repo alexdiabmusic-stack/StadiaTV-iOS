@@ -807,7 +807,7 @@ private struct TeamMatchupHero: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Theme.live, in: Capsule())
+            .background(Theme.liveFill, in: Capsule())
         } else {
             Text("FEATURED")
                 .font(.caption.weight(.bold))
@@ -1085,7 +1085,7 @@ private struct EventHero: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Theme.live, in: Capsule())
+            .background(Theme.liveFill, in: Capsule())
         } else {
             Text("FEATURED")
                 .font(.caption.weight(.bold))
@@ -1583,6 +1583,7 @@ private struct ScheduleSection: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
             }
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))

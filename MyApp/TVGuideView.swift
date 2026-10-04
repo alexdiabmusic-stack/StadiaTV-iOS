@@ -824,7 +824,7 @@ private struct JumpToNowOverlayView: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(Theme.live, in: Capsule())
+                            .background(Theme.liveFill, in: Capsule())
                             .shadow(color: Theme.live.opacity(0.4), radius: 6, y: 3)
                         }
                         .buttonStyle(.plain)
@@ -1610,13 +1610,14 @@ private struct CategoryToggleCard: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(isSelected ? Theme.accent : Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .background(isSelected ? Theme.actionFill : Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                    .strokeBorder(isSelected ? Theme.accent : Theme.hairline)
+                    .strokeBorder(isSelected ? Theme.actionFill : Theme.hairline)
             )
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .animation(.snappy, value: isSelected)
     }
 }
@@ -1657,6 +1658,7 @@ private struct ChannelSelectRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var channelInitials: some View {

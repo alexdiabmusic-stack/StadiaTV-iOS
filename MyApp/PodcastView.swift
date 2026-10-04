@@ -391,7 +391,7 @@ struct PodcastBrowserView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(mode.rawValue), \(isSelected ? "selected" : "")")
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
             Spacer()
         }
@@ -415,16 +415,16 @@ struct PodcastBrowserView: View {
                             .padding(.horizontal, 16)
                             .frame(height: 38)
                             .background(
-                                isSelected ? Theme.accent : Theme.surfaceElevated,
+                                isSelected ? Theme.actionFill : Theme.surfaceElevated,
                                 in: Capsule()
                             )
                             .overlay(
                                 Capsule()
-                                    .strokeBorder(isSelected ? Theme.accent : Theme.hairline, lineWidth: 1)
+                                    .strokeBorder(isSelected ? Theme.actionFill : Theme.hairline, lineWidth: 1)
                             )
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(topic.title), \(isSelected ? "selected" : "")")
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
             }
             .padding(.horizontal, 16)
@@ -1110,7 +1110,7 @@ ShareLink(item: podcast.feedURL) {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 20)
                         .frame(height: 44)
-                        .background(Theme.accent, in: Capsule())
+                        .background(Theme.actionFill, in: Capsule())
                         .shadow(color: Theme.accent.opacity(0.35), radius: 8, x: 0, y: 3)
                     }
                     .buttonStyle(.plain)
@@ -1317,7 +1317,7 @@ ShareLink(item: podcast.feedURL) {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
-                    .background(Theme.accent, in: Capsule())
+                    .background(Theme.actionFill, in: Capsule())
             }
             .buttonStyle(.plain)
             Spacer()
@@ -1394,7 +1394,7 @@ struct PodcastEpisodeRow: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 4))
+                            .background(Theme.actionFill, in: RoundedRectangle(cornerRadius: 4))
                     }
                 }
                 .padding(.top, 2)
@@ -1594,7 +1594,7 @@ struct PodcastMiniPlayer: View {
                                     .font(.system(size: 8, weight: .bold))
                                     .foregroundStyle(.white)
                                     .padding(2)
-                                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 3))
+                                    .background(Theme.actionFill, in: RoundedRectangle(cornerRadius: 3))
                             }
                         }
 
@@ -1707,6 +1707,7 @@ struct PodcastPlayerSheet: View {
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(Theme.textPrimary)
                     }
+                    .accessibilityLabel("Close player")
                 }
             }
         }
@@ -1747,7 +1748,7 @@ struct PodcastPlayerSheet: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 3)
-                            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 3))
+                            .background(Theme.actionFill, in: RoundedRectangle(cornerRadius: 3))
                     }
                 }
                 Text(episode.podcastTitle)
@@ -1784,6 +1785,7 @@ struct PodcastPlayerSheet: View {
                     .foregroundStyle(Theme.textPrimary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Skip back 15 seconds")
 
             Button { store.togglePlayPause() } label: {
                 ZStack {
@@ -1796,6 +1798,7 @@ struct PodcastPlayerSheet: View {
                 }
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(store.isPlaying ? "Pause" : "Play")
 
             Button { store.skip(seconds: 30) } label: {
                 Image(systemName: "goforward.30")
@@ -1803,6 +1806,7 @@ struct PodcastPlayerSheet: View {
                     .foregroundStyle(Theme.textPrimary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Skip forward 30 seconds")
         }
     }
 

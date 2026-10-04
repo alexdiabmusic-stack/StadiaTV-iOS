@@ -1170,7 +1170,7 @@ struct FantasySettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes the local Fantasy connection, provider credentials and Fantasy caches without changing playlists, favourites, recordings or other Banner settings.")
+            Text("This removes the local Fantasy connection, provider credentials and Fantasy caches without changing playlists, favourites or other Banner settings.")
         }
         .confirmationDialog("Reset Local Fantasy Data?", isPresented: $showingNativeResetConfirmation, titleVisibility: .visible) {
             Button("Reset Local Fantasy Data", role: .destructive) {
@@ -1181,7 +1181,7 @@ struct FantasySettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes Banner Fantasy teams, local leagues, rosters, lineups and transactions. It does not change IPTV playlists, recordings, favourites or imported ESPN Fantasy credentials.")
+            Text("This removes Banner Fantasy teams, local leagues, rosters, lineups and transactions. It does not change IPTV playlists, favourites or imported ESPN Fantasy credentials.")
         }
         .task {
             await nativeFantasyStore.load()

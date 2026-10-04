@@ -164,7 +164,7 @@ nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
     /// Reads `user_info`/`server_info` from `player_api.php`. 401/403/429/5xx are reported
     /// as inconclusive — a probe failure doesn't mean the connection limit is reached, it
     /// means we don't know, and callers should fall back to the existing reactive handling
-    /// (see `HLSRecorder.RecorderError.connectionLimited`) rather than guessing.
+    /// (a 403/429 surfacing mid-stream) rather than guessing.
     func accountStatus() async -> XtreamAccountStatus {
         guard let (base, user, pass) = try? baseComponents() else {
             return XtreamAccountStatus(maxConnections: nil, activeConnections: nil, isInconclusive: true)
@@ -266,12 +266,11 @@ struct XtreamAccountStatus {
     /// response) — as opposed to a successful response that simply had no connection info.
     let isInconclusive: Bool
 
-    /// Whether starting one more connection (a second live stream, a recording) risks
-    /// disrupting an existing one. Deliberately restrictive when we can't tell: an unknown
-    /// limit or a limit of exactly one both block without needing to probe further.
+    /// Whether starting one more connection (a second live stream) risks disrupting an
+    /// existing one. Deliberately restrictive when we can't tell: an unknown limit or a
+    /// limit of exactly one both block without needing to probe further.
     /// An inconclusive probe does NOT block proactively — the existing reactive handling
-    /// (a 403/429 surfacing as `HLSRecorder.RecorderError.connectionLimited` mid-stream)
-    /// remains the safety net for that case.
+    /// (a 403/429 surfacing mid-stream) remains the safety net for that case.
     var blocksAdditionalConnection: Bool {
         if isInconclusive { return false }
         guard let max = maxConnections else { return true }

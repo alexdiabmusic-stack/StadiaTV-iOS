@@ -142,38 +142,6 @@ struct CatchupResolver {
         return url
     }
 
-    // MARK: - Direct Xtream archive (for recording playback, no EPGProgramme required)
-
-    /// Builds a timeshift URL from a raw time range — used by RecordingService for DVR playback.
-    /// Credentials are already embedded in the live stream URL path and are never stored separately.
-    func resolveXtreamArchive(streamURL: URL, start: Date, end: Date) throws -> URL {
-        let parts = streamURL.pathComponents
-        guard parts.count >= 5, parts[safe: 1] == "live" else { throw CatchupError.unavailable }
-
-        let user     = parts[2]
-        let pass     = parts[3]
-        let fileComp = parts[4]
-        let streamID = fileComp.components(separatedBy: ".").first ?? fileComp
-
-        guard !user.isEmpty, !pass.isEmpty, !streamID.isEmpty else { throw CatchupError.unavailable }
-
-        var comps = URLComponents()
-        comps.scheme = streamURL.scheme ?? "http"
-        comps.host   = streamURL.host
-        comps.port   = streamURL.port
-        guard let hostBase = comps.url?.absoluteString
-                              .trimmingCharacters(in: CharacterSet(charactersIn: "/")) else {
-            throw CatchupError.unavailable
-        }
-
-        let duration = max(1, Int(ceil(end.timeIntervalSince(start) / 60)))
-        let startStr = xtreamStartString(from: start)
-
-        let urlStr = "\(hostBase)/timeshift/\(user)/\(pass)/\(duration)/\(startStr)/\(streamID).m3u8"
-        guard let url = URL(string: urlStr) else { throw CatchupError.unavailable }
-        return url
-    }
-
     // MARK: - Error
 
     enum CatchupError: Error, LocalizedError {

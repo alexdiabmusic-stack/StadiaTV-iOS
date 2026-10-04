@@ -19,6 +19,7 @@ struct MyApp: App {
     init() {
         PlaybackPriority.launchDate = Date()
         AudioSessionManager.configureAtLaunch()
+        LegacyFeatureCleanup.runIfNeeded()
     }
 
     var body: some Scene {
@@ -65,7 +66,6 @@ struct MyApp: App {
             .environmentObject(fantasyStore)
             .environmentObject(bannerFantasyStore)
             .environmentObject(ProgrammeReminderStore.shared)
-            .environmentObject(RecordingService.shared)
             .environmentObject(ParentalControlStore.shared)
             .environmentObject(launchCoordinator)
             .task { channelPrefsStore.migrateLegacyFavorites(watchStore.favorites) }

@@ -1025,15 +1025,12 @@ struct ProgrammeDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var guideStore: GuideChannelStore
     @EnvironmentObject private var reminderStore: ProgrammeReminderStore
-    @EnvironmentObject private var recordingService: RecordingService
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
 
     @State private var catchupState: CatchupState = .idle
     @State private var selectedLeadTime: Int = 5
     @State private var reminderAdding = false
-    @State private var showingRecordingSchedule = false
-    @State private var recordingScheduled = false
 
     private enum CatchupState {
         case idle, loading, available(URL), failed, notEligible
@@ -1070,13 +1067,6 @@ struct ProgrammeDetailSheet: View {
         .tint(Theme.accent)
         .task {
             await resolveCatchupIfNeeded()
-        }
-        .sheet(isPresented: $showingRecordingSchedule) {
-            RecordingScheduleSheet(
-                programme: programme,
-                channel: channel,
-                onScheduled: { _ in recordingScheduled = true }
-            )
         }
     }
 
@@ -1229,38 +1219,6 @@ struct ProgrammeDetailSheet: View {
             // Future programme: Remind Me
             if programme.isFuture(at: now) {
                 reminderSection
-            }
-
-            // Recording: available for live and future programmes
-            if programme.isOnNow(at: now) || programme.isFuture(at: now) {
-                recordingSection
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var recordingSection: some View {
-        let mode = recordingService.preferredMode(for: channel)
-        if mode != .unavailable {
-            if recordingScheduled {
-                Label("Recording scheduled", systemImage: "checkmark.circle.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.green)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-            } else {
-                Button { showingRecordingSchedule = true } label: {
-                    Label(
-                        programme.isOnNow(at: now) ? "Record Now" : "Schedule Recording",
-                        systemImage: "record.circle"
-                    )
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Theme.live.opacity(0.12), in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                    .foregroundStyle(Theme.live)
-                }
-                .buttonStyle(.plain)
             }
         }
     }

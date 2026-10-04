@@ -21,7 +21,7 @@ final class LiveStateRestoration {
 
     // MARK: - Live tab filter
 
-    /// The last selected LiveFilter rawValue (e.g. "guide", "recordings").
+    /// The last selected LiveFilter rawValue (e.g. "guide", "forYou").
     var liveFilter: String {
         get { UserDefaults.standard.string(forKey: Keys.liveFilter) ?? "forYou" }
         set { UserDefaults.standard.set(newValue, forKey: Keys.liveFilter) }

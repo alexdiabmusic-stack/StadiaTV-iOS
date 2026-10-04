@@ -28,10 +28,7 @@ struct TVHomeView: View {
         .task(id: loadKey) {
             await viewModel.load(
                 leagues: prefs.followedLeagues,
-                favorites: prefs.favoriteTeams,
-                notificationsEnabled: false,
-                notificationLeadTime: prefs.matchReminderLeadTime,
-                morningDigestEnabled: false
+                favorites: prefs.favoriteTeams
             )
             viewModel.startAutoRefresh()
         }

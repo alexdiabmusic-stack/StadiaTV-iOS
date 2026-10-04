@@ -142,9 +142,11 @@ struct MatchesView: View {
             await MatchNotificationService.shared.syncNotifications(
                 matches: viewModel.allFollowedMatches,
                 favorites: prefs.favoriteTeams,
-                leadTime: prefs.matchReminderLeadTime
+                settings: prefs.notificationSettings
             )
         }
+        // Reminders outlive this view, so show what is actually scheduled rather than what this screen remembers.
+        remindedMatchIDs = await MatchNotificationService.shared.remindedMatchIDs()
     }
 
     private func loadNews() async {
@@ -412,6 +414,7 @@ struct MatchesView: View {
     private func toggleReminder(for match: Match) async {
         if remindedMatchIDs.contains(match.id) {
             remindedMatchIDs.remove(match.id)
+            await MatchNotificationService.shared.cancelReminder(forMatchID: match.id)
             return
         }
         let scheduled = await MatchNotificationService.shared.scheduleReminder(
@@ -419,11 +422,20 @@ struct MatchesView: View {
         )
         if scheduled {
             remindedMatchIDs.insert(match.id)
+            prefs.setMatchNotificationsEnabled(true)
         } else {
             notificationAlertMessage = "Notifications are disabled. Enable them in Settings to receive game alerts."
             showingNotificationAlert = true
+            await syncNotificationPermission()
         }
-        prefs.setMatchNotificationsEnabled(scheduled)
+    }
+
+    /// A failed reminder can mean the system permission was revoked; a finished game can't be
+    /// reminded about and says nothing about permission.
+    private func syncNotificationPermission() async {
+        if !(await MatchNotificationService.shared.isAuthorized()) {
+            prefs.setMatchNotificationsEnabled(false)
+        }
     }
 }
 

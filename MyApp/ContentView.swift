@@ -24,6 +24,8 @@ struct MyApp: App {
         PlaybackPriority.launchDate = Date()
         AudioSessionManager.configureAtLaunch()
         LegacyFeatureCleanup.runIfNeeded()
+        // Registers the notification delegate now so a tap that launches the app is delivered.
+        _ = MatchNotificationService.shared
     }
 
     var body: some Scene {
@@ -71,6 +73,9 @@ struct MyApp: App {
             .environmentObject(bannerFantasyStore)
             .environmentObject(ProgrammeReminderStore.shared)
             .environmentObject(launchCoordinator)
+            .onOpenURL { url in
+                if let link = DeepLink(url: url) { DeepLinkRouter.shared.handle(link) }
+            }
             #if !os(tvOS)
             .dynamicTypeSize(Theme.isPad ? DynamicTypeSize.xLarge... : DynamicTypeSize.xSmall...)
             #endif
@@ -131,6 +136,8 @@ struct RootView: View {
     @StateObject private var eventChannelRefresh = EventChannelRefreshService()
     @State private var showingFavoriteNotificationPrompt = false
     @State private var selectedTab: AppTab = .home
+    @ObservedObject private var deepLinks = DeepLinkRouter.shared
+    @State private var deepLinkMatch: DeepLinkMatchTarget?
 
     // Applying safeAreaInset to each Tab's content (not the TabView) is the correct
     // way to place content between the tab content and the tab bar chrome.
@@ -228,6 +235,14 @@ struct RootView: View {
         }
         .onChange(of: prefs.favoriteTeams) { updateFavoriteNotificationPrompt() }
         .onChange(of: prefs.matchNotificationsEnabled) { updateFavoriteNotificationPrompt() }
+        // A tapped notification or bannertv:// URL. `initial` picks up a link that arrived
+        // before this view existed (a cold launch from a notification).
+        .onChange(of: deepLinks.pending, initial: true) { _, link in
+            guard let link else { return }
+            deepLinks.clear()
+            open(link)
+        }
+        .sheet(item: $deepLinkMatch) { DeepLinkMatchSheet(target: $0) }
         .alert("Get notified before your favourite teams play?", isPresented: $showingFavoriteNotificationPrompt) {
             Button("Not Now", role: .cancel) {
                 prefs.markFavoriteTeamNotificationPromptAnswered()
@@ -237,6 +252,18 @@ struct RootView: View {
             }
         } message: {
             Text("BannerTV can remind you before games for teams you star. You can change this later in Settings.")
+        }
+    }
+
+    private func open(_ link: DeepLink) {
+        switch link {
+        case .match(let leagueID, let matchID, let date):
+            deepLinkMatch = DeepLinkMatchTarget(leagueID: leagueID, matchID: matchID, date: date)
+        case .home: selectedTab = .home
+        case .following: selectedTab = .following
+        case .live: selectedTab = .live
+        case .discover: selectedTab = .discover
+        case .settings: selectedTab = .settings
         }
     }
 

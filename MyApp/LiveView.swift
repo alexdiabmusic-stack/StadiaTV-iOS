@@ -401,7 +401,12 @@ struct LiveView: View {
 
     private func setAlert(for match: Match) async {
         let scheduled = await MatchNotificationService.shared.scheduleReminder(for: match, leadTime: prefs.matchReminderLeadTime)
-        prefs.setMatchNotificationsEnabled(scheduled)
+        if scheduled {
+            prefs.setMatchNotificationsEnabled(true)
+        } else if !(await MatchNotificationService.shared.isAuthorized()) {
+            // A finished game can't be reminded about; only a revoked permission turns alerts off.
+            prefs.setMatchNotificationsEnabled(false)
+        }
         actionAlertMessage = scheduled
             ? (match.state == .live ? "Live alert sent for \(match.shortName)." : "Alert set for \(match.shortName).")
             : (match.state == .final ? "\(match.shortName) is already final." : "Notifications are disabled. Enable them in Settings to receive game alerts.")

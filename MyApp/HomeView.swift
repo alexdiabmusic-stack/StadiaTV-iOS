@@ -84,9 +84,7 @@ struct HomeView: View {
             await viewModel.load(
                 leagues: prefs.followedLeagues,
                 favorites: prefs.favoriteTeams,
-                notificationsEnabled: prefs.matchNotificationsEnabled,
-                notificationLeadTime: prefs.matchReminderLeadTime,
-                morningDigestEnabled: prefs.morningDigestEnabled
+                notifications: prefs.notificationSettings
             )
             viewModel.startAutoRefresh()
             // Safety-net: markAppShellReady is called here after all phases, and also
@@ -164,9 +162,7 @@ struct HomeView: View {
                 await viewModel.load(
                     leagues: prefs.followedLeagues,
                     favorites: prefs.favoriteTeams,
-                    notificationsEnabled: prefs.matchNotificationsEnabled,
-                    notificationLeadTime: prefs.matchReminderLeadTime,
-                    morningDigestEnabled: prefs.morningDigestEnabled
+                    notifications: prefs.notificationSettings
                 )
             }
         }
@@ -179,9 +175,7 @@ struct HomeView: View {
             await viewModel.load(
                 leagues: prefs.followedLeagues,
                 favorites: prefs.favoriteTeams,
-                notificationsEnabled: prefs.matchNotificationsEnabled,
-                notificationLeadTime: prefs.matchReminderLeadTime,
-                morningDigestEnabled: prefs.morningDigestEnabled,
+                notifications: prefs.notificationSettings,
                 force: true
             )
         }
@@ -208,9 +202,7 @@ struct HomeView: View {
         [
             prefs.followedLeagues.map(\.id).sorted().joined(separator: ","),
             prefs.favoriteTeams.map(\.id).sorted().joined(separator: ","),
-            prefs.matchNotificationsEnabled ? "n1" : "n0",
-            "lead-\(prefs.matchReminderLeadTime.rawValue)",
-            prefs.morningDigestEnabled ? "d1" : "d0"
+            String(describing: prefs.notificationSettings)
         ].joined(separator: "|")
     }
 
@@ -524,7 +516,12 @@ struct HomeView: View {
 
     private func setAlert(for match: Match) async {
         let scheduled = await MatchNotificationService.shared.scheduleReminder(for: match, leadTime: prefs.matchReminderLeadTime)
-        prefs.setMatchNotificationsEnabled(scheduled)
+        if scheduled {
+            prefs.setMatchNotificationsEnabled(true)
+        } else if !(await MatchNotificationService.shared.isAuthorized()) {
+            // A finished game can't be reminded about; only a revoked permission turns alerts off.
+            prefs.setMatchNotificationsEnabled(false)
+        }
         notificationAlertMessage = scheduled
             ? (match.state == .live ? "Live alert sent for \(match.shortName)." : "Alert set for \(match.shortName).")
             : (match.state == .final ? "\(match.shortName) is already final." : "Notifications are disabled. Enable them in Settings to receive game alerts.")
@@ -561,7 +558,8 @@ struct HomeView: View {
                     await viewModel.load(
                         leagues: prefs.followedLeagues,
                         favorites: prefs.favoriteTeams,
-                        notificationsEnabled: prefs.matchNotificationsEnabled
+                        notifications: prefs.notificationSettings,
+                        force: true
                     )
                 }
             }
@@ -1813,7 +1811,10 @@ final class HomeViewModel: ObservableObject {
     private var demandScoreCache: [String: Int] = [:]
 
     private var refreshTask: Task<Void, Never>?
-    private var lastLoadArgs: (leagues: [League], favorites: [FavoriteTeam], notificationsEnabled: Bool, notificationLeadTime: MatchReminderLeadTime, morningDigestEnabled: Bool)?
+    private var lastLoadArgs: (leagues: [League], favorites: [FavoriteTeam], notifications: NotificationSettings)?
+    /// What the notification schedule was last brought in line with, so a change to the settings
+    /// or favourites resyncs even when the match data itself is still fresh.
+    private var lastSyncedNotifications: (settings: NotificationSettings, favoriteSignature: String)?
 
     func startAutoRefresh() {
         refreshTask?.cancel()
@@ -1824,7 +1825,7 @@ final class HomeViewModel: ObservableObject {
                 let nanoseconds: UInt64 = hasLive ? 30_000_000_000 : 60_000_000_000
                 try? await Task.sleep(nanoseconds: nanoseconds)
                 guard !Task.isCancelled, let self, let args = self.lastLoadArgs else { continue }
-                await self.load(leagues: args.leagues, favorites: args.favorites, notificationsEnabled: args.notificationsEnabled, notificationLeadTime: args.notificationLeadTime, morningDigestEnabled: args.morningDigestEnabled)
+                await self.load(leagues: args.leagues, favorites: args.favorites, notifications: args.notifications)
             }
         }
     }
@@ -1834,8 +1835,8 @@ final class HomeViewModel: ObservableObject {
         refreshTask = nil
     }
 
-    func load(leagues: [League], favorites: [FavoriteTeam], notificationsEnabled: Bool = false, notificationLeadTime: MatchReminderLeadTime = .thirty, morningDigestEnabled: Bool = false, force: Bool = false) async {
-        lastLoadArgs = (leagues, favorites, notificationsEnabled, notificationLeadTime, morningDigestEnabled)
+    func load(leagues: [League], favorites: [FavoriteTeam], notifications: NotificationSettings = NotificationSettings(), force: Bool = false) async {
+        lastLoadArgs = (leagues, favorites, notifications)
         let followedLeagueIDs = Set(leagues.map(\.id))
         var seenDiscoveryLeagueIDs: Set<String> = []
         let discoveryLeagues = (leagues + League.all).filter { seenDiscoveryLeagueIDs.insert($0.id).inserted }
@@ -1853,6 +1854,8 @@ final class HomeViewModel: ObservableObject {
         let effectiveCacheLifetime = liveNow.isEmpty ? cacheLifetime : cacheLifetimeLive
         if !force, hasData, discoveryLeagueIDs == lastLoadedLeagueIDs, favoriteSignature == lastLoadedFavoriteSignature,
            let lastLoadedAt, Date().timeIntervalSince(lastLoadedAt) < effectiveCacheLifetime {
+            // Nothing to fetch, but notification settings may have changed since the last pass.
+            await syncNotificationsIfNeeded(favorites: favorites, settings: notifications, favoriteSignature: favoriteSignature)
             return
         }
         guard !isLoadInFlight else { return }
@@ -1956,17 +1959,7 @@ final class HomeViewModel: ObservableObject {
             rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
         }
 
-        if notificationsEnabled {
-            let allMatchesFlat = matchesByLeague.values.flatMap { $0 }
-            await MatchNotificationService.shared.syncNotifications(
-                matches: allMatchesFlat,
-                favorites: favorites,
-                leadTime: notificationLeadTime
-            )
-            if morningDigestEnabled {
-                await MatchNotificationService.shared.scheduleMorningDigest(matches: allMatchesFlat)
-            }
-        }
+        await syncNotificationsIfNeeded(favorites: favorites, settings: notifications, favoriteSignature: favoriteSignature, force: true)
 
         let recentlyFinished = matchesByLeague
             .filter { followedLeagueIDs.contains($0.key) }
@@ -2062,6 +2055,29 @@ final class HomeViewModel: ObservableObject {
                 enqueueNextLeague()
             }
             return results
+        }
+    }
+
+    /// Brings the scheduled notifications in line with the loaded matches. After a full load it
+    /// always runs; when the data was still fresh it runs only if the settings or favourites changed.
+    private func syncNotificationsIfNeeded(
+        favorites: [FavoriteTeam],
+        settings: NotificationSettings,
+        favoriteSignature: String,
+        force: Bool = false
+    ) async {
+        let previous = lastSyncedNotifications
+        if !force, let previous, previous.settings == settings, previous.favoriteSignature == favoriteSignature { return }
+        lastSyncedNotifications = (settings, favoriteSignature)
+        guard settings.enabled else { return }
+
+        let allMatches = matchesByLeague.values.flatMap { $0 }
+        await MatchNotificationService.shared.syncNotifications(matches: allMatches, favorites: favorites, settings: settings)
+        if settings.morningDigest {
+            await MatchNotificationService.shared.scheduleMorningDigest(matches: allMatches, hour: settings.morningDigestHour)
+        } else if previous?.settings.morningDigest != false {
+            // First pass of this launch, or just switched off: clear any briefing still scheduled.
+            await MatchNotificationService.shared.removeMorningDigests()
         }
     }
 

@@ -139,6 +139,18 @@ enum MatchReminderLeadTime: Int, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// The notification choices Home, Settings and the match lists hand to `MatchNotificationService`.
+struct NotificationSettings: Equatable {
+    var enabled = false
+    var leadTime: MatchReminderLeadTime = .thirty
+    /// "Game begins" alerts.
+    var liveAlerts = true
+    var closeGameAlerts = true
+    var morningDigest = false
+    /// Local hour (0-23) of the morning briefing.
+    var morningDigestHour = 8
+}
+
 enum AppAppearance: String, Codable, CaseIterable, Identifiable {
     case system
     case dark
@@ -195,6 +207,9 @@ struct UserPreferences: Codable, Equatable {
     var matchNotificationsEnabled = false
     var matchReminderLeadTime: MatchReminderLeadTime = .thirty
     var morningDigestEnabled = false
+    var morningDigestHour = 8
+    var liveAlertsEnabled = true
+    var closeGameAlertsEnabled = true
     var cloudSyncEnabled = false
     var appearance: AppAppearance = .dark
     var preferredStreamLanguages: Set<String> = ["en"]   // StreamLanguage.code values
@@ -222,6 +237,7 @@ struct UserPreferences: Codable, Equatable {
     private enum CodingKeys: String, CodingKey {
         case hasCompletedOnboarding, selectedLeagueIDs, favoriteTeams, favoritePlayers
         case matchNotificationsEnabled, matchReminderLeadTime, morningDigestEnabled, cloudSyncEnabled
+        case morningDigestHour, liveAlertsEnabled, closeGameAlertsEnabled
         case appearance, preferredStreamLanguages, spoilerFreeMode, showLiveScoreBadge, showLiveScoreBar
         case showChannelNumbers, guideProgrammeTitleLines, epgHighlightCurrentProgramme
         case playerPanelTimeoutSeconds, guideTimeScaleMinutes, playerBarActions
@@ -240,6 +256,9 @@ struct UserPreferences: Codable, Equatable {
         matchNotificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .matchNotificationsEnabled) ?? false
         matchReminderLeadTime = try container.decodeIfPresent(MatchReminderLeadTime.self, forKey: .matchReminderLeadTime) ?? .thirty
         morningDigestEnabled = try container.decodeIfPresent(Bool.self, forKey: .morningDigestEnabled) ?? false
+        morningDigestHour = min(max(try container.decodeIfPresent(Int.self, forKey: .morningDigestHour) ?? 8, 0), 23)
+        liveAlertsEnabled = try container.decodeIfPresent(Bool.self, forKey: .liveAlertsEnabled) ?? true
+        closeGameAlertsEnabled = try container.decodeIfPresent(Bool.self, forKey: .closeGameAlertsEnabled) ?? true
         cloudSyncEnabled = try container.decodeIfPresent(Bool.self, forKey: .cloudSyncEnabled) ?? false
         appearance = try container.decodeIfPresent(AppAppearance.self, forKey: .appearance) ?? .dark
         preferredStreamLanguages = try container.decodeIfPresent(Set<String>.self, forKey: .preferredStreamLanguages) ?? ["en"]
@@ -361,6 +380,17 @@ final class PreferencesStore: ObservableObject {
     var morningDigestEnabled: Bool { prefs.morningDigestEnabled }
     var cloudSyncEnabled: Bool { prefs.cloudSyncEnabled }
 
+    var notificationSettings: NotificationSettings {
+        NotificationSettings(
+            enabled: prefs.matchNotificationsEnabled,
+            leadTime: prefs.matchReminderLeadTime,
+            liveAlerts: prefs.liveAlertsEnabled,
+            closeGameAlerts: prefs.closeGameAlertsEnabled,
+            morningDigest: prefs.morningDigestEnabled,
+            morningDigestHour: prefs.morningDigestHour
+        )
+    }
+
     var shouldPromptForFavoriteTeamNotifications: Bool {
         !prefs.favoriteTeams.isEmpty
             && !prefs.matchNotificationsEnabled
@@ -383,6 +413,21 @@ final class PreferencesStore: ObservableObject {
 
     func setMorningDigestEnabled(_ enabled: Bool) {
         prefs.morningDigestEnabled = enabled
+        persist()
+    }
+
+    func setMorningDigestHour(_ hour: Int) {
+        prefs.morningDigestHour = min(max(hour, 0), 23)
+        persist()
+    }
+
+    func setLiveAlertsEnabled(_ enabled: Bool) {
+        prefs.liveAlertsEnabled = enabled
+        persist()
+    }
+
+    func setCloseGameAlertsEnabled(_ enabled: Bool) {
+        prefs.closeGameAlertsEnabled = enabled
         persist()
     }
 

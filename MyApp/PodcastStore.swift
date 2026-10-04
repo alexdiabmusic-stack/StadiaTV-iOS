@@ -3,6 +3,7 @@ import AVFoundation
 import SwiftUI
 import Combine
 import MediaPlayer
+import OSLog
 import UIKit
 
 // MARK: - Playback speed
@@ -529,7 +530,7 @@ final class PodcastStore: ObservableObject {
             try session.setCategory(.playback, mode: .spokenAudio)
             try session.setActive(true)
         } catch {
-            print("[PodcastStore] AudioSession setup error: \(error)")
+            Logger(subsystem: "BannerTV", category: "Podcast").error("Audio session setup failed: \(String(describing: error), privacy: .public)")
         }
     }
 

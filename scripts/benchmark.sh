@@ -28,8 +28,11 @@ UDID="$(xcrun simctl list devices available -j \
 [ -n "$UDID" ] || { echo "no available simulator named '$DEVICE_NAME' (set BENCHMARK_SIMULATOR to another)" >&2; exit 1; }
 
 echo "Building $SCHEME ($CONFIGURATION) for $DEVICE_NAME..."
+# GUIDEBENCHMARK compiles the benchmark runner into this one build only; the Release
+# configuration itself doesn't define it, so App Store builds never contain the runner.
 xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" \
-  -destination "id=$UDID" -derivedDataPath .build/benchmark build | xcbeautify 2>/dev/null || true
+  -destination "id=$UDID" -derivedDataPath .build/benchmark \
+  SWIFT_ACTIVE_COMPILATION_CONDITIONS='GUIDEBENCHMARK $(inherited)' build | xcbeautify 2>/dev/null || true
 
 APP_PATH="$(find .build/benchmark/Build/Products/${CONFIGURATION}-iphonesimulator -maxdepth 1 -iname '*.app' | head -1)"
 [ -n "$APP_PATH" ] || { echo "build did not produce a .app under .build/benchmark" >&2; exit 1; }

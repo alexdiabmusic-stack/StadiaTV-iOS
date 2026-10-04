@@ -95,10 +95,10 @@ private struct PlaylistCacheEntry {
 actor YouTubeService {
     @MainActor
     static let shared: YouTubeService? = {
-        guard let key = AppConfiguration.youtubeAPIKey else { return nil }
-        let url = Bundle.main.url(forResource: "sports_youtube_manifest", withExtension: "json")!
-        let data = try! Data(contentsOf: url)
-        let manifest = try! JSONDecoder().decode(YouTubeManifest.self, from: data)
+        guard let key = AppConfiguration.youtubeAPIKey,
+              let url = Bundle.main.url(forResource: "sports_youtube_manifest", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let manifest = try? JSONDecoder().decode(YouTubeManifest.self, from: data) else { return nil }
         return YouTubeService(apiKey: key, manifest: manifest)
     }()
 

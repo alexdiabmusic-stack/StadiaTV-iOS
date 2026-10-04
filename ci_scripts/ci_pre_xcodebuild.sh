@@ -25,3 +25,6 @@ fi
 if [ "${CI_XCODEBUILD_ACTION:-}" = "archive" ]; then
     sh "$CI_PRIMARY_REPOSITORY_PATH/scripts/check-release-config.sh"
 fi
+
+# Warn when a change adds fixed-size fonts (text that ignores Dynamic Type). STRICT_DYNAMIC_TYPE=1 fails the build.
+sh "$CI_PRIMARY_REPOSITORY_PATH/scripts/check-dynamic-type.sh"

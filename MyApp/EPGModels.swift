@@ -283,15 +283,6 @@ nonisolated enum EPGMatchMethod: String, Codable {
     }
 }
 
-nonisolated struct EPGChannelMapping: Codable, Hashable {
-    let canonicalChannelId: String
-    let xmltvChannelId: String
-    let sourceId: String
-    let matchMethod: EPGMatchMethod
-    let confidence: Double
-    let isManualOverride: Bool
-}
-
 // MARK: - Guide category
 
 nonisolated struct GuideCategory: Identifiable, Hashable {

@@ -36,8 +36,6 @@ struct ApplePodcast: Decodable, Hashable {
     let artworkUrl600: URL?
 }
 
-enum TeamPodcastResolverError: Error { case invalidURL, insufficientCoverage(found: Int) }
-
 actor TeamPodcastResolver {
     private let session: URLSession
     private var cache: [String: (Date, [ApplePodcast])] = [:]

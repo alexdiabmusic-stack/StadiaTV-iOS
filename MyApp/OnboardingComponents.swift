@@ -130,15 +130,3 @@ struct OnboardingBottomBar: View {
         .background(Theme.background)
     }
 }
-
-// MARK: - Sport icon helper
-
-struct SportIcon: View {
-    let systemImage: String
-    let size: CGFloat
-
-    var body: some View {
-        Image(systemName: systemImage)
-            .font(.system(size: size, weight: .medium))
-    }
-}

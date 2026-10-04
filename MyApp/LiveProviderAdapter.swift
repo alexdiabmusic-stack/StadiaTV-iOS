@@ -3,7 +3,6 @@ import Foundation
 // MARK: - Intermediate adapter types
 
 /// Raw channel record produced by a provider adapter before ID assignment and normalization.
-/// Named `AdapterChannel` to avoid collision with the existing `ProviderChannel` in IPTVOrgModels.
 nonisolated struct AdapterChannel: Sendable {
     var name: String
     var streamURL: URL

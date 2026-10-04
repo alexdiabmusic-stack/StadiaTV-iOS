@@ -6,6 +6,7 @@ struct WatchSetupView: View {
 
     @EnvironmentObject private var playlistStore: PlaylistStore
     @State private var showingAdd = false
+    @State private var addMode: AddPlaylistView.Mode = .m3u
     @State private var editingPlaylist: Playlist?
     @Environment(\.horizontalSizeClass) private var sizeClass
 
@@ -42,10 +43,11 @@ struct WatchSetupView: View {
             }
         }
         .sheet(isPresented: $showingAdd) {
-            AddPlaylistView { playlistStore.add($0) }
+            AddPlaylistView(initialMode: addMode) { playlistStore.add($0) }
         }
         .sheet(item: $editingPlaylist) { playlist in
-            AddPlaylistView(initialPlaylist: playlist) { playlistStore.add($0) }
+            // Editing keeps the playlist's id, so it must replace the existing entry, not append a duplicate.
+            AddPlaylistView(initialPlaylist: playlist) { playlistStore.replace($0) }
         }
     }
 
@@ -74,14 +76,14 @@ struct WatchSetupView: View {
                 icon: "link",
                 title: "M3U Playlist",
                 description: "Connect using a URL from your subscription service.",
-                action: { showingAdd = true }
+                action: { addMode = .m3u; showingAdd = true }
             )
 
             SourceTypeCard(
                 icon: "person.badge.key.fill",
                 title: "Xtream Account",
                 description: "Login with your Xtream Codes portal credentials.",
-                action: { showingAdd = true }
+                action: { addMode = .xtream; showingAdd = true }
             )
         }
     }

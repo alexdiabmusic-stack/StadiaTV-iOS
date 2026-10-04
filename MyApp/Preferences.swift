@@ -339,6 +339,23 @@ final class PreferencesStore: ObservableObject {
         persist()
     }
 
+    /// Adopts the preferences another device saved to iCloud, onboarding choices included, and
+    /// turns sync on so favourites and history follow. Returns false when iCloud holds nothing
+    /// for this app (including when it simply hasn't synced yet), leaving local state untouched.
+    func restorePreferencesFromCloud() -> Bool {
+        CloudSyncService.shared.start()
+        guard let cloud: UserPreferences = CloudSyncService.shared.load(UserPreferences.self, for: .preferences) else {
+            return false
+        }
+        prefs = cloud
+        prefs.hasCompletedOnboarding = true
+        prefs.cloudSyncEnabled = true
+        StreamRankingSettings.preferUHD = prefs.preferUHDStreams
+        persist()
+        CloudSyncService.shared.setEnabled(true)
+        return true
+    }
+
     var matchNotificationsEnabled: Bool { prefs.matchNotificationsEnabled }
     var matchReminderLeadTime: MatchReminderLeadTime { prefs.matchReminderLeadTime }
     var morningDigestEnabled: Bool { prefs.morningDigestEnabled }

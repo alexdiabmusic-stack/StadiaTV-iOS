@@ -117,14 +117,23 @@ final class EPGRepository: ObservableObject {
             .appendingPathComponent("BannerTV_EPG", isDirectory: true)
     }()
 
-    private let session: URLSession = {
-        let cfg = URLSessionConfiguration.default
+    private static func makeSession(allowsConstrainedAccess: Bool) -> URLSession {
         // A guide can be tens of megabytes; on a slow link two minutes aborted the download and
-        // silently fell back to stale data.
-        cfg.timeoutIntervalForResource = 600
+        // silently fell back to stale data (`NetworkPolicy` sets the longer timeout).
+        let cfg = NetworkPolicy.bulkConfiguration(allowsConstrainedAccess: allowsConstrainedAccess)
         cfg.requestCachePolicy = .reloadIgnoringLocalCacheData
         return URLSession(configuration: cfg)
-    }()
+    }
+    private let session = EPGRepository.makeSession(allowsConstrainedAccess: true)
+    /// Refused by the system while Low Data Mode is on; see `downloadSession(hasCachedCopy:)`.
+    private let deferrableSession = EPGRepository.makeSession(allowsConstrainedAccess: false)
+    private var refreshOrigin: RefreshOrigin = .userInitiated
+
+    /// An automatic refresh with a cached guide to fall back on doesn't download in Low Data Mode;
+    /// it keeps the cached guide. Anything the user asked for, and a first download, always may.
+    private func downloadSession(hasCachedCopy: Bool) -> URLSession {
+        NetworkPolicy.defersInLowDataMode(refreshOrigin, hasCachedCopy: hasCachedCopy) ? deferrableSession : session
+    }
 
     init() {
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
@@ -534,7 +543,7 @@ final class EPGRepository: ObservableObject {
     func refreshIfNeeded() async {
         if !hasMissingCustomSource(), let last = lastUpdated, Date().timeIntervalSince(last) < Self.guideStaleness,
            !programmeIndex.isEmpty { return }
-        await forceRefresh()
+        await forceRefresh(origin: .automatic)
     }
 
     // MARK: - Cold start
@@ -590,9 +599,10 @@ final class EPGRepository: ObservableObject {
         logger.info("Guide restored from store channels=\(hydrated.count, privacy: .public) programmes=\(programmeCount, privacy: .public)")
     }
 
-    func forceRefresh() async {
+    func forceRefresh(origin: RefreshOrigin = .userInitiated) async {
         guard !isRefreshing else { return }
         isRefreshing = true
+        refreshOrigin = origin
         refreshState = .refreshing
         importProgress.state = .loadingEPG
         defer { isRefreshing = false }
@@ -774,7 +784,9 @@ final class EPGRepository: ObservableObject {
             let downloadStart = Date()
             let signpost = GuideMatchingSignposts.beginGuideDownload()
             defer { GuideMatchingSignposts.endGuideDownload(signpost) }
-            let (tempURL, response) = try await session.download(from: source.url)
+            let (tempURL, response) = try await downloadSession(
+                hasCachedCopy: FileManager.default.fileExists(atPath: cacheFile.path)
+            ).download(from: source.url)
             defer { try? FileManager.default.removeItem(at: tempURL) }
             importDiagnostics.epgDownloadDuration += Date().timeIntervalSince(downloadStart)
             // An error page (403/500...) is not a guide: don't let it replace the good cache
@@ -834,7 +846,7 @@ final class EPGRepository: ObservableObject {
             let downloadStart = Date()
             let signpost = GuideMatchingSignposts.beginGuideDownload()
             defer { GuideMatchingSignposts.endGuideDownload(signpost) }
-            let (tempURL, response) = try await session.download(for: request)
+            let (tempURL, response) = try await downloadSession(hasCachedCopy: hasCachedCopy).download(for: request)
             importDiagnostics.epgDownloadDuration += Date().timeIntervalSince(downloadStart)
 
             if let http = response as? HTTPURLResponse, http.statusCode == 304 {

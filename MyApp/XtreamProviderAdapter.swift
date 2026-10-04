@@ -17,6 +17,7 @@ extension String {
     nonisolated var xtreamPathSegment: String {
         var allowed = CharacterSet.urlPathAllowed
         allowed.remove(charactersIn: "/")
+        allowed.insert(charactersIn: ";")   // a legal segment character that some Foundation builds leave out of urlPathAllowed
         return addingPercentEncoding(withAllowedCharacters: allowed) ?? self
     }
 }

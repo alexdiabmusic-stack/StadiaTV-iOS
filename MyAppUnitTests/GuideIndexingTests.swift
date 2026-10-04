@@ -1,0 +1,138 @@
+import Foundation
+import Testing
+@testable import BannerTV
+
+/// The pure pieces of the guide pipeline (`GuideIndexing.swift`): no network, no store, no main actor.
+@Suite("Guide indexing")
+struct GuideIndexingTests {
+
+    private let base = Date(timeIntervalSince1970: 1_800_000_000)
+
+    private func programme(
+        _ title: String, guideId: String = "g1", source: String = "custom-0", priority: Int = 0,
+        at minutes: Double, for length: Double = 60
+    ) -> EPGProgramme {
+        EPGProgramme(
+            id: "\(guideId)-\(title)", epgChannelId: guideId, canonicalChannelId: nil, title: title,
+            subtitle: nil, description: nil, categories: [],
+            start: base.addingTimeInterval(minutes * 60), end: base.addingTimeInterval((minutes + length) * 60),
+            imageURL: nil, season: nil, episode: nil, rating: nil,
+            sourceId: source, sourcePriority: priority, endTimeIsInferred: false
+        )
+    }
+
+    private func titles(_ programmes: [EPGProgramme]) -> [String] { programmes.map(\.title) }
+
+    // MARK: Schedules
+
+    @Test("Back-to-back programmes are all kept")
+    func keepsSequentialProgrammes() {
+        let result = GuideProgrammeIndexing.deduplicated([programme("A", at: 0), programme("B", at: 60)])
+        #expect(titles(result) == ["A", "B"])
+    }
+
+    @Test("Where equal-priority programmes overlap, the earlier one wins")
+    func dropsOverlapFromEqualPriority() {
+        let result = GuideProgrammeIndexing.deduplicated([programme("A", at: 0), programme("B", at: 30)])
+        #expect(titles(result) == ["A"])
+    }
+
+    @Test("Where programmes overlap, the lower source priority wins")
+    func prefersLowerSourcePriority() {
+        let result = GuideProgrammeIndexing.deduplicated([programme("A", priority: 1, at: 0), programme("B", priority: 0, at: 30)])
+        #expect(titles(result) == ["B"])
+    }
+
+    @Test("Merging sorts by start and removes overlaps")
+    func mergedSortsAndDeduplicates() {
+        let existing = [programme("B", at: 60)]
+        let adding = [programme("C", at: 120), programme("A", at: 0), programme("A again", at: 10)]
+        #expect(titles(GuideProgrammeIndexing.merged(existing, adding: adding)) == ["A", "B", "C"])
+    }
+
+    @Test("Removing a source leaves the others, and drops channels left empty")
+    func removingASource() {
+        let index = [
+            "c1": [programme("Custom", at: 0), programme("Top-up", source: "xtream", priority: 1, at: 120)],
+            "c2": [programme("Only custom", at: 0)],
+        ]
+        let result = GuideProgrammeIndexing.removing(sourceId: "custom-0", from: index)
+        #expect(result.keys.sorted() == ["c1"])
+        #expect(titles(result["c1"] ?? []) == ["Top-up"])
+        #expect(GuideProgrammeIndexing.removing(sourceId: "nobody", from: index).count == 2)
+    }
+
+    @Test("Coverage spans the first start to the last end")
+    func coverage() {
+        #expect(GuideProgrammeIndexing.coverage(of: [], channelId: "c1") == nil)
+        let programmes = [programme("A", at: 0), programme("B", at: 60, for: 120)]
+        let coverage = GuideProgrammeIndexing.coverage(of: programmes, channelId: "c1")
+        #expect(coverage?.earliestStart == base)
+        #expect(coverage?.latestEnd == base.addingTimeInterval(180 * 60))
+        #expect(coverage?.programmeCount == 2)
+    }
+
+    // MARK: Rebuilding from the store
+
+    @Test("Stored programmes are regrouped by canonical channel, in order, resolving each guide id once")
+    func hydrated() {
+        let stored = [
+            programme("Late", guideId: "g1", at: 60),
+            programme("Early", guideId: "g1", at: 0),
+            programme("Other feed", guideId: "g2", at: 120),
+            programme("Nobody's", guideId: "g3", at: 0),
+            programme("Too short", guideId: "g1", at: 200, for: 0),
+        ]
+        var lookups: [String] = []
+        let result = GuideProgrammeIndexing.hydrated(from: stored) { guideId in
+            lookups.append(guideId)
+            switch guideId {
+            case "g1", "g2": return "canonical"
+            default: return nil
+            }
+        }
+        #expect(result.keys.sorted() == ["canonical"])
+        #expect(titles(result["canonical"] ?? []) == ["Early", "Late", "Other feed"])
+        #expect(result["canonical"]?.allSatisfy { $0.canonicalChannelId == "canonical" } == true)
+        #expect(lookups.sorted() == ["g1", "g2", "g3"])
+    }
+
+    // MARK: Matching a playlist's own guide
+
+    @Test("Guide channels match by tvg-id (any case), then by normalised display name")
+    func customMatching() {
+        let lookup = CustomEPGLookup(
+            tvgIdToProvider: ["espn.us": "p-espn"],
+            nameToProvider: ["fs1": "p-fs1", "orphan": "p-orphan"]
+        )
+        let canonical = ["p-espn": "us-espn", "p-fs1": "us-fs1"]
+        let channels = [
+            EPGChannel(id: "ESPN.US", displayNames: ["Something else"], iconURL: nil, sourceId: "custom-0"),
+            EPGChannel(id: "fox.1", displayNames: ["Unknown", "FS1 HD"], iconURL: nil, sourceId: "custom-0"),
+            EPGChannel(id: "nobody", displayNames: ["No such channel"], iconURL: nil, sourceId: "custom-0"),
+            EPGChannel(id: "orphan.1", displayNames: ["Orphan"], iconURL: nil, sourceId: "custom-0"),
+        ]
+        let result = CustomEPGMatcher.match(channels, lookup: lookup, channelToCanonical: canonical) {
+            $0.replacingOccurrences(of: " HD", with: "")
+        }
+        #expect(result["ESPN.US"] == CustomEPGMatch(canonicalChannelId: "us-espn", providerChannelId: "p-espn"))
+        #expect(result["fox.1"] == CustomEPGMatch(canonicalChannelId: "us-fs1", providerChannelId: "p-fs1"))
+        #expect(result["nobody"] == nil)
+        #expect(result["orphan.1"] == nil, "a stream that isn't part of any canonical channel can't take the guide")
+    }
+
+    @Test("Each distinct display name is normalised once")
+    func normalisationIsCached() {
+        let lookup = CustomEPGLookup(nameToProvider: ["fs1": "p-fs1"])
+        let channels = (0..<5).map {
+            EPGChannel(id: "id\($0)", displayNames: ["FS1 HD"], iconURL: nil, sourceId: "custom-0")
+        }
+        var calls = 0
+        let result = CustomEPGMatcher.match(channels, lookup: lookup, channelToCanonical: ["p-fs1": "us-fs1"]) { name in
+            calls += 1
+            return name.replacingOccurrences(of: " HD", with: "")
+        }
+        #expect(result.count == 5)
+        #expect(calls == 1)
+    }
+}

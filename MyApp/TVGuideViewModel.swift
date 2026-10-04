@@ -224,7 +224,7 @@ final class TVGuideViewModel: ObservableObject {
     /// so scrolling and re-rendering don't redo the date maths for every cell.
     func rowLayout(for channel: CanonicalChannel) -> GuideRowLayout {
         let key = RowLayoutKey(date: selectedDate, offset: epgOffsetMinutes(for: channel),
-                               revision: repository?.programmeRevision ?? 0)
+                               revision: repository?.guideRevision(for: channel.id) ?? 0)
         if let cached = rowLayoutCache[channel.id], cached.key == key { return cached.layout }
 
         let progs = programmes(for: channel, in: guideWindowStart...guideWindowEnd)

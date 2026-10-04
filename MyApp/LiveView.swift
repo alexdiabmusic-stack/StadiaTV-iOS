@@ -802,7 +802,7 @@ final class LiveViewModel: ObservableObject {
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 60_000_000_000)
-                guard !Task.isCancelled, let self else { continue }
+                guard !Task.isCancelled, let self, AppActivity.shared.isActive else { continue }
                 await self.load(favoriteTeams: favoriteTeams, force: true)
             }
         }

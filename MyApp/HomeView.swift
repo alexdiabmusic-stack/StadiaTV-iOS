@@ -1545,6 +1545,12 @@ private struct ScheduleSection: View {
         }
     }
 
+    private static let dayLabelFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "EEEE, MMMM d"
+        return fmt
+    }()
+
     // Groups matches by calendar day, preserving order.
     private func groupByDay(_ matches: [Match]) -> [(label: String, matches: [Match])] {
         var order: [Date] = []
@@ -1554,10 +1560,8 @@ private struct ScheduleSection: View {
             if groups[day] == nil { order.append(day) }
             groups[day, default: []].append(match)
         }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "EEEE, MMMM d"
         return order.map { day in
-            (label: fmt.string(from: day), matches: groups[day]!)
+            (label: Self.dayLabelFormatter.string(from: day), matches: groups[day]!)
         }
     }
 
@@ -1882,7 +1886,7 @@ final class HomeViewModel: ObservableObject {
                 let hasLive = await MainActor.run { self?.liveNow.isEmpty == false }
                 let nanoseconds: UInt64 = hasLive ? 30_000_000_000 : 60_000_000_000
                 try? await Task.sleep(nanoseconds: nanoseconds)
-                guard !Task.isCancelled, let self, let args = self.lastLoadArgs else { continue }
+                guard !Task.isCancelled, let self, let args = self.lastLoadArgs, AppActivity.shared.isActive else { continue }
                 await self.load(leagues: args.leagues, favorites: args.favorites, notifications: args.notifications)
             }
         }
@@ -1955,18 +1959,11 @@ final class HomeViewModel: ObservableObject {
             startingSoonWindow: 6 * 3600,
             nextLimit: 8,
             onPartialResult: { [weak self] partial in
-                // Fire a main-actor task for each league that completes so the UI
-                // updates incrementally rather than waiting for all leagues to finish.
+                // Each league that completes lands here so the UI fills in incrementally rather
+                // than waiting for all of them; the rebuild itself is batched (see below).
+                let matches = partial.live + partial.startingSoon + partial.next + partial.pastStartToday
                 Task { @MainActor [weak self] in
-                    guard let self, self.isLoadInFlight else { return }
-                    for match in partial.live + partial.startingSoon + partial.next + partial.pastStartToday {
-                        self.matchesByLeague[match.league.id, default: []].append(match)
-                    }
-                    for key in self.matchesByLeague.keys {
-                        self.matchesByLeague[key] = self.mergeMatches(self.matchesByLeague[key] ?? [])
-                    }
-                    self.rebuildSections(matchesByLeague: self.matchesByLeague, followedIDs: capturedFollowedIDs, favoriteIDs: capturedFavoriteIDs, favoriteNames: capturedFavoriteNames)
-                    self.isLoading = false
+                    self?.receivePartial(matches, followedIDs: capturedFollowedIDs, favoriteIDs: capturedFavoriteIDs, favoriteNames: capturedFavoriteNames)
                 }
             }
         )
@@ -1979,6 +1976,10 @@ final class HomeViewModel: ObservableObject {
         // previously-loaded 7-day/season schedule data (from this or an
         // earlier load cycle) is preserved instead of discarded.
         let liveSnapshot = await liveSnapshotTask
+        // The final snapshot carries everything the partial results did.
+        partialFlushTask?.cancel()
+        partialFlushTask = nil
+        pendingPartialMatches.removeAll()
         // Include pastStartToday so games that started but still show as scheduled are
         // present in allMatches — they can appear in Live Now via the featured-IDs special
         // case and will be correctly matched to featured picks.
@@ -2072,6 +2073,47 @@ final class HomeViewModel: ObservableObject {
                 ? "Couldn't load sports data. Check your connection and try again."
                 : "Couldn't load sports data: \(parts.joined(separator: "; "))"
         }
+    }
+
+    // MARK: Partial results
+
+    /// Every rebuild re-merges and re-sorts all the sections, and a league's results used to trigger
+    /// one each (eleven during one live pass). The first partial result is folded in straight away,
+    /// the rest are collected and folded in together at most every `partialFlushInterval`.
+    private static let partialFlushInterval: TimeInterval = 0.25
+    private var pendingPartialMatches: [Match] = []
+    private var partialFlushTask: Task<Void, Never>?
+    private var lastPartialFlush = Date.distantPast
+
+    private func receivePartial(_ matches: [Match], followedIDs: Set<String>, favoriteIDs: Set<String>, favoriteNames: Set<String>) {
+        guard isLoadInFlight else { return }
+        pendingPartialMatches.append(contentsOf: matches)
+        guard partialFlushTask == nil else { return }
+        let wait = max(0, Self.partialFlushInterval - Date().timeIntervalSince(lastPartialFlush))
+        partialFlushTask = Task { [weak self] in
+            if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
+            guard !Task.isCancelled else { return }
+            self?.flushPartialMatches(followedIDs: followedIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+        }
+    }
+
+    private func flushPartialMatches(followedIDs: Set<String>, favoriteIDs: Set<String>, favoriteNames: Set<String>) {
+        partialFlushTask = nil
+        let batch = pendingPartialMatches
+        pendingPartialMatches.removeAll(keepingCapacity: true)
+        guard isLoadInFlight, !batch.isEmpty else { return }
+        lastPartialFlush = Date()
+        var touchedLeagues: Set<String> = []
+        for match in batch {
+            matchesByLeague[match.league.id, default: []].append(match)
+            touchedLeagues.insert(match.league.id)
+        }
+        // Only the leagues that just received matches need merging; the others were merged earlier.
+        for leagueID in touchedLeagues {
+            matchesByLeague[leagueID] = mergeMatches(matchesByLeague[leagueID] ?? [])
+        }
+        rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+        isLoading = false
     }
 
     private func orderedUnique(_ values: [String]) -> [String] {

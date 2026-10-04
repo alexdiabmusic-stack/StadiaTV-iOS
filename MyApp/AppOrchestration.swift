@@ -17,7 +17,8 @@ struct AppOrchestration: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: scenePhase) { _, phase in
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                AppActivity.shared.update(phase)
                 if phase == .active { Task { await playlistStore.refreshAccountStatus() } }
             }
             .task { epgRepository.xtreamEPGFetcher = playlistStore.fetchXtreamEPG }
@@ -66,7 +67,8 @@ struct AppOrchestration: ViewModifier {
             let hot = upcoming.contains { match in
                 abs(match.date.timeIntervalSinceNow) <= 30 * 60 && streamStore.confirmedCount(for: match.id) == 0
             }
-            if await eventChannelRefresh.refreshIfDue(playlists: playlistStore, hot: hot) {
+            // Idle (but keep the cadence) while backgrounded: a playing stream keeps the process alive.
+            if AppActivity.shared.isActive, await eventChannelRefresh.refreshIfDue(playlists: playlistStore, hot: hot) {
                 await streamStore.linkService.invalidate()
                 let horizon = Date().addingTimeInterval(12 * 3600)
                 await streamStore.scan(

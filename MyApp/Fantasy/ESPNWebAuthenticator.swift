@@ -1,12 +1,19 @@
-import AuthenticationServices
 import WebKit
 #if canImport(UIKit)
 import UIKit
 #endif
 
-/// Signs the user into ESPN inside a system-managed, secure browser session (`ASWebAuthenticationSession`)
-/// instead of asking them to find and paste raw `espn_s2`/`SWID` cookie values. Banner never sees the
-/// user's ESPN username or password — it only reads the resulting session cookies once ESPN sets them.
+/// Signs the user into ESPN inside an embedded web view instead of asking them to find and paste
+/// raw `espn_s2`/`SWID` cookie values. Banner never sees the user's ESPN username or password — it
+/// only reads the resulting session cookies once ESPN sets them.
+///
+/// This can't use `ASWebAuthenticationSession`: ESPN has no OAuth-style redirect back to an app
+/// callback scheme, so completion has to be detected by polling for session cookies, and
+/// `ASWebAuthenticationSession` only shares cookies with Safari's browsing session — never with
+/// the host app's own `WKWebsiteDataStore`. Hosting the login page in a `WKWebView` configured
+/// with `.default()` keeps the cookies visible to the same store this class polls, so sign-in can
+/// be detected and the sheet dismissed automatically instead of leaving the user stuck on
+/// espn.com until they force-close it.
 @MainActor
 final class ESPNWebAuthenticator: NSObject {
     enum AuthError: LocalizedError {
@@ -23,13 +30,11 @@ final class ESPNWebAuthenticator: NSObject {
         }
     }
 
-    private var session: ASWebAuthenticationSession?
     private var pollTask: Task<Void, Never>?
+    #if canImport(UIKit)
+    private weak var presentedController: UIViewController?
+    #endif
 
-    /// Presents ESPN's real login page, polls the shared cookie store for `espn_s2`/`SWID` after
-    /// the user signs in, and resolves with them as soon as both appear — dismissing the browser
-    /// automatically. ESPN never redirects to an app callback scheme, so completion is driven by
-    /// cookie polling rather than the session's normal callback-URL mechanism.
     func signIn() async throws -> ESPNFantasyCredentials {
         try await withCheckedThrowingContinuation { continuation in
             var didResume = false
@@ -38,7 +43,10 @@ final class ESPNWebAuthenticator: NSObject {
                 didResume = true
                 self?.pollTask?.cancel()
                 self?.pollTask = nil
-                self?.session = nil
+                #if canImport(UIKit)
+                self?.presentedController?.dismiss(animated: true)
+                self?.presentedController = nil
+                #endif
                 continuation.resume(with: result)
             }
 
@@ -47,19 +55,22 @@ final class ESPNWebAuthenticator: NSObject {
                 return
             }
 
-            let session = ASWebAuthenticationSession(url: loginURL, callbackURLScheme: "bannertv-espn") { _, error in
-                guard let error else { return }
-                let nsError = error as NSError
-                if nsError.domain == ASWebAuthenticationSessionErrorDomain,
-                   nsError.code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
-                    resume(.failure(AuthError.cancelled))
-                } else {
-                    resume(.failure(error))
-                }
+            #if canImport(UIKit)
+            guard let presenter = Self.topViewController() else {
+                resume(.failure(AuthError.presentationFailed))
+                return
             }
-            session.presentationContextProvider = self
-            session.prefersEphemeralWebBrowserSession = false
-            self.session = session
+
+            let loginController = ESPNLoginViewController(url: loginURL) {
+                resume(.failure(AuthError.cancelled))
+            }
+            let navController = UINavigationController(rootViewController: loginController)
+            presentedController = navController
+            presenter.present(navController, animated: true)
+            #else
+            resume(.failure(AuthError.presentationFailed))
+            return
+            #endif
 
             self.pollTask = Task { [weak self] in
                 while !Task.isCancelled {
@@ -74,7 +85,6 @@ final class ESPNWebAuthenticator: NSObject {
                         if let confirmed = await Self.readESPNCredentials(),
                            confirmed.espnS2 == credentials.espnS2, confirmed.swid == credentials.swid {
                             resume(.success(confirmed))
-                            self?.session?.cancel()
                             return
                         }
                         // Cookies changed or disappeared during the settle window (still mid-redirect,
@@ -82,11 +92,6 @@ final class ESPNWebAuthenticator: NSObject {
                     }
                     try? await Task.sleep(nanoseconds: 1_500_000_000)
                 }
-            }
-
-            guard session.start() else {
-                resume(.failure(AuthError.presentationFailed))
-                return
             }
         }
     }
@@ -107,19 +112,67 @@ final class ESPNWebAuthenticator: NSObject {
             }
         }
     }
+
+    #if canImport(UIKit)
+    private static func topViewController() -> UIViewController? {
+        let window = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.windows.first { $0.isKeyWindow } }
+            .first
+        var top = window?.rootViewController
+        while let presented = top?.presentedViewController {
+            top = presented
+        }
+        return top
+    }
+    #endif
 }
 
-extension ESPNWebAuthenticator: ASWebAuthenticationPresentationContextProviding {
-    nonisolated func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        MainActor.assumeIsolated {
-            #if canImport(UIKit)
-            let window = UIApplication.shared.connectedScenes
-                .compactMap { ($0 as? UIWindowScene)?.windows.first { $0.isKeyWindow } }
-                .first
-            return window ?? ASPresentationAnchor()
-            #else
-            return ASPresentationAnchor()
-            #endif
-        }
+#if canImport(UIKit)
+/// Hosts the ESPN login page in a `WKWebView` backed by the app's default (non-ephemeral) data
+/// store, so cookies ESPN sets on successful sign-in are immediately visible to
+/// `WKWebsiteDataStore.default()` — and therefore to `ESPNWebAuthenticator`'s cookie poll.
+private final class ESPNLoginViewController: UIViewController {
+    private let url: URL
+    private let onCancel: () -> Void
+    private var webView: WKWebView?
+
+    init(url: URL, onCancel: @escaping () -> Void) {
+        self.url = url
+        self.onCancel = onCancel
+        super.init(nibName: nil, bundle: nil)
+        title = "Sign in to ESPN"
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) is not supported")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            barButtonSystemItem: .cancel,
+            target: self,
+            action: #selector(cancelTapped)
+        )
+
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .default()
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(webView)
+        NSLayoutConstraint.activate([
+            webView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            webView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            webView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        self.webView = webView
+
+        webView.load(URLRequest(url: url))
+    }
+
+    @objc private func cancelTapped() {
+        onCancel()
     }
 }
+#endif

@@ -6,16 +6,12 @@ struct LiveChannelsView: View {
     @EnvironmentObject private var store: PlaylistStore
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var channelPrefs: ChannelPreferencesStore
-    @EnvironmentObject private var parentalControl: ParentalControlStore
 
     @State private var playingChannel: Channel?
     @State private var zapChannels: [Channel] = []
     @State private var isPickingMultiscreen = false
     @State private var selectedMultiChannels: [Channel] = []
     @State private var multiscreenSession: MultiscreenSession?
-    @State private var pendingRestrictedChannel: Channel?
-    @State private var pendingRestrictedZapChannels: [Channel] = []
-    @State private var showingPINPrompt = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -32,15 +28,6 @@ struct LiveChannelsView: View {
                 )
             }
             .fullScreenCover(item: $multiscreenSession) { MultiScreenPlayerView(channels: $0.channels) }
-            .fullScreenCover(isPresented: $showingPINPrompt) {
-                PINPromptView(
-                    title: "Parental Controls",
-                    message: pendingRestrictedChannel.map { "\"\($0.name)\" is restricted." } ?? "This channel is restricted.",
-                    onUnlock: { playPendingRestrictedChannel() },
-                    onCancel: { pendingRestrictedChannel = nil; pendingRestrictedZapChannels = [] }
-                )
-                .environmentObject(parentalControl)
-            }
             .tint(Theme.accent)
     }
 
@@ -132,24 +119,11 @@ struct LiveChannelsView: View {
             } else if selectedMultiChannels.count < 4 {
                 selectedMultiChannels.append(channel)
             }
-        } else if parentalControl.isRestricted(channel) {
-            pendingRestrictedZapChannels = scopeChannels.isEmpty ? [channel] : scopeChannels
-            pendingRestrictedChannel = channel
-            showingPINPrompt = true
         } else {
             zapChannels = scopeChannels.isEmpty ? [channel] : scopeChannels
             PlaybackTapClock.record()
             playingChannel = channel
         }
-    }
-
-    private func playPendingRestrictedChannel() {
-        guard let ch = pendingRestrictedChannel else { return }
-        zapChannels = pendingRestrictedZapChannels
-        PlaybackTapClock.record()
-        playingChannel = ch
-        pendingRestrictedChannel = nil
-        pendingRestrictedZapChannels = []
     }
 
     private func toggleMultiscreenPicking() {

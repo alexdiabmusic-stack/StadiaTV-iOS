@@ -66,7 +66,6 @@ struct MyApp: App {
             .environmentObject(fantasyStore)
             .environmentObject(bannerFantasyStore)
             .environmentObject(ProgrammeReminderStore.shared)
-            .environmentObject(ParentalControlStore.shared)
             .environmentObject(launchCoordinator)
             .task { channelPrefsStore.migrateLegacyFavorites(watchStore.favorites) }
             #if !os(tvOS)

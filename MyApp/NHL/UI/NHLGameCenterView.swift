@@ -33,22 +33,7 @@ struct NHLGameCenterView<WatchContent: View, RelatedContent: View>: View {
                     }.frame(maxWidth: .infinity).padding(24).background(Theme.surface)
                 }
                 watchContent()
-                ScrollView(.horizontal) {
-                    HStack(spacing: 8) {
-                        ForEach(NHLGameTab.allCases) { tab in
-                            Button { model.selectedTab = tab } label: {
-                                Text(tab.rawValue).font(.subheadline.bold()).padding(.horizontal, 14).frame(minHeight: 44)
-                                    .background(model.selectedTab == tab ? Theme.surfaceElevated : Color.clear, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
-                            }
-                            #if os(tvOS)
-                            .buttonStyle(.bordered)
-                            #else
-                            .buttonStyle(.plain)
-                            #endif
-                            .accessibilityAddTraits(model.selectedTab == tab ? [.isSelected] : [])
-                        }
-                    }.padding(.horizontal)
-                }.scrollIndicators(.hidden).padding(.vertical, 8)
+                GameTabBar(tabs: NHLGameTab.allCases, selection: $model.selectedTab)
                 if model.showingCache {
                     Text("Saved data · Last updated \(snapshot?.fetchedAt.formatted(date: .abbreviated, time: .shortened) ?? "unknown")").font(.caption).foregroundStyle(Theme.textSecondary).padding(6)
                 }
@@ -117,35 +102,50 @@ struct NHLGameCenterView<WatchContent: View, RelatedContent: View>: View {
                 } else if model.errors["plays"] == nil { loadingRows }
             }
         case .overview:
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    if let error = model.errors["landing"] { errorNotice("Game overview is temporarily unavailable.", detail: error) }
-                    if let game = snapshot?.game {
-                        if let venue = game.venue { Label(venue, systemImage: "mappin.and.ellipse").padding(.horizontal) }
-                        if !game.broadcasts.isEmpty { Label(game.broadcasts.joined(separator: ", "), systemImage: "tv").padding(.horizontal) }
+            GameOverviewScroll {
+                if let error = model.errors["landing"] { errorNotice("Game overview is temporarily unavailable.", detail: error) }
+
+                let scoringEvents = snapshot?.scoringSummary.isEmpty == false ? (snapshot?.scoringSummary ?? []) : (snapshot?.events ?? []).filter { $0.eventType == .goal }
+                GameDetailSection(title: "Scoring") {
+                    EventTimeline(events: NHLGamePresentation.timeline(events: scoringEvents, game: snapshot?.game), league: match.league,
+                                  emptyText: match.state == .pre ? "No scoring yet." : "No goals in this game yet.")
+                    if let recap = snapshot?.recapURL {
+                        Link("Game recap", destination: recap)
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(Theme.accessibleAccent)
+                            .frame(minHeight: 44)
                     }
-                    NHLTeamStatsView(stats: snapshot?.teamStats ?? [], game: snapshot?.game)
-                    Text("Scoring summary").font(.title3.bold()).padding(.horizontal)
-                    ForEach(snapshot?.scoringSummary.isEmpty == false ? snapshot?.scoringSummary ?? [] : (snapshot?.events ?? []).filter { $0.eventType == .goal }) { event in
-                        NHLPlayEventRow(event: event, game: snapshot?.game, league: match.league)
+                }
+
+                let leaders = NHLGamePresentation.leaders(players: snapshot?.players ?? [], game: snapshot?.game)
+                if !leaders.isEmpty {
+                    GameDetailSection(title: "Game Leaders") {
+                        GameLeadersStrip(leaders: leaders)
                     }
-                    if let recap = snapshot?.recapURL { Link("Game recap", destination: recap).padding() }
-                    relatedContent()
-                }.padding(.vertical)
-                    .frame(maxWidth: 1000).frame(maxWidth: .infinity)
+                }
+
+                let keyStats = NHLGamePresentation.keyStats(teamStats: snapshot?.teamStats ?? [], game: snapshot?.game)
+                if !keyStats.isEmpty {
+                    GameDetailSection(title: "Team Stats", actionTitle: "View all stats", action: { model.selectedTab = .boxscore }) {
+                        TeamStatsComparison(stats: keyStats, awayAbbreviation: snapshot?.game?.away.abbreviation ?? "Away",
+                                             homeAbbreviation: snapshot?.game?.home.abbreviation ?? "Home")
+                    }
+                }
+
+                let infoItems = NHLGamePresentation.gameInfo(game: snapshot?.game)
+                if !infoItems.isEmpty {
+                    GameDetailSection(title: "Game Info") {
+                        GameInfoCard(items: infoItems)
+                    }
+                }
+
+                relatedContent()
             }
         case .boxscore:
             ScrollView {
                 VStack {
                     if let error = model.errors["boxscore"] { errorNotice("Box score is temporarily unavailable.", detail: error) }
-                    NHLBoxScoreView(players: snapshot?.players ?? [], game: snapshot?.game, league: match.league)
+                    NHLBoxScoreView(players: snapshot?.players ?? [], teamStats: snapshot?.teamStats ?? [], game: snapshot?.game, league: match.league)
                 }.frame(maxWidth: 1000).frame(maxWidth: .infinity)
-            }
-        case .stats:
-            ScrollView {
-                if let error = model.errors["stats"] { errorNotice("Team stats are temporarily unavailable.", detail: error) }
-                NHLTeamStatsView(stats: snapshot?.teamStats ?? [], game: snapshot?.game)
-                    .frame(maxWidth: 800).frame(maxWidth: .infinity)
             }
         }
     }

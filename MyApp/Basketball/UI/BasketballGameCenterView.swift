@@ -49,16 +49,10 @@ struct BasketballGameCenterView<WatchContent: View, RelatedContent: View>: View 
                     }.frame(maxWidth: .infinity).padding().background(Theme.surface)
                 }
                 watchContent()
-                ScrollView(.horizontal) {
-                    HStack {
-                        ForEach(BasketballGameTab.allCases) { tab in
-                            Button { fullRefresh = false; model.selectedTab = tab } label: {
-                                Text(tab.rawValue).font(.subheadline.bold()).padding(.horizontal, 12).frame(minHeight: 44)
-                                    .background(model.selectedTab == tab ? Theme.surfaceElevated : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
-                            }.buttonStyle(.bordered).accessibilityAddTraits(model.selectedTab == tab ? .isSelected : [])
-                        }
-                    }.padding(8)
-                }
+                GameTabBar(tabs: BasketballGameTab.allCases, selection: Binding(
+                    get: { model.selectedTab },
+                    set: { fullRefresh = false; model.selectedTab = $0 }
+                ))
                 if model.showingCache {
                     Text("Saved data · \(snapshot?.fetchedAt.formatted(date: .abbreviated, time: .shortened) ?? "")").font(.caption).foregroundStyle(.secondary).padding(4)
                 }
@@ -114,20 +108,45 @@ struct BasketballGameCenterView<WatchContent: View, RelatedContent: View>: View 
                         }.padding().frame(maxWidth: .infinity)
                     }
                 case .overview:
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 18) {
-                            if let game = snapshot.game {
-                                BasketballLineScoreView(game: game)
-                                if let venue = game.arena?.name { Label(venue, systemImage: "mappin.and.ellipse") }
-                                if let series = game.seriesText { Text(series).font(.subheadline) }
-                                Text([game.away.record.map { "\(game.away.tricode) \($0)" }, game.home.record.map { "\(game.home.tricode) \($0)" }].compactMap { $0 }.joined(separator: " · ")).font(.caption)
+                    GameOverviewScroll {
+                        if let game = snapshot.game {
+                            BasketballLineScoreView(game: game).padding(.horizontal, Theme.Spacing.md)
+                        }
+
+                        let timeline = BasketballGamePresentation.leadChangeTimeline(plays: snapshot.plays, game: snapshot.game)
+                        GameDetailSection(title: "Scoring", actionTitle: "All plays", action: { fullRefresh = false; model.selectedTab = .plays }) {
+                            EventTimeline(events: timeline, league: match.league, emptyText: "No lead changes yet.")
+                        }
+
+                        let leaders = BasketballGamePresentation.leaders(snapshot: snapshot)
+                        if !leaders.isEmpty {
+                            GameDetailSection(title: "Game Leaders") {
+                                GameLeadersStrip(leaders: leaders)
                             }
-                            BasketballGameLeadersView(snapshot: snapshot, league: match.league, config: config)
-                            if !snapshot.shots.isEmpty { BasketballShotChartView(shots: snapshot.shots).frame(maxWidth: 320) }
-                            Text("Scoring summary").font(.title3.bold())
-                            ForEach(snapshot.plays.filter { $0.type.isScoring }.reversed()) { play in BasketballPlayRow(play: play) }
-                            relatedContent()
-                        }.padding().frame(maxWidth: 1000).frame(maxWidth: .infinity)
+                        }
+
+                        if !snapshot.shots.isEmpty {
+                            GameDetailSection(title: "Shot Chart", actionTitle: "Full chart", action: { fullRefresh = false; model.selectedTab = .shots }) {
+                                BasketballShotChartView(shots: snapshot.shots).frame(maxWidth: 320)
+                            }
+                        }
+
+                        let keyStats = BasketballGamePresentation.keyStats(awayStats: snapshot.awayTeamStats, homeStats: snapshot.homeTeamStats,
+                                                                            awayName: snapshot.game?.away.displayName ?? "Away", homeName: snapshot.game?.home.displayName ?? "Home")
+                        if !keyStats.isEmpty {
+                            GameDetailSection(title: "Team Stats", actionTitle: "View all stats", action: { fullRefresh = false; model.selectedTab = .boxscore }) {
+                                TeamStatsComparison(stats: keyStats, awayAbbreviation: snapshot.game?.away.tricode ?? "Away", homeAbbreviation: snapshot.game?.home.tricode ?? "Home")
+                            }
+                        }
+
+                        let infoItems = BasketballGamePresentation.gameInfo(game: snapshot.game)
+                        if !infoItems.isEmpty {
+                            GameDetailSection(title: "Game Info") {
+                                GameInfoCard(items: infoItems)
+                            }
+                        }
+
+                        relatedContent()
                     }
                 }
             } else { loading }

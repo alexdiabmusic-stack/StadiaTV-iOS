@@ -40,6 +40,7 @@ struct MatchDetailView: View {
     @State private var gameCenterTab: GameCenterTab = .players
     @State private var matchNews: [ESPNArticle] = []
     @State private var presentedMatchArticle: ESPNArticle?
+    @State private var showingAllMatchNews = false
 
     private enum GameCenterTab: String, CaseIterable, Identifiable {
         case players = "Players"
@@ -209,7 +210,8 @@ struct MatchDetailView: View {
             await loadOdds()
         }
         .task(id: match.id) {
-            matchNews = (try? await SportsRepository.shared.legacyNews(for: match.league, limit: 5)) ?? []
+            let articles = (try? await SportsRepository.shared.legacyNews(for: match.league, limit: 40)) ?? []
+            matchNews = MatchNewsRelevance.rank(articles: articles, match: match)
         }
         .task(id: "\(match.id)-\(playlists.channelsRevision)-\(prefs.preferredStreamLanguages.sorted().joined(separator: ","))-\(epgRepository.programmeRevision)") {
             await rankSources()
@@ -225,6 +227,22 @@ struct MatchDetailView: View {
         .navigationDestination(item: $presentedMatchArticle) { article in
             ArticleReaderView(article: article)
         }
+        .navigationDestination(isPresented: $showingAllMatchNews) { moreMatchNewsList }
+    }
+
+    private var moreMatchNewsList: some View {
+        List(matchNews) { article in
+            NewsArticleCard(article: article) { presentedMatchArticle = article }
+                .listRowBackground(Theme.surface)
+                .listRowSeparator(.hidden)
+        }
+        .listStyle(.plain)
+        .hidesScrollContentBackground()
+        .background(Theme.background)
+        .navigationTitle("Related News")
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 
     /// Finds streams for this match through `StreamAvailabilityStore`/`MatchLinkService`
@@ -1701,45 +1719,22 @@ struct MatchDetailView: View {
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
             } else if let top = rankedSources.first {
-                Button { handleSourceTap(top.channel) } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Label(
-                                match.state == .live ? "Watch on \(top.channel.name)" : "Watch \(top.channel.name) when live",
-                                systemImage: "play.fill"
-                            )
-                            .font(.subheadline.weight(.bold))
-                            if isNewlyRenamed(top.channel) { newChannelBadge }
-                        }
-                        Text(top.isConfirmed ? (top.epgProgramme?.title ?? "Confirmed match") : "Possible match")
-                            .font(.caption)
-                            .opacity(0.85)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(match.state == .live ? Theme.live : Theme.accent)
+                let cleaned = ChannelDisplayName.make(from: top.channel.name)
+                PrimaryStreamCard(
+                    title: cleaned.title,
+                    isLive: match.state == .live,
+                    matchLabel: top.isConfirmed ? top.epgProgramme?.title : nil,
+                    countryFlag: cleaned.flag,
+                    quality: cleaned.quality,
+                    isConfirmed: top.isConfirmed,
+                    showsNewBadge: isNewlyRenamed(top.channel),
+                    action: { handleSourceTap(top.channel) }
+                )
 
                 if rankedSources.count > 1 {
-                    Button {
+                    AlternateStreamsButton(count: rankedSources.count - 1) {
                         isShowingMoreSources = true
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "ellipsis.circle.fill")
-                                .foregroundStyle(Theme.accent)
-                            Text("More streams")
-                                .font(.subheadline.weight(.bold))
-                                .foregroundStyle(Theme.textPrimary)
-                            Spacer()
-                            Text("\(rankedSources.count - 1)+")
-                                .font(.caption.weight(.bold).monospacedDigit())
-                                .foregroundStyle(Theme.textSecondary)
-                        }
-                        .padding(12)
-                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
                     }
-                    .buttonStyle(.plain)
                 }
             } else {
                 Text(noStreamReason)
@@ -1766,7 +1761,7 @@ struct MatchDetailView: View {
     private var moreSourcesSheet: some View {
         NavigationStack {
             List(rankedSources) { source in
-                SourceRow(name: source.channel.name,
+                SourceRow(name: ChannelDisplayName.make(from: source.channel.name).title,
                           subtitle: source.epgProgramme?.title ?? source.channel.group ?? source.channel.playlistName,
                           logoURL: source.channel.logoURL,
                           score: source.score,
@@ -1799,14 +1794,6 @@ struct MatchDetailView: View {
     private func isNewlyRenamed(_ channel: Channel) -> Bool {
         guard let streamID = channel.xtreamStreamID else { return false }
         return eventChannelRefresh.isNew(streamID: streamID, name: channel.name)
-    }
-
-    private var newChannelBadge: some View {
-        Text("NEW")
-            .font(.caption2.weight(.bold))
-            .padding(.horizontal, 5).padding(.vertical, 2)
-            .background(Theme.live, in: Capsule())
-            .foregroundStyle(.white)
     }
 
     private func handleSourceTap(_ channel: Channel) {
@@ -1937,11 +1924,26 @@ struct MatchDetailView: View {
                         .foregroundStyle(Theme.accent)
                 }
                 VStack(spacing: 10) {
-                    ForEach(matchNews) { article in
+                    ForEach(matchNews.prefix(3)) { article in
                         NewsArticleCard(article: article) {
                             presentedMatchArticle = article
                         }
                     }
+                }
+                if matchNews.count > 3 {
+                    Button {
+                        showingAllMatchNews = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("More news")
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.accessibleAccent)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .frame(minHeight: 44)
                 }
             }
             .padding(14)

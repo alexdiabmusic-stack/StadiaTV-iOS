@@ -125,6 +125,9 @@ struct PlayerView: View {
     @State private var aspectMode: PlayerAspectMode = .fit
     /// True when the player is laid out wider than tall (device or orientation button).
     @State private var isLandscapeLayout = false
+    /// The player's own height. The swipe gestures measure against it rather than the screen's, which
+    /// is wrong in Split View and Stage Manager windows.
+    @State private var containerHeight: CGFloat = 0
     /// Lock-screen / Control Center metadata and remote play/pause while the player is open.
     @State private var nowPlaying = VideoNowPlaying()
     @StateObject private var liveTracker = FantasyLiveTrackerEngine.shared
@@ -292,6 +295,7 @@ struct PlayerView: View {
         .onGeometryChange(for: Bool.self) { $0.size.width > $0.size.height } action: { landscape in
             isLandscapeLayout = landscape
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { containerHeight = $0 }
         #if os(iOS)
         .offset(x: dismissalDragOffset.width, y: max(0, dismissalDragOffset.height))
         .scaleEffect(playerScaleForDismissal)
@@ -642,7 +646,7 @@ struct PlayerView: View {
         if value.startLocation.x <= 24, horizontal > 18, abs(horizontal) > abs(vertical) * 1.25 {
             return .edgePop
         }
-        let upperPlayerLimit = UIScreen.main.bounds.height * 0.46
+        let upperPlayerLimit = containerHeight * 0.46
         if value.startLocation.y <= upperPlayerLimit, vertical > 18, abs(vertical) > abs(horizontal) * 1.2 {
             return .pullDown
         }
@@ -663,7 +667,7 @@ struct PlayerView: View {
                 guard value.translation.height < -80,
                       abs(value.translation.height) > abs(value.translation.width) * 1.5,
                       abs(value.predictedEndTranslation.height) > 160 else { return }
-                let videoAreaThreshold = UIScreen.main.bounds.height * 0.55
+                let videoAreaThreshold = containerHeight * 0.55
                 guard value.startLocation.y < videoAreaThreshold else { return }
                 toggleOrientation()
             }

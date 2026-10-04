@@ -455,6 +455,7 @@ struct EPGGuideGrid: View {
         .onChange(of: vm.scrollToNowToken) { _, _ in scrollToNowTrigger += 1 }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
             now = Date()
+            vm.rollOverIfNeeded()
         }
     }
 
@@ -543,7 +544,7 @@ private struct ProgrammeGridView: View {
         }
         .contentMargins(.bottom, scrollState.bottomInset + 16, for: .scrollContent)
         .onChange(of: scrollToNowTrigger) { _, _ in
-            let target = vm.initialScrollOffset
+            let target = vm.initialScrollOffset(viewportWidth: scrollState.viewSize.width)
             updateRenderedMinutes(offsetX: target, viewWidth: scrollState.viewSize.width)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
                 scrollPos = ScrollPosition(x: target, y: 0)

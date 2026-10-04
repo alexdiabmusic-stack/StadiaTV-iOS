@@ -335,11 +335,16 @@ final class TVGuideViewModel: ObservableObject {
         Calendar.current.isDateInToday(date)
     }
 
-    var displayDate: String {
-        if isToday(selectedDate) { return "Today" }
+    // Built once; this is read every time the guide header is evaluated.
+    nonisolated private static let dayFmt: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "E, MMM d"
-        return f.string(from: selectedDate)
+        return f
+    }()
+
+    var displayDate: String {
+        if isToday(selectedDate) { return "Today" }
+        return Self.dayFmt.string(from: selectedDate)
     }
 
     var nowIsVisible: Bool {

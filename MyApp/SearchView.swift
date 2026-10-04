@@ -792,6 +792,13 @@ private extension UniversalSearchResult {
 }
 
 private extension Match {
+    /// Built once: a search result row asks for its weekday every time it is drawn.
+    private static let weekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("EEEE")
+        return formatter
+    }()
+
     var searchDateText: String {
         let text: String
 
@@ -807,9 +814,7 @@ private extension Match {
             } else if calendar.isDateInTomorrow(date) {
                 text = "Tomorrow"
             } else {
-                let formatter = DateFormatter()
-                formatter.setLocalizedDateFormatFromTemplate("EEEE")
-                text = formatter.string(from: date)
+                text = Self.weekdayFormatter.string(from: date)
             }
         }
 

@@ -74,13 +74,17 @@ struct CatchupResolver {
         streamURL: URL,
         epgOffsetMinutes: Int
     ) throws -> URL {
-        // Expected path: /live/{user}/{pass}/{stream_id}.{ext}
-        let parts = streamURL.pathComponents   // ["/", "live", user, pass, "12345.m3u8"]
-        guard parts.count >= 5, parts[safe: 1] == "live" else { throw CatchupError.unavailable }
+        // Expected path: /live/{user}/{pass}/{stream_id}.{ext}. Split the still-encoded path so a
+        // credential containing an escaped `/` stays one segment, then decode each segment.
+        guard let components = URLComponents(url: streamURL, resolvingAgainstBaseURL: false) else {
+            throw CatchupError.unavailable
+        }
+        let parts = components.percentEncodedPath.split(separator: "/").map(String.init)
+        guard parts.count >= 4, parts[0] == "live" else { throw CatchupError.unavailable }
 
-        let user     = parts[2]
-        let pass     = parts[3]
-        let fileComp = parts[4]
+        let user     = parts[1].removingPercentEncoding ?? parts[1]
+        let pass     = parts[2].removingPercentEncoding ?? parts[2]
+        let fileComp = parts[3]
         let streamID = fileComp.components(separatedBy: ".").first ?? fileComp
 
         guard !user.isEmpty, !pass.isEmpty, !streamID.isEmpty else { throw CatchupError.unavailable }
@@ -100,7 +104,7 @@ struct CatchupResolver {
         let duration  = max(1, Int(ceil(realEnd.timeIntervalSince(realStart) / 60)))
         let startStr  = xtreamStartString(from: realStart)
 
-        let urlStr = "\(hostBase)/timeshift/\(user)/\(pass)/\(duration)/\(startStr)/\(streamID).m3u8"
+        let urlStr = "\(hostBase)/timeshift/\(user.xtreamPathSegment)/\(pass.xtreamPathSegment)/\(duration)/\(startStr)/\(streamID).m3u8"
         guard let url = URL(string: urlStr) else { throw CatchupError.unavailable }
         return url
     }

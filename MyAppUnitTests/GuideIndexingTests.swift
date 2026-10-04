@@ -136,3 +136,25 @@ struct GuideIndexingTests {
         #expect(calls == 1)
     }
 }
+
+@Suite("Programme store")
+struct EPGProgrammeStoreTests {
+
+    @Test("An in-memory store is private to itself and leaves no file behind")
+    func inMemoryStoresArePrivate() async throws {
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let programme = EPGProgramme(
+            id: "g1-1", epgChannelId: "g1", canonicalChannelId: nil, title: "Show", subtitle: nil, description: nil, categories: [],
+            start: start, end: start.addingTimeInterval(3600), imageURL: nil, season: nil, episode: nil, rating: nil,
+            sourceId: "custom-0", sourcePriority: 0, endTimeIsInferred: false
+        )
+        let first = try EPGProgrammeStore.inMemory()
+        let second = try EPGProgrammeStore.inMemory()
+        try await first.replaceProgrammes([programme], sourceId: "custom-0")
+
+        let window = start.addingTimeInterval(-3600)...start.addingTimeInterval(7200)
+        #expect(try await first.snapshot(from: window.lowerBound, to: window.upperBound).map(\.title) == ["Show"])
+        #expect(try await second.snapshot(from: window.lowerBound, to: window.upperBound).isEmpty)
+        #expect(!FileManager.default.fileExists(atPath: ":memory:"))
+    }
+}

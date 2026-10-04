@@ -38,8 +38,15 @@ actor EPGProgrammeStore {
     }()
 
     init(url: URL) throws {
+        try self.init(path: url.path)
+    }
+
+    /// `path` goes to SQLite as given, so `":memory:"` is a private in-memory database. It must not
+    /// pass through a `URL`: `URL(fileURLWithPath: ":memory:")` resolves against the working
+    /// directory, which made the old fallback open (or fail to create) a file with that name.
+    private init(path: String) throws {
         guard sqlite3_open_v2(
-            url.path,
+            path,
             &db,
             SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX,
             nil
@@ -50,7 +57,7 @@ actor EPGProgrammeStore {
     }
 
     static func inMemory() throws -> EPGProgrammeStore {
-        try EPGProgrammeStore(url: URL(fileURLWithPath: ":memory:"))
+        try EPGProgrammeStore(path: ":memory:")
     }
 
     private static func empty() -> EPGProgrammeStore {
@@ -112,8 +119,10 @@ actor EPGProgrammeStore {
                 guard sqlite3_step(stmt) == SQLITE_DONE else { throw StoreError.writeFailed }
             }
 
+            // OR REPLACE: `id` is unique across every source, so one clashing row shouldn't roll
+            // back the whole source's write and leave its guide unsaved.
             let insertSQL = """
-            INSERT INTO epg_programmes
+            INSERT OR REPLACE INTO epg_programmes
                 (id, epg_channel_id, title, subtitle, description, categories_json,
                  start_time, end_time, image_url, season, episode, rating,
                  source_id, source_priority, end_time_inferred)
@@ -321,13 +330,15 @@ actor EPGProgrammeStore {
         }
     }
 
+    // SQLITE_TRANSIENT copies the bytes before the call returns, so Swift's temporary C string
+    // is enough; there's no need to allocate an NSString per value.
     private func bindText(_ stmt: OpaquePointer?, _ col: Int32, _ val: String) {
-        sqlite3_bind_text(stmt, col, (val as NSString).utf8String, -1, kEPGSQLiteTransient)
+        sqlite3_bind_text(stmt, col, val, -1, kEPGSQLiteTransient)
     }
 
     private func bindOptionalText(_ stmt: OpaquePointer?, _ col: Int32, _ val: String?) {
         if let val {
-            sqlite3_bind_text(stmt, col, (val as NSString).utf8String, -1, kEPGSQLiteTransient)
+            sqlite3_bind_text(stmt, col, val, -1, kEPGSQLiteTransient)
         } else {
             sqlite3_bind_null(stmt, col)
         }

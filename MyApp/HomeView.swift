@@ -264,14 +264,6 @@ struct HomeView: View {
                     .offset(y: (showHero || reduceMotion) ? 0 : 26)
                     .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.5), value: showHero)
 
-                // Straight back into what you were watching, and your favourite channels.
-                if !watchStore.history.isEmpty {
-                    ContinueWatchingSection(entries: watchStore.history) { PlaybackTapClock.record(); playingChannel = $0 }
-                        .opacity(showHero ? 1 : 0)
-                        .offset(y: (showHero || reduceMotion) ? 0 : 26)
-                        .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.5), value: showHero)
-                }
-
                 if !favouriteChannels.isEmpty {
                     FavouriteChannelsRail(channels: favouriteChannels) { PlaybackTapClock.record(); playingChannel = $0 }
                         .opacity(showHero ? 1 : 0)
@@ -308,6 +300,15 @@ struct HomeView: View {
 
                 if !viewModel.recentHighlights.isEmpty {
                     TrendingSection(highlights: viewModel.recentHighlights)
+                        .opacity(showRemaining ? 1 : 0)
+                        .offset(y: (showRemaining || reduceMotion) ? 0 : 40)
+                        .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.45), value: showRemaining)
+                }
+
+                // Straight back into what you were watching — placed last so it doesn't
+                // compete with today's live/upcoming content for top-of-page attention.
+                if !watchStore.history.isEmpty {
+                    ContinueWatchingSection(entries: watchStore.history) { PlaybackTapClock.record(); playingChannel = $0 }
                         .opacity(showRemaining ? 1 : 0)
                         .offset(y: (showRemaining || reduceMotion) ? 0 : 40)
                         .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.45), value: showRemaining)

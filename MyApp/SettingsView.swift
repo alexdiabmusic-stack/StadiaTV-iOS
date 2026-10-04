@@ -1238,6 +1238,9 @@ struct ESPNFantasyConnectSheet: View {
     @State private var isSigningIn = false
     @State private var signedInViaWeb = false
     @State private var webAuthError: String?
+    @State private var isDiscoveringLeagues = false
+    @State private var discoveredLeagues: [ESPNDiscoveredLeague] = []
+    @State private var discoveryError: String?
 
     var body: some View {
         NavigationStack {
@@ -1265,11 +1268,44 @@ struct ESPNFantasyConnectSheet: View {
                         if signedInViaWeb {
                             Label("Signed in to ESPN", systemImage: "checkmark.seal.fill")
                                 .foregroundStyle(.green)
+
+                            if isDiscoveringLeagues {
+                                HStack {
+                                    Text("Finding your leagues…")
+                                    Spacer()
+                                    ProgressView()
+                                }
+                            } else if !discoveredLeagues.isEmpty {
+                                ForEach(discoveredLeagues) { league in
+                                    Button {
+                                        selectedSport = league.sport
+                                        leagueID = league.leagueID
+                                        seasonID = String(league.seasonID)
+                                    } label: {
+                                        HStack {
+                                            Label(league.teamName ?? "League \(league.leagueID)", systemImage: league.sport.symbolName)
+                                                .foregroundStyle(Theme.textPrimary)
+                                            Spacer()
+                                            if selectedSport == league.sport, leagueID == league.leagueID, seasonID == String(league.seasonID) {
+                                                Image(systemName: "checkmark")
+                                                    .foregroundStyle(Theme.accent)
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                Text(discoveryError ?? "Banner couldn't find any leagues automatically for this account. Enter the League ID above manually.")
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+
                             Button("Sign in with a different ESPN account") {
                                 signedInViaWeb = false
                                 includePrivateCredentials = false
                                 espnS2 = ""
                                 swid = ""
+                                discoveredLeagues = []
+                                discoveryError = nil
                             }
                         } else {
                             Button {
@@ -1282,6 +1318,7 @@ struct ESPNFantasyConnectSheet: View {
                                         swid = credentials.swid
                                         includePrivateCredentials = true
                                         signedInViaWeb = true
+                                        await discoverLeagues(credentials: credentials)
                                     } catch {
                                         webAuthError = error.localizedDescription
                                     }
@@ -1357,6 +1394,24 @@ struct ESPNFantasyConnectSheet: View {
                 }
             }
         }
+    }
+
+    private func discoverLeagues(credentials: ESPNFantasyCredentials) async {
+        isDiscoveringLeagues = true
+        discoveryError = nil
+        do {
+            let leagues = try await ESPNFanLeagueDiscoveryClient().discoverLeagues(credentials: credentials)
+            discoveredLeagues = leagues
+            if let first = leagues.first {
+                selectedSport = first.sport
+                leagueID = first.leagueID
+                seasonID = String(first.seasonID)
+            }
+        } catch {
+            discoveredLeagues = []
+            discoveryError = error.localizedDescription
+        }
+        isDiscoveringLeagues = false
     }
 }
 

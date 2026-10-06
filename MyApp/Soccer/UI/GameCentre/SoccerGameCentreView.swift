@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The reusable Soccer Game Centre shell — tabs, polling wiring, premium/spoiler
 /// gating, pregame/live/final/cache states. Provider-agnostic: every subview it
-/// renders (`SoccerScoreHeaderView`, `SoccerOverviewView`, `SoccerTimelineView`,
+/// renders (`SoccerGameHeaderView`, `SoccerOverviewView`, `SoccerTimelineView`,
 /// `SoccerLineupsView`, `SoccerStatsView`, `SoccerCommentaryView`) takes only
 /// canonical Soccer domain types, and the provider identity (which endpoint client,
 /// which polling cadence, which cache namespace, which league path) is injected by
@@ -53,7 +53,7 @@ struct SoccerGameCentreView<WatchContent: View, RelatedContent: View>: View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 if let soccerMatch = snapshot?.match {
-                    SoccerScoreHeaderView(match: soccerMatch, homeLogo: match.home.logoURL, awayLogo: match.away.logoURL, hideScore: hideScore)
+                    SoccerGameHeaderView(match: soccerMatch, league: match.league, homeLogo: match.home.logoURL, awayLogo: match.away.logoURL)
                 } else {
                     VStack(spacing: 12) {
                         Text(match.shortName).font(.title2.bold())
@@ -62,16 +62,10 @@ struct SoccerGameCentreView<WatchContent: View, RelatedContent: View>: View {
                     }.frame(maxWidth: .infinity).padding().background(Theme.surface)
                 }
                 watchContent()
-                ScrollView(.horizontal) {
-                    HStack {
-                        ForEach(availableTabs) { tab in
-                            Button { fullRefresh = false; model.selectedTab = tab } label: {
-                                Text(tab.rawValue).font(.subheadline.bold()).padding(.horizontal, 12).frame(minHeight: 44)
-                                    .background(model.selectedTab == tab ? Theme.surfaceElevated : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
-                            }.buttonStyle(.bordered).accessibilityAddTraits(model.selectedTab == tab ? .isSelected : [])
-                        }
-                    }.padding(8)
-                }
+                GameTabBar(tabs: availableTabs, selection: Binding(
+                    get: { model.selectedTab },
+                    set: { fullRefresh = false; model.selectedTab = $0 }
+                ))
                 if model.showingCache {
                     Text("Saved data · \(snapshot?.fetchedAt.formatted(date: .abbreviated, time: .shortened) ?? "")").font(.caption).foregroundStyle(.secondary).padding(4)
                 }
@@ -116,11 +110,11 @@ struct SoccerGameCentreView<WatchContent: View, RelatedContent: View>: View {
             if let snapshot {
                 switch model.selectedTab {
                 case .overview:
-                    ScrollView {
-                        VStack(alignment: .leading) {
-                            SoccerOverviewView(snapshot: snapshot)
-                            relatedContent()
-                        }.padding().frame(maxWidth: 1000).frame(maxWidth: .infinity)
+                    GameOverviewScroll {
+                        SoccerOverviewView(snapshot: snapshot, league: match.league,
+                            onViewAllEvents: availableTabs.contains(.timeline) ? { fullRefresh = false; model.selectedTab = .timeline } : nil,
+                            onViewAllStats: availableTabs.contains(.stats) ? { fullRefresh = false; model.selectedTab = .stats } : nil)
+                        relatedContent()
                     }
                 case .timeline:
                     SoccerTimelineView(snapshot: snapshot, wide: wide)

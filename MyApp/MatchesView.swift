@@ -64,8 +64,10 @@ struct MatchesView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
             #endif
+            #if os(iOS) || os(tvOS)
             .toolbarBackground(Theme.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            #endif
             .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
             .toolbar {
                 if selectedPage == .matches {
@@ -340,7 +342,7 @@ struct MatchesView: View {
     ) -> some View {
         Button {
             #if os(iOS)
-            UISelectionFeedbackGenerator().selectionChanged()
+            Haptic.selection()
             #endif
             action()
         } label: {
@@ -820,6 +822,9 @@ private struct FollowingComingUpSection: View {
     /// Matches whose league has 10+ matches in the last 14 days and none confident — the
     /// playlist's guide doesn't carry it. Shown collapsed instead of cluttering the main list.
     var notOnPlaylistMatches: [Match] = []
+    #if os(tvOS)
+    @State private var showingNotOnPlaylist = false
+    #endif
 
     private struct DateGroup: Identifiable {
         let title: String
@@ -918,6 +923,33 @@ private struct FollowingComingUpSection: View {
                 .buttonStyle(.plain)
 
                 if !notOnPlaylistMatches.isEmpty {
+                    #if os(tvOS)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Button { showingNotOnPlaylist.toggle() } label: {
+                            HStack {
+                                Text("Not on your playlist (\(notOnPlaylistMatches.count))")
+                                Spacer()
+                                Image(systemName: showingNotOnPlaylist ? "chevron.up" : "chevron.down")
+                            }
+                        }
+                        .buttonStyle(.card)
+                        if showingNotOnPlaylist {
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(notOnPlaylistMatches.prefix(20)) { match in
+                                    NavigationLink(value: match) {
+                                        FollowingEventRow(match: match, streamCount: 0)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.top, 8)
+                        }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+                    #else
                     DisclosureGroup("Not on your playlist (\(notOnPlaylistMatches.count))") {
                         VStack(alignment: .leading, spacing: 6) {
                             ForEach(notOnPlaylistMatches.prefix(20)) { match in
@@ -933,6 +965,7 @@ private struct FollowingComingUpSection: View {
                     .foregroundStyle(Theme.textSecondary)
                     .padding(.horizontal, 20)
                     .padding(.top, 14)
+                    #endif
                 }
             }
         }
@@ -1058,8 +1091,10 @@ private struct FollowingFullScheduleView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        #if os(iOS) || os(tvOS)
         .toolbarBackground(Theme.background, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
+        #endif
     }
 
     private var sportFilterMenu: some View {

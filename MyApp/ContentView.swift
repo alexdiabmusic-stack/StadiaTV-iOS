@@ -40,6 +40,37 @@ struct MyApp: App {
             normalContent
             #endif
         }
+        #if os(macOS)
+        .defaultSize(width: 1280, height: 860)
+        .commands { MacCommands() }
+        #endif
+        #if os(macOS)
+        Settings {
+            MoreView()
+                .environmentObject(playlistStore)
+                .environmentObject(preferences)
+                .environmentObject(watchStore)
+                .environmentObject(entitlements)
+                .environmentObject(predictions)
+                .environmentObject(articleLibrary)
+                .environmentObject(podcastStore)
+                .environmentObject(epgRepository)
+                .environmentObject(guideStore)
+                .environmentObject(streamStore)
+                .environmentObject(eventChannelRefresh)
+                .environmentObject(BannerAppEnvironment.shared)
+                .environmentObject(channelPrefsStore)
+                .environmentObject(customGroupStore)
+                .environmentObject(groupPrefsStore)
+                .environmentObject(fantasyStore)
+                .environmentObject(bannerFantasyStore)
+                .environmentObject(ProgrammeReminderStore.shared)
+                .environmentObject(RecordingService.shared)
+                .environmentObject(ParentalControlStore.shared)
+                .environmentObject(launchCoordinator)
+                .frame(minWidth: 480, minHeight: 420)
+        }
+        #endif
     }
 
     @ViewBuilder
@@ -116,7 +147,7 @@ struct MyApp: App {
             .task { launchCoordinator.startBrandSequence() }
             // Overlay — present during every launch phase except `.home`.
             // Removed from the hierarchy once the transition is fully complete.
-            #if !os(tvOS)
+            #if os(iOS)
             .overlay {
                 if launchCoordinator.phase != .home {
                     LaunchAnimationView()
@@ -158,30 +189,71 @@ struct RootView: View {
         }
     }
 
-    var body: some View {
-        TabView(selection: $selectedTab) {
-            Tab("Home", systemImage: "house.fill", value: AppTab.home) {
-                HomeView(switchToFollowing: { selectedTab = .following })
-                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
+    #if os(macOS)
+    /// Native Mac sidebar + detail shell. `selectedTab` stays non-optional (shared with
+    /// iOS/iPadOS and with `appEnvironment.requestedTab` elsewhere in this file), so the
+    /// sidebar `List` selection binding bridges it to the `Optional` it expects.
+    private var macSidebarSelection: Binding<AppTab?> {
+        Binding(get: { selectedTab }, set: { if let newValue = $0 { selectedTab = newValue } })
+    }
+
+    private var macNavigationBody: some View {
+        NavigationSplitView {
+            List(selection: macSidebarSelection) {
+                Label("Home", systemImage: "house.fill").tag(AppTab.home)
+                Label("Following", systemImage: "star.fill").tag(AppTab.following)
+                Label("Live", systemImage: "dot.radiowaves.left.and.right").tag(AppTab.live)
+                Label("Discover", systemImage: "safari.fill").tag(AppTab.discover)
             }
-            Tab("Following", systemImage: "star.fill", value: AppTab.following) {
-                MatchesView()
-                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
-            }
-            Tab("Live", systemImage: "dot.radiowaves.left.and.right", value: AppTab.live) {
-                LiveView()
-                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
-            }
-            Tab("Discover", systemImage: "safari.fill", value: AppTab.discover) {
-                DiscoverView()
-                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
-            }
-            Tab("Settings", systemImage: "gearshape.fill", value: AppTab.settings) {
-                MoreView()
-                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
-            }
+            .navigationSplitViewColumnWidth(min: 180, ideal: 220)
+        } detail: {
+            macDetailContent
+                .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
         }
-        .tabViewStyle(.sidebarAdaptable)
+    }
+
+    @ViewBuilder
+    private var macDetailContent: some View {
+        switch selectedTab {
+        case .home: HomeView(switchToFollowing: { selectedTab = .following })
+        case .following: MatchesView()
+        case .live: LiveView()
+        case .discover: DiscoverView()
+        case .settings: MoreView()
+        }
+    }
+    #endif
+
+    var body: some View {
+        Group {
+            #if os(macOS)
+            macNavigationBody
+            #else
+            TabView(selection: $selectedTab) {
+                Tab("Home", systemImage: "house.fill", value: AppTab.home) {
+                    HomeView(switchToFollowing: { selectedTab = .following })
+                        .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
+                }
+                Tab("Following", systemImage: "star.fill", value: AppTab.following) {
+                    MatchesView()
+                        .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
+                }
+                Tab("Live", systemImage: "dot.radiowaves.left.and.right", value: AppTab.live) {
+                    LiveView()
+                        .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
+                }
+                Tab("Discover", systemImage: "safari.fill", value: AppTab.discover) {
+                    DiscoverView()
+                        .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
+                }
+                Tab("Settings", systemImage: "gearshape.fill", value: AppTab.settings) {
+                    MoreView()
+                        .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
+                }
+            }
+            .tabViewStyle(.sidebarAdaptable)
+            #endif
+        }
         .tint(Theme.accent)
         .environmentObject(liveViewModel)
         .environmentObject(epgRepository)
@@ -256,7 +328,7 @@ struct RootView: View {
             selectedTab = tab
             appEnvironment.requestedTab = nil
         }
-        .fullScreenCover(item: $deepLinkMatch) { MatchDetailView(match: $0) }
+        .fullScreenCoverCompat(item: $deepLinkMatch) { MatchDetailView(match: $0) }
         .alert("Get notified before your favourite teams play?", isPresented: $showingFavoriteNotificationPrompt) {
             Button("Not Now", role: .cancel) {
                 prefs.markFavoriteTeamNotificationPromptAnswered()

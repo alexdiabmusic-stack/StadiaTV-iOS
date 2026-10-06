@@ -23,13 +23,15 @@ struct LiveView: View {
             content
                 .background(Theme.background.ignoresSafeArea())
                 .navigationTitle("Live")
-                #if !os(tvOS)
+                #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
             #endif
+                #if os(iOS) || os(tvOS)
                 .toolbarBackground(Theme.background, for: .navigationBar)
                 .toolbarBackground(.visible, for: .navigationBar)
+                #endif
                 .toolbar {
-                    ToolbarItemGroup(placement: .topBarTrailing) {
+                    ToolbarItemGroup(placement: .compatTopBarTrailing) {
                         NavigationLink(destination: SearchView()) {
                             Image(systemName: "magnifyingglass")
                                 .foregroundStyle(Theme.textPrimary)
@@ -69,7 +71,7 @@ struct LiveView: View {
                 get: { section },
                 set: { newValue in
                     #if os(iOS)
-                    UISelectionFeedbackGenerator().selectionChanged()
+                    Haptic.selection()
                     #endif
                     sectionRaw = newValue.rawValue
                 }
@@ -200,7 +202,7 @@ struct LiveView: View {
     private func sportNavChip(_ sport: SportGroup?, label: String) -> some View {
         Button {
             #if os(iOS)
-            UISelectionFeedbackGenerator().selectionChanged()
+            Haptic.selection()
             #endif
             withAnimation(Theme.Motion.snappy) { selectedSport = sport }
         } label: {
@@ -234,7 +236,7 @@ struct LiveView: View {
     private func filterChip(_ f: LiveFilter) -> some View {
         Button {
             #if os(iOS)
-            UISelectionFeedbackGenerator().selectionChanged()
+            Haptic.selection()
             #endif
             withAnimation(Theme.Motion.snappy) { filter = f }
         } label: {

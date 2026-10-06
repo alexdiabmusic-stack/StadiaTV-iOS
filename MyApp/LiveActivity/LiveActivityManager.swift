@@ -1,3 +1,4 @@
+#if os(iOS) || os(visionOS)
 import ActivityKit
 import BannerSharedKit
 import Foundation
@@ -126,3 +127,28 @@ final class LiveActivityManager {
             statusDetail: match.statusDetail, stateLabel: match.state.label)
     }
 }
+#else
+import Foundation
+
+/// Live Activities have no native macOS/tvOS equivalent (ActivityKit's `Activity` APIs
+/// are unavailable there). This stub keeps the call sites in ContentView.swift and
+/// CarPlayPlaybackCoordinator.swift platform-agnostic.
+@MainActor
+final class LiveActivityManager {
+    static let shared = LiveActivityManager()
+
+    private(set) var trackedMatchID: String?
+
+    private init() {}
+
+    func setExplicitlyTracked(matchID: String?) {}
+
+    func reconcile(
+        liveMatches: [Match],
+        favoriteMatchIDs: Set<String>,
+        listeningMatchID: String?,
+        followedTeamMatchIDs: Set<String>,
+        followedLeagueMatchIDs: Set<String>
+    ) {}
+}
+#endif

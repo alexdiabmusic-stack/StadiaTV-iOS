@@ -98,7 +98,7 @@ struct StandingsView: View {
                                 Button {
                                     withAnimation(.easeInOut(duration: 0.18)) { showDivisions = isDivTab }
                                     #if os(iOS)
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    Haptic.impact(.light)
                                     #endif
                                 } label: {
                                     Text(label)

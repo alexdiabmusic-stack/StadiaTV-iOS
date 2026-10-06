@@ -18,10 +18,10 @@ struct FantasyDashboardView: View {
             content
         }
         .navigationTitle("Fantasy")
-        #if !os(tvOS)
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
         #endif
-        .fullScreenCover(item: $playingChannel) { PlayerView(channel: $0) }
+        .fullScreenCoverCompat(item: $playingChannel) { PlayerView(channel: $0) }
         .sheet(isPresented: $showingConnect) {
             SleeperConnectSheet(channels: playlists.allChannels, preferredLanguages: prefs.preferredStreamLanguages)
                 .environmentObject(fantasyStore)
@@ -405,7 +405,9 @@ struct SleeperConnectSheet: View {
                             .foregroundStyle(Theme.textSecondary)
                     }
                     TextField("Sleeper username", text: $username)
+                        #if os(iOS)
                         .textInputAutocapitalization(.never)
+                        #endif
                         .autocorrectionDisabled()
                         .padding(14)
                         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))

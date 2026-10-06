@@ -64,7 +64,7 @@ struct TVLiveTVView: View {
             .searchable(text: $query, prompt: "Search channels")
         }
         .tint(Theme.accent)
-        .fullScreenCover(item: $playingChannel) { TVPlayerView(channel: $0, initialMatch: nil) }
+        .fullScreenCoverCompat(item: $playingChannel) { TVPlayerView(channel: $0, initialMatch: nil) }
     }
 
     // MARK: - Sidebar

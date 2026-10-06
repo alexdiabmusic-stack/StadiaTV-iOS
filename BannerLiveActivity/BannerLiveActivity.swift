@@ -1,4 +1,6 @@
+#if os(iOS) || os(visionOS)
 import ActivityKit
+#endif
 import BannerSharedKit
 import WidgetKit
 import SwiftUI
@@ -8,6 +10,7 @@ import SwiftUI
 /// given — no sports/priority logic lives here.
 struct BannerGameLiveActivity: Widget {
     var body: some WidgetConfiguration {
+        #if os(iOS) || os(visionOS)
         ActivityConfiguration(for: GameLiveActivityAttributes.self) { context in
             BannerLiveActivityLockScreenView(context: context)
                 .activityBackgroundTint(Color.black)
@@ -36,9 +39,18 @@ struct BannerGameLiveActivity: Widget {
             }
             .widgetURL(URL(string: "banner://game/\(context.attributes.matchID)"))
         }
+        #else
+        // Live Activities have no macOS equivalent for this app; this extension target
+        // isn't meaningful there, but the Xcode multiplatform build system still forces
+        // it to compile for every platform MyApp supports, so this is a valid no-op.
+        StaticConfiguration(kind: "BannerGameLiveActivityUnavailable", provider: NoOpTimelineProvider()) { _ in
+            EmptyView()
+        }
+        #endif
     }
 }
 
+#if os(iOS) || os(visionOS)
 private struct BannerLiveActivityLockScreenView: View {
     let context: ActivityViewContext<GameLiveActivityAttributes>
 
@@ -62,3 +74,16 @@ private struct BannerLiveActivityLockScreenView: View {
         .widgetURL(URL(string: "banner://game/\(context.attributes.matchID)"))
     }
 }
+#else
+private struct NoOpEntry: TimelineEntry { let date = Date() }
+
+private struct NoOpTimelineProvider: TimelineProvider {
+    func placeholder(in context: Context) -> NoOpEntry { NoOpEntry() }
+    func getSnapshot(in context: Context, completion: @escaping (NoOpEntry) -> Void) {
+        completion(NoOpEntry())
+    }
+    func getTimeline(in context: Context, completion: @escaping (Timeline<NoOpEntry>) -> Void) {
+        completion(Timeline(entries: [NoOpEntry()], policy: .never))
+    }
+}
+#endif

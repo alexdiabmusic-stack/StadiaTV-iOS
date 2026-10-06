@@ -193,7 +193,7 @@ struct ParentalGateModifier: ViewModifier {
                     onAllowed()
                 }
             }
-            .fullScreenCover(isPresented: $showingPIN) {
+            .fullScreenCoverCompat(isPresented: $showingPIN) {
                 if let ch = channel {
                     PINPromptView(
                         title: "Parental Controls",

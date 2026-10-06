@@ -30,7 +30,7 @@ struct WelcomeView: View {
         }
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
-        #if !os(tvOS)
+        #if os(iOS)
         .statusBarHidden(false)
         #endif
         .onAppear {

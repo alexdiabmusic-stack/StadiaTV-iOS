@@ -70,14 +70,14 @@ struct HomeView: View {
                 Theme.background.ignoresSafeArea()
                 mainContent
             }
-            #if !os(tvOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
+            .inlineNavigationTitle()
             .toolbar { toolbarContent }
+            #if os(iOS) || os(tvOS)
             .toolbarBackground(Theme.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            #endif
             .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
-            .fullScreenCover(item: $playingChannel) { PlayerView(channel: $0) }
+            .fullScreenCoverCompat(item: $playingChannel) { PlayerView(channel: $0) }
         }
         .tint(Theme.accent)
         .task(id: loadPreferencesKey) {

@@ -1,5 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 /// BannerTV visual language — neutral foundation with colour reserved for meaning.
 enum Theme {
@@ -18,14 +22,26 @@ enum Theme {
     static let hairline         = dynamic(dark: 0xFFFFFF, light: 0x000000, darkAlpha: 0.09, lightAlpha: 0.09)
 
     private static func dynamic(dark: UInt, light: UInt, darkAlpha: Double = 1, lightAlpha: Double = 1) -> Color {
+        #if canImport(UIKit)
         Color(UIColor { traits in
             traits.userInterfaceStyle == .light
                 ? UIColor(Color(hex: light, alpha: lightAlpha))
                 : UIColor(Color(hex: dark, alpha: darkAlpha))
         })
+        #elseif os(macOS)
+        Color(NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+                ? NSColor(Color(hex: dark, alpha: darkAlpha))
+                : NSColor(Color(hex: light, alpha: lightAlpha))
+        })
+        #endif
     }
 
+    #if os(iOS)
     static let isPad = UIDevice.current.userInterfaceIdiom == .pad
+    #else
+    static let isPad = false
+    #endif
 
     // MARK: Spacing (4-pt grid)
 
@@ -81,14 +97,24 @@ enum Theme {
     // MARK: Motion
 
     enum Motion {
+        private static var isReduceMotionEnabled: Bool {
+            #if os(iOS) || os(tvOS)
+            UIAccessibility.isReduceMotionEnabled
+            #elseif os(macOS)
+            NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            #else
+            false
+            #endif
+        }
+
         /// State changes (toggles, selection, small layout shifts).
         /// With Reduce Motion on, becomes a short fade-like ease with no spring travel.
         static var snappy: Animation {
-            UIAccessibility.isReduceMotionEnabled ? .easeOut(duration: 0.15) : .snappy(duration: 0.25)
+            isReduceMotionEnabled ? .easeOut(duration: 0.15) : .snappy(duration: 0.25)
         }
         /// Presentations (sheets, overlays, panels).
         static var smooth: Animation {
-            UIAccessibility.isReduceMotionEnabled ? .easeOut(duration: 0.2) : .smooth(duration: 0.35)
+            isReduceMotionEnabled ? .easeOut(duration: 0.2) : .smooth(duration: 0.35)
         }
 
         /// `animation` unless Reduce Motion is on.
@@ -163,7 +189,7 @@ extension View {
 
     @ViewBuilder
     func platformRowActions<Actions: View>(@ViewBuilder _ actions: () -> Actions) -> some View {
-        #if os(tvOS)
+        #if os(tvOS) || os(macOS)
         contextMenu(menuItems: actions)
         #else
         swipeActions(edge: .trailing, allowsFullSwipe: true, content: actions)
@@ -172,7 +198,7 @@ extension View {
 
     @ViewBuilder
     func platformGroupedList() -> some View {
-        #if os(tvOS)
+        #if os(tvOS) || os(macOS)
         listStyle(.plain)
         #else
         listStyle(.insetGrouped)
@@ -188,10 +214,60 @@ extension View {
     }
 
     func inlineNavigationTitle() -> some View {
-        #if os(tvOS)
-        self
-        #else
+        #if os(iOS)
         navigationBarTitleDisplayMode(.inline)
+        #else
+        self
+        #endif
+    }
+}
+
+extension View {
+    /// `fullScreenCover` on iOS/tvOS; macOS has no full-screen cover concept for a
+    /// window-based app, so this presents as a sheet there instead.
+    @ViewBuilder
+    func fullScreenCoverCompat<Item: Identifiable, Content: View>(
+        item: Binding<Item?>,
+        @ViewBuilder content: @escaping (Item) -> Content
+    ) -> some View {
+        #if os(macOS)
+        sheet(item: item, content: content)
+        #else
+        fullScreenCover(item: item, content: content)
+        #endif
+    }
+
+    /// `fullScreenCover` on iOS/tvOS; macOS has no full-screen cover concept for a
+    /// window-based app, so this presents as a sheet there instead.
+    @ViewBuilder
+    func fullScreenCoverCompat<Content: View>(
+        isPresented: Binding<Bool>,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        #if os(macOS)
+        sheet(isPresented: isPresented, content: content)
+        #else
+        fullScreenCover(isPresented: isPresented, content: content)
+        #endif
+    }
+}
+
+extension ToolbarItemPlacement {
+    /// `.topBarTrailing` on iOS/tvOS; the closest native equivalent on macOS.
+    static var compatTopBarTrailing: ToolbarItemPlacement {
+        #if os(macOS)
+        .primaryAction
+        #else
+        .topBarTrailing
+        #endif
+    }
+
+    /// `.topBarLeading` on iOS/tvOS; the closest native equivalent on macOS.
+    static var compatTopBarLeading: ToolbarItemPlacement {
+        #if os(macOS)
+        .navigation
+        #else
+        .topBarLeading
         #endif
     }
 }

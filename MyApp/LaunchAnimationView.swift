@@ -1,5 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
 
 // MARK: - LaunchAnimationView
 
@@ -110,9 +112,13 @@ struct LaunchAnimationView: View {
     /// so we read the actual status-bar height from the UIKit window instead.
     private func logoOffset(in geo: GeometryProxy) -> CGFloat {
         guard coordinator.isTransitioningToHome && !reduceMotion else { return 0 }
+        #if os(iOS)
         let statusBarHeight = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
             .first?.keyWindow?.safeAreaInsets.top ?? geo.safeAreaInsets.top
+        #else
+        let statusBarHeight = geo.safeAreaInsets.top
+        #endif
         let navBarCentreY = statusBarHeight + 22
         let currentCentreY = geo.size.height / 2
         return navBarCentreY - currentCentreY

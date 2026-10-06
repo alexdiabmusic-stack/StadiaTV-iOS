@@ -1,3 +1,4 @@
+#if canImport(CarPlay)
 import CarPlay
 import Foundation
 
@@ -360,3 +361,4 @@ final class CarPlayCoordinator {
         _ = task
     }
 }
+#endif

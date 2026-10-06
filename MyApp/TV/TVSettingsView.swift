@@ -28,10 +28,10 @@ struct TVSettingsView: View {
             .navigationTitle("Settings")
         }
         .tint(Theme.accent)
-        .fullScreenCover(isPresented: $showingAddPlaylist) {
+        .fullScreenCoverCompat(isPresented: $showingAddPlaylist) {
             AddPlaylistView { playlists.add($0) }
         }
-        .fullScreenCover(isPresented: $showingTeamEditor) {
+        .fullScreenCoverCompat(isPresented: $showingTeamEditor) {
             TeamEditorView()
         }
         .sheet(isPresented: $showingFantasyConnect) {

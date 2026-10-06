@@ -62,7 +62,7 @@ struct TVStatsView: View {
         .tint(Theme.accent)
         .task { syncLeague() }
         .onChange(of: prefs.followedLeagues) { syncLeague() }
-        .fullScreenCover(isPresented: $showPaywall) {
+        .fullScreenCoverCompat(isPresented: $showPaywall) {
             TVPaywallView()
         }
     }

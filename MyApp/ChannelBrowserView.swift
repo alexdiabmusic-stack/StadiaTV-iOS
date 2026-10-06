@@ -299,7 +299,7 @@ struct ChannelBrowserView: View {
 
     @ToolbarContentBuilder
     private var sortMenu: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
+        ToolbarItem(placement: .compatTopBarTrailing) {
             Menu {
                 Picker("Sort", selection: $sortOrder) {
                     ForEach(ChannelSortOrder.allCases) { order in

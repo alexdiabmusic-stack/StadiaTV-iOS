@@ -1,3 +1,4 @@
+#if os(iOS) || os(visionOS)
 import ActivityKit
 import Foundation
 
@@ -37,3 +38,4 @@ public struct GameLiveActivityAttributes: ActivityAttributes {
         self.awayAbbreviation = awayAbbreviation
     }
 }
+#endif

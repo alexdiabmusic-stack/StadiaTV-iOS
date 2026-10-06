@@ -45,12 +45,21 @@ struct TVGuideView: View {
                 guideContent
             }
         }
+        #if os(macOS)
+        .sheet(item: $playingChannel) { ch in
+            PlayerView(canonicalChannel: ch)
+        }
+        .sheet(item: $catchupChannel) { ch in
+            PlayerView(channel: ch)
+        }
+        #else
         .fullScreenCover(item: $playingChannel) { ch in
             PlayerView(canonicalChannel: ch)
         }
         .fullScreenCover(item: $catchupChannel) { ch in
             PlayerView(channel: ch)
         }
+        #endif
         .sheet(item: $selectedProgramme) { prog in
             if let ch = selectedProgrammeChannel {
                 ProgrammeDetailSheet(
@@ -200,7 +209,7 @@ struct TVGuideView: View {
 
                 Button {
                     #if !os(tvOS)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    Haptic.impact(.light)
                     #endif
                     showingFilters = true
                 } label: {
@@ -245,7 +254,9 @@ struct TVGuideView: View {
                     .font(.subheadline)
                     .foregroundStyle(Theme.textPrimary)
                     .autocorrectionDisabled()
+                    #if os(iOS)
                     .textInputAutocapitalization(.never)
+                    #endif
                     .onChange(of: channelSearchQuery) { _, q in
                         vm.setChannelNameFilter(q)
                     }
@@ -292,7 +303,7 @@ struct TVGuideView: View {
             }
             Button("Get Started") {
                 #if !os(tvOS)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                Haptic.impact(.medium)
                 #endif
                 showingBuildGuide = true
             }
@@ -332,7 +343,7 @@ struct GuideModeControl: View {
         let selected = mode == target
         return Button {
             #if !os(tvOS)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            Haptic.impact(.light)
             #endif
             withAnimation(.snappy) { onSelect(target) }
         } label: {
@@ -363,6 +374,7 @@ final class EPGScrollState: ObservableObject {
 
 // MARK: - Directional Lock
 
+#if os(iOS)
 /// Introspects the SwiftUI ScrollView's backing UIScrollView and enables
 /// isDirectionalLockEnabled so that diagonal finger movement locks to one axis.
 private struct DirectionalLockModifier: UIViewRepresentable {
@@ -383,6 +395,7 @@ private struct DirectionalLockModifier: UIViewRepresentable {
     }
     func updateUIView(_ uiView: UIView, context: Context) {}
 }
+#endif
 
 // MARK: - EPG Guide Grid
 
@@ -519,7 +532,9 @@ private struct ProgrammeGridView: View {
                         width: colW + vm.guideWindowWidth,
                         height: rulerH + CGFloat(channels.count) * rowH
                     )
+                    #if os(iOS)
                     .background(DirectionalLockModifier())
+                    #endif
 
                 ForEach(rows, id: \.self) { i in
                     let ch = channels[i]
@@ -810,7 +825,7 @@ private struct JumpToNowOverlayView: View {
                         Spacer()
                         Button {
                             #if !os(tvOS)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            Haptic.impact(.light)
                             #endif
                             onJump()
                         } label: {
@@ -1470,7 +1485,7 @@ struct BuildGuideSheet: View {
                             isSelected: selectedCategoryIds.contains(cat.id)
                         ) {
                             #if !os(tvOS)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            Haptic.impact(.light)
                             #endif
                             if selectedCategoryIds.contains(cat.id) {
                                 selectedCategoryIds.remove(cat.id)
@@ -1486,7 +1501,7 @@ struct BuildGuideSheet: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Build Your Guide")
-        #if !os(tvOS)
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
         #endif
         .toolbar {
@@ -1524,7 +1539,7 @@ struct BuildGuideSheet: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Select Channels")
-        #if !os(tvOS)
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
         #endif
         .searchable(text: $searchText, prompt: "Search channels")
@@ -1590,7 +1605,7 @@ struct BuildGuideSheet: View {
                 Spacer()
                 Button("View My Guide") {
                     #if !os(tvOS)
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    Haptic.impact(.medium)
                     #endif
                     guideStore.setChannels(localSelectedIDs)
                     guideStore.markConfigured()
@@ -1944,7 +1959,11 @@ struct WhatsOnView: View {
                 }
             }
         }
+        #if os(macOS)
+        .sheet(item: $playingChannel) { ch in PlayerView(canonicalChannel: ch) }
+        #else
         .fullScreenCover(item: $playingChannel) { ch in PlayerView(canonicalChannel: ch) }
+        #endif
         .onAppear {
             vm.setup(repository: repository)
             vm.applyGuideStore(guideStore, repository: repository)

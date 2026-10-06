@@ -432,6 +432,16 @@ struct PlayerView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
+        #if os(macOS)
+        .sheet(isPresented: $showingGuideFromPlayer) {
+            TVGuideView(onChannelSelected: { canonicalChannel in
+                if let ch = canonicalChannel.playableChannel {
+                    switchChannel(to: ch, canonicalChannel: canonicalChannel)
+                }
+                showingGuideFromPlayer = false
+            })
+        }
+        #else
         .fullScreenCover(isPresented: $showingGuideFromPlayer) {
             TVGuideView(onChannelSelected: { canonicalChannel in
                 if let ch = canonicalChannel.playableChannel {
@@ -440,6 +450,7 @@ struct PlayerView: View {
                 showingGuideFromPlayer = false
             })
         }
+        #endif
         .overlay(alignment: .trailing) {
             if showingFantasySidebar {
                 FantasyMatchupSidebarView(
@@ -486,9 +497,15 @@ struct PlayerView: View {
             // Observes FantasyStore on its own so fantasy updates don't re-render the player.
             PlayerFantasyTrackerBridge(liveTracker: liveTracker, channels: { stores?.playlistStore.allChannels ?? [] })
         }
+        #if os(macOS)
+        .sheet(item: $multiscreenSession) { session in
+            MultiScreenPlayerView(channels: session.channels)
+        }
+        #else
         .fullScreenCover(item: $multiscreenSession) { session in
             MultiScreenPlayerView(channels: session.channels)
         }
+        #endif
         .sheet(isPresented: $showPaywall) {
             PaywallView()
                 .presentationDetents([.large])
@@ -3499,6 +3516,93 @@ private struct PlayerSurface: UIViewRepresentable {
         }
     }
 }
+#elseif os(macOS)
+private final class PlayerLayerView: NSView {
+    let playerLayer = AVPlayerLayer()
+
+    var player: AVPlayer? {
+        get { playerLayer.player }
+        set { playerLayer.player = newValue }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer = playerLayer
+        playerLayer.videoGravity = .resizeAspect
+        playerLayer.backgroundColor = NSColor.black.cgColor
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        wantsLayer = true
+        layer = playerLayer
+        playerLayer.videoGravity = .resizeAspect
+        playerLayer.backgroundColor = NSColor.black.cgColor
+    }
+}
+
+private struct VideoSurface: NSViewRepresentable {
+    let player: AVPlayer
+    let showsPlaybackControls: Bool
+    let allowsPictureInPicture: Bool
+    var onPiPControllerReady: ((AVPictureInPictureController) -> Void)? = nil
+
+    func makeNSView(context: Context) -> PlayerLayerView {
+        let view = PlayerLayerView()
+        view.player = player
+        return view
+    }
+
+    func updateNSView(_ view: PlayerLayerView, context: Context) {
+        if view.player !== player {
+            view.player = player
+        }
+    }
+}
+
+/// Hosts the `PlaybackController`'s shared AVPlayer. The surface only attaches the player
+/// to its layer and reports the first displayable frame; it never creates or stops players,
+/// so it can be rebuilt (window resizes, layout changes) without interrupting playback.
+private struct PlayerSurface: NSViewRepresentable {
+    let controller: PlaybackController
+    var videoGravity: AVLayerVideoGravity = .resizeAspect
+    var onPiPControllerReady: ((AVPictureInPictureController) -> Void)? = nil
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> PlayerLayerView {
+        let view = PlayerLayerView()
+        view.player = controller.player
+        view.playerLayer.videoGravity = videoGravity
+        context.coordinator.observeReadyForDisplay(of: view.playerLayer, controller: controller)
+        return view
+    }
+
+    func updateNSView(_ view: PlayerLayerView, context: Context) {
+        if view.player !== controller.player {
+            view.player = controller.player
+        }
+        if view.playerLayer.videoGravity != videoGravity {
+            view.playerLayer.videoGravity = videoGravity
+        }
+    }
+
+    static func dismantleNSView(_ view: PlayerLayerView, coordinator: Coordinator) {
+        coordinator.readyObservation?.invalidate()
+    }
+
+    final class Coordinator: NSObject {
+        var readyObservation: NSKeyValueObservation?
+
+        func observeReadyForDisplay(of layer: AVPlayerLayer, controller: PlaybackController) {
+            readyObservation = layer.observe(\.isReadyForDisplay, options: [.initial, .new]) { @Sendable [weak controller] layer, _ in
+                guard layer.isReadyForDisplay else { return }
+                Task { @MainActor [weak controller] in controller?.surfaceReadyForDisplay() }
+            }
+        }
+    }
+}
 #endif
 
 /// Start-up, buffering and recovery states drawn over the video.
@@ -3824,9 +3928,7 @@ private struct PlayerMultiscreenPicker: View {
                 }
             }
             .navigationTitle("Add to Multiscreen")
-            #if !os(tvOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
+            .inlineNavigationTitle()
             .searchable(text: $query, prompt: "Search channels")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -4284,9 +4386,7 @@ private struct PlayerMoreSheet: View {
             }
             .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Options")
-            #if !os(tvOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
@@ -4613,9 +4713,7 @@ private struct SelectionList<Content: View>: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle(title)
-        #if !os(tvOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavigationTitle()
     }
 }
 
@@ -4689,9 +4787,7 @@ private struct PlayerChannelListSheet: View {
             .listStyle(.plain)
             .hidesScrollContentBackground()
             .navigationTitle("Channels")
-            #if !os(tvOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
             }
@@ -4748,9 +4844,7 @@ private struct PlayerRecentsSheet: View {
                 }
             }
             .navigationTitle("Recent Channels")
-            #if !os(tvOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
             }

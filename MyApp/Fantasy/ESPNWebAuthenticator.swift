@@ -1,4 +1,6 @@
+#if canImport(WebKit)
 import WebKit
+#endif
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -14,6 +16,10 @@ import UIKit
 /// with `.default()` keeps the cookies visible to the same store this class polls, so sign-in can
 /// be detected and the sheet dismissed automatically instead of leaving the user stuck on
 /// espn.com until they force-close it.
+///
+/// WebKit doesn't exist on tvOS/watchOS, so there this always fails immediately with
+/// `.presentationFailed` — the same degraded behavior UIKit-less platforms already got before
+/// WebKit availability was considered.
 @MainActor
 final class ESPNWebAuthenticator: NSObject {
     enum AuthError: LocalizedError {
@@ -55,7 +61,7 @@ final class ESPNWebAuthenticator: NSObject {
                 return
             }
 
-            #if canImport(UIKit)
+            #if canImport(UIKit) && canImport(WebKit)
             guard let presenter = Self.topViewController() else {
                 resume(.failure(AuthError.presentationFailed))
                 return
@@ -72,6 +78,7 @@ final class ESPNWebAuthenticator: NSObject {
             return
             #endif
 
+            #if canImport(WebKit)
             self.pollTask = Task { [weak self] in
                 while !Task.isCancelled {
                     if let credentials = await Self.readESPNCredentials() {
@@ -93,9 +100,11 @@ final class ESPNWebAuthenticator: NSObject {
                     try? await Task.sleep(nanoseconds: 1_500_000_000)
                 }
             }
+            #endif
         }
     }
 
+    #if canImport(WebKit)
     private static func readESPNCredentials() async -> ESPNFantasyCredentials? {
         await withCheckedContinuation { continuation in
             WKWebsiteDataStore.default().httpCookieStore.getAllCookies { cookies in
@@ -112,6 +121,7 @@ final class ESPNWebAuthenticator: NSObject {
             }
         }
     }
+    #endif
 
     #if canImport(UIKit)
     private static func topViewController() -> UIViewController? {
@@ -127,7 +137,7 @@ final class ESPNWebAuthenticator: NSObject {
     #endif
 }
 
-#if canImport(UIKit)
+#if canImport(UIKit) && canImport(WebKit)
 /// Hosts the ESPN login page in a `WKWebView` backed by the app's default (non-ephemeral) data
 /// store, so cookies ESPN sets on successful sign-in are immediately visible to
 /// `WKWebsiteDataStore.default()` — and therefore to `ESPNWebAuthenticator`'s cookie poll.

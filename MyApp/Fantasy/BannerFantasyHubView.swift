@@ -637,7 +637,9 @@ struct BannerFantasyJoinLeagueSheet: View {
             Form {
                 Section("Invite") {
                     TextField("Invite code", text: $inviteCode)
+                        #if os(iOS)
                         .textInputAutocapitalization(.characters)
+                        #endif
                     TextField("Your team name", text: $teamName)
                 }
                 Section {
@@ -697,7 +699,9 @@ struct BannerFantasyDraftRoomView: View {
                 Theme.background.ignoresSafeArea()
                 VStack(spacing: 12) {
                     TextField("Search players", text: $query)
+                        #if os(iOS)
                         .textInputAutocapitalization(.never)
+                        #endif
                         .autocorrectionDisabled()
                         .padding(12)
                         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))

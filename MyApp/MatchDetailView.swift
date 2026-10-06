@@ -187,9 +187,15 @@ struct MatchDetailView: View {
             }
         }
         .navigationTitle(match.league.name)
+        #if os(macOS)
+        .sheet(item: $playbackContext) { context in
+            PlayerView(context: context, showsLiveTVControls: false)
+        }
+        #else
         .fullScreenCover(item: $playbackContext) { context in
             PlayerView(context: context, showsLiveTVControls: false)
         }
+        #endif
         .sheet(isPresented: $showPaywall) {
             PaywallView()
                 .presentationDetents([.large])
@@ -234,7 +240,9 @@ struct MatchDetailView: View {
         List(matchNews) { article in
             NewsArticleCard(article: article) { presentedMatchArticle = article }
                 .listRowBackground(Theme.surface)
+                #if !os(tvOS)
                 .listRowSeparator(.hidden)
+                #endif
         }
         .listStyle(.plain)
         .hidesScrollContentBackground()
@@ -1800,7 +1808,7 @@ struct MatchDetailView: View {
         PlaybackTapClock.record()
         #if os(iOS)
         // Starting a stream counts as a channel switch.
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        Haptic.impact(.light)
         #endif
         playbackContext = MatchPlaybackContext(match: match, channel: channel, rankedSources: rankedSources)
     }

@@ -1,6 +1,11 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
-private struct IdentifiableURL: Identifiable {
+private struct IdentifiableURL: Identifiable, Equatable {
     let id = UUID()
     let url: URL
 }
@@ -27,7 +32,7 @@ enum ReaderAppearance: String, CaseIterable {
     }
     var chipForeground: Color {
         switch self {
-        case .automatic: return Color(.label)
+        case .automatic: return Color.reader_label
         case .light:     return Color(red: 0.10, green: 0.10, blue: 0.12)
         case .dark:      return Color(red: 0.92, green: 0.92, blue: 0.94)
         case .sepia:     return Color(red: 0.26, green: 0.19, blue: 0.12)
@@ -86,7 +91,7 @@ struct ArticleReaderView: View {
     }
     private var readerText: Color {
         switch appearance {
-        case .automatic: return Color(.label)
+        case .automatic: return Color.reader_label
         case .light:     return Color(red: 0.10, green: 0.10, blue: 0.12)
         case .dark:      return Color(red: 0.92, green: 0.92, blue: 0.94)
         case .sepia:     return Color(red: 0.26, green: 0.19, blue: 0.12)
@@ -94,7 +99,7 @@ struct ArticleReaderView: View {
     }
     private var readerSecondary: Color {
         switch appearance {
-        case .automatic: return Color(.secondaryLabel)
+        case .automatic: return Color.reader_secondaryLabel
         case .light:     return Color(red: 0.45, green: 0.45, blue: 0.48)
         case .dark:      return Color(red: 0.60, green: 0.60, blue: 0.62)
         case .sepia:     return Color(red: 0.52, green: 0.40, blue: 0.28)
@@ -221,10 +226,16 @@ struct ArticleReaderView: View {
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
         }
-        #if !os(tvOS)
+        #if os(iOS)
         .sheet(item: $safariItem) { item in
             SafariSheet(url: item.url)
                 .ignoresSafeArea()
+        }
+        #elseif os(macOS)
+        .onChange(of: safariItem) { _, item in
+            guard let item else { return }
+            NSWorkspace.shared.open(item.url)
+            safariItem = nil
         }
         #endif
         .preferredColorScheme(preferredScheme)
@@ -672,30 +683,56 @@ private extension ESPNArticle {
 
 private extension Color {
     static var reader_systemBackground: Color {
-        #if os(tvOS)
-        Theme.background
-        #else
+        #if os(iOS)
         Color(.systemBackground)
+        #elseif os(macOS)
+        Color(NSColor.windowBackgroundColor)
+        #else
+        Theme.background
+        #endif
+    }
+
+    static var reader_label: Color {
+        #if os(iOS)
+        Color(.label)
+        #elseif os(macOS)
+        Color(NSColor.labelColor)
+        #else
+        Theme.textPrimary
+        #endif
+    }
+
+    static var reader_secondaryLabel: Color {
+        #if os(iOS)
+        Color(.secondaryLabel)
+        #elseif os(macOS)
+        Color(NSColor.secondaryLabelColor)
+        #else
+        Theme.textSecondary
         #endif
     }
 }
 
 private extension Color {
     static var reader_systemGray5: Color {
-        #if os(tvOS)
-        Theme.surfaceElevated
-        #else
+        #if os(iOS)
         Color(.systemGray5)
+        #elseif os(macOS)
+        Color(NSColor.quaternaryLabelColor)
+        #else
+        Theme.surfaceElevated
         #endif
     }
 }
 
 private extension Color {
     static var reader_secondarySystemFill: Color {
-        #if os(tvOS)
-        Theme.surface
-        #else
+        #if os(iOS)
         Color(.secondarySystemFill)
+        #elseif os(macOS)
+        Color(NSColor.quaternaryLabelColor)
+        #else
+        Theme.surface
         #endif
     }
 }

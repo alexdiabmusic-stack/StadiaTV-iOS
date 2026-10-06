@@ -35,6 +35,18 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
         [.banner, .list, .sound]
     }
 
+    /// Routes a tapped match notification through the same `banner://game/{eventID}`
+    /// deep link CarPlay/Live Activities use, instead of a separate notification-only path.
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        guard let matchID = response.notification.request.content.userInfo["matchID"] as? String else { return }
+        await MainActor.run {
+            BannerAppEnvironment.shared.pendingDeepLink = .game(matchID: matchID)
+        }
+    }
+
     func requestAuthorization() async -> Bool {
         do {
             return try await center.requestAuthorization(options: [.alert, .sound, .badge])
@@ -157,6 +169,7 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
         content.title = "\(match.away.shortName) vs \(match.home.shortName) is live"
         content.body = match.statusDetail
         content.sound = .default
+        content.userInfo = ["matchID": match.id]
         await addRequest(identifier: liveIdentifier(for: match), content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false))
     }
 
@@ -166,6 +179,7 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
         content.title = "Close game: \(match.away.shortName) vs \(match.home.shortName)"
         content.body = "\(match.away.score ?? "-")-\(match.home.score ?? "-") · \(match.statusDetail)"
         content.sound = .default
+        content.userInfo = ["matchID": match.id]
         await addRequest(identifier: closeGameIdentifier(for: match), content: content, trigger: UNTimeIntervalNotificationTrigger(timeInterval: 2, repeats: false))
     }
 

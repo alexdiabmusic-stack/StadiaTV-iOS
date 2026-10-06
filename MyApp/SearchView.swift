@@ -128,7 +128,7 @@ struct SearchView: View {
                 }
             }
             .searchable(text: $query, prompt: "Teams, leagues, games, channels, players")
-            .fullScreenCover(item: $playingChannel) { channel in
+            .fullScreenCoverCompat(item: $playingChannel) { channel in
                 PlayerView(channel: channel)
             }
             .navigationDestination(item: $presentedArticle) { article in

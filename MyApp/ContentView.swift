@@ -2,13 +2,20 @@ import SwiftUI
 
 @main
 struct MyApp: App {
-    @StateObject private var playlistStore = PlaylistStore()
-    @StateObject private var preferences = PreferencesStore()
+    // Sourced from BannerAppEnvironment.shared so CarPlay (a separate scene with no
+    // SwiftUI environment of its own) reads/drives the same instances instead of
+    // duplicating stores or polling loops. See BannerAppEnvironment.swift.
+    @StateObject private var playlistStore = BannerAppEnvironment.shared.playlistStore
+    @StateObject private var preferences = BannerAppEnvironment.shared.preferences
+    @StateObject private var podcastStore = BannerAppEnvironment.shared.podcastStore
+    @StateObject private var epgRepository = BannerAppEnvironment.shared.epgRepository
+    @StateObject private var guideStore = BannerAppEnvironment.shared.guideStore
+    @StateObject private var streamStore = BannerAppEnvironment.shared.streamStore
+    @StateObject private var eventChannelRefresh = BannerAppEnvironment.shared.eventChannelRefresh
     @StateObject private var watchStore = WatchStore()
     @StateObject private var entitlements = EntitlementStore()
     @StateObject private var predictions = PredictionsStore()
     @StateObject private var articleLibrary = ArticleLibraryStore()
-    @StateObject private var podcastStore = PodcastStore()
     @StateObject private var channelPrefsStore = ChannelPreferencesStore()
     @StateObject private var customGroupStore = CustomGroupStore()
     @StateObject private var groupPrefsStore = GroupPreferencesStore()
@@ -33,6 +40,37 @@ struct MyApp: App {
             normalContent
             #endif
         }
+        #if os(macOS)
+        .defaultSize(width: 1280, height: 860)
+        .commands { MacCommands() }
+        #endif
+        #if os(macOS)
+        Settings {
+            MoreView()
+                .environmentObject(playlistStore)
+                .environmentObject(preferences)
+                .environmentObject(watchStore)
+                .environmentObject(entitlements)
+                .environmentObject(predictions)
+                .environmentObject(articleLibrary)
+                .environmentObject(podcastStore)
+                .environmentObject(epgRepository)
+                .environmentObject(guideStore)
+                .environmentObject(streamStore)
+                .environmentObject(eventChannelRefresh)
+                .environmentObject(BannerAppEnvironment.shared)
+                .environmentObject(channelPrefsStore)
+                .environmentObject(customGroupStore)
+                .environmentObject(groupPrefsStore)
+                .environmentObject(fantasyStore)
+                .environmentObject(bannerFantasyStore)
+                .environmentObject(ProgrammeReminderStore.shared)
+                .environmentObject(RecordingService.shared)
+                .environmentObject(ParentalControlStore.shared)
+                .environmentObject(launchCoordinator)
+                .frame(minWidth: 480, minHeight: 420)
+        }
+        #endif
     }
 
     @ViewBuilder
@@ -59,6 +97,11 @@ struct MyApp: App {
             .environmentObject(predictions)
             .environmentObject(articleLibrary)
             .environmentObject(podcastStore)
+            .environmentObject(epgRepository)
+            .environmentObject(guideStore)
+            .environmentObject(streamStore)
+            .environmentObject(eventChannelRefresh)
+            .environmentObject(BannerAppEnvironment.shared)
             .environmentObject(channelPrefsStore)
             .environmentObject(customGroupStore)
             .environmentObject(groupPrefsStore)
@@ -93,13 +136,18 @@ struct MyApp: App {
                 )
                 _ = await (espnRefresh, eventContextRefresh)
             }
+            .onOpenURL { url in
+                if let link = BannerDeepLink(url: url) {
+                    BannerAppEnvironment.shared.pendingDeepLink = link
+                }
+            }
             // Cold-launch brand animation — starts the visual sequence immediately.
             // The startup pipeline runs concurrently; `markAppShellReady()` is called
             // from HomeView once the first batch of data is available.
             .task { launchCoordinator.startBrandSequence() }
             // Overlay — present during every launch phase except `.home`.
             // Removed from the hierarchy once the transition is fully complete.
-            #if !os(tvOS)
+            #if os(iOS)
             .overlay {
                 if launchCoordinator.phase != .home {
                     LaunchAnimationView()
@@ -123,12 +171,14 @@ struct RootView: View {
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var bannerFantasyStore: BannerFantasyStore
     @StateObject private var liveViewModel = LiveViewModel()
-    @StateObject private var epgRepository = EPGRepository()
-    @StateObject private var guideStore = GuideChannelStore()
-    @StateObject private var streamStore = StreamAvailabilityStore()
-    @StateObject private var eventChannelRefresh = EventChannelRefreshService()
+    @EnvironmentObject private var epgRepository: EPGRepository
+    @EnvironmentObject private var guideStore: GuideChannelStore
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
+    @EnvironmentObject private var eventChannelRefresh: EventChannelRefreshService
+    @EnvironmentObject private var appEnvironment: BannerAppEnvironment
     @State private var showingFavoriteNotificationPrompt = false
     @State private var selectedTab: AppTab = .home
+    @State private var deepLinkMatch: Match?
 
     // Applying safeAreaInset to each Tab's content (not the TabView) is the correct
     // way to place content between the tab content and the tab bar chrome.
@@ -139,30 +189,71 @@ struct RootView: View {
         }
     }
 
-    var body: some View {
-        TabView(selection: $selectedTab) {
-            Tab("Home", systemImage: "house.fill", value: AppTab.home) {
-                HomeView(switchToFollowing: { selectedTab = .following })
-                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
+    #if os(macOS)
+    /// Native Mac sidebar + detail shell. `selectedTab` stays non-optional (shared with
+    /// iOS/iPadOS and with `appEnvironment.requestedTab` elsewhere in this file), so the
+    /// sidebar `List` selection binding bridges it to the `Optional` it expects.
+    private var macSidebarSelection: Binding<AppTab?> {
+        Binding(get: { selectedTab }, set: { if let newValue = $0 { selectedTab = newValue } })
+    }
+
+    private var macNavigationBody: some View {
+        NavigationSplitView {
+            List(selection: macSidebarSelection) {
+                Label("Home", systemImage: "house.fill").tag(AppTab.home)
+                Label("Following", systemImage: "star.fill").tag(AppTab.following)
+                Label("Live", systemImage: "dot.radiowaves.left.and.right").tag(AppTab.live)
+                Label("Discover", systemImage: "safari.fill").tag(AppTab.discover)
             }
-            Tab("Following", systemImage: "star.fill", value: AppTab.following) {
-                MatchesView()
-                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
-            }
-            Tab("Live", systemImage: "dot.radiowaves.left.and.right", value: AppTab.live) {
-                LiveView()
-                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
-            }
-            Tab("Discover", systemImage: "safari.fill", value: AppTab.discover) {
-                DiscoverView()
-                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
-            }
-            Tab("Settings", systemImage: "gearshape.fill", value: AppTab.settings) {
-                MoreView()
-                    .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
-            }
+            .navigationSplitViewColumnWidth(min: 180, ideal: 220)
+        } detail: {
+            macDetailContent
+                .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
         }
-        .tabViewStyle(.sidebarAdaptable)
+    }
+
+    @ViewBuilder
+    private var macDetailContent: some View {
+        switch selectedTab {
+        case .home: HomeView(switchToFollowing: { selectedTab = .following })
+        case .following: MatchesView()
+        case .live: LiveView()
+        case .discover: DiscoverView()
+        case .settings: MoreView()
+        }
+    }
+    #endif
+
+    var body: some View {
+        Group {
+            #if os(macOS)
+            macNavigationBody
+            #else
+            TabView(selection: $selectedTab) {
+                Tab("Home", systemImage: "house.fill", value: AppTab.home) {
+                    HomeView(switchToFollowing: { selectedTab = .following })
+                        .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
+                }
+                Tab("Following", systemImage: "star.fill", value: AppTab.following) {
+                    MatchesView()
+                        .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
+                }
+                Tab("Live", systemImage: "dot.radiowaves.left.and.right", value: AppTab.live) {
+                    LiveView()
+                        .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
+                }
+                Tab("Discover", systemImage: "safari.fill", value: AppTab.discover) {
+                    DiscoverView()
+                        .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
+                }
+                Tab("Settings", systemImage: "gearshape.fill", value: AppTab.settings) {
+                    MoreView()
+                        .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
+                }
+            }
+            .tabViewStyle(.sidebarAdaptable)
+            #endif
+        }
         .tint(Theme.accent)
         .environmentObject(liveViewModel)
         .environmentObject(epgRepository)
@@ -224,8 +315,20 @@ struct RootView: View {
             )
             Task { await refreshFantasyContexts(force: true) }
         }
+        .onChange(of: liveViewModel.allLive) { _, live in updateLiveActivity(live) }
         .onChange(of: prefs.favoriteTeams) { updateFavoriteNotificationPrompt() }
         .onChange(of: prefs.matchNotificationsEnabled) { updateFavoriteNotificationPrompt() }
+        .onChange(of: appEnvironment.pendingDeepLink) { _, link in
+            guard let link else { return }
+            appEnvironment.pendingDeepLink = nil
+            Task { await handleDeepLink(link) }
+        }
+        .onChange(of: appEnvironment.requestedTab) { _, tab in
+            guard let tab else { return }
+            selectedTab = tab
+            appEnvironment.requestedTab = nil
+        }
+        .fullScreenCoverCompat(item: $deepLinkMatch) { MatchDetailView(match: $0) }
         .alert("Get notified before your favourite teams play?", isPresented: $showingFavoriteNotificationPrompt) {
             Button("Not Now", role: .cancel) {
                 prefs.markFavoriteTeamNotificationPromptAnswered()
@@ -255,6 +358,34 @@ struct RootView: View {
         _ = await (espnRefresh, eventContextRefresh)
     }
 
+    /// Resolves a `banner://game/{eventID}` link to a `Match` and presents its Game Centre
+    /// screen. Checks the already-loaded live/starting-soon lists first (instant for the
+    /// common case of tapping a notification about a game that's currently live), then
+    /// falls back to a one-off broad fetch across every league for games outside that set.
+    private func handleDeepLink(_ link: BannerDeepLink) async {
+        guard case .game(let matchID) = link else { return }
+        if let match = (liveViewModel.allLive + liveViewModel.startingSoon).first(where: { $0.id == matchID }) {
+            deepLinkMatch = match
+            return
+        }
+        let snapshot = await SportsRepository.shared.liveMatchSnapshot(leagues: League.all, startingSoonWindow: 7 * 24 * 3600, nextLimit: 100)
+        let all = snapshot.live + snapshot.startingSoon + snapshot.next + snapshot.pastStartToday
+        deepLinkMatch = all.first(where: { $0.id == matchID })
+    }
+
+    /// Piggybacks on `LiveViewModel`'s own refresh (no new polling loop) to keep at most
+    /// one Live Activity tracking the highest-priority live game.
+    private func updateLiveActivity(_ live: [Match]) {
+        let favoriteIDs = Set(live.filter { prefs.isFavoriteMatch($0) }.map(\.id))
+        let followedLeagueIDs = Set(live.filter { prefs.followedLeagues.contains($0.league) }.map(\.id))
+        LiveActivityManager.shared.reconcile(
+            liveMatches: live,
+            favoriteMatchIDs: favoriteIDs,
+            listeningMatchID: appEnvironment.activeLivePlaybackContext?.match.id,
+            followedTeamMatchIDs: favoriteIDs,
+            followedLeagueMatchIDs: followedLeagueIDs)
+    }
+
     private func updateFavoriteNotificationPrompt() {
         #if os(tvOS)
         showingFavoriteNotificationPrompt = false
@@ -279,6 +410,11 @@ struct RootView: View {
         .environmentObject(PredictionsStore())
         .environmentObject(ArticleLibraryStore())
         .environmentObject(PodcastStore())
+        .environmentObject(EPGRepository())
+        .environmentObject(GuideChannelStore())
+        .environmentObject(StreamAvailabilityStore())
+        .environmentObject(EventChannelRefreshService())
+        .environmentObject(BannerAppEnvironment.shared)
         .environmentObject(FantasyStore.shared)
         .environmentObject(BannerFantasyStore.shared)
         .environmentObject(StartupCoordinator())

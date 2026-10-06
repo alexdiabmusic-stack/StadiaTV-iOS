@@ -37,7 +37,7 @@ struct RecordingsView: View {
                 emptyState
             }
         }
-        .fullScreenCover(item: $playbackChannel) { ch in
+        .fullScreenCoverCompat(item: $playbackChannel) { ch in
             PlayerView(channel: ch)
         }
         .alert("Playback Error", isPresented: $showingError) {

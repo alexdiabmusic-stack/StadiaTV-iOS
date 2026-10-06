@@ -1,6 +1,9 @@
 import Foundation
 import SwiftUI
 import Combine
+#if os(macOS)
+import AppKit
+#endif
 
 // MARK: - Guide View Model
 
@@ -307,7 +310,13 @@ final class TVGuideViewModel: ObservableObject {
         let now = Date()
         guard now >= guideWindowStart, now <= guideWindowEnd else { return 0 }
         let nowX = xOffset(for: now)
+        #if os(iOS)
         let screenWidth: CGFloat = UIScreen.main.bounds.width - Self.channelColumnWidth
+        #elseif os(macOS)
+        let screenWidth: CGFloat = (NSScreen.main?.frame.width ?? 1200) - Self.channelColumnWidth
+        #else
+        let screenWidth: CGFloat = 1200 - Self.channelColumnWidth
+        #endif
         return max(0, nowX - screenWidth * 0.20)
     }
 

@@ -56,6 +56,9 @@ nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
         }
         let categories = try await fetchCategoryMap(base: base, user: user, pass: pass)
         let channels = try await liveStreams(base: base, user: user, pass: pass, categories: categories, categoryID: nil)
+        // An empty list is how a panel says "expired", "banned" or "slow down" as often as it is a real lineup.
+        // Accepting it would replace the channels the user already has with nothing.
+        guard !channels.isEmpty else { throw LiveProviderError.noChannels }
 
         var epgComps = base
         epgComps.path = "/xmltv.php"
@@ -94,13 +97,17 @@ nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
             throw LiveProviderError.missingConfiguration("Could not build stream request URL")
         }
         let (data, response) = try await session.data(for: apiRequest(url))
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw LiveProviderError.badResponse
-        }
+        guard let http = response as? HTTPURLResponse else { throw LiveProviderError.badResponse }
+        guard (200..<300).contains(http.statusCode) else { throw LiveProviderError.httpStatus(http.statusCode) }
 
-        let streams = try await Task.detached(priority: .userInitiated) {
-            try JSONDecoder().decode([XtreamStream].self, from: data)
-        }.value
+        let streams: [XtreamStream]
+        do {
+            streams = try await Task.detached(priority: .userInitiated) {
+                try JSONDecoder().decode([XtreamStream].self, from: data)
+            }.value
+        } catch {
+            throw Self.explainUndecodable(data)
+        }
 
         var hostBase = URLComponents(string: provider.host ?? "")
         hostBase?.queryItems = nil
@@ -129,6 +136,22 @@ nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
                 )
             }
         }.value
+    }
+
+    /// What a reply that isn't a list of streams means. A panel rejects a login with HTTP 200 and
+    /// `{"user_info":{"auth":0}}`; anything else (an HTML block page, a maintenance notice) is just unexpected.
+    private static func explainUndecodable(_ data: Data) -> LiveProviderError {
+        struct Envelope: Decodable {
+            struct UserInfo: Decodable { let auth: XtreamNumeric? }
+            let user_info: UserInfo?
+        }
+        // A rejection is a few dozen bytes. Anything bigger is some other reply, and reading it here, on the caller's
+        // actor, could mean parsing megabytes for nothing.
+        if data.count <= 16_384,
+           let envelope = try? JSONDecoder().decode(Envelope.self, from: data), envelope.user_info?.auth?.intValue == 0 {
+            return .authenticationFailed
+        }
+        return .badResponse
     }
 
     func resolveStream(for channel: LiveChannel) async throws -> StreamDescriptor {
@@ -267,7 +290,10 @@ nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
         guard let url = comps.url else { return [:] }
         let (data, _) = try await session.data(for: apiRequest(url))
         let cats = (try? JSONDecoder().decode([XtreamCategory].self, from: data)) ?? []
-        return Dictionary(uniqueKeysWithValues: cats.map { ($0.category_id, $0.category_name) })
+        // Panels sometimes repeat an id or send entries with none; the first title wins. A repeated key
+        // would otherwise trap, taking the whole app down while a playlist opens.
+        return Dictionary(cats.filter { !$0.category_id.isEmpty }.map { ($0.category_id, $0.category_name) },
+                          uniquingKeysWith: { first, _ in first })
     }
 }
 

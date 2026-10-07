@@ -57,9 +57,13 @@ nonisolated protocol LiveProviderAdapter: Sendable {
 
 // MARK: - Provider error
 
-nonisolated enum LiveProviderError: LocalizedError, Sendable {
+nonisolated enum LiveProviderError: LocalizedError, Sendable, Equatable {
     case missingConfiguration(String)
     case badResponse
+    case httpStatus(Int)
+    /// The provider answered, but with no channels. Panels send an empty list for an expired or banned
+    /// account and when they are limiting requests as often as for a real lineup.
+    case noChannels
     case noStreamAvailable
     case authenticationFailed
 
@@ -67,8 +71,19 @@ nonisolated enum LiveProviderError: LocalizedError, Sendable {
         switch self {
         case .missingConfiguration(let detail): return "Provider misconfigured: \(detail)"
         case .badResponse: return "The provider returned an unexpected response."
+        case .httpStatus(let code): return Self.describe(httpStatus: code)
+        case .noChannels: return "The provider returned no channels. The account may have expired or the provider may be limiting requests; try again in a few minutes."
         case .noStreamAvailable: return "No stream URL is available for this channel."
         case .authenticationFailed: return "Provider credentials are invalid or missing."
+        }
+    }
+
+    private static func describe(httpStatus code: Int) -> String {
+        switch code {
+        case 401, 403: return "The provider refused the request (HTTP \(code)). Check the username, password and expiry date."
+        case 429: return "The provider is limiting requests (HTTP 429). Try again in a few minutes."
+        case 500...599: return "The provider's server is having trouble (HTTP \(code)). Try again later."
+        default: return "The provider answered with HTTP \(code)."
         }
     }
 }

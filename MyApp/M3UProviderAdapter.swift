@@ -34,10 +34,17 @@ nonisolated struct M3UProviderAdapter: LiveProviderAdapter {
         // old `data(for:)` call held the entire body as a second in-memory copy.
         let (tempURL, response) = try await session.download(for: request)
         defer { try? FileManager.default.removeItem(at: tempURL) }
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            throw LiveProviderError.badResponse
-        }
-        return try await M3UProviderAdapter.parseM3U(fileURL: tempURL)
+        return try await M3UProviderAdapter.channels(inDownload: tempURL, response: response)
+    }
+
+    /// What a downloaded playlist amounts to. A reply that isn't a playlist, an error page or a login page, parses
+    /// to nothing, and accepting that would replace the channels already cached with an empty list.
+    static func channels(inDownload fileURL: URL, response: URLResponse) async throws -> (epgURL: String?, channels: [AdapterChannel]) {
+        guard let http = response as? HTTPURLResponse else { throw LiveProviderError.badResponse }
+        guard (200..<300).contains(http.statusCode) else { throw LiveProviderError.httpStatus(http.statusCode) }
+        let parsed = try await parseM3U(fileURL: fileURL)
+        guard !parsed.channels.isEmpty else { throw LiveProviderError.noChannels }
+        return parsed
     }
 
     func resolveStream(for channel: LiveChannel) async throws -> StreamDescriptor {
@@ -93,12 +100,20 @@ nonisolated struct M3UProviderAdapter: LiveProviderAdapter {
         private var pendingCatchupDays: Int = 0
         private var pendingCatchupEnabled: Bool = false
         private var pendingHeaders: [String: String] = [:]
+        /// Whether the text has said it is a playlist yet (`#EXTM3U`, `#EXTINF`).
+        private var sawPlaylistMarker = false
+
+        /// Schemes a bare line must start with to count as a stream in a text that never said it is a playlist: an
+        /// HTML error or login page is made of lines that Foundation will happily turn into URLs.
+        private static let streamSchemes: Set<String> = ["http", "https", "rtmp", "rtmps", "rtsp", "rtp", "udp", "mms", "mmsh", "srt"]
 
         func processLine(_ rawLine: String) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
             if line.hasPrefix("#EXTM3U") {
+                sawPlaylistMarker = true
                 epgURL = M3UProviderAdapter.attribute("x-tvg-url", in: line)
             } else if line.hasPrefix("#EXTINF") {
+                sawPlaylistMarker = true
                 pendingLogo    = M3UProviderAdapter.attribute("tvg-logo",    in: line).flatMap(URL.init(string:))
                 pendingGroup   = M3UProviderAdapter.attribute("group-title", in: line)
                 pendingTvgID   = M3UProviderAdapter.attribute("tvg-id",      in: line)
@@ -150,7 +165,8 @@ nonisolated struct M3UProviderAdapter: LiveProviderAdapter {
                 return
             } else if !line.isEmpty,
                       case let (urlString, pipeHeaders) = StreamHTTPHeaders.splitPipeSuffix(line),
-                      let streamURL = URL(string: urlString) {
+                      let streamURL = URL(string: urlString),
+                      sawPlaylistMarker || streamURL.scheme.map({ Self.streamSchemes.contains($0.lowercased()) }) == true {
                 pendingHeaders.merge(pipeHeaders) { _, new in new }
                 let name = pendingName ?? streamURL.lastPathComponent
                 channels.append(AdapterChannel(

@@ -19,7 +19,7 @@ nonisolated private extension Data {
 }
 
 /// Why a guide download wasn't used; the caller falls back to its cached copy.
-private enum GuideDownloadError: Error {
+nonisolated private enum GuideDownloadError: Error {
     case badStatus
     case undecodable
 }
@@ -515,7 +515,7 @@ final class EPGRepository: ObservableObject {
                 }
             }
             if retained > 0 {
-                finalizeProgrammeIndex(merged)
+                await finalizeProgrammeIndex(merged)
                 importProgress.programmesRetained = programmeIndex.values.reduce(0) { $0 + $1.count }
                 lastUpdated = Date()
                 persistState()
@@ -645,16 +645,23 @@ final class EPGRepository: ObservableObject {
             let lookup = customEPGLookup
             let channelToCanonical = channelToCanonicalMap
             let normalizer = self.normalizer
-            let outcome = await Task.detached(priority: .utility) { () -> (result: EPGParseResult, mapping: [String: CustomEPGMatch]) in
+            let outcome = await Task.detached(priority: .utility) { () -> (mapping: [String: CustomEPGMatch], schedules: [String: [EPGProgramme]]) in
                 let result = EPGXMLParser(sourceId: sourceId, priority: 0).parse(data: data, programmeWindow: programmeWindow)
-                guard let normalizer else { return (result, [:]) }
+                guard let normalizer else { return ([:], [:]) }
                 let mapping = CustomEPGMatcher.match(
                     result.channels, lookup: lookup, channelToCanonical: channelToCanonical, normalize: normalizer.normalize
                 )
-                return (result, mapping)
+                // Grouped by canonical channel here: appending a couple of hundred thousand programmes one at a
+                // time on the main actor held the UI for about a tenth of a second.
+                var schedules: [String: [EPGProgramme]] = [:]
+                for var prog in result.programmes {
+                    guard prog.isValid, let match = mapping[prog.epgChannelId] else { continue }
+                    prog.canonicalChannelId = match.canonicalChannelId
+                    schedules[match.canonicalChannelId, default: []].append(prog)
+                }
+                return (mapping, schedules)
             }.value
             importDiagnostics.epgChannelParseDuration += Date().timeIntervalSince(started)
-            let parseResult = outcome.result
             let mapping = outcome.mapping
             guard !mapping.isEmpty else { continue }
             programmeIndex = GuideProgrammeIndexing.removing(sourceId: sourceId, from: programmeIndex)
@@ -667,18 +674,18 @@ final class EPGRepository: ObservableObject {
             // not stamped onto the programme itself. A canonical channel can merge
             // several mirrors/feeds; consumers check that index to see which of
             // them actually share this programme's guide ID.
-            for var prog in parseResult.programmes {
-                guard prog.isValid, let match = mapping[prog.epgChannelId] else { continue }
-                prog.canonicalChannelId = match.canonicalChannelId
-                programmeIndex[match.canonicalChannelId, default: []].append(prog)
-            }
+            // A channel with nothing from another source takes its schedule as it is, with no element-by-element copy;
+            // appending 200,000 programmes channel by channel held the main actor for about 60 ms.
+            programmeIndex.merge(outcome.schedules) { existing, added in existing + added }
         }
 
-        if !customChannelMappings.isEmpty {
+        let publishedCustomGuide = !customChannelMappings.isEmpty
+        var genericProgrammesAdded = false
+        if publishedCustomGuide {
             saveCustomEPGMapping(customChannelMappings.mapValues(\.canonicalChannelId))
             // Early partial publish: the user's own playlist EPG is ready and merged —
             // surface it now instead of waiting on the slower generic feeds below.
-            finalizeProgrammeIndex(programmeIndex)
+            await finalizeProgrammeIndex(programmeIndex)
             importProgress.programmesRetained = programmeIndex.values.reduce(0) { $0 + $1.count }
             lastUpdated = Date()
             persistState()
@@ -741,6 +748,7 @@ final class EPGRepository: ObservableObject {
                     guard let result else { continue }
                     importDiagnostics.epgProgrammeParseDuration += result.duration
                     mergeProgrammes(result.programmes, into: &programmeIndex)
+                    if !result.programmes.isEmpty { genericProgrammesAdded = true }
                 }
             }
         }
@@ -750,7 +758,10 @@ final class EPGRepository: ObservableObject {
             return
         }
 
-        finalizeProgrammeIndex(programmeIndex)
+        // Already published above, so the sort, coverage and store write run again only if a generic feed added to it.
+        if genericProgrammesAdded || !publishedCustomGuide {
+            await finalizeProgrammeIndex(programmeIndex)
+        }
         importProgress.programmesRetained = programmeIndex.values.reduce(0) { $0 + $1.count }
 
         lastUpdated = Date()
@@ -796,13 +807,15 @@ final class EPGRepository: ObservableObject {
             if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
                 throw GuideDownloadError.badStatus
             }
-            let raw = try Data(contentsOf: tempURL, options: .mappedIfSafe)
-            guard let decompressed = await Task.detached(priority: .utility, operation: { raw.gunzippedIfNeeded() }).value else {
-                throw GuideDownloadError.undecodable
-            }
-            // Atomic, so a kill mid-write can't leave a truncated file with a fresh timestamp.
-            try decompressed.write(to: cacheFile, options: .atomic)
-            return decompressed
+            // Reading, inflating and writing a guide of tens of megabytes happens off the main actor: the write alone
+            // held the UI for over half a second. Atomic, so a kill mid-write can't leave a truncated file with a
+            // fresh timestamp.
+            return try await Task.detached(priority: .utility) { () throws -> Data in
+                let raw = try Data(contentsOf: tempURL, options: .mappedIfSafe)
+                guard let decompressed = raw.gunzippedIfNeeded() else { throw GuideDownloadError.undecodable }
+                try decompressed.write(to: cacheFile, options: .atomic)
+                return decompressed
+            }.value
         } catch {
             // Network failure or unusable response: use the cached file even if stale
             return try? Data(contentsOf: cacheFile, options: .mappedIfSafe)
@@ -864,11 +877,12 @@ final class EPGRepository: ObservableObject {
             if let http, !(200..<300).contains(http.statusCode) {
                 throw GuideDownloadError.badStatus
             }
-            let raw = try Data(contentsOf: tempURL, options: .mappedIfSafe)
-            guard let decompressed = await Task.detached(priority: .utility, operation: { raw.gunzippedIfNeeded() }).value else {
-                throw GuideDownloadError.undecodable
-            }
-            try decompressed.write(to: cacheFile, options: .atomic)
+            let decompressed = try await Task.detached(priority: .utility) { () throws -> Data in
+                let raw = try Data(contentsOf: tempURL, options: .mappedIfSafe)
+                guard let decompressed = raw.gunzippedIfNeeded() else { throw GuideDownloadError.undecodable }
+                try decompressed.write(to: cacheFile, options: .atomic)
+                return decompressed
+            }.value
             let newValidators = CacheValidators(
                 etag: http?.value(forHTTPHeaderField: "ETag"),
                 lastModified: http?.value(forHTTPHeaderField: "Last-Modified")
@@ -1012,17 +1026,28 @@ final class EPGRepository: ObservableObject {
         }
     }
 
-    private func finalizeProgrammeIndex(_ index: [String: [EPGProgramme]]) {
-        var finalized: [String: [EPGProgramme]] = [:]
-        finalized.reserveCapacity(index.count)
-        for (key, programmes) in index {
-            finalized[key] = GuideProgrammeIndexing.deduplicated(programmes.sorted { $0.start < $1.start })
-        }
-        programmeIndex = finalized
+    /// Sorts and de-duplicates every channel's schedule, builds the coverage index, publishes both and hands the
+    /// schedules to the store. The sorting and indexing run off the main actor: on a large guide they are the
+    /// longest step of an import and used to hold the UI for a fifth of a second or more.
+    private func finalizeProgrammeIndex(_ index: [String: [EPGProgramme]]) async {
+        let built = await Task.detached(priority: .userInitiated) {
+            () -> (schedules: [String: [EPGProgramme]], coverage: [String: ProgrammeCoverage]) in
+            var schedules: [String: [EPGProgramme]] = [:]
+            var coverage: [String: ProgrammeCoverage] = [:]
+            schedules.reserveCapacity(index.count)
+            coverage.reserveCapacity(index.count)
+            for (key, programmes) in index {
+                let schedule = GuideProgrammeIndexing.deduplicated(programmes.sorted { $0.start < $1.start })
+                schedules[key] = schedule
+                if let entry = GuideProgrammeIndexing.coverage(of: schedule, channelId: key) { coverage[key] = entry }
+            }
+            return (schedules, coverage)
+        }.value
+        programmeIndex = built.schedules
         programmeRevision &+= 1
-        rebuildCoverageIndex()
+        coverageIndex = built.coverage
         persistDebounceTask?.cancel()
-        persistProgrammesToStore(finalized)
+        persistProgrammesToStore(built.schedules)
     }
 
     /// Folds one channel's on-demand programmes into its schedule. Unlike `finalizeProgrammeIndex`
@@ -1054,8 +1079,9 @@ final class EPGRepository: ObservableObject {
     /// `programmeIndex` (canonical-channel-keyed, in-memory) stays the synchronous hot-path
     /// read the rest of this file uses; this is purely the cross-launch durability layer.
     private func persistProgrammesToStore(_ index: [String: [EPGProgramme]]) {
-        let bySource = Dictionary(grouping: index.values.flatMap { $0 }, by: \.sourceId)
         Task.detached(priority: .background) {
+            // Grouped here: flattening every programme on the main actor took about a tenth of a second.
+            let bySource = Dictionary(grouping: index.values.flatMap { $0 }, by: \.sourceId)
             for (sourceId, programmes) in bySource {
                 try? await EPGProgrammeStore.shared.replaceProgrammes(programmes, sourceId: sourceId, retentionDays: 7)
             }

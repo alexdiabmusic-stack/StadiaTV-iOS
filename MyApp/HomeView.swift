@@ -229,8 +229,11 @@ struct HomeView: View {
         ToolbarItem(placement: .primaryAction) {
             NavigationLink(destination: SearchView()) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 16))
+                    .font(.system(size: Theme.isMac ? Theme.Mac.Header.searchIconSize : 16))
                     .foregroundStyle(Theme.textSecondary)
+                    .frame(width: Theme.isMac ? Theme.Mac.Header.searchSize : nil,
+                           height: Theme.isMac ? Theme.Mac.Header.searchSize : nil)
+                    .background(Theme.isMac ? Theme.surfaceElevated : Color.clear, in: Circle())
             }
             .buttonStyle(.plain)
             .opacity(homeRevealed ? 1 : 0)
@@ -317,6 +320,7 @@ struct HomeView: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 104)
+            .macContentWidth()
         }
     }
 
@@ -648,14 +652,14 @@ private struct TeamMatchupHero: View {
     let match: Match?
     let now: Date
 
-    private static var cardHeight: CGFloat { Theme.isPad ? 400 : 300 }
+    private static var cardHeight: CGFloat { Theme.isMac ? 240 : Theme.isPad ? 400 : 300 }
     private var isLive: Bool { match?.state == .live }
     private var eventDate: Date? { match?.date ?? pick.startDate }
     private var homeSide: TeamSide { match?.home ?? pick.streamMatch.home }
     private var awaySide: TeamSide { match?.away ?? pick.streamMatch.away }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Mac.Radius.hero : Theme.Radius.xl, style: .continuous)
         GeometryReader { proxy in
             ZStack {
                 // Background image
@@ -701,22 +705,22 @@ private struct TeamMatchupHero: View {
                     HStack(spacing: 0) {
                         Spacer()
                         VStack(spacing: 4) {
-                            TeamLogo(url: awaySide.logoURL, size: 48)
+                            TeamLogo(url: awaySide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.hero : 48)
                             Text(awaySide.shortName)
-                                .font(Theme.Typography.caption)
+                                .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : Theme.Typography.caption)
                                 .foregroundStyle(.white.opacity(0.80))
                                 .lineLimit(1)
                         }
                         Spacer()
                         Text("VS")
-                            .font(Theme.Typography.overline)
+                            .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : Theme.Typography.overline)
                             .foregroundStyle(.white.opacity(0.50))
                             .frame(width: 28)
                         Spacer()
                         VStack(spacing: 4) {
-                            TeamLogo(url: homeSide.logoURL, size: 48)
+                            TeamLogo(url: homeSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.hero : 48)
                             Text(homeSide.shortName)
-                                .font(Theme.Typography.caption)
+                                .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : Theme.Typography.caption)
                                 .foregroundStyle(.white.opacity(0.80))
                                 .lineLimit(1)
                         }
@@ -726,7 +730,7 @@ private struct TeamMatchupHero: View {
 
                     // Match title
                     Text(pick.title)
-                        .font(.system(size: 21, weight: .bold))
+                        .font(.system(size: Theme.isMac ? 22 : 21, weight: .bold))
                         .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
                         .lineLimit(3)
@@ -795,7 +799,7 @@ private struct TeamMatchupHero: View {
                     .foregroundStyle(.white.opacity(0.55))
                     .tracking(1)
                 Text("\(m.away.score ?? "—") – \(m.home.score ?? "—")")
-                    .font(.system(size: 26, weight: .bold, design: .rounded).monospacedDigit())
+                    .font(.system(size: Theme.isMac ? 30 : 26, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(.white)
                 Text(m.statusDetail)
                     .font(.caption2.weight(.semibold))
@@ -810,7 +814,7 @@ private struct TeamMatchupHero: View {
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(start, style: .time)
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .font(.system(size: Theme.isMac ? 30 : 28, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                 } else if secsRemaining > 24 * 3600 {
                     Text("DATE")
@@ -818,7 +822,7 @@ private struct TeamMatchupHero: View {
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .font(.system(size: Theme.isMac ? 26 : 22, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                 } else {
                     let h = max(0, secsRemaining) / 3600
@@ -828,7 +832,7 @@ private struct TeamMatchupHero: View {
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(secsRemaining < 60 ? "NOW" : h > 0 ? "\(h)h \(mins)m" : "\(mins)m")
-                        .font(.system(size: 28, weight: .bold, design: .rounded).monospacedDigit())
+                        .font(.system(size: Theme.isMac ? 30 : 28, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(.white)
                 }
             }
@@ -854,11 +858,12 @@ private struct TeamMatchupHero: View {
 
     private func heroButton(_ title: String, icon: String, primary: Bool) -> some View {
         Label(title, systemImage: icon)
-            .font(.caption.weight(.bold))
+            .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .bold) : .caption.weight(.bold))
             .lineLimit(1)
             .foregroundStyle(.white)
             .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .frame(height: Theme.isMac ? Theme.Mac.ControlHeight.lg : nil)
+            .padding(.vertical, Theme.isMac ? 0 : 10)
             .fixedSize(horizontal: true, vertical: false)
             .background(
                 primary ? Theme.accent.opacity(0.9) : Color.white.opacity(0.10),
@@ -893,7 +898,7 @@ private struct EventHero: View {
     let match: Match?
     let now: Date
 
-    private static var cardHeight: CGFloat { Theme.isPad ? 400 : 300 }
+    private static var cardHeight: CGFloat { Theme.isMac ? 240 : Theme.isPad ? 400 : 300 }
     private var isLive: Bool { match?.state == .live }
     private var eventDate: Date? { match?.date ?? pick.startDate }
 
@@ -925,7 +930,7 @@ private struct EventHero: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Mac.Radius.hero : Theme.Radius.xl, style: .continuous)
         GeometryReader { proxy in
             ZStack(alignment: .topLeading) {
                 // Background image — preserves right-side artwork
@@ -965,7 +970,7 @@ private struct EventHero: View {
                         .padding(.top, 10)
 
                     Text(pick.title)
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .font(.system(size: Theme.isMac ? 22 : 20, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1053,7 +1058,7 @@ private struct EventHero: View {
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(start, style: .time)
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
+                        .font(.system(size: Theme.isMac ? 32 : 30, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                 } else if secsRemaining > 24 * 3600 {
                     Text("DATE")
@@ -1061,7 +1066,7 @@ private struct EventHero: View {
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(start.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()))
-                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .font(.system(size: Theme.isMac ? 28 : 24, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
                     Text(start, style: .time)
                         .font(Theme.Typography.caption)
@@ -1074,7 +1079,7 @@ private struct EventHero: View {
                         .foregroundStyle(.white.opacity(0.55))
                         .tracking(1)
                     Text(secsRemaining < 60 ? "NOW" : h > 0 ? "\(h)h \(mins)m" : "\(mins)m")
-                        .font(.system(size: 30, weight: .bold, design: .rounded).monospacedDigit())
+                        .font(.system(size: Theme.isMac ? 32 : 30, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(.white)
                     Text(start, style: .time)
                         .font(Theme.Typography.caption)
@@ -1087,11 +1092,12 @@ private struct EventHero: View {
 
     private func eventButton(_ title: String, icon: String, primary: Bool) -> some View {
         Label(title, systemImage: icon)
-            .font(.caption.weight(.bold))
+            .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .bold) : .caption.weight(.bold))
             .lineLimit(1)
             .foregroundStyle(.white)
             .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .frame(height: Theme.isMac ? Theme.Mac.ControlHeight.lg : nil)
+            .padding(.vertical, Theme.isMac ? 0 : 10)
             .fixedSize(horizontal: true, vertical: false)
             .background(
                 primary ? Theme.accent.opacity(0.9) : Color.white.opacity(0.10),
@@ -1161,10 +1167,10 @@ private struct PrimeHeroCard: View {
                     colors: [Theme.surfaceElevated, Theme.surface],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 ),
-                in: RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
+                in: RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Mac.Radius.hero : Theme.Radius.xl, style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: Theme.Radius.xl, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Mac.Radius.hero : Theme.Radius.xl, style: .continuous)
                     .strokeBorder(match.state == .live ? Theme.live.opacity(0.4) : Theme.hairline)
             )
         }
@@ -1173,9 +1179,9 @@ private struct PrimeHeroCard: View {
 
     private func teamColumn(_ side: TeamSide) -> some View {
         VStack(spacing: 8) {
-            TeamLogo(url: side.logoURL, size: 44)
+            TeamLogo(url: side.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.hero : 44)
             Text(side.shortName)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: Theme.isMac ? Theme.Mac.Typography.bodyLarge : 13, weight: .semibold))
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -1227,7 +1233,8 @@ private struct LiveNowCommandCenter: View {
             HStack(spacing: 8) {
                 PulsingLiveBadge()
                 Text("LIVE NOW")
-                    .font(.footnote.weight(.semibold))
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : .footnote.weight(.semibold))
+                    .tracking(Theme.isMac ? 0.4 : 0)
                     .foregroundStyle(Theme.live)
                 Spacer()
                 if !matches.isEmpty {
@@ -1264,8 +1271,8 @@ private struct LiveNowCommandCenter: View {
                     .foregroundStyle(Theme.textSecondary)
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.hairline))
+                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
             } else {
                 ForEach(displayed) { match in
                     NavigationLink(value: match) {
@@ -1317,8 +1324,8 @@ private struct LiveNowCommandCenter: View {
                 Spacer()
             }
             .padding(16)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.hairline))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
         }
     }
 
@@ -1346,7 +1353,8 @@ struct StartingSoonTimeline: View {
             HStack(spacing: 6) {
                 Image(systemName: "clock.badge.fill")
                 Text("STARTING SOON")
-                    .font(.footnote.weight(.semibold))
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : .footnote.weight(.semibold))
+                    .tracking(Theme.isMac ? 0.4 : 0)
                     .foregroundStyle(Theme.starting)
                 Spacer()
             }
@@ -1388,20 +1396,20 @@ private struct SoonTimelineCard: View {
                 }
 
                 HStack(spacing: 6) {
-                    TeamLogo(url: match.away.logoURL, size: 28)
+                    TeamLogo(url: match.away.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 8 : 28)
                     Text("vs")
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
-                    TeamLogo(url: match.home.logoURL, size: 28)
+                    TeamLogo(url: match.home.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 8 : 28)
                 }
 
                 Text(match.shortName)
-                    .font(.caption.weight(.semibold))
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .semibold) : .caption.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
 
                 Text(secs < 60 ? "Starts now" : (h > 0 ? "In \(h)h \(m)m" : "In \(m) min"))
-                    .font(.system(size: 12, weight: .bold, design: .rounded).monospacedDigit())
+                    .font(.system(size: Theme.isMac ? 13 : 12, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(urgent ? Theme.live : Theme.starting)
 
                 if !match.broadcasts.isEmpty {
@@ -1411,8 +1419,8 @@ private struct SoonTimelineCard: View {
                         .lineLimit(1)
                 }
             }
-            .padding(12)
-            .frame(width: 150)
+            .padding(Theme.isMac ? 14 : 12)
+            .frame(width: Theme.isMac ? 165 : 150)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
             .overlay(alignment: .top) {
@@ -1504,7 +1512,8 @@ private struct ScheduleSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("YOUR SCHEDULE")
-                .font(.footnote.weight(.semibold))
+                .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : .footnote.weight(.semibold))
+                .tracking(Theme.isMac ? 0.4 : 0)
                 .foregroundStyle(Theme.textSecondary)
 
             // Day picker
@@ -1513,20 +1522,22 @@ private struct ScheduleSection: View {
                     let isSelected = selectedDay == day
                     Button { withAnimation(.snappy) { selectedDay = day } } label: {
                         Text(day.rawValue)
-                            .font(.subheadline.weight(.semibold))
+                            .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .semibold) : .subheadline.weight(.semibold))
                             .foregroundStyle(isSelected ? Theme.accent : Theme.textSecondary)
-                            .padding(.vertical, 8)
+                            .padding(.vertical, Theme.isMac ? 0 : 8)
                             .frame(maxWidth: .infinity)
+                            .frame(height: Theme.isMac ? Theme.Mac.ControlHeight.md : nil)
                     }
                     .buttonStyle(.plain)
                 }
             }
+            .frame(maxWidth: Theme.isMac ? 650 : .infinity)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             .overlay(
                 GeometryReader { proxy in
                     let idx = ScheduleDay.allCases.firstIndex(of: selectedDay) ?? 0
                     let w = proxy.size.width / CGFloat(ScheduleDay.allCases.count)
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Radius.sm : 10, style: .continuous)
                         .fill(Theme.accent.opacity(0.15))
                         .frame(width: w, height: proxy.size.height)
                         .offset(x: w * CGFloat(idx))
@@ -1545,8 +1556,8 @@ private struct ScheduleSection: View {
                     Spacer()
                 }
                 .padding(16)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.hairline))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
             } else if selectedDay == .today {
                 ForEach(displayedMatches) { match in
                     NavigationLink(value: match) { ScheduleRow(match: match) }
@@ -1556,7 +1567,7 @@ private struct ScheduleSection: View {
                 let groups = groupByDay(displayedMatches)
                 ForEach(groups, id: \.label) { group in
                     Text(group.label)
-                        .font(.footnote.weight(.semibold))
+                        .font(Theme.isMac ? .system(size: Theme.Mac.Typography.smallMetadata, weight: .semibold) : .footnote.weight(.semibold))
                         .foregroundStyle(Theme.textSecondary)
                         .padding(.top, 4)
                     ForEach(group.matches) { match in
@@ -1584,7 +1595,7 @@ private struct ScheduleRow: View {
         HStack(spacing: 14) {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(match.date, style: .time)
-                    .font(.system(size: 13, weight: .bold, design: .rounded).monospacedDigit())
+                    .font(.system(size: Theme.isMac ? 15 : 13, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
                 Text(match.league.shortName)
@@ -1599,21 +1610,21 @@ private struct ScheduleRow: View {
                 .frame(width: 1, height: 36)
 
             HStack(spacing: 10) {
-                TeamLogo(url: match.away.logoURL, size: 28)
+                TeamLogo(url: match.away.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 8 : 28)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(match.shortName)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: Theme.isMac ? 15 : 14, weight: .semibold))
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
                     if !match.broadcasts.isEmpty {
                         Text(match.broadcasts.prefix(2).joined(separator: " · "))
-                            .font(.caption2)
+                            .font(Theme.isMac ? .system(size: Theme.Mac.Typography.smallMetadata) : .caption2)
                             .foregroundStyle(Theme.textSecondary)
                             .lineLimit(1)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                TeamLogo(url: match.home.logoURL, size: 28)
+                TeamLogo(url: match.home.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 8 : 28)
             }
 
             Image(systemName: "chevron.right")
@@ -1621,7 +1632,7 @@ private struct ScheduleRow: View {
                 .foregroundStyle(Theme.textSecondary.opacity(0.4))
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, Theme.isMac ? 14 : 12)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
     }
@@ -1637,7 +1648,8 @@ private struct TrendingSection: View {
             HStack(spacing: 6) {
                 Image(systemName: "play.circle.fill")
                 Text("RECENT HIGHLIGHTS")
-                    .font(.footnote.weight(.semibold))
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : .footnote.weight(.semibold))
+                    .tracking(Theme.isMac ? 0.4 : 0)
             }
             .foregroundStyle(Theme.accent)
 
@@ -1696,7 +1708,8 @@ struct ContinueWatchingSection: View {
             HStack(spacing: 6) {
                 Image(systemName: "clock.arrow.circlepath")
                 Text("CONTINUE WATCHING")
-                    .font(.footnote.weight(.semibold))
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : .footnote.weight(.semibold))
+                    .tracking(Theme.isMac ? 0.4 : 0)
             }
             .foregroundStyle(Theme.accent)
 

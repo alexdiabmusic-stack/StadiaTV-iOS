@@ -119,9 +119,11 @@ struct MatchesView: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
+        .controlSize(Theme.isMac ? .large : .regular)
+        .frame(maxWidth: Theme.isMac ? 360 : .infinity)
         .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
+        .padding(.top, Theme.isMac ? 4 : 8)
+        .padding(.bottom, Theme.isMac ? 2 : 4)
     }
 
     private var loadKey: String {
@@ -233,8 +235,8 @@ struct MatchesView: View {
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 entitySelector
-                    .padding(.top, 8)
-                    .padding(.bottom, 16)
+                    .padding(.top, Theme.isMac ? 4 : 8)
+                    .padding(.bottom, Theme.isMac ? 10 : 16)
 
                 FollowingSportsSummary(
                     liveCount: liveList.count,
@@ -243,7 +245,7 @@ struct MatchesView: View {
                     nextUpcoming: nextUp
                 )
                 .padding(.horizontal, 20)
-                .padding(.bottom, 20)
+                .padding(.bottom, Theme.isMac ? 12 : 20)
 
                 Group {
                     if let live = liveList.first {
@@ -259,7 +261,7 @@ struct MatchesView: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 28)
+                .padding(.bottom, Theme.isMac ? 20 : 28)
 
                 FollowingComingUpSection(
                     matches: Array(comingUpVisible.prefix(6)),
@@ -269,11 +271,11 @@ struct MatchesView: View {
                     streamCountByMatchId: streamStore.countByMatchId,
                     notOnPlaylistMatches: notOnPlaylist
                 )
-                .padding(.bottom, 28)
+                .padding(.bottom, Theme.isMac ? 20 : 28)
 
                 if !news.isEmpty || newsLoading {
                     FollowingNewsSection(articles: news, isLoading: newsLoading)
-                        .padding(.bottom, 28)
+                        .padding(.bottom, Theme.isMac ? 20 : 28)
                 }
 
                 FollowingStandingsSnapshot(
@@ -284,6 +286,7 @@ struct MatchesView: View {
 
                 Spacer(minLength: 120)
             }
+            .macContentWidth()
         }
         .refreshable { await loadAll() }
     }
@@ -317,9 +320,10 @@ struct MatchesView: View {
                 }
                 Button { showingTeamEditor = true } label: {
                     Image(systemName: "plus")
-                        .font(.caption.weight(.bold))
+                        .font(Theme.isMac ? .system(size: Theme.Mac.IconSize.sm, weight: .bold) : .caption.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
-                        .frame(width: 32, height: 32)
+                        .frame(width: Theme.isMac ? Theme.Mac.ControlHeight.sm + 2 : 32,
+                               height: Theme.isMac ? Theme.Mac.ControlHeight.sm + 2 : 32)
                         .background(Theme.surface, in: Capsule())
                         .overlay(Capsule().strokeBorder(Theme.hairline))
                 }
@@ -346,15 +350,15 @@ struct MatchesView: View {
             #endif
             action()
         } label: {
-            HStack(spacing: 5) {
-                if let logoURL { TeamLogo(url: logoURL, size: 18) }
+            HStack(spacing: Theme.isMac ? 6 : 5) {
+                if let logoURL { TeamLogo(url: logoURL, size: Theme.isMac ? Theme.Mac.IconSize.sm : 18) }
                 Text(title)
-                    .font(.caption.weight(.bold))
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .bold) : .caption.weight(.bold))
                     .foregroundStyle(isSelected ? .white : Theme.textPrimary)
                     .lineLimit(1)
             }
-            .padding(.horizontal, logoURL == nil ? 12 : 8)
-            .frame(height: 32)
+            .padding(.horizontal, Theme.isMac ? (logoURL == nil ? 16 : 12) : (logoURL == nil ? 12 : 8))
+            .frame(height: Theme.isMac ? Theme.Mac.ControlHeight.sm + 2 : 32)
             .background(isSelected ? Theme.accent : Theme.surface, in: Capsule())
             .overlay(Capsule().strokeBorder(isSelected ? Theme.accent.opacity(0.4) : Theme.hairline))
             .shadow(color: isSelected ? Theme.accent.opacity(0.28) : .clear, radius: 8, y: 3)
@@ -484,21 +488,21 @@ private struct FollowingSportsSummary: View {
         Rectangle()
             .fill(Theme.hairline)
             .frame(width: 1, height: 24)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Theme.isMac ? 14 : 16)
     }
 
     private func statItem(icon: String, value: String, label: String,
                           tint: Color, prominent: Bool) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Theme.isMac ? 8 : 6) {
             Image(systemName: icon)
-                .font(.caption2.weight(.bold))
+                .font(Theme.isMac ? .system(size: Theme.Mac.IconSize.sm, weight: .bold) : .caption2.weight(.bold))
                 .foregroundStyle(prominent ? tint : Theme.textTertiary)
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
-                    .font(.system(size: 16, weight: .bold, design: .rounded).monospacedDigit())
+                    .font(.system(size: Theme.isMac ? 21 : 16, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(prominent ? tint : Theme.textPrimary)
                 Text(label)
-                    .font(.caption2.weight(.semibold))
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : .caption2.weight(.semibold))
                     .foregroundStyle(Theme.textSecondary)
             }
         }
@@ -521,7 +525,7 @@ private struct FollowingLiveHero: View {
 
     var body: some View {
         NavigationLink(value: match) {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: Theme.isMac ? 12 : 16) {
                 HStack {
                     HStack(spacing: 6) {
                         PulsingLiveBadge()
@@ -555,9 +559,9 @@ private struct FollowingLiveHero: View {
                 } else {
                     HStack(spacing: 0) {
                         VStack(spacing: 8) {
-                            TeamLogo(url: match.away.logoURL, size: 54)
+                            TeamLogo(url: match.away.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.hero : 54)
                             Text(match.away.shortName)
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.system(size: Theme.isMac ? Theme.Mac.Typography.bodyLarge : 13, weight: .bold))
                                 .foregroundStyle(Theme.textPrimary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
@@ -580,9 +584,9 @@ private struct FollowingLiveHero: View {
                         }
 
                         VStack(spacing: 8) {
-                            TeamLogo(url: match.home.logoURL, size: 54)
+                            TeamLogo(url: match.home.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.hero : 54)
                             Text(match.home.shortName)
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.system(size: Theme.isMac ? Theme.Mac.Typography.bodyLarge : 13, weight: .bold))
                                 .foregroundStyle(Theme.textPrimary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
@@ -595,7 +599,7 @@ private struct FollowingLiveHero: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Theme.live.opacity(0.75))
             }
-            .padding(20)
+            .padding(Theme.isMac ? 18 : 20)
             .background(
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .fill(Theme.surface)
@@ -636,7 +640,7 @@ private struct FollowingUpNextHero: View {
     private var isRacing: Bool { match.league.group == .racing }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: Theme.isMac ? 12 : 16) {
             HStack {
                 Text("UP NEXT")
                     .font(.caption.weight(.bold))
@@ -664,9 +668,9 @@ private struct FollowingUpNextHero: View {
             } else {
                 HStack(alignment: .center, spacing: 0) {
                     VStack(spacing: 10) {
-                        TeamLogo(url: match.away.logoURL, size: 60)
+                        TeamLogo(url: match.away.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.hero : 60)
                         Text(match.away.displayName)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: Theme.isMac ? Theme.Mac.Typography.bodyLarge : 13, weight: .bold))
                             .foregroundStyle(Theme.textPrimary)
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
@@ -675,15 +679,15 @@ private struct FollowingUpNextHero: View {
                     .frame(maxWidth: .infinity)
 
                     Text("VS")
-                        .font(Theme.Typography.caption)
+                        .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : Theme.Typography.caption)
                         .foregroundStyle(Theme.textTertiary)
                         .tracking(1)
                         .padding(.horizontal, 4)
 
                     VStack(spacing: 10) {
-                        TeamLogo(url: match.home.logoURL, size: 60)
+                        TeamLogo(url: match.home.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.hero : 60)
                         Text(match.home.displayName)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: Theme.isMac ? Theme.Mac.Typography.bodyLarge : 13, weight: .bold))
                             .foregroundStyle(Theme.textPrimary)
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
@@ -695,27 +699,28 @@ private struct FollowingUpNextHero: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(friendlyDate)
-                    .font(.subheadline.weight(.semibold))
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : .subheadline.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
                 if let venue = match.venue, !venue.isEmpty {
                     Text(venue)
-                        .font(.caption)
+                        .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata) : .caption)
                         .foregroundStyle(Theme.textSecondary)
                         .lineLimit(1)
                 }
                 Text(countdown)
-                    .font(.caption)
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata) : .caption)
                     .foregroundStyle(Theme.textSecondary)
             }
 
             HStack(spacing: 10) {
                 NavigationLink(value: match) {
                     Text(isRacing ? "Event Centre" : "Game Centre")
-                        .font(.subheadline.weight(.bold))
+                        .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .bold) : .subheadline.weight(.bold))
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .frame(height: Theme.isMac ? Theme.Mac.ControlHeight.lg : nil)
+                        .padding(.vertical, Theme.isMac ? 0 : 12)
+                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Radius.md : 10, style: .continuous))
                 }
                 .buttonStyle(.plain)
 
@@ -724,24 +729,25 @@ private struct FollowingUpNextHero: View {
                         Image(systemName: isReminderSet ? "bell.fill" : "bell")
                             .font(.caption.weight(.bold))
                         Text(isReminderSet ? "Reminder Set" : "Remind Me")
-                            .font(.subheadline.weight(.semibold))
+                            .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .semibold) : .subheadline.weight(.semibold))
                     }
                     .foregroundStyle(isReminderSet ? Theme.starting : Theme.accent)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .frame(height: Theme.isMac ? Theme.Mac.ControlHeight.lg : nil)
+                    .padding(.vertical, Theme.isMac ? 0 : 12)
                     .background(
                         isReminderSet ? Theme.starting.opacity(0.12) : Theme.surfaceElevated,
-                        in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        in: RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Radius.md : 10, style: .continuous)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Radius.md : 10, style: .continuous)
                             .strokeBorder(isReminderSet ? Theme.starting.opacity(0.3) : Theme.hairline)
                     )
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(20)
+        .padding(Theme.isMac ? 18 : 20)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(Theme.surface)
@@ -1152,14 +1158,14 @@ private struct FollowingEventRow: View {
 
             if isRacing {
                 Text(cleanTitle)
-                    .font(.subheadline.weight(.semibold))
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .semibold) : .subheadline.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
             } else {
                 HStack(spacing: 7) {
                     TeamLogo(url: match.away.logoURL, size: 20)
                     Text(cleanTitle)
-                        .font(.subheadline.weight(.semibold))
+                        .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .semibold) : .subheadline.weight(.semibold))
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
                 }
@@ -1200,9 +1206,9 @@ private struct FollowingEventRow: View {
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.hairline))
+        .padding(.vertical, Theme.isMac ? 14 : 12)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Radius.md : 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Radius.md : 10, style: .continuous).strokeBorder(Theme.hairline))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityText)
         .accessibilityHint("Opens \(isRacing ? "Event" : "Game") Centre")
@@ -1261,10 +1267,10 @@ private struct FollowingNewsSection: View {
     }
 
     private var newsPlaceholder: some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
+        RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Mac.Radius.card : 14, style: .continuous)
             .fill(Theme.surface)
-            .frame(width: 200, height: 170)
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
+            .frame(width: Theme.isMac ? 210 : 200, height: Theme.isMac ? 177 : 170)
+            .overlay(RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Mac.Radius.card : 14, style: .continuous).strokeBorder(Theme.hairline))
     }
 }
 
@@ -1424,21 +1430,21 @@ private struct FollowingStandingsPanelView: View {
                     let hi = row.teamID == highlightTeamID
                     HStack(spacing: 10) {
                         Text("\(rank)")
-                            .font(.caption.weight(.bold).monospacedDigit())
+                            .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .bold).monospacedDigit() : .caption.weight(.bold).monospacedDigit())
                             .foregroundStyle(hi ? Theme.accent : Theme.textSecondary)
                             .frame(width: 22, alignment: .trailing)
                         TeamLogo(url: row.logoURL, size: 20)
                         Text(row.abbreviation.isEmpty ? row.displayName : row.abbreviation)
-                            .font(.caption.weight(hi ? .heavy : .semibold))
+                            .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: hi ? .heavy : .semibold) : .caption.weight(hi ? .heavy : .semibold))
                             .foregroundStyle(hi ? Theme.textPrimary : Theme.textSecondary)
                             .lineLimit(1)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         Text(primaryStat(row))
-                            .font(.caption.weight(hi ? .heavy : .regular).monospacedDigit())
+                            .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: hi ? .heavy : .regular).monospacedDigit() : .caption.weight(hi ? .heavy : .regular).monospacedDigit())
                             .foregroundStyle(hi ? Theme.textPrimary : Theme.textSecondary)
                     }
                     .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
+                    .padding(.vertical, Theme.isMac ? 10 : 8)
                     .background(hi ? Theme.accent.opacity(0.09) : Color.clear)
                     if idx < rows.count - 1 {
                         Divider().overlay(Theme.hairline).padding(.leading, 44)

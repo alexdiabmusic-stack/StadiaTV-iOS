@@ -1929,13 +1929,13 @@ struct PodcastCardTile: View {
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 6) {
-                PodcastArtwork(url: artworkURL, size: 140, cornerRadius: Theme.Radius.md)
+                PodcastArtwork(url: artworkURL, size: Theme.isMac ? 128 : 140, cornerRadius: Theme.Radius.md)
                     .overlay(
                         RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                             .strokeBorder(Theme.hairline, lineWidth: 1)
                     )
                 Text(podcast.title)
-                    .font(.caption.weight(.semibold))
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : .caption.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
@@ -1982,7 +1982,7 @@ struct PodcastCarousel: View {
                             tags: feed.tags
                         )
                         PodcastCardTile(podcast: podcast) { selectedPodcast = podcast }
-                            .frame(width: 140)
+                            .frame(width: Theme.isMac ? 136 : 140)
                     }
                 }
                 .padding(.horizontal, 4)

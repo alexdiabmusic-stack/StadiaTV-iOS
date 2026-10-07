@@ -34,8 +34,13 @@ struct LiveView: View {
                     ToolbarItemGroup(placement: .compatTopBarTrailing) {
                         NavigationLink(destination: SearchView()) {
                             Image(systemName: "magnifyingglass")
+                                .font(.system(size: Theme.isMac ? Theme.Mac.Header.searchIconSize : 17))
                                 .foregroundStyle(Theme.textPrimary)
+                                .frame(width: Theme.isMac ? Theme.Mac.Header.searchSize : nil,
+                                       height: Theme.isMac ? Theme.Mac.Header.searchSize : nil)
+                                .background(Theme.isMac ? Theme.surfaceElevated : Color.clear, in: Circle())
                         }
+                        .buttonStyle(.plain)
                         .accessibilityLabel("Search")
                     }
                 }
@@ -485,7 +490,7 @@ struct LiveMatchCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: Theme.isMac ? 6 : 10) {
             HStack {
                 PulsingLiveBadge()
                 Text(match.league.shortName)
@@ -531,7 +536,9 @@ struct LiveMatchCard: View {
 
             eventSummaryRow
 
-            if !match.broadcasts.isEmpty {
+            // Hidden on mac — the row is compacted to scoreboard density there and this
+            // isn't essential (unlike ScheduleRow, which has room and a reason to show it).
+            if !Theme.isMac, !match.broadcasts.isEmpty {
                 HStack(spacing: 4) {
                     Image(systemName: "tv")
                         .font(.caption2)
@@ -541,8 +548,8 @@ struct LiveMatchCard: View {
                 .foregroundStyle(Theme.textSecondary)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.horizontal, Theme.isMac ? 18 : 14)
+        .padding(.vertical, Theme.isMac ? 10 : 12)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
         .overlay(alignment: .top) {
@@ -626,7 +633,7 @@ struct LiveMatchCard: View {
     private var headToHeadScoreRow: some View {
         HStack(spacing: 0) {
             HStack(spacing: 8) {
-                TeamLogo(url: match.away.logoURL, size: 36)
+                TeamLogo(url: match.away.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.row : 36)
                 Text(match.away.shortName)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
@@ -647,7 +654,7 @@ struct LiveMatchCard: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
-                TeamLogo(url: match.home.logoURL, size: 36)
+                TeamLogo(url: match.home.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.row : 36)
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
@@ -666,12 +673,12 @@ private struct CompactSoonCard: View {
 
             VStack(spacing: 8) {
                 HStack(spacing: 4) {
-                    TeamLogo(url: match.away.logoURL, size: 26)
+                    TeamLogo(url: match.away.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 10 : 26)
                     Text("vs").font(.caption2.weight(.bold)).foregroundStyle(Theme.textSecondary)
-                    TeamLogo(url: match.home.logoURL, size: 26)
+                    TeamLogo(url: match.home.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 10 : 26)
                 }
                 Text(match.shortName)
-                    .font(.caption.weight(.semibold))
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .semibold) : .caption.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
                     .frame(width: 110)
@@ -682,9 +689,9 @@ private struct CompactSoonCard: View {
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, Theme.isMac ? 14 : 12)
             .padding(.vertical, 12)
-            .frame(width: 130)
+            .frame(width: Theme.isMac ? 150 : 130)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
         }

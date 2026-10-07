@@ -43,6 +43,12 @@ enum Theme {
     static let isPad = false
     #endif
 
+    #if os(macOS)
+    static let isMac = true
+    #else
+    static let isMac = false
+    #endif
+
     // MARK: Spacing (4-pt grid)
 
     enum Spacing {
@@ -164,6 +170,84 @@ enum Theme {
 
     static func scaled(_ base: CGFloat) -> CGFloat {
         isPad ? base * 1.4 : base
+    }
+
+    // MARK: Mac design tokens
+    // macOS-only sizing system (see MEMORY: project-mac-ui-overhaul). Every value here is
+    // only ever read from an `isMac` branch, so iOS/iPadOS/tvOS visuals are untouched.
+
+    enum Mac {
+        /// Point sizes for `.system(size:weight:)` fonts (desktop density, not Dynamic Type).
+        enum Typography {
+            static let xs: CGFloat = 11
+            static let smallMetadata: CGFloat = 12
+            static let standardMetadata: CGFloat = 13
+            static let body: CGFloat = 14
+            static let bodyLarge: CGFloat = 15
+            static let cardTitle: CGFloat = 16
+            static let sectionTitle: CGFloat = 18
+            static let heading: CGFloat = 24
+            static let pageTitle: CGFloat = 28
+            static let score: CGFloat = 24
+        }
+
+        /// Buttons, segmented controls, chips, pills.
+        enum ControlHeight {
+            static let xs: CGFloat = 28
+            static let sm: CGFloat = 32
+            static let md: CGFloat = 36
+            static let lg: CGFloat = 40
+        }
+
+        enum IconSize {
+            static let xs: CGFloat = 14
+            static let sm: CGFloat = 18
+            static let md: CGFloat = 22
+            static let lg: CGFloat = 28
+        }
+
+        /// Team/channel crest sizes.
+        enum LogoSize {
+            static let row: CGFloat = 24
+            static let card: CGFloat = 32
+            static let hero: CGFloat = 52
+        }
+
+        enum Radius {
+            static let control: CGFloat = Theme.Radius.sm
+            static let row: CGFloat = Theme.Radius.md
+            static let card: CGFloat = Theme.Radius.lg
+            /// Hero/feature surfaces — distinct from `Theme.Radius.xl` (24), which stays
+            /// reserved for non-mac hero cards.
+            static let hero: CGFloat = 20
+        }
+
+        /// The missing rungs of `Theme.Spacing`'s 4/8/12/16/24/32 ladder.
+        enum Spacing {
+            static let s20: CGFloat = 20
+            static let s40: CGFloat = 40
+        }
+
+        static let contentMaxWidth: CGFloat = 1280
+        static let pagePadding: CGFloat = 20
+
+        enum Sidebar {
+            static let width: CGFloat = 196
+            static let rowHeight: CGFloat = 40
+            static let horizontalPadding: CGFloat = 13
+            static let iconSize: CGFloat = 19
+            static let labelSize: CGFloat = 15
+            static let iconLabelGap: CGFloat = 9
+            static let selectedRadius: CGFloat = 9
+        }
+
+        enum Header {
+            static let height: CGFloat = 56
+            static let logoWidth: CGFloat = 92
+            static let logoHeight: CGFloat = 30
+            static let searchSize: CGFloat = 36
+            static let searchIconSize: CGFloat = 17
+        }
     }
 }
 
@@ -290,6 +374,10 @@ struct BrandMark: View {
                 .scaledToFit()
                 .opacity(isAllWhite ? 1.0 : 0.0)
         }
+        #if os(macOS)
+        .frame(width: Theme.Mac.Header.logoWidth, height: Theme.Mac.Header.logoHeight)
+        #else
         .frame(height: Theme.scaled(36))
+        #endif
     }
 }

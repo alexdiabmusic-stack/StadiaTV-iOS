@@ -121,15 +121,17 @@ struct DiscoverView: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(Theme.hairline).frame(height: 0.5)
         }
+        .macContentWidth()
     }
 
     private func filterChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.subheadline.weight(.semibold))
+                .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .semibold) : .subheadline.weight(.semibold))
                 .foregroundStyle(isSelected ? .white : Theme.textSecondary)
                 .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .padding(.vertical, Theme.isMac ? 0 : 8)
+                .frame(height: Theme.isMac ? 35 : nil)
                 .background(isSelected ? Theme.accent : Theme.surface, in: Capsule())
                 .overlay(Capsule().strokeBorder(isSelected ? Theme.accent : Theme.hairline))
         }
@@ -194,7 +196,7 @@ struct DiscoverView: View {
                 }
 
                 if !latestArticles.isEmpty {
-                    if sizeClass == .regular {
+                    if sizeClass == .regular || Theme.isMac {
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                             ForEach(latestArticles) { article in
                                 Button { open(article: article) } label: {
@@ -244,6 +246,7 @@ struct DiscoverView: View {
                 }
             }
             .padding(20)
+            .macContentWidth()
         }
         .refreshable {
             await refreshTargetLeagues()
@@ -354,8 +357,16 @@ private struct HeroArticleCard: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            ArticleImage(url: article.imageURL)
-                .aspectRatio(16 / 9, contentMode: .fit)
+            // Capped fixed height on mac — a full-width 16:9 box would otherwise put this
+            // near 700pt tall on a wide window. `ArticleImage` already fills/crops/clips.
+            if Theme.isMac {
+                ArticleImage(url: article.imageURL)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 400)
+            } else {
+                ArticleImage(url: article.imageURL)
+                    .aspectRatio(16 / 9, contentMode: .fit)
+            }
             LinearGradient(
                 colors: [.clear, .black.opacity(0.88)],
                 startPoint: .center,
@@ -371,24 +382,24 @@ private struct HeroArticleCard: View {
                             .background(badge == "BREAKING" ? Theme.live : Theme.accent, in: Capsule())
                     }
                 }
-                .font(.caption.weight(.bold))
+                .font(Theme.isMac ? .system(size: Theme.Mac.Typography.smallMetadata, weight: .bold) : .caption.weight(.bold))
                 .foregroundStyle(.white)
 
                 Text(article.headline)
-                    .font(.title3.weight(.bold))
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.heading, weight: .bold) : .title3.weight(.bold))
                     .foregroundStyle(.white)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
 
 
                 Text(article.metadataLine(includeSource: true))
-                    .font(.caption.weight(.semibold))
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : .caption.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.72))
             }
-            .padding(16)
+            .padding(Theme.isMac ? 22 : 16)
         }
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Mac.Radius.hero : Theme.Radius.sm, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Mac.Radius.hero : Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
         .contextMenu { ArticleContextActions(article: article, isSaved: isSaved, onToggleSaved: onToggleSaved, onHide: onHide, onMute: onMute) }
     }
 }
@@ -404,7 +415,7 @@ private struct TeamNewsRow: View {
         HStack(alignment: .center, spacing: 12) {
             ArticleImage(url: article.imageURL)
                 .frame(width: 60, height: 46)
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Radius.sm : 6, style: .continuous))
             VStack(alignment: .leading, spacing: 4) {
                 Text(article.headline)
                     .font(.subheadline.weight(.semibold))

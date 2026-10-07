@@ -69,6 +69,6 @@ final class NHLGameCenterViewModel {
     }
 }
 nonisolated enum NHLGameTab: String, CaseIterable, Identifiable {
-    case overview = "Overview", plays = "Play-by-Play", boxscore = "Box Score", stats = "Stats"
+    case overview = "Overview", plays = "Play-by-Play", boxscore = "Box Score"
     var id: String { rawValue }
 }

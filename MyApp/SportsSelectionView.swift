@@ -99,7 +99,7 @@ struct SportsSelectionView: View {
             }
         }
         #if !os(tvOS)
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        Haptic.impact(.light)
         #endif
     }
 
@@ -208,7 +208,7 @@ private struct LeagueExpansionDrawer: View {
                             store.toggleLeague(league, inSport: sport)
                         }
                         #if !os(tvOS)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        Haptic.impact(.light)
                         #endif
                     }
                 }
@@ -317,7 +317,9 @@ private struct LeagueSearchField: View {
                 .font(.subheadline)
                 .foregroundStyle(Theme.textPrimary)
                 .autocorrectionDisabled()
+                #if os(iOS)
                 .textInputAutocapitalization(.never)
+                #endif
             if !text.isEmpty {
                 Button { text = "" } label: {
                     Image(systemName: "xmark.circle.fill")

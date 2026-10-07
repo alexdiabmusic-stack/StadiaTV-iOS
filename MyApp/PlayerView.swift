@@ -62,8 +62,14 @@ struct PlayerView: View {
     /// `findAndPollLiveMatch` and uses `pollMatchUpdates(for:)` on the known match instead.
     let matchPlaybackContext: MatchPlaybackContext?
     @StateObject private var streamSelection: StreamSelectionState
-    /// Owns the AVPlayer for this presentation; layout changes never recreate it.
+    /// The shared `AVPlayer`-owning controller (`BannerAppEnvironment.playbackController`) —
+    /// not constructed per presentation, so layout changes, re-presentation, and switching
+    /// to/from CarPlay all keep using the same player instead of restarting it.
     @StateObject private var playback: PlaybackController
+    /// Captured at init and applied via `playback.notePendingTapDate(_:)` right before this
+    /// presentation's first `load()`, since the controller itself is no longer constructed
+    /// fresh per presentation (see above).
+    @State private var initialTapDate: Date
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var entitlements: EntitlementStore
@@ -149,7 +155,8 @@ struct PlayerView: View {
         _currentZapChannel = State(initialValue: zap[idx])
         _zapIndex = State(initialValue: idx)
         _streamSelection = StateObject(wrappedValue: StreamSelectionState(channel: zap[idx]))
-        _playback = StateObject(wrappedValue: PlaybackController(tapDate: tapDate ?? PlaybackTapClock.consume()))
+        _playback = StateObject(wrappedValue: BannerAppEnvironment.shared.playbackController)
+        _initialTapDate = State(initialValue: tapDate ?? PlaybackTapClock.consume() ?? Date())
     }
 
     init(canonicalChannel: CanonicalChannel, tapDate: Date? = nil) {
@@ -169,7 +176,8 @@ struct PlayerView: View {
         _currentZapChannel = State(initialValue: channel)
         _zapIndex = State(initialValue: 0)
         _streamSelection = StateObject(wrappedValue: StreamSelectionState(channel: channel, canonicalChannel: canonicalChannel))
-        _playback = StateObject(wrappedValue: PlaybackController(tapDate: tapDate ?? PlaybackTapClock.consume()))
+        _playback = StateObject(wrappedValue: BannerAppEnvironment.shared.playbackController)
+        _initialTapDate = State(initialValue: tapDate ?? PlaybackTapClock.consume() ?? Date())
     }
 
     init(context: MatchPlaybackContext, showsLiveTVControls: Bool = false, tapDate: Date? = nil) {
@@ -182,7 +190,8 @@ struct PlayerView: View {
         // The match's other ranked sources become failover/cycle candidates, in rank order.
         let candidates = context.rankedSources.prefix(StreamSelectionState.maxRawCandidates).map(\.channel)
         _streamSelection = StateObject(wrappedValue: StreamSelectionState(channel: context.channel, candidates: Array(candidates)))
-        _playback = StateObject(wrappedValue: PlaybackController(tapDate: tapDate ?? PlaybackTapClock.consume()))
+        _playback = StateObject(wrappedValue: BannerAppEnvironment.shared.playbackController)
+        _initialTapDate = State(initialValue: tapDate ?? PlaybackTapClock.consume() ?? Date())
     }
 
     private var canonicalChannel: CanonicalChannel? {
@@ -435,6 +444,16 @@ struct PlayerView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
+        #if os(macOS)
+        .sheet(isPresented: $showingGuideFromPlayer) {
+            TVGuideView(onChannelSelected: { canonicalChannel in
+                if let ch = canonicalChannel.playableChannel {
+                    switchChannel(to: ch, canonicalChannel: canonicalChannel)
+                }
+                showingGuideFromPlayer = false
+            })
+        }
+        #else
         .fullScreenCover(isPresented: $showingGuideFromPlayer) {
             TVGuideView(onChannelSelected: { canonicalChannel in
                 if let ch = canonicalChannel.playableChannel {
@@ -443,6 +462,7 @@ struct PlayerView: View {
                 showingGuideFromPlayer = false
             })
         }
+        #endif
         .overlay(alignment: .trailing) {
             if showingFantasySidebar {
                 FantasyMatchupSidebarView(
@@ -489,9 +509,15 @@ struct PlayerView: View {
             // Observes FantasyStore on its own so fantasy updates don't re-render the player.
             PlayerFantasyTrackerBridge(liveTracker: liveTracker, channels: { stores?.playlistStore.allChannels ?? [] })
         }
+        #if os(macOS)
+        .sheet(item: $multiscreenSession) { session in
+            MultiScreenPlayerView(channels: session.channels)
+        }
+        #else
         .fullScreenCover(item: $multiscreenSession) { session in
             MultiScreenPlayerView(channels: session.channels)
         }
+        #endif
         .sheet(isPresented: $showPaywall) {
             PaywallView()
                 .presentationDetents([.large])
@@ -880,8 +906,10 @@ struct PlayerView: View {
                 streamSelection.updateRuntimeMetadata(metadata, for: streamID)
             }
         }
-        // onAppear can fire again (e.g. after a full-screen cover); only load if nothing is playing.
+        // onAppear can fire again (e.g. after a full-screen cover); only load if nothing is
+        // playing — including nothing already started by CarPlay on this same shared controller.
         if playback.channel?.id != activePlaybackChannel.id || playback.currentItem == nil {
+            playback.notePendingTapDate(initialTapDate)
             loadActiveStream()
         }
     }
@@ -3496,6 +3524,93 @@ private struct PlayerSurface: UIViewRepresentable {
         }
     }
 }
+#elseif os(macOS)
+private final class PlayerLayerView: NSView {
+    let playerLayer = AVPlayerLayer()
+
+    var player: AVPlayer? {
+        get { playerLayer.player }
+        set { playerLayer.player = newValue }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer = playerLayer
+        playerLayer.videoGravity = .resizeAspect
+        playerLayer.backgroundColor = NSColor.black.cgColor
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        wantsLayer = true
+        layer = playerLayer
+        playerLayer.videoGravity = .resizeAspect
+        playerLayer.backgroundColor = NSColor.black.cgColor
+    }
+}
+
+private struct VideoSurface: NSViewRepresentable {
+    let player: AVPlayer
+    let showsPlaybackControls: Bool
+    let allowsPictureInPicture: Bool
+    var onPiPControllerReady: ((AVPictureInPictureController) -> Void)? = nil
+
+    func makeNSView(context: Context) -> PlayerLayerView {
+        let view = PlayerLayerView()
+        view.player = player
+        return view
+    }
+
+    func updateNSView(_ view: PlayerLayerView, context: Context) {
+        if view.player !== player {
+            view.player = player
+        }
+    }
+}
+
+/// Hosts the `PlaybackController`'s shared AVPlayer. The surface only attaches the player
+/// to its layer and reports the first displayable frame; it never creates or stops players,
+/// so it can be rebuilt (window resizes, layout changes) without interrupting playback.
+private struct PlayerSurface: NSViewRepresentable {
+    let controller: PlaybackController
+    var videoGravity: AVLayerVideoGravity = .resizeAspect
+    var onPiPControllerReady: ((AVPictureInPictureController) -> Void)? = nil
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> PlayerLayerView {
+        let view = PlayerLayerView()
+        view.player = controller.player
+        view.playerLayer.videoGravity = videoGravity
+        context.coordinator.observeReadyForDisplay(of: view.playerLayer, controller: controller)
+        return view
+    }
+
+    func updateNSView(_ view: PlayerLayerView, context: Context) {
+        if view.player !== controller.player {
+            view.player = controller.player
+        }
+        if view.playerLayer.videoGravity != videoGravity {
+            view.playerLayer.videoGravity = videoGravity
+        }
+    }
+
+    static func dismantleNSView(_ view: PlayerLayerView, coordinator: Coordinator) {
+        coordinator.readyObservation?.invalidate()
+    }
+
+    final class Coordinator: NSObject {
+        var readyObservation: NSKeyValueObservation?
+
+        func observeReadyForDisplay(of layer: AVPlayerLayer, controller: PlaybackController) {
+            readyObservation = layer.observe(\.isReadyForDisplay, options: [.initial, .new]) { @Sendable [weak controller] layer, _ in
+                guard layer.isReadyForDisplay else { return }
+                Task { @MainActor [weak controller] in controller?.surfaceReadyForDisplay() }
+            }
+        }
+    }
+}
 #endif
 
 /// Start-up, buffering and recovery states drawn over the video.
@@ -3821,9 +3936,7 @@ private struct PlayerMultiscreenPicker: View {
                 }
             }
             .navigationTitle("Add to Multiscreen")
-            #if !os(tvOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
+            .inlineNavigationTitle()
             .searchable(text: $query, prompt: "Search channels")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -4283,9 +4396,7 @@ private struct PlayerMoreSheet: View {
             }
             .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Options")
-            #if !os(tvOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
@@ -4612,9 +4723,7 @@ private struct SelectionList<Content: View>: View {
         }
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle(title)
-        #if !os(tvOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .inlineNavigationTitle()
     }
 }
 
@@ -4688,9 +4797,7 @@ private struct PlayerChannelListSheet: View {
             .listStyle(.plain)
             .hidesScrollContentBackground()
             .navigationTitle("Channels")
-            #if !os(tvOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
             }
@@ -4748,9 +4855,7 @@ private struct PlayerRecentsSheet: View {
                 }
             }
             .navigationTitle("Recent Channels")
-            #if !os(tvOS)
-            .navigationBarTitleDisplayMode(.inline)
-            #endif
+            .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
             }

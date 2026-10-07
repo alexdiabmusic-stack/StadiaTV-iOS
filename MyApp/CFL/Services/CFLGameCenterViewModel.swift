@@ -8,7 +8,7 @@ import Observation
     private(set) var game: CFLGameState?
     private(set) var error: String?
     private(set) var cached = false
-    var tab = "Overview"
+    var tab: CFLGameTab = .overview
     private var generation = UUID()
     private let service: any CFLGameCenterServing
     init(service: any CFLGameCenterServing = CFLGameCenterService()) { self.service = service }
@@ -24,7 +24,7 @@ import Observation
         var failures = 0
         repeat {
             do {
-                let details = tab == "Plays"
+                let details = tab == .plays
                 let updated = try await service.load(gameID: id, date: date, previous: game, details: details)
                 guard self.generation == generation, !Task.isCancelled, updated.id == id else { return }
                 game = updated; error = nil; cached = false; failures = 0
@@ -46,4 +46,8 @@ import Observation
             catch { return }
         } while !Task.isCancelled
     }
+}
+nonisolated enum CFLGameTab: String, CaseIterable, Identifiable {
+    case overview = "Overview", plays = "Plays", boxscore = "Box Score", stats = "Stats"
+    var id: String { rawValue }
 }

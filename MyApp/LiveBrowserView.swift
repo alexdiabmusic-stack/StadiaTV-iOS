@@ -1,5 +1,14 @@
 import SwiftUI
 
+#if os(macOS)
+/// Stand-in for SwiftUI's `EditMode`, which has no macOS environment key.
+/// Drives this view's own Edit/Done button and filtering; native row
+/// drag-to-reorder via the `\.editMode` environment key is iOS/tvOS-only.
+enum EditMode: Equatable {
+    case active, inactive
+}
+#endif
+
 /// Navigation root for the Live TV tab.
 /// Shows Favourites, All Channels, user-created custom groups, and
 /// per-provider group sections — each linking to a ChannelBrowserView.
@@ -109,7 +118,9 @@ struct LiveBrowserView: View {
         .listStyle(.plain)
         .hidesScrollContentBackground()
         .background(Theme.background)
+        #if os(iOS) || os(tvOS)
         .environment(\.editMode, $editMode)
+        #endif
         .refreshable { await refreshAction() }
         .toolbar { editToolbar }
         .animation(Theme.Motion.snappy, value: customGroups.groups.map(\.id))
@@ -195,7 +206,7 @@ struct LiveBrowserView: View {
 
     @ToolbarContentBuilder
     private var editToolbar: some ToolbarContent {
-        ToolbarItem(placement: .topBarLeading) {
+        ToolbarItem(placement: .compatTopBarLeading) {
             Button(editMode == .active ? "Done" : "Edit") {
                 withAnimation { editMode = editMode == .active ? .inactive : .active }
             }

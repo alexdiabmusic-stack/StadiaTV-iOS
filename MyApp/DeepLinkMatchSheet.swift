@@ -1,4 +1,3 @@
-#if !os(tvOS)
 import SwiftUI
 
 /// The game a deep link points at, identified the way notifications and URLs name it.
@@ -31,12 +30,14 @@ struct DeepLinkMatchSheet: View {
             case .loaded(let match):
                 NavigationStack {
                     MatchDetailView(match: match)
-                        .navigationBarTitleDisplayMode(.inline)
+                        .inlineNavigationTitle()
+                        #if !os(tvOS)
                         .toolbar {
                             ToolbarItem(placement: .cancellationAction) {
                                 Button("Done") { dismiss() }
                             }
                         }
+                        #endif
                 }
             case .loading:
                 placeholder {
@@ -101,4 +102,3 @@ struct DeepLinkMatchSheet: View {
         (try? await fetch())?.first { $0.id == target.matchID }
     }
 }
-#endif

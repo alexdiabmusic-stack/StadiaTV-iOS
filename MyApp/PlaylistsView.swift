@@ -170,7 +170,9 @@ struct AddPlaylistView: View {
                     Section {
                         TextField("http://example.com/playlist.m3u", text: $m3uURL)
                             .autocorrectionDisabled()
+                            #if os(iOS)
                             .keyboardType(.URL)
+                            #endif
                     } header: {
                         Text("M3U URL")
                     } footer: {
@@ -181,7 +183,9 @@ struct AddPlaylistView: View {
                     Section {
                         TextField("http://server.com:8080", text: $host)
                             .autocorrectionDisabled()
+                            #if os(iOS)
                             .keyboardType(.URL)
+                            #endif
                     } header: {
                         Text("Server")
                     } footer: {
@@ -199,7 +203,9 @@ struct AddPlaylistView: View {
                 Section {
                     TextField("Default (Apple)", text: $userAgent)
                         .autocorrectionDisabled()
+                        #if os(iOS)
                         .textInputAutocapitalization(.never)
+                        #endif
                 } header: {
                     Text("User-Agent (Optional)")
                 } footer: {

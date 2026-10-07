@@ -1,6 +1,9 @@
 import Foundation
 import SwiftUI
 import Combine
+#if os(macOS)
+import AppKit
+#endif
 
 // MARK: - Guide View Model
 

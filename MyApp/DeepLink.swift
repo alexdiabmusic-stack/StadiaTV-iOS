@@ -2,7 +2,8 @@ import Foundation
 import Combine
 
 /// Somewhere the app can open from outside its own UI: a tapped notification or a
-/// `bannertv://` URL.
+/// `banner://` URL. Game links from CarPlay, Live Activities and Siri (`banner://game/{id}`)
+/// are `BannerDeepLink`'s; the two share the `banner` scheme and each ignores the other's hosts.
 nonisolated enum DeepLink: Equatable, Sendable {
     /// A game's detail screen. `date` is the game's start, when known, so the loader can ask
     /// for just that day's scoreboard.
@@ -13,9 +14,9 @@ nonisolated enum DeepLink: Equatable, Sendable {
     case discover
     case settings
 
-    static let scheme = "bannertv"
+    static let scheme = "banner"
 
-    /// `bannertv://match?league=soccer%2Feng.1&id=401234&date=1790000000`, or `bannertv://live`
+    /// `banner://match?league=soccer%2Feng.1&id=401234&date=1790000000`, or `banner://live`
     /// (and `home`, `following`, `discover`, `settings`) to switch tabs.
     init?(url: URL) {
         guard url.scheme?.lowercased() == Self.scheme, let host = url.host?.lowercased() else { return nil }

@@ -1,4 +1,4 @@
-#if os(iOS)
+#if os(iOS) || os(macOS)
 import SwiftUI
 
 /// Half-sheet that lists the top ranked streams for a match so the user can
@@ -30,20 +30,26 @@ struct QuickStreamSheet: View {
                 }
             }
             .navigationTitle(match.shortName)
-            .navigationBarTitleDisplayMode(.inline)
+            .inlineNavigationTitle()
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .navigation) {
                     Text(match.league.shortName)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Theme.textSecondary)
                 }
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
             }
+            #if os(macOS)
+            .sheet(item: $playingChannel) { ch in
+                PlayerView(channel: ch, zapChannels: [ch], currentIndex: 0)
+            }
+            #else
             .fullScreenCover(item: $playingChannel) { ch in
                 PlayerView(channel: ch, zapChannels: [ch], currentIndex: 0)
             }
+            #endif
         }
     }
 

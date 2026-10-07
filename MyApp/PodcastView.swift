@@ -1,6 +1,11 @@
 import SwiftUI
 import AVFoundation
 import AVKit
+#if canImport(UIKit)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 // MARK: - Podcast Topic Model
 
@@ -236,7 +241,9 @@ struct PodcastBrowserView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        #if os(iOS)
         .navigationBarHidden(true)
+        #endif
         .enableSwipeBack()
         .navigationDestination(item: $selectedPodcast) { podcast in
             PodcastDetailView(podcast: podcast)
@@ -337,7 +344,9 @@ struct PodcastBrowserView: View {
                 .font(.system(size: 16))
                 .foregroundStyle(Theme.textPrimary)
                 .autocorrectionDisabled()
+                #if os(iOS)
                 .textInputAutocapitalization(.never)
+                #endif
 
             if isSearching {
                 ProgressView()
@@ -892,7 +901,9 @@ struct PodcastDetailView: View {
             }
         }
         .navigationBarBackButtonHidden(true)
+        #if os(iOS)
         .navigationBarHidden(true)
+        #endif
         .enableSwipeBack()
         .task {
             await store.fetchArtwork(for: podcast.feedURL)
@@ -1701,7 +1712,7 @@ struct PodcastPlayerSheet: View {
             }
             .inlineNavigationTitle()
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .compatTopBarLeading) {
                     Button { dismiss() } label: {
                         Image(systemName: "chevron.down")
                             .font(.title3.weight(.semibold))
@@ -1900,9 +1911,14 @@ struct PodcastArtwork: View {
                 return
             }
             let request = URLRequest(url: url, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 30)
-            guard let (data, _) = try? await URLSession.shared.data(for: request),
-                  let uiImage = UIImage(data: data) else { return }
+            guard let (data, _) = try? await URLSession.shared.data(for: request) else { return }
+            #if os(iOS)
+            guard let uiImage = UIImage(data: data) else { return }
             cachedImage = Image(uiImage: uiImage)
+            #elseif os(macOS)
+            guard let nsImage = NSImage(data: data) else { return }
+            cachedImage = Image(nsImage: nsImage)
+            #endif
         }
     }
 }
@@ -1947,13 +1963,13 @@ struct PodcastCardTile: View {
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: 6) {
-                PodcastArtwork(url: artworkURL, size: 140, cornerRadius: Theme.Radius.md)
+                PodcastArtwork(url: artworkURL, size: Theme.isMac ? 128 : 140, cornerRadius: Theme.Radius.md)
                     .overlay(
                         RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
                             .strokeBorder(Theme.hairline, lineWidth: 1)
                     )
                 Text(podcast.title)
-                    .font(.caption.weight(.semibold))
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : .caption.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
@@ -2000,7 +2016,7 @@ struct PodcastCarousel: View {
                             tags: feed.tags
                         )
                         PodcastCardTile(podcast: podcast) { selectedPodcast = podcast }
-                            .frame(width: 140)
+                            .frame(width: Theme.isMac ? 136 : 140)
                     }
                 }
                 .padding(.horizontal, 4)
@@ -2018,10 +2034,15 @@ struct PodcastCarousel: View {
 
 extension View {
     func enableSwipeBack() -> some View {
+        #if os(iOS)
         background(EnableSwipeBackHelper())
+        #else
+        self
+        #endif
     }
 }
 
+#if os(iOS)
 private struct EnableSwipeBackHelper: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> SwipeBackViewController {
         SwipeBackViewController()
@@ -2047,3 +2068,4 @@ private class SwipeBackViewController: UIViewController, UIGestureRecognizerDele
         return true
     }
 }
+#endif

@@ -98,7 +98,7 @@ struct TVMatchDetailView: View {
         .task(id: match.id) {
             matchNews = (try? await SportsRepository.shared.legacyNews(for: match.league, limit: 6)) ?? []
         }
-        .fullScreenCover(item: $playingChannel) { channel in
+        .fullScreenCoverCompat(item: $playingChannel) { channel in
             TVPlayerView(channel: channel, initialMatch: match)
         }
     }

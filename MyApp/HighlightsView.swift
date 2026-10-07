@@ -473,9 +473,7 @@ struct YouTubePlayerSheet: View {
             YouTubeEmbedView(videoId: item.videoId)
                 .ignoresSafeArea(edges: .bottom)
                 .navigationTitle(item.title)
-                #if !os(tvOS)
-                .navigationBarTitleDisplayMode(.inline)
-                #endif
+                .inlineNavigationTitle()
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Done") { dismiss() }

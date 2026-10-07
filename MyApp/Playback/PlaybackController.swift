@@ -63,6 +63,11 @@ final class PlaybackController: ObservableObject {
     let player = AVPlayer()
     private(set) var channel: Channel?
     private(set) var bufferProfile: PlayerBufferProfile
+    /// Set by the `audioOnly` argument to the most recent `load(_:audioOnly:)` call. Drives
+    /// which audio-session category an interruption resume re-activates, since this
+    /// controller is now shared across a video presentation (phone `PlayerView`) and
+    /// audio-only ones (CarPlay, Siri) rather than owned by a single always-video caller.
+    private(set) var isAudioOnlySession = false
     private var peakBitRate: Double = 0
 
     /// Called when the current stream can't be played (after fallback URLs and reconnects
@@ -113,8 +118,22 @@ final class PlaybackController: ObservableObject {
 
     // MARK: - Public API
 
+    /// Records the tap timestamp for the *next* `load()` call's time-to-first-frame metric.
+    /// The controller is now a long-lived shared instance (one per process, reused across
+    /// presentations and across CarPlay/phone — see `BannerAppEnvironment.playbackController`)
+    /// rather than constructed fresh per presentation, so callers that used to pass `tapDate`
+    /// to `init` call this immediately before their own `load()` instead.
+    func notePendingTapDate(_ date: Date) {
+        pendingTapDate = date
+    }
+
     /// Starts `channel` on the shared player, replacing whatever was playing.
-    func load(_ channel: Channel) {
+    /// - Parameter audioOnly: true for CarPlay/Siri driving-mode playback — activates the
+    ///   `.spokenAudio` session instead of claiming the video/movie-playback session, since
+    ///   no video surface will be attached. Defaults to false (today's phone `PlayerView`
+    ///   behavior, unchanged).
+    func load(_ channel: Channel, audioOnly: Bool = false) {
+        isAudioOnlySession = audioOnly
         let now = Date()
         let tapDate = pendingTapDate ?? now
         pendingTapDate = nil
@@ -142,7 +161,7 @@ final class PlaybackController: ObservableObject {
             return
         }
 
-        AudioSessionManager.activateForVideo()
+        if audioOnly { AudioSessionManager.activateForAudioOnly() } else { AudioSessionManager.activateForVideo() }
         NotificationCenter.default.post(name: .bannerVideoPlaybackWillStart, object: nil)
         setHoldsPlaybackPriority(true)
         startCurrentURL()
@@ -610,7 +629,7 @@ final class PlaybackController: ObservableObject {
         case .ended:
             let options = AVAudioSession.InterruptionOptions(rawValue: rawOptions)
             if options.contains(.shouldResume), wasPlayingBeforeInterruption, !isUserPaused {
-                AudioSessionManager.activateForVideo()
+                if isAudioOnlySession { AudioSessionManager.activateForAudioOnly() } else { AudioSessionManager.activateForVideo() }
                 if let pausedAt, Date().timeIntervalSince(pausedAt) > Self.staleBufferInterval {
                     seekToLiveEdge()
                 }

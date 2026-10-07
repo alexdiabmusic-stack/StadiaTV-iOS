@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import BannerTV
 
-/// How a `bannertv://` URL or a tapped notification maps to somewhere in the app.
+/// How a `banner://` URL or a tapped notification maps to somewhere in the app.
 @Suite("Deep links")
 struct DeepLinkTests {
 
@@ -10,29 +10,30 @@ struct DeepLinkTests {
 
     @Test("A match link carries its league, id and, when known, start time")
     func matchURL() {
-        #expect(DeepLink(url: url("bannertv://match?league=soccer%2Feng.1&id=401234&date=1790000000"))
+        #expect(DeepLink(url: url("banner://match?league=soccer%2Feng.1&id=401234&date=1790000000"))
                 == .match(leagueID: "soccer/eng.1", matchID: "401234", date: Date(timeIntervalSince1970: 1790000000)))
-        #expect(DeepLink(url: url("bannertv://match?league=hockey/nhl&id=9"))
+        #expect(DeepLink(url: url("banner://match?league=hockey/nhl&id=9"))
                 == .match(leagueID: "hockey/nhl", matchID: "9", date: nil), "an unescaped slash is fine, and the date is optional")
-        #expect(DeepLink(url: url("bannertv://match?league=a&id=b&date=notanumber"))
+        #expect(DeepLink(url: url("banner://match?league=a&id=b&date=notanumber"))
                 == .match(leagueID: "a", matchID: "b", date: nil), "a bad date is ignored and the link kept")
     }
 
     @Test("Tab links, in any case")
     func tabURLs() {
-        #expect(DeepLink(url: url("BannerTV://Live")) == .live)
-        #expect(DeepLink(url: url("bannertv://home")) == .home)
-        #expect(DeepLink(url: url("bannertv://following")) == .following)
-        #expect(DeepLink(url: url("bannertv://discover")) == .discover)
-        #expect(DeepLink(url: url("bannertv://settings")) == .settings)
+        #expect(DeepLink(url: url("Banner://Live")) == .live)
+        #expect(DeepLink(url: url("banner://home")) == .home)
+        #expect(DeepLink(url: url("banner://following")) == .following)
+        #expect(DeepLink(url: url("banner://discover")) == .discover)
+        #expect(DeepLink(url: url("banner://settings")) == .settings)
     }
 
     @Test("Anything else is rejected")
     func rejected() {
-        #expect(DeepLink(url: url("bannertv://match?league=&id=1")) == nil, "empty league")
-        #expect(DeepLink(url: url("bannertv://match?id=1")) == nil, "missing league")
-        #expect(DeepLink(url: url("bannertv://match?league=a")) == nil, "missing id")
-        #expect(DeepLink(url: url("bannertv://unknown")) == nil)
+        #expect(DeepLink(url: url("banner://match?league=&id=1")) == nil, "empty league")
+        #expect(DeepLink(url: url("banner://match?id=1")) == nil, "missing league")
+        #expect(DeepLink(url: url("banner://match?league=a")) == nil, "missing id")
+        #expect(DeepLink(url: url("banner://unknown")) == nil)
+        #expect(DeepLink(url: url("banner://game/401234")) == nil, "game links are BannerDeepLink's, not this type's")
         #expect(DeepLink(url: url("https://example.com/match?league=a&id=b")) == nil, "other schemes")
     }
 

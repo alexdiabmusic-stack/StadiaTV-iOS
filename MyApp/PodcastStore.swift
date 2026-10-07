@@ -4,7 +4,11 @@ import SwiftUI
 import Combine
 import MediaPlayer
 import OSLog
+#if canImport(UIKit)
 import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 // MARK: - Playback speed
 
@@ -525,6 +529,7 @@ final class PodcastStore: ObservableObject {
     // MARK: - Audio session
 
     private func configureAudioSession() {
+        #if os(iOS) || os(tvOS)
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .spokenAudio)
@@ -532,6 +537,7 @@ final class PodcastStore: ObservableObject {
         } catch {
             Logger(subsystem: "BannerTV", category: "Podcast").error("Audio session setup failed: \(String(describing: error), privacy: .public)")
         }
+        #endif
     }
 
     // MARK: - Player observers & Background Power Optimization
@@ -615,6 +621,7 @@ final class PodcastStore: ObservableObject {
     // MARK: - App Lifecycle Power Management
 
     private func setupAppLifecycleObservers() {
+        #if os(iOS)
         NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification,
             object: nil, queue: .main
@@ -632,6 +639,7 @@ final class PodcastStore: ObservableObject {
                 self?.handleWillEnterForeground()
             }
         }
+        #endif
 
         // The live TV player owns the lock-screen controls while it's on screen.
         NotificationCenter.default.addObserver(
@@ -731,8 +739,12 @@ final class PodcastStore: ObservableObject {
         // Fetch artwork asynchronously and update once loaded
         if let artworkURL = episode.podcastArtworkURL {
             Task {
-                guard let (data, _) = try? await URLSession.shared.data(from: artworkURL),
-                      let image = UIImage(data: data) else { return }
+                guard let (data, _) = try? await URLSession.shared.data(from: artworkURL) else { return }
+                #if canImport(UIKit)
+                guard let image = UIImage(data: data) else { return }
+                #elseif os(macOS)
+                guard let image = NSImage(data: data) else { return }
+                #endif
                 let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
                 guard var current = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
                 current[MPMediaItemPropertyArtwork] = artwork

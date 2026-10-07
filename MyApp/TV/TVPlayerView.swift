@@ -87,10 +87,10 @@ struct TVPlayerView: View {
             revealChromeTemporarily()
         }
         .animation(.easeInOut(duration: 0.25), value: isChromeVisible)
-        .fullScreenCover(isPresented: $showMultiscreen) {
+        .fullScreenCoverCompat(isPresented: $showMultiscreen) {
             MultiScreenPlayerView(channels: multiscreenChannelsList)
         }
-        .fullScreenCover(isPresented: $showPaywall) {
+        .fullScreenCoverCompat(isPresented: $showPaywall) {
             TVPaywallView()
         }
         .onAppear {

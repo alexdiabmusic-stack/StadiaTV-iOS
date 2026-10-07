@@ -261,7 +261,7 @@ struct PaywallView: View {
         return Button {
             withAnimation(.spring(duration: 0.22)) { selectedID = EntitlementStore.monthlyID }
             #if os(iOS)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            Haptic.impact(.light)
             #endif
         } label: {
             VStack(alignment: .leading, spacing: 8) {
@@ -323,7 +323,7 @@ struct PaywallView: View {
                 Button {
                     withAnimation(.spring(duration: 0.22)) { selectedID = EntitlementStore.annualID }
                     #if os(iOS)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    Haptic.impact(.light)
                     #endif
                 } label: {
                     VStack(spacing: 4) {
@@ -354,7 +354,7 @@ struct PaywallView: View {
                 Button {
                     withAnimation(.spring(duration: 0.22)) { selectedID = EntitlementStore.lifetimeID }
                     #if os(iOS)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    Haptic.impact(.light)
                     #endif
                 } label: {
                     VStack(spacing: 4) {
@@ -395,7 +395,7 @@ struct PaywallView: View {
         return Button {
             withAnimation(.spring(duration: 0.22)) { selectedID = id }
             #if os(iOS)
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            Haptic.impact(.light)
             #endif
         } label: {
             ZStack(alignment: .topTrailing) {
@@ -567,7 +567,7 @@ struct PremiumGateOverlay: View {
                 Button {
                     showPaywall = true
                     #if os(iOS)
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    Haptic.impact(.medium)
                     #endif
                 } label: {
                     Text("Unlock Premium")
@@ -666,7 +666,7 @@ struct PremiumSuccessOverlay: View {
                 ringOpacity = 0
             }
             #if os(iOS)
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            Haptic.success()
             #endif
         }
     }
@@ -786,7 +786,7 @@ struct PremiumSectionGate: View {
                 Button {
                     showPaywall = true
                     #if os(iOS)
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    Haptic.impact(.medium)
                     #endif
                 } label: {
                     Label("Unlock Premium", systemImage: "lock.open.fill")

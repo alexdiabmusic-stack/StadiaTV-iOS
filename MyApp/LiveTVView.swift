@@ -20,14 +20,14 @@ struct LiveChannelsView: View {
                 if isPickingMultiscreen { multiscreenFooter }
             }
             .toolbar { multiscreenToolbarItem }
-            .fullScreenCover(item: $playingChannel) { channel in
+            .fullScreenCoverCompat(item: $playingChannel) { channel in
                 PlayerView(
                     channel: channel,
                     zapChannels: zapChannels,
                     currentIndex: zapChannels.firstIndex(where: { $0.id == channel.id }) ?? 0
                 )
             }
-            .fullScreenCover(item: $multiscreenSession) { MultiScreenPlayerView(channels: $0.channels) }
+            .fullScreenCoverCompat(item: $multiscreenSession) { MultiScreenPlayerView(channels: $0.channels) }
             .tint(Theme.accent)
     }
 
@@ -69,7 +69,7 @@ struct LiveChannelsView: View {
     @ToolbarContentBuilder
     private var multiscreenToolbarItem: some ToolbarContent {
         if store.allChannels.count >= 2 {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .compatTopBarTrailing) {
                 Button { toggleMultiscreenPicking() } label: {
                     Image(systemName: isPickingMultiscreen
                           ? "checkmark.rectangle.stack" : "rectangle.grid.2x2")

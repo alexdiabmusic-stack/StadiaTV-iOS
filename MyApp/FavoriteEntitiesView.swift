@@ -53,7 +53,9 @@ struct FavoriteEntitiesView: View {
                 .foregroundStyle(Theme.textSecondary)
             TextField("Search teams", text: $searchText)
                 .autocorrectionDisabled()
+                #if os(iOS)
                 .textInputAutocapitalization(.words)
+                #endif
                 .foregroundStyle(Theme.textPrimary)
             if !searchText.isEmpty {
                 Button { searchText = "" } label: {
@@ -103,7 +105,7 @@ struct FavoriteEntitiesView: View {
                             store.toggleFavorite(teamID: team.id)
                         }
                         #if !os(tvOS)
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        Haptic.impact(.light)
                         #endif
                     }
                     Divider().background(Theme.hairline).padding(.leading, 56)
@@ -134,7 +136,7 @@ struct FavoriteEntitiesView: View {
                                 store.toggleFavorite(teamID: team.id)
                             }
                             #if !os(tvOS)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            Haptic.impact(.light)
                             #endif
                         }
                     }

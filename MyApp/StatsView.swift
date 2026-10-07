@@ -110,7 +110,7 @@ struct StatsView: View {
                             if isLocked {
                                 showPaywall = true
                                 #if os(iOS)
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                Haptic.impact(.medium)
                                 #endif
                             } else {
                                 selectedSection = section

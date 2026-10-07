@@ -1,4 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 struct SettingsView: View {
     var body: some View {
@@ -1262,6 +1267,9 @@ struct ESPNFantasyConnectSheet: View {
     @State private var isSigningIn = false
     @State private var signedInViaWeb = false
     @State private var webAuthError: String?
+    @State private var isDiscoveringLeagues = false
+    @State private var discoveredLeagues: [ESPNDiscoveredLeague] = []
+    @State private var discoveryError: String?
 
     var body: some View {
         NavigationStack {
@@ -1275,11 +1283,17 @@ struct ESPNFantasyConnectSheet: View {
                             }
                         }
                         TextField("League ID", text: $leagueID)
+                            #if os(iOS)
                             .keyboardType(.numberPad)
+                            #endif
                         TextField("Season", text: $seasonID)
+                            #if os(iOS)
                             .keyboardType(.numberPad)
+                            #endif
                         TextField("Your team ID", text: $teamID)
+                            #if os(iOS)
                             .keyboardType(.numberPad)
+                            #endif
                         Text("For public leagues, enter your ESPN Fantasy team ID so Banner knows which roster is yours.")
                             .font(.footnote)
                             .foregroundStyle(Theme.textSecondary)
@@ -1289,11 +1303,44 @@ struct ESPNFantasyConnectSheet: View {
                         if signedInViaWeb {
                             Label("Signed in to ESPN", systemImage: "checkmark.seal.fill")
                                 .foregroundStyle(.green)
+
+                            if isDiscoveringLeagues {
+                                HStack {
+                                    Text("Finding your leagues…")
+                                    Spacer()
+                                    ProgressView()
+                                }
+                            } else if !discoveredLeagues.isEmpty {
+                                ForEach(discoveredLeagues) { league in
+                                    Button {
+                                        selectedSport = league.sport
+                                        leagueID = league.leagueID
+                                        seasonID = String(league.seasonID)
+                                    } label: {
+                                        HStack {
+                                            Label(league.teamName ?? "League \(league.leagueID)", systemImage: league.sport.symbolName)
+                                                .foregroundStyle(Theme.textPrimary)
+                                            Spacer()
+                                            if selectedSport == league.sport, leagueID == league.leagueID, seasonID == String(league.seasonID) {
+                                                Image(systemName: "checkmark")
+                                                    .foregroundStyle(Theme.accent)
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                Text(discoveryError ?? "Banner couldn't find any leagues automatically for this account. Enter the League ID above manually.")
+                                    .font(.footnote)
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+
                             Button("Sign in with a different ESPN account") {
                                 signedInViaWeb = false
                                 includePrivateCredentials = false
                                 espnS2 = ""
                                 swid = ""
+                                discoveredLeagues = []
+                                discoveryError = nil
                             }
                         } else {
                             Button {
@@ -1306,6 +1353,7 @@ struct ESPNFantasyConnectSheet: View {
                                         swid = credentials.swid
                                         includePrivateCredentials = true
                                         signedInViaWeb = true
+                                        await discoverLeagues(credentials: credentials)
                                     } catch {
                                         webAuthError = error.localizedDescription
                                     }
@@ -1335,10 +1383,14 @@ struct ESPNFantasyConnectSheet: View {
                             Toggle("Enter session cookies manually instead", isOn: $includePrivateCredentials)
                             if includePrivateCredentials {
                                 SecureField("espn_s2", text: $espnS2)
+                                    #if os(iOS)
                                     .textInputAutocapitalization(.never)
+                                    #endif
                                     .autocorrectionDisabled()
                                 SecureField("SWID", text: $swid)
+                                    #if os(iOS)
                                     .textInputAutocapitalization(.never)
+                                    #endif
                                     .autocorrectionDisabled()
                                 Text("These values are stored in Keychain and sent only as ESPN Cookie headers. Never enter your ESPN password.")
                                     .font(.footnote)
@@ -1381,6 +1433,24 @@ struct ESPNFantasyConnectSheet: View {
                 }
             }
         }
+    }
+
+    private func discoverLeagues(credentials: ESPNFantasyCredentials) async {
+        isDiscoveringLeagues = true
+        discoveryError = nil
+        do {
+            let leagues = try await ESPNFanLeagueDiscoveryClient().discoverLeagues(credentials: credentials)
+            discoveredLeagues = leagues
+            if let first = leagues.first {
+                selectedSport = first.sport
+                leagueID = first.leagueID
+                seasonID = String(first.seasonID)
+            }
+        } catch {
+            discoveredLeagues = []
+            discoveryError = error.localizedDescription
+        }
+        isDiscoveringLeagues = false
     }
 }
 
@@ -1659,10 +1729,12 @@ private struct AppearanceThemeCard: View {
         case .dark:   return Theme.Palette.nearBlack
         case .light:  return Theme.Palette.cloud
         case .system:
-            #if os(tvOS)
-            return Theme.background
-            #else
+            #if os(iOS)
             return Color(UIColor.systemBackground)
+            #elseif os(macOS)
+            return Color(NSColor.windowBackgroundColor)
+            #else
+            return Theme.background
             #endif
         }
     }
@@ -1672,10 +1744,12 @@ private struct AppearanceThemeCard: View {
         case .dark:   return Theme.Palette.slate
         case .light:  return Theme.Palette.mist
         case .system:
-            #if os(tvOS)
-            return Theme.surfaceElevated
-            #else
+            #if os(iOS)
             return Color(UIColor.secondarySystemBackground)
+            #elseif os(macOS)
+            return Color(NSColor.controlBackgroundColor)
+            #else
+            return Theme.surfaceElevated
             #endif
         }
     }

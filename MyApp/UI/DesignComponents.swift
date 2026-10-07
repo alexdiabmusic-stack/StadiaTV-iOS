@@ -33,10 +33,10 @@ struct Chip: View {
                 if let systemImage { Image(systemName: systemImage) }
                 Text(title).lineLimit(1)
             }
-            .font(Theme.Typography.caption)
+            .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .semibold) : Theme.Typography.caption)
             .foregroundStyle(isSelected ? Color.white : Theme.textPrimary)
-            .padding(.horizontal, Theme.Spacing.sm)
-            .frame(minHeight: 32)
+            .padding(.horizontal, Theme.isMac ? Theme.Mac.Spacing.s20 - 4 : Theme.Spacing.sm)
+            .frame(minHeight: Theme.isMac ? Theme.Mac.ControlHeight.sm : 32)
             .background(isSelected ? Theme.actionFill : Theme.surfaceElevated,
                         in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             .contentShape(Rectangle())
@@ -135,12 +135,12 @@ struct SectionHeader: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(title)
-                .font(Theme.Typography.headline)
+                .font(Theme.isMac ? .system(size: Theme.Mac.Typography.sectionTitle, weight: .semibold) : Theme.Typography.headline)
                 .foregroundStyle(Theme.textPrimary)
             Spacer()
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .font(Theme.Typography.caption)
+                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : Theme.Typography.caption)
                     .foregroundStyle(Theme.accessibleAccent)
             }
         }
@@ -178,6 +178,23 @@ struct ChannelLogo: View {
         let words = name.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).prefix(2)
         let letters = words.compactMap(\.first).map(String.init).joined()
         return letters.isEmpty ? "TV" : letters.uppercased()
+    }
+}
+
+// MARK: - Mac layout helpers
+
+extension View {
+    /// Caps top-level scroll content at `Theme.Mac.contentMaxWidth`, centered. Apply
+    /// *after* a view's existing horizontal padding — this only adds the width cap and
+    /// centering, not additional insets. No-op on iOS/iPadOS/tvOS.
+    @ViewBuilder
+    func macContentWidth() -> some View {
+        #if os(macOS)
+        frame(maxWidth: Theme.Mac.contentMaxWidth)
+        .frame(maxWidth: .infinity)
+        #else
+        self
+        #endif
     }
 }
 

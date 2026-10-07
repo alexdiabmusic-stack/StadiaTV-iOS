@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		D2B5925B3077054D007B21D7 /* CarPlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D2B5925A3077054D007B21D7 /* CarPlay.framework */; platformFilter = ios; };
 		D2B5925D30770571007B21D7 /* CarPlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D2B5925A3077054D007B21D7 /* CarPlay.framework */; platformFilter = ios; };
-		D2B5925E30770571007B21D7 /* CarPlay.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D2B5925A3077054D007B21D7 /* CarPlay.framework */; platformFilter = ios; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		D2F2344930745D0000AA9DC4 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D2F2344830745D0000AA9DC4 /* WidgetKit.framework */; };
 		D2F2344B30745D0000AA9DC4 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D2F2344A30745D0000AA9DC4 /* SwiftUI.framework */; };
 		D2F2345630745D0200AA9DC4 /* BannerLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D2F2344630745D0000AA9DC4 /* BannerLiveActivityExtension.appex */; platformFilters = (ios, xros, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -64,7 +63,6 @@
 			dstSubfolder = Frameworks;
 			files = (
 				D2F2347630746CBE00AA9DC4 /* BannerSharedKit.framework in Embed Frameworks */,
-				D2B5925E30770571007B21D7 /* CarPlay.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 		};
@@ -73,7 +71,7 @@
 /* Begin PBXFileReference section */
 		000000000000000000000120 /* StadiaTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StadiaTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1C0FF1E0000000000000001 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
-		D2B5925A3077054D007B21D7 /* CarPlay.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CarPlay.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS27.2.sdk/System/Library/Frameworks/CarPlay.framework; sourceTree = DEVELOPER_DIR; };
+		D2B5925A3077054D007B21D7 /* CarPlay.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CarPlay.framework; path = System/Library/Frameworks/CarPlay.framework; sourceTree = SDKROOT; };
 		D2F2344630745D0000AA9DC4 /* BannerLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BannerLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		D2F2344830745D0000AA9DC4 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = /System/Library/Frameworks/WidgetKit.framework; sourceTree = "<absolute>"; };
 		D2F2344A30745D0000AA9DC4 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = /System/Library/Frameworks/SwiftUI.framework; sourceTree = "<absolute>"; };

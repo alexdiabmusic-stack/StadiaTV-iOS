@@ -265,7 +265,7 @@ struct TVFollowingView: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 22)
                             .padding(.vertical, 11)
-                            .background(Theme.accent, in: Capsule())
+                            .background(Theme.actionFill, in: Capsule())
                     }
                     .frame(maxWidth: 300)
 

@@ -42,7 +42,7 @@ final class TVGuideViewModel: ObservableObject {
 
     // Guide window: full selected day
     var guideWindowStart: Date { selectedDate }
-    var guideWindowEnd: Date { selectedDate.addingTimeInterval(24 * 3600) }
+    var guideWindowEnd: Date { GuideDay.end(startingAt: selectedDate) }
     var guideWindowWidth: CGFloat {
         CGFloat(guideWindowEnd.timeIntervalSince(guideWindowStart) / 60) * Self.ptsPerMinute
     }
@@ -167,6 +167,13 @@ final class TVGuideViewModel: ObservableObject {
         }
     }
 
+    /// If midnight has passed while the guide was showing the day that just ended, moves it on to
+    /// the new day. A guide the user had moved to another day is left alone.
+    func rollOverIfNeeded() {
+        let today = Calendar.current.startOfDay(for: Date())
+        if GuideDay.followingMidnight(selected: selectedDate, today: today) != selectedDate { scrollToNow() }
+    }
+
     /// Resets the selected date to today and signals EPGGuideGrid to scroll to NOW.
     func scrollToNow() {
         selectedDate = Calendar.current.startOfDay(for: Date())
@@ -227,7 +234,7 @@ final class TVGuideViewModel: ObservableObject {
     /// so scrolling and re-rendering don't redo the date maths for every cell.
     func rowLayout(for channel: CanonicalChannel) -> GuideRowLayout {
         let key = RowLayoutKey(date: selectedDate, offset: epgOffsetMinutes(for: channel),
-                               revision: repository?.programmeRevision ?? 0)
+                               revision: repository?.guideRevision(for: channel.id) ?? 0)
         if let cached = rowLayoutCache[channel.id], cached.key == key { return cached.layout }
 
         let progs = programmes(for: channel, in: guideWindowStart...guideWindowEnd)
@@ -305,19 +312,14 @@ final class TVGuideViewModel: ObservableObject {
 
     // MARK: - Time helpers
 
-    /// Initial horizontal scroll offset to position current time ~20% from left
-    var initialScrollOffset: CGFloat {
+    /// Initial horizontal scroll offset to position current time ~20% from left, in a guide
+    /// `viewportWidth` points wide (the width the guide was measured at, channel column included).
+    func initialScrollOffset(viewportWidth: CGFloat) -> CGFloat {
         let now = Date()
         guard now >= guideWindowStart, now <= guideWindowEnd else { return 0 }
         let nowX = xOffset(for: now)
-        #if os(iOS)
-        let screenWidth: CGFloat = UIScreen.main.bounds.width - Self.channelColumnWidth
-        #elseif os(macOS)
-        let screenWidth: CGFloat = (NSScreen.main?.frame.width ?? 1200) - Self.channelColumnWidth
-        #else
-        let screenWidth: CGFloat = 1200 - Self.channelColumnWidth
-        #endif
-        return max(0, nowX - screenWidth * 0.20)
+        let visibleWidth = max(0, viewportWidth - Self.channelColumnWidth)
+        return max(0, nowX - visibleWidth * 0.20)
     }
 
     /// Time labels for the ruler every 30 minutes
@@ -344,11 +346,16 @@ final class TVGuideViewModel: ObservableObject {
         Calendar.current.isDateInToday(date)
     }
 
-    var displayDate: String {
-        if isToday(selectedDate) { return "Today" }
+    // Built once; this is read every time the guide header is evaluated.
+    nonisolated private static let dayFmt: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "E, MMM d"
-        return f.string(from: selectedDate)
+        return f
+    }()
+
+    var displayDate: String {
+        if isToday(selectedDate) { return "Today" }
+        return Self.dayFmt.string(from: selectedDate)
     }
 
     var nowIsVisible: Bool {

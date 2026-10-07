@@ -2,12 +2,18 @@ import Foundation
 import SwiftUI
 import Combine
 
-/// A persistable snapshot of a channel so favorites and watch history survive
-/// app restarts and playlist refreshes.
+/// A persistable snapshot of a channel so watch history survives app restarts and
+/// playlist refreshes.
+///
+/// Deliberately holds no stream URL: Xtream stream URLs embed the account's username and
+/// password in their path, and these snapshots are written to UserDefaults (so into device
+/// backups) and to iCloud key-value storage. Playable channels are rebuilt from live
+/// provider data by `PlaylistStore.channel(for:)`. Older builds did persist the URL; the
+/// extra `streamURLString` key in those blobs is ignored when decoding and dropped on the
+/// next save.
 struct SavedChannel: Codable, Hashable, Identifiable {
     let id: String
     let name: String
-    let streamURLString: String
     let logoURLString: String?
     let group: String?
     let playlistID: UUID
@@ -16,25 +22,10 @@ struct SavedChannel: Codable, Hashable, Identifiable {
     init(channel: Channel) {
         self.id = channel.id
         self.name = channel.name
-        self.streamURLString = channel.streamURL.absoluteString
         self.logoURLString = channel.logoURL?.absoluteString
         self.group = channel.group
         self.playlistID = channel.playlistID
         self.playlistName = channel.playlistName
-    }
-
-    /// Rebuilds a playable channel from the snapshot.
-    var channel: Channel? {
-        guard let url = URL(string: streamURLString) else { return nil }
-        return Channel(
-            id: id,
-            name: name,
-            streamURL: url,
-            logoURL: logoURLString.flatMap(URL.init(string:)),
-            group: group,
-            playlistID: playlistID,
-            playlistName: playlistName
-        )
     }
 }
 
@@ -59,37 +50,63 @@ struct WatchHistoryEntry: Codable, Hashable, Identifiable {
     var id: String { saved.id }
 }
 
-/// Owns favorite channels, recently watched channels, and dwell-confirmed recents.
+/// Owns the watch history ("continue watching") and dwell-confirmed recents.
+///
+/// Favourite channels live in `ChannelPreferencesStore`, the single source of truth shared
+/// with the channel browser and Home; the favourite methods here forward to it so the
+/// player's heart and every list agree.
 @MainActor
 final class WatchStore: ObservableObject {
-    @Published private(set) var favorites: [SavedChannel] = []
     @Published private(set) var history: [WatchHistoryEntry] = []
     /// Dwell-confirmed recent channels for fast channel navigation (device-local, not cloud-synced).
     @Published private(set) var recents: [RecentEntry] = []
 
-    private let favoritesKey = "bannertv.favoritechannels.v1"
+    private let channelPreferences: ChannelPreferencesStore
+    private var preferencesObservation: AnyCancellable?
+
     private let historyKey = "bannertv.watchhistory.v1"
     private let recentsKey = "bannertv.recents.v1"
     private let historyLimit = 20
     private let recentsLimit = 20
 
-    init() {
+    /// Marks blobs written by builds that stored each channel's stream URL.
+    private static let legacyStreamURLMarker = Data("streamURLString".utf8)
+
+    convenience init() {
+        self.init(channelPreferences: ChannelPreferencesStore())
+    }
+
+    init(channelPreferences: ChannelPreferencesStore) {
+        self.channelPreferences = channelPreferences
         CloudSyncService.shared.start()
-        if let data = UserDefaults.standard.data(forKey: favoritesKey),
-           let decoded = try? JSONDecoder().decode([SavedChannel].self, from: data) {
-            favorites = decoded
-        } else if let cloud: [SavedChannel] = CloudSyncService.shared.load([SavedChannel].self, for: .favoriteChannels) {
-            favorites = cloud
-        }
+
+        var rewriteLocalBlobs = false
         if let data = UserDefaults.standard.data(forKey: historyKey),
            let decoded = try? JSONDecoder().decode([WatchHistoryEntry].self, from: data) {
             history = decoded
+            rewriteLocalBlobs = rewriteLocalBlobs || data.range(of: Self.legacyStreamURLMarker) != nil
         } else if let cloud: [WatchHistoryEntry] = CloudSyncService.shared.load([WatchHistoryEntry].self, for: .watchHistory) {
             history = cloud
         }
         if let data = UserDefaults.standard.data(forKey: recentsKey),
            let decoded = try? JSONDecoder().decode([RecentEntry].self, from: data) {
             recents = decoded
+            rewriteLocalBlobs = rewriteLocalBlobs || data.range(of: Self.legacyStreamURLMarker) != nil
+        }
+
+        // Older builds persisted stream URLs (which carry Xtream credentials) in these blobs,
+        // locally and in iCloud. Re-save without them and purge the synced copies.
+        let purgedCloudKeys = CloudSyncService.shared.purgeLegacyStreamURLBlobs()
+        if rewriteLocalBlobs {
+            persistHistory()
+            persistRecents()
+        } else if purgedCloudKeys.contains(.watchHistory) {
+            CloudSyncService.shared.save(history, for: .watchHistory)
+        }
+
+        // Favourite state changes in ChannelPreferencesStore must refresh views observing this store.
+        preferencesObservation = channelPreferences.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
         }
         NotificationCenter.default.addObserver(
             forName: .bannertvCloudSyncDidChange,
@@ -101,19 +118,19 @@ final class WatchStore: ObservableObject {
         }
     }
 
-    // MARK: Favorites
+    // MARK: Favorites (forwarded to ChannelPreferencesStore)
 
     func isFavorite(_ channel: Channel) -> Bool {
-        favorites.contains { $0.id == channel.id }
+        channelPreferences.isFavorite(channel.id)
     }
 
     func toggleFavorite(_ channel: Channel) {
-        if let index = favorites.firstIndex(where: { $0.id == channel.id }) {
-            favorites.remove(at: index)
-        } else {
-            favorites.append(SavedChannel(channel: channel))
-        }
-        persistFavorites()
+        channelPreferences.toggleFavorite(channelID: channel.id)
+    }
+
+    /// IDs of every favourite channel, for filtering channel lists.
+    var favoriteChannelIDs: Set<String> {
+        Set(channelPreferences.favoriteChannelIDs)
     }
 
     // MARK: Continue watching
@@ -150,19 +167,7 @@ final class WatchStore: ObservableObject {
         persistRecents()
     }
 
-    /// The most recent dwell-confirmed channel other than the given one (for Previous Channel toggle).
-    func previousChannel(relativeTo current: Channel) -> Channel? {
-        recents.first { $0.id != current.id }?.saved.channel
-    }
-
     // MARK: Persistence
-
-    private func persistFavorites() {
-        if let data = try? JSONEncoder().encode(favorites) {
-            UserDefaults.standard.set(data, forKey: favoritesKey)
-        }
-        CloudSyncService.shared.save(favorites, for: .favoriteChannels)
-    }
 
     private func persistHistory() {
         if let data = try? JSONEncoder().encode(history) {
@@ -179,12 +184,11 @@ final class WatchStore: ObservableObject {
 
     private func applyCloudStateIfNeeded() {
         guard CloudSyncService.shared.isEnabled else { return }
-        if let cloudFavorites: [SavedChannel] = CloudSyncService.shared.load([SavedChannel].self, for: .favoriteChannels),
-           cloudFavorites != favorites {
-            favorites = cloudFavorites
-            if let data = try? JSONEncoder().encode(favorites) {
-                UserDefaults.standard.set(data, forKey: favoritesKey)
-            }
+        // A device still on an older build may re-upload a blob with stream URLs in it.
+        let purgedCloudKeys = CloudSyncService.shared.purgeLegacyStreamURLBlobs()
+        if purgedCloudKeys.contains(.watchHistory) {
+            CloudSyncService.shared.save(history, for: .watchHistory)
+            return
         }
         if let cloudHistory: [WatchHistoryEntry] = CloudSyncService.shared.load([WatchHistoryEntry].self, for: .watchHistory),
            cloudHistory != history {

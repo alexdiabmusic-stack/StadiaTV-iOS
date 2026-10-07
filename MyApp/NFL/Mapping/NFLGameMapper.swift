@@ -85,10 +85,15 @@ nonisolated enum NFLGameMapper {
         game.offset = raw["offset"].int ?? game.offset; game.summaryUpdated = now
         return game
     }
+    // Built once: parsed for every game. Never mutated after creation, so sharing is safe.
+    private nonisolated(unsafe) static let isoPlain = ISO8601DateFormatter()
+    private nonisolated(unsafe) static let isoFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions.insert(.withFractionalSeconds)
+        return f
+    }()
     static func date(_ value: String?) -> Date? {
         guard let value else { return nil }
-        let f = ISO8601DateFormatter()
-        if let date = f.date(from: value) { return date }
-        f.formatOptions.insert(.withFractionalSeconds); return f.date(from: value)
+        return isoPlain.date(from: value) ?? isoFractional.date(from: value)
     }
 }

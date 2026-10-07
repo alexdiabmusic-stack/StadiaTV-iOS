@@ -146,9 +146,11 @@ struct MatchesView: View {
             await MatchNotificationService.shared.syncNotifications(
                 matches: viewModel.allFollowedMatches,
                 favorites: prefs.favoriteTeams,
-                leadTime: prefs.matchReminderLeadTime
+                settings: prefs.notificationSettings
             )
         }
+        // Reminders outlive this view, so show what is actually scheduled rather than what this screen remembers.
+        remindedMatchIDs = await MatchNotificationService.shared.remindedMatchIDs()
     }
 
     private func loadNews() async {
@@ -359,11 +361,12 @@ struct MatchesView: View {
             }
             .padding(.horizontal, Theme.isMac ? (logoURL == nil ? 16 : 12) : (logoURL == nil ? 12 : 8))
             .frame(height: Theme.isMac ? Theme.Mac.ControlHeight.sm + 2 : 32)
-            .background(isSelected ? Theme.accent : Theme.surface, in: Capsule())
+            .background(isSelected ? Theme.actionFill : Theme.surface, in: Capsule())
             .overlay(Capsule().strokeBorder(isSelected ? Theme.accent.opacity(0.4) : Theme.hairline))
             .shadow(color: isSelected ? Theme.accent.opacity(0.28) : .clear, radius: 8, y: 3)
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: Derived data
@@ -418,6 +421,7 @@ struct MatchesView: View {
     private func toggleReminder(for match: Match) async {
         if remindedMatchIDs.contains(match.id) {
             remindedMatchIDs.remove(match.id)
+            await MatchNotificationService.shared.cancelReminder(forMatchID: match.id)
             return
         }
         let scheduled = await MatchNotificationService.shared.scheduleReminder(
@@ -425,11 +429,20 @@ struct MatchesView: View {
         )
         if scheduled {
             remindedMatchIDs.insert(match.id)
+            prefs.setMatchNotificationsEnabled(true)
         } else {
             notificationAlertMessage = "Notifications are disabled. Enable them in Settings to receive game alerts."
             showingNotificationAlert = true
+            await syncNotificationPermission()
         }
-        prefs.setMatchNotificationsEnabled(scheduled)
+    }
+
+    /// A failed reminder can mean the system permission was revoked; a finished game can't be
+    /// reminded about and says nothing about permission.
+    private func syncNotificationPermission() async {
+        if !(await MatchNotificationService.shared.isAuthorized()) {
+            prefs.setMatchNotificationsEnabled(false)
+        }
     }
 }
 
@@ -720,7 +733,7 @@ private struct FollowingUpNextHero: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: Theme.isMac ? Theme.Mac.ControlHeight.lg : nil)
                         .padding(.vertical, Theme.isMac ? 0 : 12)
-                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Radius.md : 10, style: .continuous))
+                        .background(Theme.actionFill, in: RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Radius.md : 10, style: .continuous))
                 }
                 .buttonStyle(.plain)
 
@@ -1505,7 +1518,7 @@ private struct FollowingEmptyStateView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+                    .background(Theme.actionFill, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 36)
@@ -1518,6 +1531,7 @@ private struct FollowingEmptyStateView: View {
 // MARK: - Skeleton
 
 private struct FollowingSkeletonView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var phase: Double = 0
 
     var body: some View {
@@ -1551,6 +1565,7 @@ private struct FollowingSkeletonView: View {
             }
         }
         .onAppear {
+            guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { phase = 1 }
         }
     }
@@ -1630,7 +1645,7 @@ struct MatchRow: View {
                     .foregroundStyle(.white)
                     .lineLimit(1).minimumScaleFactor(0.75)
                     .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(Theme.live, in: Capsule())
+                    .background(Theme.liveFill, in: Capsule())
             case .pre:
                 Text(match.statusDetail)
                     .font(.caption2.weight(.semibold))

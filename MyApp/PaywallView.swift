@@ -598,7 +598,7 @@ struct PremiumLockBadge: View {
             .font(Theme.Typography.overline)
             .foregroundStyle(.white)
             .padding(5)
-            .background(Theme.accent, in: Circle())
+            .background(Theme.actionFill, in: Circle())
             .offset(x: -6, y: 6)
     }
 }

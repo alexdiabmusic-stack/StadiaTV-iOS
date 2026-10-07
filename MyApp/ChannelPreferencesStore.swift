@@ -19,8 +19,23 @@ final class ChannelPreferencesStore: ObservableObject {
     private(set) var revision = 0
 
     private let defaultsKey = "bannertv.channelprefs.v1"
+    /// Where older builds kept their own favourites list (`WatchStore`); see `absorbLegacyFavorites`.
+    private static let legacyFavoritesDefaultsKey = "bannertv.favoritechannels.v1"
+    /// Last favourites list written to or read from iCloud, to avoid redundant writes.
+    private var lastCloudFavoriteIDs: [String]?
 
-    init() { load() }
+    init() {
+        load()
+        absorbLegacyFavorites()
+        NotificationCenter.default.addObserver(
+            forName: .bannertvCloudSyncDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in self.applyCloudFavorites() }
+        }
+    }
 
     // MARK: - Read
 
@@ -105,17 +120,92 @@ final class ChannelPreferencesStore: ObservableObject {
         setFavorite(!isFavorite(channelID), for: channelID)
     }
 
-    /// One-time migration from the legacy WatchStore favorites list.
-    /// No-op if ChannelPreferencesStore already contains at least one favourite.
-    func migrateLegacyFavorites(_ savedChannels: [SavedChannel]) {
-        guard !preferences.values.contains(where: { $0.isFavorite }) else { return }
-        for (index, saved) in savedChannels.enumerated() {
-            var p = preferences(for: saved.id)
-            p.isFavorite    = true
-            p.favoriteOrder = index
-            preferences[p.channelID] = p
+    /// Adds each channel ID as a favourite after the existing ones, in the order given.
+    /// IDs that are already favourites keep their position.
+    private func appendFavorites(_ channelIDs: [String]) {
+        var nextOrder = (preferences.values.compactMap(\.favoriteOrder).max() ?? -1) + 1
+        var updated = preferences
+        var changed = false
+        for id in channelIDs {
+            var p = updated[id] ?? ChannelPreferences(channelID: id)
+            guard !p.isFavorite else { continue }
+            p.isFavorite = true
+            p.favoriteOrder = nextOrder
+            nextOrder += 1
+            updated[id] = p
+            changed = true
         }
-        persist()
+        // ChannelPreferences compares by channelID only, so detect changes explicitly.
+        if changed { preferences = updated }
+    }
+
+    /// Makes the favourites exactly `channelIDs`, in that order. Used when iCloud wins.
+    private func replaceFavorites(with channelIDs: [String]) {
+        let wanted = Set(channelIDs)
+        var updated = preferences
+        var changed = false
+        let dropped = updated.filter { $0.value.isFavorite && !wanted.contains($0.key) }.map(\.key)
+        for id in dropped {
+            updated[id]?.isFavorite = false
+            updated[id]?.favoriteOrder = nil
+            changed = true
+        }
+        for (index, id) in channelIDs.enumerated() {
+            var p = updated[id] ?? ChannelPreferences(channelID: id)
+            if p.isFavorite && p.favoriteOrder == index { continue }
+            p.isFavorite = true
+            p.favoriteOrder = index
+            updated[id] = p
+            changed = true
+        }
+        guard changed else { return }
+        preferences = updated
+        if let data = try? JSONEncoder().encode(preferences) {
+            UserDefaults.standard.set(data, forKey: defaultsKey)
+        }
+    }
+
+    // MARK: - Legacy favourites
+
+    /// Folds in favourites saved by older builds — `WatchStore` kept its own list of channel
+    /// snapshots — then deletes those copies. The snapshots embedded each stream's URL, which
+    /// carries Xtream credentials, and this store is now the only home for favourites.
+    private func absorbLegacyFavorites() {
+        let defaults = UserDefaults.standard
+        var legacyIDs: [String] = []
+        if let data = defaults.data(forKey: Self.legacyFavoritesDefaultsKey),
+           let saved = try? JSONDecoder().decode([SavedChannel].self, from: data) {
+            legacyIDs += saved.map(\.id)
+        }
+        if let cloud: [SavedChannel] = CloudSyncService.shared.load([SavedChannel].self, for: .favoriteChannels) {
+            legacyIDs += cloud.map(\.id)
+        }
+        if !legacyIDs.isEmpty {
+            appendFavorites(legacyIDs)
+            persist()
+        }
+        defaults.removeObject(forKey: Self.legacyFavoritesDefaultsKey)
+        CloudSyncService.shared.removeValue(for: .favoriteChannels)
+    }
+
+    // MARK: - iCloud sync (favourite IDs only)
+
+    private func applyCloudFavorites() {
+        guard CloudSyncService.shared.isEnabled else { return }
+        if let cloudIDs = CloudSyncService.shared.load([String].self, for: .favoriteChannelIDs) {
+            lastCloudFavoriteIDs = cloudIDs
+            if cloudIDs != favoriteChannelIDs { replaceFavorites(with: cloudIDs) }
+        } else if !favoriteChannelIDs.isEmpty {
+            pushFavoritesToCloudIfChanged()
+        }
+        // A device still on an older build may keep re-uploading its own favourites list.
+        absorbLegacyFavorites()
+    }
+
+    private func pushFavoritesToCloudIfChanged() {
+        guard CloudSyncService.shared.isEnabled, lastCloudFavoriteIDs != favoriteChannelIDs else { return }
+        lastCloudFavoriteIDs = favoriteChannelIDs
+        CloudSyncService.shared.save(favoriteChannelIDs, for: .favoriteChannelIDs)
     }
 
     // MARK: - Persistence
@@ -136,6 +226,7 @@ final class ChannelPreferencesStore: ObservableObject {
         if let data = try? JSONEncoder().encode(preferences) {
             UserDefaults.standard.set(data, forKey: defaultsKey)
         }
+        pushFavoritesToCloudIfChanged()
     }
 }
 

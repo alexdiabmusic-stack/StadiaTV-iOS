@@ -556,7 +556,7 @@ private struct StatsGolfCard: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
-                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+                    .background(Theme.actionFill, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             }
             .buttonStyle(.plain)
         }

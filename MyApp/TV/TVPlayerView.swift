@@ -63,6 +63,7 @@ struct TVPlayerView: View {
                                 .foregroundStyle(.white.opacity(0.7))
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Hide score")
                     }
                     .padding(.horizontal, 16).padding(.vertical, 10)
                     .background(.black.opacity(0.72), in: Capsule())

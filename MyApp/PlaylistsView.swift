@@ -20,6 +20,7 @@ struct PlaylistsView: View {
                     Button { showingAdd = true } label: {
                         Image(systemName: "plus")
                     }
+                    .accessibilityLabel("Add playlist")
                 }
             }
             .sheet(isPresented: $showingAdd) {
@@ -129,10 +130,11 @@ struct AddPlaylistView: View {
     @State private var password = ""
     @State private var userAgent: String
 
-    init(initialPlaylist: Playlist? = nil, onAdd: @escaping (Playlist) -> Void) {
+    /// - Parameter initialMode: the form shown for a new playlist; editing keeps the playlist's own kind.
+    init(initialPlaylist: Playlist? = nil, initialMode: Mode = .m3u, onAdd: @escaping (Playlist) -> Void) {
         self.initialPlaylist = initialPlaylist
         self.onAdd = onAdd
-        _mode = State(initialValue: initialPlaylist?.kind == .xtream ? .xtream : .m3u)
+        _mode = State(initialValue: initialPlaylist.map { $0.kind == .xtream ? .xtream : .m3u } ?? initialMode)
         _name = State(initialValue: initialPlaylist?.name ?? "")
         _m3uURL = State(initialValue: initialPlaylist?.m3uURL ?? "")
         _host = State(initialValue: initialPlaylist?.host ?? "")

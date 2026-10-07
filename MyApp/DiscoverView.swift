@@ -132,10 +132,11 @@ struct DiscoverView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, Theme.isMac ? 0 : 8)
                 .frame(height: Theme.isMac ? 35 : nil)
-                .background(isSelected ? Theme.accent : Theme.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(isSelected ? Theme.accent : Theme.hairline))
+                .background(isSelected ? Theme.actionFill : Theme.surface, in: Capsule())
+                .overlay(Capsule().strokeBorder(isSelected ? Theme.actionFill : Theme.hairline))
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     @ViewBuilder private var content: some View {

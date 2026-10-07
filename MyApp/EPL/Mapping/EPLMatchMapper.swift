@@ -59,14 +59,20 @@ nonisolated enum EPLMatchMapper {
 
     // MARK: Players
 
+    // Built once: parsed for every player in a squad. Never mutated after creation, so sharing is safe.
+    private nonisolated(unsafe) static let birthDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
     /// Squad-list player row: `{name:{first,last,display}, id, shirtNum, position, ...}`.
     static func rosterPlayer(_ raw: EPLValue) -> SoccerRosterPlayer? {
         guard let id = raw["id"].string else { return nil }
         let name = raw["name"]
         let reference = SoccerPlayerReference(id: id, firstName: name["first"].string, lastName: name["last"].string)
-        let birth = raw["dates"]["birth"].string.flatMap { value -> Date? in
-            let f = DateFormatter(); f.locale = Locale(identifier: "en_US_POSIX"); f.dateFormat = "yyyy-MM-dd"; return f.date(from: value)
-        }
+        let birth = raw["dates"]["birth"].string.flatMap { birthDateFormatter.date(from: $0) }
         return SoccerRosterPlayer(reference: reference, position: raw["position"].string, shirtNumber: raw["shirtNum"].string, nationality: raw["country"]["country"].string, dateOfBirth: birth)
     }
 

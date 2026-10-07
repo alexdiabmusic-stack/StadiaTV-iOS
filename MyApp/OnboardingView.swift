@@ -9,6 +9,7 @@ struct OnboardingView: View {
     @State private var store = OnboardingStore()
     @State private var sportPendingDeselect: CatalogSport?
     @State private var showDeselectAlert = false
+    @State private var showNothingToRestoreAlert = false
 
     var body: some View {
         ZStack {
@@ -46,6 +47,11 @@ struct OnboardingView: View {
         } message: { sport in
             Text("This will also remove your \(sport.name) league selections and any favorite teams.")
         }
+        .alert("Nothing to restore yet", isPresented: $showNothingToRestoreAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("BannerTV couldn't find saved settings in iCloud. They appear once iCloud Sync is on in Settings on your other device, and can take a moment to arrive. Try again shortly, or tap Get Started to set up here.")
+        }
     }
 
     // MARK: - Step content
@@ -56,7 +62,7 @@ struct OnboardingView: View {
         case .welcome:
             WelcomeView(
                 onGetStarted: { withAnimation(.easeInOut(duration: 0.3)) { step = .sports } },
-                onRestore: { prefs.completeOnboarding() }
+                onRestore: { if !prefs.restorePreferencesFromCloud() { showNothingToRestoreAlert = true } }
             )
         case .sports:
             SportsSelectionView(

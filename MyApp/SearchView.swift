@@ -279,6 +279,15 @@ final class SearchViewModel: ObservableObject {
     private var loadedFavoritePlayerTeamIDs: Set<String> = []
 
     func loadBase(leagues: [League], favoriteTeams: [FavoriteTeam]) async {
+        // Search is presented afresh each time, and every open fetched two weeks of games, news and teams for
+        // every league. Show the last result straight away and only fetch again once it is a couple of minutes old.
+        let cacheKey = leagues.map(\.id).joined(separator: ",")
+        let cached = SearchBaseCache.entry?.key == cacheKey ? SearchBaseCache.entry : nil
+        if let cached {
+            matches = cached.matches
+            articles = cached.articles
+            teams = cached.teams
+        }
         var loadedMatches: [Match] = []
         var loadedArticles: [ESPNArticle] = []
         var loadedTeams: [SearchTeamResult] = []
@@ -288,6 +297,8 @@ final class SearchViewModel: ObservableObject {
             return !favoriteIDs.contains(legacyKey) && !favoriteIDs.contains(player.teamID)
         }
         loadedFavoritePlayerTeamIDs.formIntersection(favoriteIDs)
+
+        if let cached, Date().timeIntervalSince(cached.date) < SearchBaseCache.freshFor { return }
 
         await withTaskGroup(of: SearchLoadResult.self) { group in
             for league in leagues {
@@ -312,6 +323,9 @@ final class SearchViewModel: ObservableObject {
             }
         }
 
+        // A load that found nothing (offline, or cancelled) leaves whatever is already on screen.
+        if cached != nil, loadedMatches.isEmpty, loadedArticles.isEmpty, loadedTeams.isEmpty { return }
+
         matches = Dictionary(grouping: loadedMatches, by: \.id)
             .compactMap { $0.value.first }
             .sorted { $0.date < $1.date }
@@ -321,6 +335,13 @@ final class SearchViewModel: ObservableObject {
         teams = Dictionary(grouping: loadedTeams, by: \.id)
             .compactMap { $0.value.first }
             .sorted { $0.team.displayName.localizedCaseInsensitiveCompare($1.team.displayName) == .orderedAscending }
+
+        // Remember it for the next open, but only a load that wasn't cut short. Every league has teams, so one
+        // that came back without any is a failed fetch: keep what arrived to show, but fetch again next time.
+        guard !Task.isCancelled, !(matches.isEmpty && articles.isEmpty && teams.isEmpty) else { return }
+        let complete = Set(loadedTeams.map(\.league.id)).count == leagues.count
+        SearchBaseCache.entry = .init(key: cacheKey, date: complete ? Date() : .distantPast,
+                                      matches: matches, articles: articles, teams: teams)
     }
 
     func loadFavoritePlayers(favoriteTeams: [FavoriteTeam]) async {
@@ -348,6 +369,19 @@ final class SearchViewModel: ObservableObject {
             .compactMap { $0.value.first }
             .sorted { $0.athlete.displayName.localizedCaseInsensitiveCompare($1.athlete.displayName) == .orderedAscending }
     }
+}
+
+/// The last base result Search loaded, kept for the next time it opens.
+private enum SearchBaseCache {
+    struct Entry {
+        let key: String
+        let date: Date
+        let matches: [Match]
+        let articles: [ESPNArticle]
+        let teams: [SearchTeamResult]
+    }
+    static var entry: Entry?
+    static let freshFor: TimeInterval = 120
 }
 
 private struct SearchLoadResult {
@@ -792,6 +826,13 @@ private extension UniversalSearchResult {
 }
 
 private extension Match {
+    /// Built once: a search result row asks for its weekday every time it is drawn.
+    private static let weekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("EEEE")
+        return formatter
+    }()
+
     var searchDateText: String {
         let text: String
 
@@ -807,9 +848,7 @@ private extension Match {
             } else if calendar.isDateInTomorrow(date) {
                 text = "Tomorrow"
             } else {
-                let formatter = DateFormatter()
-                formatter.setLocalizedDateFormatFromTemplate("EEEE")
-                text = formatter.string(from: date)
+                text = Self.weekdayFormatter.string(from: date)
             }
         }
 

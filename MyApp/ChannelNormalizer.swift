@@ -216,3 +216,7 @@ nonisolated final class ChannelNormalizer {
         )
     }
 }
+
+/// Every compiled pattern is assigned once in `init` and never mutated, so one normalizer can
+/// be shared with background tasks.
+extension ChannelNormalizer: @unchecked Sendable {}

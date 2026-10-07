@@ -4,6 +4,8 @@ Start with [PROMPTS.md](PROMPTS.md): nine prompts in run order (the guide, grid 
 
 Links a sports match to every stream in the user's playlist that carries it, using only data the playlist already sends: its own XMLTV guide, its channel names, and (as support) the broadcaster list from the sports-data API. Foundation only. No network, no app types, no global state beyond a lock-guarded Unicode cache.
 
+`Sources/BannerTV/StreamLinker.swift` and `Tests/BannerTVTests/StreamLinkerTests.swift` are symlinks to the files the app and its test target build (`MyApp/Matching/`, `MyAppTests/`), so there is one copy to edit. `linker-cli` uses a Darwin-only clock and builds on macOS only.
+
 ```
 LinkerEvent    (teams, kickoff, API broadcasters) ─┐
 LinkerStream[] (name, category, guide id)  ────────┼─▶  StreamLinker.link(event) ─▶ [LinkedFeed]   ranked, mirrors included

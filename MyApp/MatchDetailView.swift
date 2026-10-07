@@ -40,6 +40,7 @@ struct MatchDetailView: View {
     @State private var gameCenterTab: GameCenterTab = .players
     @State private var matchNews: [ESPNArticle] = []
     @State private var presentedMatchArticle: ESPNArticle?
+    @State private var actionMessage: String?
     @State private var showingAllMatchNews = false
 
     private enum GameCenterTab: String, CaseIterable, Identifiable {
@@ -150,7 +151,7 @@ struct MatchDetailView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     eventHeader
-                    if match.state != .final && (!playlists.allChannels.isEmpty || !watchLinks.isEmpty) {
+                    if match.state != .final {
                         sourcesSection
                     }
                     if gameCentreArchetype.usesHeadToHeadParticipantUI {
@@ -187,6 +188,16 @@ struct MatchDetailView: View {
             }
         }
         .navigationTitle(match.league.name)
+        #if !os(tvOS)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) { gameActionsMenu }
+        }
+        #endif
+        .alert("Game", isPresented: Binding(get: { actionMessage != nil }, set: { if !$0 { actionMessage = nil } })) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(actionMessage ?? "")
+        }
         #if os(macOS)
         .sheet(item: $playbackContext) { context in
             PlayerView(context: context, showsLiveTVControls: false)
@@ -253,6 +264,71 @@ struct MatchDetailView: View {
         #endif
     }
 
+    // MARK: Game actions
+
+    #if !os(tvOS)
+    /// Share, remind and add-to-calendar for this game; the same actions the list cards offer
+    /// in their context menus, now reachable from the screen itself.
+    private var gameActionsMenu: some View {
+        Menu {
+            ShareLink(item: shareText) {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            if match.state != .final {
+                Button { Task { await setReminder() } } label: {
+                    Label(match.state == .live ? "Send Live Alert" : "Remind Me", systemImage: "bell")
+                }
+            }
+            #if canImport(EventKit)
+            if match.state == .pre {
+                Button { Task { await addToCalendar() } } label: {
+                    Label("Add to Calendar", systemImage: "calendar.badge.plus")
+                }
+            }
+            #endif
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+        .accessibilityLabel("Game actions")
+    }
+    #endif
+
+    /// Never includes a score: the recipient may not have watched yet.
+    private var shareText: String {
+        let matchup = "\(match.leadingSide.displayName) \(match.listsHomeSideFirst ? "v" : "at") \(match.trailingSide.displayName)"
+        var lines = ["\(matchup) · \(match.league.shortName)"]
+        switch match.state {
+        case .pre: lines.append(match.date.formatted(date: .abbreviated, time: .shortened))
+        case .live: lines.append("Live now")
+        case .final: lines.append("Final")
+        }
+        if !match.broadcasts.isEmpty { lines.append("On \(match.broadcasts.joined(separator: ", "))") }
+        return lines.joined(separator: "\n")
+    }
+
+    private func setReminder() async {
+        let scheduled = await MatchNotificationService.shared.scheduleReminder(for: match, leadTime: prefs.matchReminderLeadTime)
+        if scheduled {
+            prefs.setMatchNotificationsEnabled(true)
+        } else if !(await MatchNotificationService.shared.isAuthorized()) {
+            prefs.setMatchNotificationsEnabled(false)
+        }
+        actionMessage = scheduled
+            ? (match.state == .live ? "Live alert sent for \(match.shortName)." : "Reminder set for \(match.shortName).")
+            : "Notifications are disabled. Enable them in Settings to receive game alerts."
+    }
+
+    private func addToCalendar() async {
+        #if canImport(EventKit)
+        do {
+            let saved = try await MatchCalendarService.shared.add(matches: [match])
+            actionMessage = saved == 1 ? "Added \(match.shortName) to Calendar." : "No calendar event was added."
+        } catch {
+            actionMessage = error.localizedDescription
+        }
+        #endif
+    }
+
     /// Finds streams for this match through `StreamAvailabilityStore`/`MatchLinkService`
     /// (the shared `StreamLinker` engine — see MatchLinker/PROMPTS.md). Delegating to the
     /// store instead of re-running the guide+backup scan here removes the duplicate matching
@@ -290,9 +366,16 @@ struct MatchDetailView: View {
         odds = try? await OddsService().odds(for: match)
     }
 
+    /// Leagues whose detail screen is a native game centre that loads its own data (see `body`).
+    /// Only a league outside this set falls through to the generic screen the legacy summary feeds.
+    private static let nativeGameCentreLeaguePaths: Set<String> = [
+        "hockey/nhl", "baseball/mlb", "football/nfl", "football/cfl", "racing/f1", "golf/pga",
+        "basketball/nba", "basketball/wnba", "soccer/eng.1", "soccer/usa.1", "soccer/esp.1",
+    ]
+
     /// Loads boxscore stats once, then keeps polling while the game is live.
     private func loadGameSummary() async {
-        guard !["hockey/nhl", "baseball/mlb", "racing/f1", "football/nfl", "football/cfl", "basketball/nba", "basketball/wnba", "golf/pga"].contains(match.league.path) else { return }
+        guard !Self.nativeGameCentreLeaguePaths.contains(match.league.path) else { return }
         gameSummary = nil
         gameCenterTab = .players
         didAttemptGameSummaryLoad = false
@@ -364,7 +447,7 @@ struct MatchDetailView: View {
         VStack(spacing: 16) {
             statusLine
             HStack(alignment: .center) {
-                teamColumn(match.away)
+                teamColumn(match.leadingSide)
                 VStack(spacing: 4) {
                     if match.state == .pre {
                         Text("VS").font(.headline).foregroundStyle(Theme.textSecondary)
@@ -380,12 +463,12 @@ struct MatchDetailView: View {
                             .foregroundStyle(Theme.accent)
                         }
                     } else {
-                        Text("\(match.away.score ?? "-")  –  \(match.home.score ?? "-")")
+                        Text("\(match.leadingSide.score ?? "-")  –  \(match.trailingSide.score ?? "-")")
                             .font(.title.weight(.bold).monospacedDigit())
                             .foregroundStyle(Theme.textPrimary)
                     }
                 }
-                teamColumn(match.home)
+                teamColumn(match.trailingSide)
             }
             compactMoneyline
             if let venue = match.venue {
@@ -490,10 +573,7 @@ struct MatchDetailView: View {
         case .live: return "LIVE · \(match.statusDetail)"
         case .final: return "FINAL"
         case .pre:
-            let f = DateFormatter()
-            f.dateStyle = .medium
-            f.timeStyle = .short
-            return f.string(from: match.date)
+            return match.date.formatted(date: .abbreviated, time: .shortened)
         }
     }
 
@@ -900,7 +980,7 @@ struct MatchDetailView: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
-            .background(Theme.accent, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .background(Theme.actionFill, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(match.state != .pre)
@@ -1262,10 +1342,11 @@ struct MatchDetailView: View {
                     .foregroundStyle(isSelected ? .white : Theme.textSecondary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
-                    .background(isSelected ? Theme.accent : Theme.surfaceElevated, in: Capsule())
-                    .overlay(Capsule().strokeBorder(isSelected ? Theme.accent : Theme.hairline))
+                    .background(isSelected ? Theme.actionFill : Theme.surfaceElevated, in: Capsule())
+                    .overlay(Capsule().strokeBorder(isSelected ? Theme.actionFill : Theme.hairline))
             }
             .buttonStyle(.plain)
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
         }
 
         private func positionLabel(for athlete: RosterAthlete) -> String {
@@ -1429,7 +1510,7 @@ struct MatchDetailView: View {
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.white)
                     .frame(width: 28, height: 28)
-                    .background(Theme.accent, in: Circle())
+                    .background(Theme.actionFill, in: Circle())
                     .overlay(Circle().strokeBorder(.white.opacity(0.45)))
                 Text(label)
                     .font(.system(size: 8, weight: .bold))
@@ -1715,6 +1796,7 @@ struct MatchDetailView: View {
                         .foregroundStyle(Theme.textPrimary)
                     noPlaylistWatchOptions
                 }
+                if playlists.playlists.isEmpty { connectPlaylistPrompt }
             } else if isRankingSources && rankedSources.isEmpty {
                 HStack(spacing: 10) {
                     ProgressView().tint(Theme.accent)
@@ -1752,6 +1834,13 @@ struct MatchDetailView: View {
                     .padding(14)
                     .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
+                // Nothing in the playlist matched, but the broadcaster may still stream it online.
+                if !watchLinks.isEmpty {
+                    Text("Or watch on")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                    noPlaylistWatchOptions
+                }
             }
         }
         .sheet(isPresented: $isShowingMoreSources) { moreSourcesSheet }
@@ -1856,15 +1945,19 @@ struct MatchDetailView: View {
         .accessibilityHint("Opens the \(link.name) live stream")
     }
 
-    private var noPlaylistsHint: some View {
-        VStack(spacing: 8) {
+    /// Shown when no playlist is connected: the way to watch in-app starts in Settings.
+    private var connectPlaylistPrompt: some View {
+        VStack(spacing: 10) {
             Image(systemName: "list.and.film")
                 .font(.title)
                 .foregroundStyle(Theme.textSecondary)
-            Text("Connect a personal subscription playlist in the Playlists tab.")
+            Text("Add a playlist to watch this game here.")
                 .font(.callout)
                 .foregroundStyle(Theme.textSecondary)
                 .multilineTextAlignment(.center)
+            Button("Open Settings") { DeepLinkRouter.shared.handle(.settings) }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.accent)
         }
         .frame(maxWidth: .infinity)
         .padding(20)

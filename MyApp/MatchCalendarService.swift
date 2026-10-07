@@ -19,7 +19,7 @@ final class MatchCalendarService {
         for match in matches {
             let event = EKEvent(eventStore: eventStore)
             event.calendar = calendar
-            event.title = "\(match.away.shortName) vs \(match.home.shortName)"
+            event.title = "\(match.leadingSide.shortName) vs \(match.trailingSide.shortName)"
             event.startDate = match.date
             event.endDate = match.date.addingTimeInterval(defaultDuration(for: match))
             event.location = match.venue

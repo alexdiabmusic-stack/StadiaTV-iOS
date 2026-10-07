@@ -468,6 +468,7 @@ struct EPGGuideGrid: View {
         .onChange(of: vm.scrollToNowToken) { _, _ in scrollToNowTrigger += 1 }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
             now = Date()
+            vm.rollOverIfNeeded()
         }
     }
 
@@ -558,7 +559,7 @@ private struct ProgrammeGridView: View {
         }
         .contentMargins(.bottom, scrollState.bottomInset + 16, for: .scrollContent)
         .onChange(of: scrollToNowTrigger) { _, _ in
-            let target = vm.initialScrollOffset
+            let target = vm.initialScrollOffset(viewportWidth: scrollState.viewSize.width)
             updateRenderedMinutes(offsetX: target, viewWidth: scrollState.viewSize.width)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
                 scrollPos = ScrollPosition(x: target, y: 0)
@@ -838,7 +839,7 @@ private struct JumpToNowOverlayView: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
-                            .background(Theme.live, in: Capsule())
+                            .background(Theme.liveFill, in: Capsule())
                             .shadow(color: Theme.live.opacity(0.4), radius: 6, y: 3)
                         }
                         .buttonStyle(.plain)
@@ -1040,15 +1041,12 @@ struct ProgrammeDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var guideStore: GuideChannelStore
     @EnvironmentObject private var reminderStore: ProgrammeReminderStore
-    @EnvironmentObject private var recordingService: RecordingService
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
 
     @State private var catchupState: CatchupState = .idle
     @State private var selectedLeadTime: Int = 5
     @State private var reminderAdding = false
-    @State private var showingRecordingSchedule = false
-    @State private var recordingScheduled = false
 
     private enum CatchupState {
         case idle, loading, available(URL), failed, notEligible
@@ -1085,13 +1083,6 @@ struct ProgrammeDetailSheet: View {
         .tint(Theme.accent)
         .task {
             await resolveCatchupIfNeeded()
-        }
-        .sheet(isPresented: $showingRecordingSchedule) {
-            RecordingScheduleSheet(
-                programme: programme,
-                channel: channel,
-                onScheduled: { _ in recordingScheduled = true }
-            )
         }
     }
 
@@ -1244,38 +1235,6 @@ struct ProgrammeDetailSheet: View {
             // Future programme: Remind Me
             if programme.isFuture(at: now) {
                 reminderSection
-            }
-
-            // Recording: available for live and future programmes
-            if programme.isOnNow(at: now) || programme.isFuture(at: now) {
-                recordingSection
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var recordingSection: some View {
-        let mode = recordingService.preferredMode(for: channel)
-        if mode != .unavailable {
-            if recordingScheduled {
-                Label("Recording scheduled", systemImage: "checkmark.circle.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.green)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-            } else {
-                Button { showingRecordingSchedule = true } label: {
-                    Label(
-                        programme.isOnNow(at: now) ? "Record Now" : "Schedule Recording",
-                        systemImage: "record.circle"
-                    )
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Theme.live.opacity(0.12), in: RoundedRectangle(cornerRadius: Theme.Radius.md))
-                    .foregroundStyle(Theme.live)
-                }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -1666,13 +1625,14 @@ private struct CategoryToggleCard: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(isSelected ? Theme.accent : Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+            .background(isSelected ? Theme.actionFill : Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                    .strokeBorder(isSelected ? Theme.accent : Theme.hairline)
+                    .strokeBorder(isSelected ? Theme.actionFill : Theme.hairline)
             )
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .animation(.snappy, value: isSelected)
     }
 }
@@ -1713,6 +1673,7 @@ private struct ChannelSelectRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var channelInitials: some View {

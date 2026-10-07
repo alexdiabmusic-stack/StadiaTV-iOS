@@ -3,7 +3,6 @@ import Foundation
 // MARK: - Intermediate adapter types
 
 /// Raw channel record produced by a provider adapter before ID assignment and normalization.
-/// Named `AdapterChannel` to avoid collision with the existing `ProviderChannel` in IPTVOrgModels.
 nonisolated struct AdapterChannel: Sendable {
     var name: String
     var streamURL: URL
@@ -86,6 +85,33 @@ nonisolated enum LiveChannelIDGenerator {
         return String(hash, radix: 16, uppercase: false)
     }
 
+    /// Channel IDs for a whole playlist, in playlist order, each naming exactly one channel.
+    ///
+    /// Providers repeat tvg-ids (HD / SD / backup entries of one channel) and repeat names, and a
+    /// 32-bit hash can collide besides. An ID is the cache's primary key and the key favourites and
+    /// preferences are stored under, so it can't be shared: the first holder keeps the plain ID
+    /// (existing favourites still resolve) and later holders get `~2`, `~3`… in playlist order.
+    static func uniqueChannelIDs(for channels: [AdapterChannel], providerID: UUID, kind: LiveProviderKind) -> [String] {
+        var seen: [String: Int] = [:]
+        seen.reserveCapacity(channels.count)
+        return channels.map { channel in
+            let base = channelID(for: channel, providerID: providerID, kind: kind)
+            let occurrence = (seen[base] ?? 0) + 1
+            seen[base] = occurrence
+            return occurrence == 1 ? base : "\(base)~\(occurrence)"
+        }
+    }
+
+    /// The ID a channel would have if no other channel in its playlist shared it.
+    static func channelID(for channel: AdapterChannel, providerID: UUID, kind: LiveProviderKind) -> String {
+        switch kind {
+        case .m3u:
+            return m3uChannelID(providerID: providerID, tvgID: channel.tvgID, name: channel.name, group: channel.groupTitle)
+        case .xtream:
+            return xtreamChannelID(providerID: providerID, streamID: channel.xtreamStreamID ?? 0)
+        }
+    }
+
     /// M3U channel with tvg-id: keyed by the tvg-id for maximum stability.
     /// M3U channel without tvg-id: keyed by normalised name+group.
     static func m3uChannelID(providerID: UUID, tvgID: String?, name: String, group: String?) -> String {
@@ -111,18 +137,16 @@ nonisolated enum LiveChannelIDGenerator {
 // MARK: - LiveChannel factory
 
 nonisolated extension LiveChannel {
+    /// Constructs every LiveChannel of one playlist, with IDs that are unique within it.
+    static func makeAll(from adapterChannels: [AdapterChannel], providerID: UUID, kind: LiveProviderKind) -> [LiveChannel] {
+        let ids = LiveChannelIDGenerator.uniqueChannelIDs(for: adapterChannels, providerID: providerID, kind: kind)
+        return zip(adapterChannels, ids).map { make(from: $0, providerID: providerID, kind: kind, channelID: $1) }
+    }
+
     /// Constructs a LiveChannel from an AdapterChannel emitted by any adapter.
-    static func make(from ac: AdapterChannel, providerID: UUID, kind: LiveProviderKind) -> LiveChannel {
-        let channelID: String
-        switch kind {
-        case .m3u:
-            channelID = LiveChannelIDGenerator.m3uChannelID(
-                providerID: providerID, tvgID: ac.tvgID,
-                name: ac.name, group: ac.groupTitle)
-        case .xtream:
-            channelID = LiveChannelIDGenerator.xtreamChannelID(
-                providerID: providerID, streamID: ac.xtreamStreamID ?? 0)
-        }
+    /// `channelID` overrides the ID derived from the channel itself (see `makeAll`).
+    static func make(from ac: AdapterChannel, providerID: UUID, kind: LiveProviderKind, channelID: String? = nil) -> LiveChannel {
+        let channelID = channelID ?? LiveChannelIDGenerator.channelID(for: ac, providerID: providerID, kind: kind)
 
         let streamID = LiveChannelIDGenerator.streamDescriptorID(channelID: channelID, index: 0)
         let stream = StreamDescriptor(

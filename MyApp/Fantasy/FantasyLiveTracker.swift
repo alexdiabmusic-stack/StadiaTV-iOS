@@ -163,7 +163,7 @@ struct FantasyRedZoneToastView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(Theme.accent, in: Capsule())
+                    .background(Theme.actionFill, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
@@ -174,6 +174,7 @@ struct FantasyRedZoneToastView: View {
                     .foregroundStyle(.white.opacity(0.6))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss alert")
         }
         .padding(12)
         .background(.black.opacity(0.88), in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
@@ -265,6 +266,7 @@ struct FantasyMatchupSidebarView: View {
                     .foregroundStyle(.white.opacity(0.6))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Close")
         }
         .padding(14)
         .background(Theme.surfaceElevated)
@@ -482,7 +484,7 @@ struct FantasyMatchupSidebarView: View {
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.white)
                         .padding(6)
-                        .background(Theme.accent, in: Circle())
+                        .background(Theme.actionFill, in: Circle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Watch \(channel.name)")

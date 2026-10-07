@@ -11,11 +11,10 @@ import Combine
 final class PlaylistStore: ObservableObject {
 
     @Published private(set) var playlists: [Playlist] = []
-    /// Channels loaded per playlist, keyed by playlist id.
-    @Published private(set) var channelsByPlaylist: [UUID: [Channel]] = [:] {
-        didSet { rebuildChannelIndexes() }
-    }
-    /// All channels across every loaded playlist — the pool the matcher searches.
+    /// Channels loaded per playlist, keyed by playlist id. Changes only through `applyChannels`.
+    @Published private(set) var channelsByPlaylist: [UUID: [Channel]] = [:]
+    /// All channels across every loaded playlist — the pool the matcher searches, in a stable
+    /// order (the default playlist first, then the rest in the order they were added).
     /// Rebuilt once when `channelsByPlaylist` changes, never on read.
     @Published private(set) var allChannels: [Channel] = []
     /// `allChannels` keyed by channel ID.
@@ -92,7 +91,34 @@ final class PlaylistStore: ObservableObject {
     /// apply a renamed event-slot channel without re-downloading or re-matching the whole
     /// playlist. Bumps `channelsRevision` like any other channel-list change.
     func updateChannels(_ channels: [Channel], for playlistID: UUID) {
-        channelsByPlaylist[playlistID] = channels
+        applyChannels([playlistID: channels])
+    }
+
+    /// Rebuilds a playable channel from a saved snapshot (watch history, recents).
+    ///
+    /// The stream URL, headers and Xtream identifiers come from live provider data, never from
+    /// the snapshot (see `SavedChannel`), so a changed host or password is picked up and no
+    /// credentials are persisted with history. Display fields stay as the user last saw them.
+    /// Returns nil until the channel's playlist has loaded, or when the provider no longer lists it.
+    func channel(for saved: SavedChannel) -> Channel? {
+        guard let indexed = channelsByID[saved.id] else { return nil }
+        // The ID index keeps one channel per ID; prefer the saved playlist's own copy if another shadows it.
+        let live = indexed.playlistID == saved.playlistID
+            ? indexed
+            : (channelsByPlaylist[saved.playlistID]?.first { $0.id == saved.id } ?? indexed)
+        return Channel(
+            id: live.id,
+            name: saved.name,
+            streamURL: live.streamURL,
+            logoURL: saved.logoURLString.flatMap(URL.init(string:)) ?? live.logoURL,
+            group: saved.group,
+            playlistID: live.playlistID,
+            playlistName: live.playlistName,
+            tvgId: live.tvgId,
+            httpHeaders: live.httpHeaders,
+            xtreamCategoryID: live.xtreamCategoryID,
+            xtreamStreamID: live.xtreamStreamID
+        )
     }
 
     #if DEBUG
@@ -106,17 +132,49 @@ final class PlaylistStore: ObservableObject {
 
     // MARK: - Channel indexes
 
+    /// The one way a playlist's channel list changes. Applies every given list and removal
+    /// together and rebuilds the indexes once, and only if something actually differs: a refresh
+    /// that returns the lineup already held must not bump `channelsRevision`, which restarts the
+    /// guide import, the stream scan and the fantasy refresh for everything that watches it.
+    private func applyChannels(_ updates: [UUID: [Channel]] = [:], removing removed: [UUID] = []) {
+        var next = channelsByPlaylist
+        var changed = false
+        for id in removed where next[id] != nil {
+            next[id] = nil
+            changed = true
+        }
+        for (id, channels) in updates where next[id] != channels {
+            next[id] = channels
+            changed = true
+        }
+        guard changed else { return }
+        channelsByPlaylist = next
+        rebuildChannelIndexes()
+    }
+
+    /// Playlist ids in the order their channels are flattened: the default playlist first, then
+    /// the rest as added. Dictionary order is randomised per process, so without this the order
+    /// of `allChannels` changed from launch to launch.
+    private var channelOrder: [UUID] {
+        var order = playlists.map(\.id)
+        if let defaultPlaylistID, let index = order.firstIndex(of: defaultPlaylistID), index > 0 {
+            order.insert(order.remove(at: index), at: 0)
+        }
+        return order
+    }
+
     private func rebuildChannelIndexes() {
         indexGeneration += 1
         let generation = indexGeneration
         let snapshot = channelsByPlaylist
+        let order = channelOrder
         let total = snapshot.values.reduce(0) { $0 + $1.count }
         guard total > Self.backgroundIndexThreshold else {
-            apply(Self.buildIndexes(snapshot))
+            apply(Self.buildIndexes(snapshot, order: order))
             return
         }
         Task {
-            let built = await Task.detached(priority: .userInitiated) { Self.buildIndexes(snapshot) }.value
+            let built = await Task.detached(priority: .userInitiated) { Self.buildIndexes(snapshot, order: order) }.value
             guard generation == self.indexGeneration else { return }
             self.apply(built)
         }
@@ -128,8 +186,11 @@ final class PlaylistStore: ObservableObject {
         channelsRevision &+= 1
     }
 
-    nonisolated private static func buildIndexes(_ byPlaylist: [UUID: [Channel]]) -> (channels: [Channel], byID: [String: Channel]) {
-        let channels = byPlaylist.values.flatMap { $0 }
+    /// Flattens `byPlaylist` in `order`; any playlist missing from `order` follows, by id.
+    nonisolated static func buildIndexes(_ byPlaylist: [UUID: [Channel]], order: [UUID]) -> (channels: [Channel], byID: [String: Channel]) {
+        let listed = Set(order)
+        let unlisted = byPlaylist.keys.filter { !listed.contains($0) }.sorted { $0.uuidString < $1.uuidString }
+        let channels = (order + unlisted).flatMap { byPlaylist[$0] ?? [] }
         var byID: [String: Channel] = [:]
         byID.reserveCapacity(channels.count)
         for channel in channels where byID[channel.id] == nil {
@@ -145,12 +206,14 @@ final class PlaylistStore: ObservableObject {
             .flatMap(UUID.init(uuidString:))
         guard let data = UserDefaults.standard.data(forKey: defaultsKey),
               let decoded = try? JSONDecoder().decode([Playlist].self, from: data) else { return }
-        playlists = decoded.map { migrateCredentialsIfNeeded(for: $0) }
+        let sanitized = decoded.map { migrateCredentialsIfNeeded(for: $0) }
+        playlists = sanitized
         if let defaultPlaylistID, !playlists.contains(where: { $0.id == defaultPlaylistID }) {
             self.defaultPlaylistID = nil
             UserDefaults.standard.removeObject(forKey: defaultPlaylistKey)
         }
-        persist()
+        // Rewritten only when a legacy blob still carried credentials that were just moved out.
+        if sanitized != decoded { persist() }
         // Populate the channel grid from the SQLite cache before any network calls.
         cacheLoadTask = Task { await loadCachedChannels() }
     }
@@ -158,12 +221,15 @@ final class PlaylistStore: ObservableObject {
     /// Reads channels from the local SQLite cache for each known playlist.
     /// Runs without touching the network so the UI has data on cold start.
     private func loadCachedChannels() async {
-        for playlist in playlists {
-            guard channelsByPlaylist[playlist.id] == nil else { continue }
-            if let cached = await repository.cachedChannels(for: playlist) {
-                channelsByPlaylist[playlist.id] = cached
+        var cached: [UUID: [Channel]] = [:]
+        for playlist in playlists where channelsByPlaylist[playlist.id] == nil {
+            if let channels = await repository.cachedChannels(for: playlist) {
+                cached[playlist.id] = channels
             }
         }
+        // Published together, so N playlists cost one rebuild instead of N. A refresh that
+        // finished while this was reading has fresher channels than the cache.
+        applyChannels(cached.filter { channelsByPlaylist[$0.key] == nil })
     }
 
     private func persist() {
@@ -227,7 +293,7 @@ final class PlaylistStore: ObservableObject {
         do {
             let secured = try secureCredentialsIfNeeded(for: playlist)
             playlists[index] = secured
-            channelsByPlaylist[secured.id] = nil
+            applyChannels(removing: [secured.id])
             persist()
             Task { await refresh(secured) }
         } catch {
@@ -245,9 +311,9 @@ final class PlaylistStore: ObservableObject {
     }
 
     func remove(at offsets: IndexSet) {
+        applyChannels(removing: offsets.map { playlists[$0].id })
         for index in offsets {
             let playlist = playlists[index]
-            channelsByPlaylist[playlist.id] = nil
             repository.removeChannels(for: playlist.id)
             if playlist.kind == .xtream {
                 KeychainStore.deleteXtreamCredentials(for: playlist.credentialID)
@@ -271,6 +337,7 @@ final class PlaylistStore: ObservableObject {
     /// - Parameter force: when false (launch), playlists with cached channels refreshed in the
     ///   last 12 hours are skipped. Pull-to-refresh and the playlist editor pass true.
     func refreshAll(force: Bool = false) async {
+        let origin: RefreshOrigin = force ? .userInitiated : .automatic
         // The TTL check needs to know which playlists already have cached channels.
         await cacheLoadTask?.value
         var due: [Playlist] = []
@@ -284,7 +351,7 @@ final class PlaylistStore: ObservableObject {
         }
         await withTaskGroup(of: Void.self) { group in
             for playlist in due {
-                group.addTask { await self.refresh(playlist) }
+                group.addTask { await self.refresh(playlist, origin: origin) }
             }
         }
     }
@@ -322,7 +389,10 @@ final class PlaylistStore: ObservableObject {
     /// Fetches fresh channels from the provider via the appropriate adapter,
     /// persists them to the SQLite cache, and publishes the result.
     /// Existing cached channels remain visible while the refresh is in flight.
-    func refresh(_ playlist: Playlist) async {
+    ///
+    /// An automatic refresh (launch) of a playlist that already has a lineup is skipped while
+    /// Low Data Mode is on, quietly: the cached lineup stays, and a pull-to-refresh still works.
+    func refresh(_ playlist: Playlist, origin: RefreshOrigin = .userInitiated) async {
         guard !loadingPlaylistIDs.contains(playlist.id) else { return }
         loadingPlaylistIDs.insert(playlist.id)
         defer { loadingPlaylistIDs.remove(playlist.id) }
@@ -330,8 +400,9 @@ final class PlaylistStore: ObservableObject {
         // multiscreen/recording attempt — a no-op for M3U playlists.
         Task { await xtreamAccountStatus.refresh(for: playlist) }
         do {
-            let result = try await repository.refreshChannels(for: playlist)
-            channelsByPlaylist[playlist.id] = result.channels
+            let hasCachedCopy = channelsByPlaylist[playlist.id]?.isEmpty == false
+            let result = try await repository.refreshChannels(for: playlist, origin: origin, hasCachedCopy: hasCachedCopy)
+            applyChannels([playlist.id: result.channels])
 
             if let parsedEPGURL = result.epgURL, playlist.epgURL != parsedEPGURL {
                 var updated = playlist
@@ -343,6 +414,7 @@ final class PlaylistStore: ObservableObject {
                 }
             }
         } catch {
+            if origin == .automatic, NetworkPolicy.isLowDataModeRefusal(error) { return }
             lastError = "\(playlist.name): \(error.localizedDescription)"
         }
     }

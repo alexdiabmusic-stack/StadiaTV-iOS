@@ -9,6 +9,19 @@ enum XtreamProviderAdapterTestHooks {
 }
 #endif
 
+extension String {
+    /// Percent-encodes the string for use as a single URL path segment, so characters like
+    /// `/ ? # %` in an Xtream username or password can't break (or silently truncate) a
+    /// `/live/{user}/{pass}/{id}` stream URL. Characters that are legal in a path segment
+    /// (`@ : ! $ & ' ( ) * + , ; =`) stay as typed, so URLs for ordinary credentials are unchanged.
+    nonisolated var xtreamPathSegment: String {
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "/")
+        allowed.insert(charactersIn: ";")   // a legal segment character that some Foundation builds leave out of urlPathAllowed
+        return addingPercentEncoding(withAllowedCharacters: allowed) ?? self
+    }
+}
+
 /// Loads live channels from an Xtream Codes server.
 /// Category and stream fetches are parallel-friendly; decoding runs on a background thread.
 nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
@@ -93,14 +106,18 @@ nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
         hostBase?.queryItems = nil
         hostBase?.path = ""
         let hostString = hostBase?.string ?? (provider.host ?? "")
+        // Credentials sit in the URL path, so characters like `/ ? # %` must be escaped.
+        let userSegment = user.xtreamPathSegment
+        let passSegment = pass.xtreamPathSegment
 
         return await Task.detached(priority: .userInitiated) {
-            streams.map { stream in
-                let urlString  = "\(hostString)/live/\(user)/\(pass)/\(stream.stream_id).m3u8"
+            streams.compactMap { stream in
+                let urlString = "\(hostString)/live/\(userSegment)/\(passSegment)/\(stream.stream_id).m3u8"
+                guard let streamURL = URL(string: urlString) else { return nil }
                 let groupTitle = stream.category_id.flatMap { categories[$0] }
                 return AdapterChannel(
                     name: stream.name,
-                    streamURL: URL(string: urlString) ?? URL(string: hostString)!,
+                    streamURL: streamURL,
                     logoURL: stream.stream_icon.flatMap(URL.init(string:)),
                     groupTitle: groupTitle,
                     tvgID: stream.epg_channel_id,
@@ -164,7 +181,7 @@ nonisolated struct XtreamProviderAdapter: LiveProviderAdapter {
     /// Reads `user_info`/`server_info` from `player_api.php`. 401/403/429/5xx are reported
     /// as inconclusive — a probe failure doesn't mean the connection limit is reached, it
     /// means we don't know, and callers should fall back to the existing reactive handling
-    /// (see `HLSRecorder.RecorderError.connectionLimited`) rather than guessing.
+    /// (a 403/429 surfacing mid-stream) rather than guessing.
     func accountStatus() async -> XtreamAccountStatus {
         guard let (base, user, pass) = try? baseComponents() else {
             return XtreamAccountStatus(maxConnections: nil, activeConnections: nil, isInconclusive: true)
@@ -266,12 +283,11 @@ struct XtreamAccountStatus {
     /// response) — as opposed to a successful response that simply had no connection info.
     let isInconclusive: Bool
 
-    /// Whether starting one more connection (a second live stream, a recording) risks
-    /// disrupting an existing one. Deliberately restrictive when we can't tell: an unknown
-    /// limit or a limit of exactly one both block without needing to probe further.
+    /// Whether starting one more connection (a second live stream) risks disrupting an
+    /// existing one. Deliberately restrictive when we can't tell: an unknown limit or a
+    /// limit of exactly one both block without needing to probe further.
     /// An inconclusive probe does NOT block proactively — the existing reactive handling
-    /// (a 403/429 surfacing as `HLSRecorder.RecorderError.connectionLimited` mid-stream)
-    /// remains the safety net for that case.
+    /// (a 403/429 surfacing mid-stream) remains the safety net for that case.
     var blocksAdditionalConnection: Bool {
         if isInconclusive { return false }
         guard let max = maxConnections else { return true }

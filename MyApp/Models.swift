@@ -762,45 +762,6 @@ nonisolated enum MatchStatus: String, Hashable, Sendable {
     case rejected
 }
 
-/// Types of hard conflicts that reject a candidate before scoring.
-/// A single hard conflict makes the result `.rejected` regardless of positive evidence.
-nonisolated enum HardConflictType: String, Hashable, Sendable {
-    case wrongSport               // HC-001: feed family incompatible with event sport
-    case wrongRacingSession       // HC-010: qualifying channel for race event (or vice versa)
-    case nonSportsChannelFamily   // HC-015: news / weather / cooking channel
-    case wrongEventInstance       // HC-016: EPG programme is a different game/leg/session
-    case sourceDisagreement       // HC-018: EPG and dynamic title disagree on which event is airing
-}
-
-nonisolated struct HardConflict: Hashable, Sendable {
-    let type: HardConflictType
-    let description: String
-}
-
-/// Relationship between a candidate stream and the selected event.
-nonisolated enum EventRelationship: String, Hashable, Sendable {
-    /// The stream is carrying this specific event live — the only relationship eligible
-    /// for primary stream selection.
-    case exactEvent
-    case pregame
-    case postgame
-    case replay
-    case highlights
-    case unknown
-}
-
-/// Current playability state of a stream, independent of event identity.
-nonisolated enum StreamAvailabilityState: String, Hashable, Sendable {
-    case online
-    case offline
-    /// Channel confirmed for this event but stream has not yet started.
-    case placeholder
-    case drmBlocked
-    case geoBlocked
-    case authRequired
-    case unknown
-}
-
 // MARK: - News
 
 nonisolated struct ESPNArticle: Identifiable, Hashable {

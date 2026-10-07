@@ -25,6 +25,7 @@ enum AppConfiguration {
     private nonisolated static let nbcSportsNewsEnabledName = "NBCSportsNewsProviderEnabled"
     private nonisolated static let foxRSSEnabledName = "FOXRSSNewsProviderEnabled"
     private nonisolated static let bleacherReportEnabledName = "BleacherReportNewsProviderEnabled"
+    private nonisolated static let unlockAllFeaturesName = "PremiumUnlockAllFeatures"
 
     static var oddsAPIKey: String? {
         sanitizedString(for: oddsAPIKeyName)
@@ -142,6 +143,13 @@ enum AppConfiguration {
     nonisolated static var isBleacherReportNewsProviderEnabled: Bool {
         guard let value = sanitizedString(for: bleacherReportEnabledName)?.lowercased() else { return false }
         return ["1", "true", "yes", "enabled"].contains(value)
+    }
+
+    /// True while every feature is unlocked and StoreKit is bypassed. Driven by
+    /// `BANNER_UNLOCK_ALL_FEATURES` in Config/App.xcconfig (surfaced through Info.plist);
+    /// anything other than "YES", including a missing key, ships the paywall.
+    nonisolated static var unlocksAllFeatures: Bool {
+        sanitizedString(for: unlockAllFeaturesName)?.lowercased() == "yes"
     }
 
     private nonisolated static func sanitizedString(for key: String) -> String? {

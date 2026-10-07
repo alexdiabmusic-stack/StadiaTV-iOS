@@ -18,11 +18,15 @@ nonisolated struct CuratedGuideConfig: Decodable {
         case deduplication, channels
     }
 
-    nonisolated static func load() -> CuratedGuideConfig? {
+    /// The bundled catalogue, read and decoded on first use and shared after that: the guide import asks for
+    /// it once per playlist, the guide's category list once per setup, and Build Guide each time its view is made.
+    nonisolated static func load() -> CuratedGuideConfig? { bundled }
+
+    private nonisolated static let bundled: CuratedGuideConfig? = {
         guard let url = Bundle.main.url(forResource: "curated_tv_guide_filter", withExtension: "json"),
               let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(CuratedGuideConfig.self, from: data)
-    }
+    }()
 }
 
 nonisolated struct CuratedProfile: Decodable {

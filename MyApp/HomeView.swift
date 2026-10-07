@@ -51,6 +51,7 @@ struct HomeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var playingChannel: Channel?
+    @State private var quickStreamMatch: Match?
     @State private var selectedLiveSport: SportGroup?
     @State private var selectedScheduleDay: ScheduleDay = .today
     @State private var showingNotificationAlert = false
@@ -78,15 +79,22 @@ struct HomeView: View {
             #endif
             .navigationDestination(for: Match.self) { MatchDetailView(match: $0) }
             .fullScreenCoverCompat(item: $playingChannel) { PlayerView(channel: $0) }
+            .sheet(item: $quickStreamMatch) { match in
+                #if os(tvOS)
+                TVMatchDetailView(match: match)
+                #else
+                QuickStreamSheet(match: match, sources: streamStore.topRanked(for: match.id))
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                #endif
+            }
         }
         .tint(Theme.accent)
         .task(id: loadPreferencesKey) {
             await viewModel.load(
                 leagues: prefs.followedLeagues,
                 favorites: prefs.favoriteTeams,
-                notificationsEnabled: prefs.matchNotificationsEnabled,
-                notificationLeadTime: prefs.matchReminderLeadTime,
-                morningDigestEnabled: prefs.morningDigestEnabled
+                notifications: prefs.notificationSettings
             )
             viewModel.startAutoRefresh()
             // Safety-net: markAppShellReady is called here after all phases, and also
@@ -164,9 +172,7 @@ struct HomeView: View {
                 await viewModel.load(
                     leagues: prefs.followedLeagues,
                     favorites: prefs.favoriteTeams,
-                    notificationsEnabled: prefs.matchNotificationsEnabled,
-                    notificationLeadTime: prefs.matchReminderLeadTime,
-                    morningDigestEnabled: prefs.morningDigestEnabled
+                    notifications: prefs.notificationSettings
                 )
             }
         }
@@ -179,9 +185,7 @@ struct HomeView: View {
             await viewModel.load(
                 leagues: prefs.followedLeagues,
                 favorites: prefs.favoriteTeams,
-                notificationsEnabled: prefs.matchNotificationsEnabled,
-                notificationLeadTime: prefs.matchReminderLeadTime,
-                morningDigestEnabled: prefs.morningDigestEnabled,
+                notifications: prefs.notificationSettings,
                 force: true
             )
         }
@@ -208,9 +212,7 @@ struct HomeView: View {
         [
             prefs.followedLeagues.map(\.id).sorted().joined(separator: ","),
             prefs.favoriteTeams.map(\.id).sorted().joined(separator: ","),
-            prefs.matchNotificationsEnabled ? "n1" : "n0",
-            "lead-\(prefs.matchReminderLeadTime.rawValue)",
-            prefs.morningDigestEnabled ? "d1" : "d0"
+            String(describing: prefs.notificationSettings)
         ].joined(separator: "|")
     }
 
@@ -310,8 +312,8 @@ struct HomeView: View {
 
                 // Straight back into what you were watching — placed last so it doesn't
                 // compete with today's live/upcoming content for top-of-page attention.
-                if !watchStore.history.isEmpty {
-                    ContinueWatchingSection(entries: watchStore.history) { PlaybackTapClock.record(); playingChannel = $0 }
+                if !continueWatchingItems.isEmpty {
+                    ContinueWatchingSection(items: continueWatchingItems) { PlaybackTapClock.record(); playingChannel = $0 }
                         .opacity(showRemaining ? 1 : 0)
                         .offset(y: (showRemaining || reduceMotion) ? 0 : 40)
                         .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.45), value: showRemaining)
@@ -322,6 +324,10 @@ struct HomeView: View {
             .padding(.bottom, 104)
             .macContentWidth()
         }
+    }
+
+    private var continueWatchingItems: [ContinueWatchingItem] {
+        watchStore.continueWatchingItems(using: playlistStore)
     }
 
     /// Favourite channels in the user's order, resolved through the channel index.
@@ -360,9 +366,14 @@ struct HomeView: View {
                 return end > ctx.date
             }
             if let pick {
-                FeaturedHero(pick: pick, match: viewModel.featuredMatchesByPickID[pick.id]) { match in
-                    Task { await setAlert(for: match) }
-                }
+                let heroMatch = viewModel.featuredMatchesByPickID[pick.id]
+                FeaturedHero(
+                    pick: pick,
+                    match: heroMatch,
+                    hasStreams: heroMatch.map { streamStore.count(for: $0.id) > 0 } ?? false,
+                    onWatch: { quickStreamMatch = $0 },
+                    onSetAlert: { match in Task { await setAlert(for: match) } }
+                )
             } else if let prime = viewModel.primeMatch {
                 PrimeHeroCard(match: prime)
             }
@@ -482,7 +493,7 @@ struct HomeView: View {
             let points = total.map { " · \($0.formatted(.number.precision(.fractionLength(1)))) pts" } ?? ""
             return HomeFantasySummary(
                 title: "FANTASY LIVE",
-                subtitle: "\(playerCount) player\(playerCount == 1 ? "" : "s") · \(liveContexts.count) NHL game\(liveContexts.count == 1 ? "" : "s")\(points)",
+                subtitle: "\(playerCount) player\(playerCount == 1 ? "" : "s") · \(gameCountLabel(for: liveContexts))\(points)",
                 isLive: true,
                 watchChannel: liveContexts.first(where: { $0.watchAvailable })?.matchedChannel?.channel
             )
@@ -492,12 +503,20 @@ struct HomeView: View {
             let playerCount = todayContexts.reduce(0) { $0 + $1.playerGames.count }
             return HomeFantasySummary(
                 title: "FANTASY TONIGHT",
-                subtitle: "\(playerCount) player\(playerCount == 1 ? "" : "s") · \(todayContexts.count) NHL game\(todayContexts.count == 1 ? "" : "s")",
+                subtitle: "\(playerCount) player\(playerCount == 1 ? "" : "s") · \(gameCountLabel(for: todayContexts))",
                 isLive: false,
                 watchChannel: nil
             )
         }
         return nil
+    }
+
+    /// "2 NHL games", or just "3 games" when the contexts span more than one league.
+    private func gameCountLabel(for contexts: [FantasyEventContext]) -> String {
+        let leagues = Set(contexts.map { $0.event.league.shortName })
+        let noun = contexts.count == 1 ? "game" : "games"
+        if leagues.count == 1, let league = leagues.first { return "\(contexts.count) \(league) \(noun)" }
+        return "\(contexts.count) \(noun)"
     }
 
     // MARK: - Live Now
@@ -524,7 +543,12 @@ struct HomeView: View {
 
     private func setAlert(for match: Match) async {
         let scheduled = await MatchNotificationService.shared.scheduleReminder(for: match, leadTime: prefs.matchReminderLeadTime)
-        prefs.setMatchNotificationsEnabled(scheduled)
+        if scheduled {
+            prefs.setMatchNotificationsEnabled(true)
+        } else if !(await MatchNotificationService.shared.isAuthorized()) {
+            // A finished game can't be reminded about; only a revoked permission turns alerts off.
+            prefs.setMatchNotificationsEnabled(false)
+        }
         notificationAlertMessage = scheduled
             ? (match.state == .live ? "Live alert sent for \(match.shortName)." : "Alert set for \(match.shortName).")
             : (match.state == .final ? "\(match.shortName) is already final." : "Notifications are disabled. Enable them in Settings to receive game alerts.")
@@ -561,7 +585,8 @@ struct HomeView: View {
                     await viewModel.load(
                         leagues: prefs.followedLeagues,
                         favorites: prefs.favoriteTeams,
-                        notificationsEnabled: prefs.matchNotificationsEnabled
+                        notifications: prefs.notificationSettings,
+                        force: true
                     )
                 }
             }
@@ -632,14 +657,17 @@ private struct HomeFilterBar: View {
 private struct FeaturedHero: View {
     let pick: FeaturedEventPick
     let match: Match?
+    /// True when at least one playlist channel is linked to the match, so "Watch Live" has somewhere to go.
+    let hasStreams: Bool
+    let onWatch: (Match) -> Void
     let onSetAlert: (Match) -> Void
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { ctx in
             if pick.isTeamMatchup {
-                TeamMatchupHero(pick: pick, match: match, now: ctx.date)
+                TeamMatchupHero(pick: pick, match: match, now: ctx.date, hasStreams: hasStreams, onWatch: onWatch, onSetAlert: onSetAlert)
             } else {
-                EventHero(pick: pick, match: match, now: ctx.date)
+                EventHero(pick: pick, match: match, now: ctx.date, hasStreams: hasStreams, onWatch: onWatch)
             }
         }
     }
@@ -651,12 +679,16 @@ private struct TeamMatchupHero: View {
     let pick: FeaturedEventPick
     let match: Match?
     let now: Date
+    let hasStreams: Bool
+    let onWatch: (Match) -> Void
+    let onSetAlert: (Match) -> Void
 
     private static var cardHeight: CGFloat { Theme.isMac ? 240 : Theme.isPad ? 400 : 300 }
     private var isLive: Bool { match?.state == .live }
     private var eventDate: Date? { match?.date ?? pick.startDate }
-    private var homeSide: TeamSide { match?.home ?? pick.streamMatch.home }
-    private var awaySide: TeamSide { match?.away ?? pick.streamMatch.away }
+    private var displayMatch: Match { match ?? pick.streamMatch }
+    private var leadingSide: TeamSide { displayMatch.leadingSide }
+    private var trailingSide: TeamSide { displayMatch.trailingSide }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Mac.Radius.hero : Theme.Radius.xl, style: .continuous)
@@ -705,8 +737,8 @@ private struct TeamMatchupHero: View {
                     HStack(spacing: 0) {
                         Spacer()
                         VStack(spacing: 4) {
-                            TeamLogo(url: awaySide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.hero : 48)
-                            Text(awaySide.shortName)
+                            TeamLogo(url: leadingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.hero : 48)
+                            Text(leadingSide.shortName)
                                 .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : Theme.Typography.caption)
                                 .foregroundStyle(.white.opacity(0.80))
                                 .lineLimit(1)
@@ -718,8 +750,8 @@ private struct TeamMatchupHero: View {
                             .frame(width: 28)
                         Spacer()
                         VStack(spacing: 4) {
-                            TeamLogo(url: homeSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.hero : 48)
-                            Text(homeSide.shortName)
+                            TeamLogo(url: trailingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.hero : 48)
+                            Text(trailingSide.shortName)
                                 .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : Theme.Typography.caption)
                                 .foregroundStyle(.white.opacity(0.80))
                                 .lineLimit(1)
@@ -779,7 +811,7 @@ private struct TeamMatchupHero: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Theme.live, in: Capsule())
+            .background(Theme.liveFill, in: Capsule())
         } else {
             Text("FEATURED")
                 .font(.caption.weight(.bold))
@@ -798,7 +830,7 @@ private struct TeamMatchupHero: View {
                     .font(Theme.Typography.overline)
                     .foregroundStyle(.white.opacity(0.55))
                     .tracking(1)
-                Text("\(m.away.score ?? "—") – \(m.home.score ?? "—")")
+                Text("\(m.leadingSide.score ?? "—") – \(m.trailingSide.score ?? "—")")
                     .font(.system(size: Theme.isMac ? 30 : 26, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(.white)
                 Text(m.statusDetail)
@@ -839,20 +871,41 @@ private struct TeamMatchupHero: View {
         }
     }
 
+    /// Every button does something: Watch Live opens the match's streams, Remind Me schedules an
+    /// alert, the rest open the match. Before the match resolves there is nothing to open, so none show.
     @ViewBuilder
     private var buttonsView: some View {
         if let m = match {
-            NavigationLink(value: m) {
-                heroButton(m.state == .final ? "Highlights" : m.state == .live ? "Watch Live" : "Match Info", icon: "play.fill", primary: true)
+            switch m.state {
+            case .live where hasStreams:
+                Button { onWatch(m) } label: {
+                    heroButton("Watch Live", icon: "play.fill", primary: true)
+                }
+                .buttonStyle(.plain)
+                NavigationLink(value: m) {
+                    heroButton("Matchup", icon: "sportscourt", primary: false)
+                }
+                .buttonStyle(.plain)
+            case .live:
+                NavigationLink(value: m) {
+                    heroButton("Match Info", icon: "info.circle", primary: true)
+                }
+                .buttonStyle(.plain)
+            case .pre:
+                NavigationLink(value: m) {
+                    heroButton("Match Info", icon: "info.circle", primary: true)
+                }
+                .buttonStyle(.plain)
+                Button { onSetAlert(m) } label: {
+                    heroButton("Remind Me", icon: "bell", primary: false)
+                }
+                .buttonStyle(.plain)
+            case .final:
+                NavigationLink(value: m) {
+                    heroButton("Highlights", icon: "play.fill", primary: true)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
-            NavigationLink(value: m) {
-                heroButton("Matchup", icon: "sportscourt", primary: false)
-            }
-            .buttonStyle(.plain)
-        } else {
-            heroButton("Watch Live", icon: "play.fill", primary: true)
-            heroButton("Matchup", icon: "sportscourt", primary: false)
         }
     }
 
@@ -897,6 +950,8 @@ private struct EventHero: View {
     let pick: FeaturedEventPick
     let match: Match?
     let now: Date
+    let hasStreams: Bool
+    let onWatch: (Match) -> Void
 
     private static var cardHeight: CGFloat { Theme.isMac ? 240 : Theme.isPad ? 400 : 300 }
     private var isLive: Bool { match?.state == .live }
@@ -988,22 +1043,27 @@ private struct EventHero: View {
 
                     countdownView
 
-                    HStack(spacing: 8) {
-                        if let m = match {
-                            NavigationLink(value: m) {
-                                eventButton(m.state == .final ? "Highlights" : m.state == .live ? "Watch Live" : "Match Info", icon: "play.fill", primary: true)
+                    // Before the match resolves there is nothing to open, so no buttons show.
+                    if let m = match {
+                        HStack(spacing: 8) {
+                            if m.state == .live, hasStreams {
+                                Button { onWatch(m) } label: {
+                                    eventButton("Watch Live", icon: "play.fill", primary: true)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                NavigationLink(value: m) {
+                                    eventButton(m.state == .final ? "Highlights" : "Match Info", icon: m.state == .final ? "play.fill" : "info.circle", primary: true)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                             NavigationLink(value: m) {
                                 eventButton(secondaryLabel, icon: secondaryIcon, primary: false)
                             }
                             .buttonStyle(.plain)
-                        } else {
-                            eventButton("Watch Live", icon: "play.fill", primary: true)
-                            eventButton(secondaryLabel, icon: secondaryIcon, primary: false)
                         }
+                        .padding(.top, 10)
                     }
-                    .padding(.top, 10)
                 }
                 .padding(16)
                 .frame(maxWidth: min(proxy.size.width * 0.62, 240), minHeight: Self.cardHeight, alignment: .topLeading)
@@ -1030,7 +1090,7 @@ private struct EventHero: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Theme.live, in: Capsule())
+            .background(Theme.liveFill, in: Capsule())
         } else {
             Text("FEATURED")
                 .font(.caption.weight(.bold))
@@ -1140,11 +1200,11 @@ private struct PrimeHeroCard: View {
                     }
 
                     HStack(spacing: 12) {
-                        teamColumn(match.away)
+                        teamColumn(match.leadingSide)
                         VStack(spacing: 4) {
                             Text(match.state == .pre
                                  ? "VS"
-                                 : "\(match.away.score ?? "-") – \(match.home.score ?? "-")")
+                                 : "\(match.leadingSide.score ?? "-") – \(match.trailingSide.score ?? "-")")
                                 .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
                                 .foregroundStyle(Theme.textPrimary)
                             Text(primeHeroStatusText(for: match))
@@ -1153,7 +1213,7 @@ private struct PrimeHeroCard: View {
                                 .lineLimit(1)
                         }
                         .frame(minWidth: 80)
-                        teamColumn(match.home)
+                        teamColumn(match.trailingSide)
                     }
                 }
 
@@ -1396,11 +1456,11 @@ private struct SoonTimelineCard: View {
                 }
 
                 HStack(spacing: 6) {
-                    TeamLogo(url: match.away.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 8 : 28)
+                    TeamLogo(url: match.leadingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 8 : 28)
                     Text("vs")
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.textSecondary)
-                    TeamLogo(url: match.home.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 8 : 28)
+                    TeamLogo(url: match.trailingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 8 : 28)
                 }
 
                 Text(match.shortName)
@@ -1493,6 +1553,12 @@ private struct ScheduleSection: View {
         }
     }
 
+    private static let dayLabelFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "EEEE, MMMM d"
+        return fmt
+    }()
+
     // Groups matches by calendar day, preserving order.
     private func groupByDay(_ matches: [Match]) -> [(label: String, matches: [Match])] {
         var order: [Date] = []
@@ -1502,10 +1568,8 @@ private struct ScheduleSection: View {
             if groups[day] == nil { order.append(day) }
             groups[day, default: []].append(match)
         }
-        let fmt = DateFormatter()
-        fmt.dateFormat = "EEEE, MMMM d"
         return order.map { day in
-            (label: fmt.string(from: day), matches: groups[day]!)
+            (label: Self.dayLabelFormatter.string(from: day), matches: groups[day]!)
         }
     }
 
@@ -1529,6 +1593,7 @@ private struct ScheduleSection: View {
                             .frame(height: Theme.isMac ? Theme.Mac.ControlHeight.md : nil)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
             }
             .frame(maxWidth: Theme.isMac ? 650 : .infinity)
@@ -1610,7 +1675,7 @@ private struct ScheduleRow: View {
                 .frame(width: 1, height: 36)
 
             HStack(spacing: 10) {
-                TeamLogo(url: match.away.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 8 : 28)
+                TeamLogo(url: match.leadingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 8 : 28)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(match.shortName)
                         .font(.system(size: Theme.isMac ? 15 : 14, weight: .semibold))
@@ -1624,7 +1689,7 @@ private struct ScheduleRow: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                TeamLogo(url: match.home.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 8 : 28)
+                TeamLogo(url: match.trailingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 8 : 28)
             }
 
             Image(systemName: "chevron.right")
@@ -1699,8 +1764,26 @@ struct FavouriteChannelsRail: View {
     }
 }
 
+/// A watch-history entry paired with the playable channel rebuilt from live provider data.
+struct ContinueWatchingItem: Identifiable {
+    let entry: WatchHistoryEntry
+    let channel: Channel
+
+    var id: String { entry.id }
+}
+
+extension WatchStore {
+    /// History entries that can be played right now, most recent first. Entries whose playlist
+    /// hasn't loaded yet, or whose channel the provider no longer lists, are left out.
+    func continueWatchingItems(using playlists: PlaylistStore) -> [ContinueWatchingItem] {
+        history.compactMap { entry in
+            playlists.channel(for: entry.saved).map { ContinueWatchingItem(entry: entry, channel: $0) }
+        }
+    }
+}
+
 struct ContinueWatchingSection: View {
-    let entries: [WatchHistoryEntry]
+    let items: [ContinueWatchingItem]
     let onPlay: (Channel) -> Void
 
     var body: some View {
@@ -1715,13 +1798,11 @@ struct ContinueWatchingSection: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(entries) { entry in
-                        if let channel = entry.saved.channel {
-                            Button { onPlay(channel) } label: {
-                                ContinueWatchingCard(entry: entry)
-                            }
-                            .buttonStyle(.plain)
+                    ForEach(items) { item in
+                        Button { onPlay(item.channel) } label: {
+                            ContinueWatchingCard(item: item)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -1730,13 +1811,13 @@ struct ContinueWatchingSection: View {
 }
 
 private struct ContinueWatchingCard: View {
-    let entry: WatchHistoryEntry
+    let item: ContinueWatchingItem
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack {
                 Theme.surfaceElevated
-                CachedImage(url: entry.saved.channel?.logoURL) { phase in
+                CachedImage(url: item.channel.logoURL) { phase in
                     if case .success(let image) = phase {
                         image.resizable().scaledToFit().padding(10)
                     } else {
@@ -1755,11 +1836,11 @@ private struct ContinueWatchingCard: View {
                     .padding(6)
             }
 
-            Text(entry.saved.name)
+            Text(item.channel.name)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(1)
-            Text(entry.lastWatched.formatted(.relative(presentation: .named)))
+            Text(item.entry.lastWatched.formatted(.relative(presentation: .named)))
                 .font(.caption2)
                 .foregroundStyle(Theme.textSecondary)
                 .lineLimit(1)
@@ -1806,7 +1887,10 @@ final class HomeViewModel: ObservableObject {
     private var demandScoreCache: [String: Int] = [:]
 
     private var refreshTask: Task<Void, Never>?
-    private var lastLoadArgs: (leagues: [League], favorites: [FavoriteTeam], notificationsEnabled: Bool, notificationLeadTime: MatchReminderLeadTime, morningDigestEnabled: Bool)?
+    private var lastLoadArgs: (leagues: [League], favorites: [FavoriteTeam], notifications: NotificationSettings)?
+    /// What the notification schedule was last brought in line with, so a change to the settings
+    /// or favourites resyncs even when the match data itself is still fresh.
+    private var lastSyncedNotifications: (settings: NotificationSettings, favoriteSignature: String)?
 
     func startAutoRefresh() {
         refreshTask?.cancel()
@@ -1816,8 +1900,8 @@ final class HomeViewModel: ObservableObject {
                 let hasLive = await MainActor.run { self?.liveNow.isEmpty == false }
                 let nanoseconds: UInt64 = hasLive ? 30_000_000_000 : 60_000_000_000
                 try? await Task.sleep(nanoseconds: nanoseconds)
-                guard !Task.isCancelled, let self, let args = self.lastLoadArgs else { continue }
-                await self.load(leagues: args.leagues, favorites: args.favorites, notificationsEnabled: args.notificationsEnabled, notificationLeadTime: args.notificationLeadTime, morningDigestEnabled: args.morningDigestEnabled)
+                guard !Task.isCancelled, let self, let args = self.lastLoadArgs, AppActivity.shared.isActive else { continue }
+                await self.load(leagues: args.leagues, favorites: args.favorites, notifications: args.notifications)
             }
         }
     }
@@ -1827,8 +1911,8 @@ final class HomeViewModel: ObservableObject {
         refreshTask = nil
     }
 
-    func load(leagues: [League], favorites: [FavoriteTeam], notificationsEnabled: Bool = false, notificationLeadTime: MatchReminderLeadTime = .thirty, morningDigestEnabled: Bool = false, force: Bool = false) async {
-        lastLoadArgs = (leagues, favorites, notificationsEnabled, notificationLeadTime, morningDigestEnabled)
+    func load(leagues: [League], favorites: [FavoriteTeam], notifications: NotificationSettings = NotificationSettings(), force: Bool = false) async {
+        lastLoadArgs = (leagues, favorites, notifications)
         let followedLeagueIDs = Set(leagues.map(\.id))
         var seenDiscoveryLeagueIDs: Set<String> = []
         let discoveryLeagues = (leagues + League.all).filter { seenDiscoveryLeagueIDs.insert($0.id).inserted }
@@ -1846,6 +1930,8 @@ final class HomeViewModel: ObservableObject {
         let effectiveCacheLifetime = liveNow.isEmpty ? cacheLifetime : cacheLifetimeLive
         if !force, hasData, discoveryLeagueIDs == lastLoadedLeagueIDs, favoriteSignature == lastLoadedFavoriteSignature,
            let lastLoadedAt, Date().timeIntervalSince(lastLoadedAt) < effectiveCacheLifetime {
+            // Nothing to fetch, but notification settings may have changed since the last pass.
+            await syncNotificationsIfNeeded(favorites: favorites, settings: notifications, favoriteSignature: favoriteSignature)
             return
         }
         guard !isLoadInFlight else { return }
@@ -1887,18 +1973,11 @@ final class HomeViewModel: ObservableObject {
             startingSoonWindow: 6 * 3600,
             nextLimit: 8,
             onPartialResult: { [weak self] partial in
-                // Fire a main-actor task for each league that completes so the UI
-                // updates incrementally rather than waiting for all leagues to finish.
+                // Each league that completes lands here so the UI fills in incrementally rather
+                // than waiting for all of them; the rebuild itself is batched (see below).
+                let matches = partial.live + partial.startingSoon + partial.next + partial.pastStartToday
                 Task { @MainActor [weak self] in
-                    guard let self, self.isLoadInFlight else { return }
-                    for match in partial.live + partial.startingSoon + partial.next + partial.pastStartToday {
-                        self.matchesByLeague[match.league.id, default: []].append(match)
-                    }
-                    for key in self.matchesByLeague.keys {
-                        self.matchesByLeague[key] = self.mergeMatches(self.matchesByLeague[key] ?? [])
-                    }
-                    self.rebuildSections(matchesByLeague: self.matchesByLeague, followedIDs: capturedFollowedIDs, favoriteIDs: capturedFavoriteIDs, favoriteNames: capturedFavoriteNames)
-                    self.isLoading = false
+                    self?.receivePartial(matches, followedIDs: capturedFollowedIDs, favoriteIDs: capturedFavoriteIDs, favoriteNames: capturedFavoriteNames)
                 }
             }
         )
@@ -1911,6 +1990,10 @@ final class HomeViewModel: ObservableObject {
         // previously-loaded 7-day/season schedule data (from this or an
         // earlier load cycle) is preserved instead of discarded.
         let liveSnapshot = await liveSnapshotTask
+        // The final snapshot carries everything the partial results did.
+        partialFlushTask?.cancel()
+        partialFlushTask = nil
+        pendingPartialMatches.removeAll()
         // Include pastStartToday so games that started but still show as scheduled are
         // present in allMatches — they can appear in Live Now via the featured-IDs special
         // case and will be correctly matched to featured picks.
@@ -1949,17 +2032,7 @@ final class HomeViewModel: ObservableObject {
             rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedLeagueIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
         }
 
-        if notificationsEnabled {
-            let allMatchesFlat = matchesByLeague.values.flatMap { $0 }
-            await MatchNotificationService.shared.syncNotifications(
-                matches: allMatchesFlat,
-                favorites: favorites,
-                leadTime: notificationLeadTime
-            )
-            if morningDigestEnabled {
-                await MatchNotificationService.shared.scheduleMorningDigest(matches: allMatchesFlat)
-            }
-        }
+        await syncNotificationsIfNeeded(favorites: favorites, settings: notifications, favoriteSignature: favoriteSignature, force: true)
 
         let recentlyFinished = matchesByLeague
             .filter { followedLeagueIDs.contains($0.key) }
@@ -2016,6 +2089,47 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
+    // MARK: Partial results
+
+    /// Every rebuild re-merges and re-sorts all the sections, and a league's results used to trigger
+    /// one each (eleven during one live pass). The first partial result is folded in straight away,
+    /// the rest are collected and folded in together at most every `partialFlushInterval`.
+    private static let partialFlushInterval: TimeInterval = 0.25
+    private var pendingPartialMatches: [Match] = []
+    private var partialFlushTask: Task<Void, Never>?
+    private var lastPartialFlush = Date.distantPast
+
+    private func receivePartial(_ matches: [Match], followedIDs: Set<String>, favoriteIDs: Set<String>, favoriteNames: Set<String>) {
+        guard isLoadInFlight else { return }
+        pendingPartialMatches.append(contentsOf: matches)
+        guard partialFlushTask == nil else { return }
+        let wait = max(0, Self.partialFlushInterval - Date().timeIntervalSince(lastPartialFlush))
+        partialFlushTask = Task { [weak self] in
+            if wait > 0 { try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }
+            guard !Task.isCancelled else { return }
+            self?.flushPartialMatches(followedIDs: followedIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+        }
+    }
+
+    private func flushPartialMatches(followedIDs: Set<String>, favoriteIDs: Set<String>, favoriteNames: Set<String>) {
+        partialFlushTask = nil
+        let batch = pendingPartialMatches
+        pendingPartialMatches.removeAll(keepingCapacity: true)
+        guard isLoadInFlight, !batch.isEmpty else { return }
+        lastPartialFlush = Date()
+        var touchedLeagues: Set<String> = []
+        for match in batch {
+            matchesByLeague[match.league.id, default: []].append(match)
+            touchedLeagues.insert(match.league.id)
+        }
+        // Only the leagues that just received matches need merging; the others were merged earlier.
+        for leagueID in touchedLeagues {
+            matchesByLeague[leagueID] = mergeMatches(matchesByLeague[leagueID] ?? [])
+        }
+        rebuildSections(matchesByLeague: matchesByLeague, followedIDs: followedIDs, favoriteIDs: favoriteIDs, favoriteNames: favoriteNames)
+        isLoading = false
+    }
+
     private func orderedUnique(_ values: [String]) -> [String] {
         var seen = Set<String>()
         return values.filter { seen.insert($0).inserted }
@@ -2055,6 +2169,29 @@ final class HomeViewModel: ObservableObject {
                 enqueueNextLeague()
             }
             return results
+        }
+    }
+
+    /// Brings the scheduled notifications in line with the loaded matches. After a full load it
+    /// always runs; when the data was still fresh it runs only if the settings or favourites changed.
+    private func syncNotificationsIfNeeded(
+        favorites: [FavoriteTeam],
+        settings: NotificationSettings,
+        favoriteSignature: String,
+        force: Bool = false
+    ) async {
+        let previous = lastSyncedNotifications
+        if !force, let previous, previous.settings == settings, previous.favoriteSignature == favoriteSignature { return }
+        lastSyncedNotifications = (settings, favoriteSignature)
+        guard settings.enabled else { return }
+
+        let allMatches = matchesByLeague.values.flatMap { $0 }
+        await MatchNotificationService.shared.syncNotifications(matches: allMatches, favorites: favorites, settings: settings)
+        if settings.morningDigest {
+            await MatchNotificationService.shared.scheduleMorningDigest(matches: allMatches, hour: settings.morningDigestHour)
+        } else if previous?.settings.morningDigest != false {
+            // First pass of this launch, or just switched off: clear any briefing still scheduled.
+            await MatchNotificationService.shared.removeMorningDigests()
         }
     }
 

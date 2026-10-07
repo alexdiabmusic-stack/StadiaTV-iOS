@@ -105,7 +105,17 @@ actor FantasyPersistenceStore {
     func savePlayerDirectory(_ directory: CachedFantasyPlayerDirectory, provider: FantasyProvider, sport: FantasySport) {
         guard let data = try? encoder.encode(directory) else { return }
         try? FileManager.default.createDirectory(at: cacheDirectoryURL, withIntermediateDirectories: true)
+        Self.excludeFromBackup(cacheDirectoryURL)
         try? data.write(to: playerDirectoryFileURL(provider: provider, sport: sport), options: [.atomic])
+    }
+
+    /// The player directories are multi-megabyte downloads that refresh daily; there is no reason to back them up.
+    /// The flag is on the folder, so it covers files written by earlier versions too.
+    private nonisolated static func excludeFromBackup(_ directory: URL) {
+        var directory = directory
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? directory.setResourceValues(values)
     }
 
     func loadMappings() -> [String: BannerPlayerIdentity] {

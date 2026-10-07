@@ -302,11 +302,11 @@ struct NotificationsCalendarSettingsView: View {
                         SettingsDisclosureRow(title: "Game starting", value: reminderValue)
                     }
                     Divider().overlay(Theme.hairline)
-                    StaticSwitchRow(title: "Game begins", isOn: true)
+                    SettingsToggleRow(title: "Game begins", isOn: Binding(get: { prefs.notificationSettings.liveAlerts }, set: { prefs.setLiveAlertsEnabled($0) }))
                     Divider().overlay(Theme.hairline)
                     StaticSwitchRow(title: "Score changes", isOn: true)
                     Divider().overlay(Theme.hairline)
-                    StaticSwitchRow(title: "Close game", isOn: true)
+                    SettingsToggleRow(title: "Close game", isOn: Binding(get: { prefs.notificationSettings.closeGameAlerts }, set: { prefs.setCloseGameAlertsEnabled($0) }))
                     Divider().overlay(Theme.hairline)
                     StaticSwitchRow(title: "Overtime or extra innings", isOn: true)
                     Divider().overlay(Theme.hairline)
@@ -317,9 +317,21 @@ struct NotificationsCalendarSettingsView: View {
             }
 
             SettingsPanel(title: "DAILY") {
-                SettingsToggleRow(title: "Morning Briefing", isOn: Binding(get: { prefs.morningDigestEnabled }, set: { prefs.setMorningDigestEnabled($0) }))
+                SettingsToggleRow(title: "Morning Briefing", isOn: Binding(get: { prefs.morningDigestEnabled }, set: { setMorningDigest($0) }))
                 Divider().overlay(Theme.hairline)
-                SettingsDisclosureRow(title: "Briefing Time", value: "8:00 AM")
+                Menu {
+                    ForEach(Self.briefingHours, id: \.self) { hour in
+                        Button { prefs.setMorningDigestHour(hour) } label: {
+                            if prefs.notificationSettings.morningDigestHour == hour {
+                                Label(Self.hourLabel(hour), systemImage: "checkmark")
+                            } else {
+                                Text(Self.hourLabel(hour))
+                            }
+                        }
+                    }
+                } label: {
+                    SettingsDisclosureRow(title: "Briefing Time", value: Self.hourLabel(prefs.notificationSettings.morningDigestHour))
+                }
             }
             .opacity(prefs.matchNotificationsEnabled ? 1 : 0.42)
 
@@ -344,6 +356,18 @@ struct NotificationsCalendarSettingsView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+    }
+
+    private static let briefingHours = Array(5...12)
+
+    private static func hourLabel(_ hour: Int) -> String {
+        let date = Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: Date()) ?? Date()
+        return date.formatted(date: .omitted, time: .shortened)
+    }
+
+    private func setMorningDigest(_ enabled: Bool) {
+        prefs.setMorningDigestEnabled(enabled)
+        if !enabled { Task { await MatchNotificationService.shared.removeMorningDigests() } }
     }
 
     private var reminderValue: String {
@@ -380,7 +404,7 @@ struct NotificationsCalendarSettingsView: View {
 
     private func syncFavoriteGameNotifications() async {
         let matches = await loadFollowedMatches()
-        await MatchNotificationService.shared.syncNotifications(matches: matches, favorites: prefs.favoriteTeams, leadTime: prefs.matchReminderLeadTime)
+        await MatchNotificationService.shared.syncNotifications(matches: matches, favorites: prefs.favoriteTeams, settings: prefs.notificationSettings)
     }
 
     private func exportFollowedGamesToCalendar() async {
@@ -1175,7 +1199,7 @@ struct FantasySettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes the local Fantasy connection, provider credentials and Fantasy caches without changing playlists, favourites, recordings or other Banner settings.")
+            Text("This removes the local Fantasy connection, provider credentials and Fantasy caches without changing playlists, favourites or other Banner settings.")
         }
         .confirmationDialog("Reset Local Fantasy Data?", isPresented: $showingNativeResetConfirmation, titleVisibility: .visible) {
             Button("Reset Local Fantasy Data", role: .destructive) {
@@ -1186,7 +1210,7 @@ struct FantasySettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes Banner Fantasy teams, local leagues, rosters, lineups and transactions. It does not change IPTV playlists, recordings, favourites or imported ESPN Fantasy credentials.")
+            Text("This removes Banner Fantasy teams, local leagues, rosters, lineups and transactions. It does not change IPTV playlists, favourites or imported ESPN Fantasy credentials.")
         }
         .task {
             await nativeFantasyStore.load()

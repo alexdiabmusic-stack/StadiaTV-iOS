@@ -197,15 +197,31 @@ struct RootView: View {
         Binding(get: { selectedTab }, set: { if let newValue = $0 { selectedTab = newValue } })
     }
 
+    @ViewBuilder
+    private func macSidebarRow(_ title: String, systemImage: String) -> some View {
+        HStack(spacing: Theme.Mac.Sidebar.iconLabelGap) {
+            Image(systemName: systemImage)
+                .font(.system(size: Theme.Mac.Sidebar.iconSize))
+                .frame(width: Theme.Mac.Sidebar.iconSize, alignment: .center)
+            Text(title)
+                .font(.system(size: Theme.Mac.Sidebar.labelSize, weight: .medium))
+        }
+        .padding(.horizontal, Theme.Mac.Sidebar.horizontalPadding)
+        .frame(height: Theme.Mac.Sidebar.rowHeight)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .listRowInsets(EdgeInsets())
+    }
+
     private var macNavigationBody: some View {
         NavigationSplitView {
             List(selection: macSidebarSelection) {
-                Label("Home", systemImage: "house.fill").tag(AppTab.home)
-                Label("Following", systemImage: "star.fill").tag(AppTab.following)
-                Label("Live", systemImage: "dot.radiowaves.left.and.right").tag(AppTab.live)
-                Label("Discover", systemImage: "safari.fill").tag(AppTab.discover)
+                macSidebarRow("Home", systemImage: "house.fill").tag(AppTab.home)
+                macSidebarRow("Following", systemImage: "star.fill").tag(AppTab.following)
+                macSidebarRow("Live", systemImage: "dot.radiowaves.left.and.right").tag(AppTab.live)
+                macSidebarRow("Discover", systemImage: "safari.fill").tag(AppTab.discover)
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 220)
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 188, ideal: Theme.Mac.Sidebar.width)
         } detail: {
             macDetailContent
                 .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }

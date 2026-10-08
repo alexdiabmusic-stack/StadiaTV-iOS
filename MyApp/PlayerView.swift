@@ -207,10 +207,7 @@ struct PlayerView: View {
         let hasOtherChannels = stores.playlistStore.channelsByPlaylist.values.contains { channels in
             channels.contains { $0.id != currentZapChannel.id }
         }
-        guard hasOtherChannels else { return false }
-        // A single-connection (or unknown-limit) Xtream account can't safely open a
-        // second stream on top of the one already playing.
-        return !stores.playlistStore.xtreamAccountStatus.blocksAdditionalConnection(forPlaylistID: activePlaybackChannel.playlistID)
+        return hasOtherChannels
     }
 
     /// "More in {group}": other channels in the zap list from the same group.
@@ -920,13 +917,6 @@ struct PlayerView: View {
         subtitleGroup = nil
         activeStreamMetadata = nil
         playback.load(streamSelection.activeChannel)
-        // The server reports the connection limit is actually reached right now (not just a
-        // single-connection account playing normally) — tell the viewer failover won't be
-        // pre-warmed, instead of silently doing nothing. See MatchLinker/PROMPTS.md, Prompt 6.
-        if let status = XtreamAccountStatusStore.shared.statusByPlaylistID[activePlaybackChannel.playlistID],
-           let max = status.maxConnections, let active = status.activeConnections, active >= max {
-            failoverNotice = "Connection limit reached — failover unavailable"
-        }
         Task { await streamSelection.preflightAlternates() }
     }
 

@@ -1,7 +1,3480 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "" : {
 
+    },
+    "-" : {
+
+    },
+    "--:--" : {
+
+    },
+    "-%@" : {
+
+    },
+    "–" : {
+
+    },
+    "?" : {
+
+    },
+    "? - ?" : {
+
+    },
+    "? – ?" : {
+
+    },
+    "·" : {
+
+    },
+    "·  %lld H" : {
+
+    },
+    "· %@" : {
+
+    },
+    "(%lld)" : {
+
+    },
+    "/ month" : {
+
+    },
+    "#" : {
+
+    },
+    "#%@" : {
+
+    },
+    "#%lld" : {
+
+    },
+    "#%lld hardest" : {
+
+    },
+    "%.1f mph" : {
+
+    },
+    "%.1f pts" : {
+
+    },
+    "%@" : {
+
+    },
+    "%@  -  %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@  -  %2$@"
+          }
+        }
+      }
+    },
+    "%@  –  %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@  –  %2$@"
+          }
+        }
+      }
+    },
+    "%@  %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@  %2$@"
+          }
+        }
+      }
+    },
+    "%@ – %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ – %2$@"
+          }
+        }
+      }
+    },
+    "%@ — %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ — %2$@"
+          }
+        }
+      }
+    },
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@ · %@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@ · %3$@"
+          }
+        }
+      }
+    },
+    "%@ · %@ · %lld/%lld teams · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@ · %3$lld/%4$lld teams · %5$@"
+          }
+        }
+      }
+    },
+    "%@ · ID %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · ID %2$@"
+          }
+        }
+      }
+    },
+    "%@ & %@ • %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ & %2$@ • %3$@"
+          }
+        }
+      }
+    },
+    "%@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@"
+          }
+        }
+      }
+    },
+    "%@ %@  –  %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@  –  %3$@ %4$@"
+          }
+        }
+      }
+    },
+    "%@ %@ – %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@ – %3$@ %4$@"
+          }
+        }
+      }
+    },
+    "%@ %@, %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@, %3$@ %4$@"
+          }
+        }
+      }
+    },
+    "%@ %@, %@ %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@, %3$@ %4$@, %5$@"
+          }
+        }
+      }
+    },
+    "%@ %lld – %lld %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$lld – %3$lld %4$@"
+          }
+        }
+      }
+    },
+    "%@ %lld · %@ %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$lld · %3$@ %4$lld"
+          }
+        }
+      }
+    },
+    "%@ %lld, %@ %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$lld, %3$@ %4$lld"
+          }
+        }
+      }
+    },
+    "%@ • %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ • %2$@"
+          }
+        }
+      }
+    },
+    "%@ • %@ • Thru %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ • %2$@ • Thru %3$@"
+          }
+        }
+      }
+    },
+    "%@ • %@ • Week %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ • %2$@ • Week %3$lld"
+          }
+        }
+      }
+    },
+    "%@ → %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ → %2$@"
+          }
+        }
+      }
+    },
+    "%@ ahead" : {
+
+    },
+    "%@ BALL" : {
+
+    },
+    "%@ batting" : {
+
+    },
+    "%@ coming on" : {
+
+    },
+    "%@ data isn't available on this network." : {
+
+    },
+    "%@ details for %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ details for %2$@"
+          }
+        }
+      }
+    },
+    "%@ DRIVE" : {
+
+    },
+    "%@ game unavailable" : {
+
+    },
+    "%@ going off" : {
+
+    },
+    "%@ is playing %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ is playing %2$@."
+          }
+        }
+      }
+    },
+    "%@ lineup not announced" : {
+
+    },
+    "%@ minute" : {
+
+    },
+    "%@ remaining" : {
+
+    },
+    "%@ s" : {
+
+    },
+    "%@ scores" : {
+
+    },
+    "%@ vs %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ vs %2$@"
+          }
+        }
+      }
+    },
+    "%@–%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@–%2$@"
+          }
+        }
+      }
+    },
+    "%@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "%@, %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@, %3$@"
+          }
+        }
+      }
+    },
+    "%@, %@, %@, %@ minute." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@, %3$@, %4$@ minute."
+          }
+        }
+      }
+    },
+    "%@, %@, %@, last season fantasy points %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@, %3$@, last season fantasy points %4$@"
+          }
+        }
+      }
+    },
+    "%@, %@. %@. %@. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@. %3$@. %4$@. %5$@"
+          }
+        }
+      }
+    },
+    "%@, %@. %@. %@. %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@. %3$@. %4$@. %5$@, %6$@"
+          }
+        }
+      }
+    },
+    "%@, %@. %@%@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@. %3$@%4$@."
+          }
+        }
+      }
+    },
+    "%@, %lld percent through" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$lld percent through"
+          }
+        }
+      }
+    },
+    "%@, inning %lld, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, inning %2$lld, %3$@"
+          }
+        }
+      }
+    },
+    "%@, position %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, position %2$@"
+          }
+        }
+      }
+    },
+    "%@: %@ %@, %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@ %3$@, %4$@ %5$@"
+          }
+        }
+      }
+    },
+    "%@. %@ %@. %@ %@" : {
+      "comment" : "A label that combines the home and away stats for a given team stat.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@. %2$@ %3$@. %4$@ %5$@"
+          }
+        }
+      }
+    },
+    "%@. Team roster" : {
+
+    },
+    "%@%@. Team roster" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@%2$@. Team roster"
+          }
+        }
+      }
+    },
+    "%lld" : {
+
+    },
+    "%lld / %lld teams joined" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld / %2$lld teams joined"
+          }
+        }
+      }
+    },
+    "%lld %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld %2$@"
+          }
+        }
+      }
+    },
+    "%lld balls, %lld strikes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld balls, %2$lld strikes"
+          }
+        }
+      }
+    },
+    "%lld channels" : {
+
+    },
+    "%lld channels selected" : {
+
+    },
+    "%lld Fantasy" : {
+
+    },
+    "%lld Fantasy players" : {
+
+    },
+    "%lld favorite%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld favorite%2$@"
+          }
+        }
+      }
+    },
+    "%lld games currently live" : {
+
+    },
+    "%lld laps" : {
+
+    },
+    "%lld LIVE" : {
+
+    },
+    "%lld min" : {
+
+    },
+    "%lld min read" : {
+
+    },
+    "%lld NEW PLAYS" : {
+
+    },
+    "%lld new plays · Jump to live" : {
+
+    },
+    "%lld of your teams are live" : {
+
+    },
+    "%lld other games are live." : {
+
+    },
+    "%lld outs" : {
+
+    },
+    "%lld pit stops" : {
+
+    },
+    "%lld players" : {
+
+    },
+    "%lld podcasts" : {
+
+    },
+    "%lld R" : {
+
+    },
+    "%lld seconds" : {
+
+    },
+    "%lld selected" : {
+
+    },
+    "%lld shot%@ beyond half court" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld shot%2$@ beyond half court"
+          }
+        }
+      }
+    },
+    "%lld sources selected · tap Start" : {
+
+    },
+    "%lld starting" : {
+
+    },
+    "%lld yards" : {
+
+    },
+    "%lld yds" : {
+
+    },
+    "%lld YDS" : {
+
+    },
+    "%lld-%lld-%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld-%2$lld-%3$lld"
+          }
+        }
+      }
+    },
+    "%lld–%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld–%2$lld"
+          }
+        }
+      }
+    },
+    "%lld–%lld COUNT" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld–%2$lld COUNT"
+          }
+        }
+      }
+    },
+    "%lld'" : {
+
+    },
+    "%lld/%lld teams · Invite %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld/%2$lld teams · Invite %3$@"
+          }
+        }
+      }
+    },
+    "%lld/4" : {
+
+    },
+    "%lld°F" : {
+
+    },
+    "%lldh %lldm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lldh %2$lldm"
+          }
+        }
+      }
+    },
+    "%lldh %lldm left" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lldh %2$lldm left"
+          }
+        }
+      }
+    },
+    "%lldm" : {
+
+    },
+    "%lldm left" : {
+
+    },
+    "• %@" : {
+
+    },
+    "••• %lld more broadcast%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "••• %1$lld more broadcast%2$@"
+          }
+        }
+      }
+    },
+    "↑ %@" : {
+
+    },
+    "↑ %lld NEW PLAYS" : {
+
+    },
+    "↓ %@" : {
+
+    },
+    "+%lld" : {
+
+    },
+    "+%lld more" : {
+
+    },
+    "+%lld pts" : {
+
+    },
+    "×" : {
+
+    },
+    "▣" : {
+
+    },
+    "○" : {
+
+    },
+    "●" : {
+
+    },
+    "★" : {
+
+    },
+    "★%lld" : {
+
+    },
+    "🔥" : {
+
+    },
+    "🔥 %lld" : {
+
+    },
+    "🔥 %lld streak" : {
+
+    },
+    "0 pts" : {
+
+    },
+    "1 Fantasy player" : {
+
+    },
+    "1 game currently live" : {
+
+    },
+    "1 of your teams is live" : {
+
+    },
+    "5 min before" : {
+
+    },
+    "7 DAYS FREE" : {
+      "comment" : "A label displayed under a paywall button.",
+      "isCommentAutoGenerated" : true
+    },
+    "7-day free trial — no charge today" : {
+
+    },
+    "10 min before" : {
+
+    },
+    "15 min before" : {
+
+    },
+    "30 min before" : {
+
+    },
+    "A" : {
+
+    },
+    "A shot map will appear once shots are recorded." : {
+
+    },
+    "Aa" : {
+
+    },
+    "ACTIONS" : {
+
+    },
+    "ACTIVITY" : {
+
+    },
+    "Add" : {
+
+    },
+    "Add %@" : {
+
+    },
+    "Add %@ to favorites" : {
+
+    },
+    "Add a playlist to watch this game here." : {
+
+    },
+    "Add an IPTV playlist in Settings to see a TV guide." : {
+
+    },
+    "Add an M3U link or stream login to connect your personal channels." : {
+
+    },
+    "Add playlist" : {
+
+    },
+    "Add Playlist" : {
+
+    },
+    "Add Stream Playlist" : {
+
+    },
+    "Add to Calendar" : {
+
+    },
+    "Add to favourites" : {
+
+    },
+    "Add to Favourites" : {
+
+    },
+    "Add to Group" : {
+
+    },
+    "Add to Group…" : {
+
+    },
+    "Add to Multiscreen" : {
+
+    },
+    "Add to My Guide" : {
+
+    },
+    "Adjust in 15-minute steps" : {
+
+    },
+    "Air %.0f°C" : {
+
+    },
+    "AirPlay" : {
+
+    },
+    "All" : {
+
+    },
+    "All Categories" : {
+
+    },
+    "All Caught Up!" : {
+
+    },
+    "All Episodes" : {
+
+    },
+    "All features unlocked" : {
+
+    },
+    "All Picks" : {
+
+    },
+    "All plays" : {
+
+    },
+    "All Sources" : {
+
+    },
+    "All Sports" : {
+
+    },
+    "Allow Notifications" : {
+
+    },
+    "Already set up?" : {
+
+    },
+    "Annual" : {
+
+    },
+    "Archive unavailable — stream failed to load." : {
+
+    },
+    "Assist: %@" : {
+      "comment" : "A sublabel that describes the assist given to the main player.",
+      "isCommentAutoGenerated" : true
+    },
+    "At-bat" : {
+
+    },
+    "ATTACKING ZONES" : {
+
+    },
+    "AUDIO LIVE" : {
+
+    },
+    "Auto" : {
+
+    },
+    "Auto normally starts on 1080p or 720p, which start faster. Turn on to try 4K sources first." : {
+
+    },
+    "AVAILABLE PLAYERS" : {
+
+    },
+    "Back" : {
+
+    },
+    "Back to Discover" : {
+
+    },
+    "Ball at %@, %lld yards to goal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Ball at %1$@, %2$lld yards to goal"
+          }
+        }
+      }
+    },
+    "BANNER FANTASY" : {
+
+    },
+    "BANNER TV" : {
+
+    },
+    "Banner TV does not provide, host, or sell streaming content. This feature is intended for use with paid subscription services and personal DVR systems (such as Plex or Channels DVR) that you already subscribe to and that permit playlist export." : {
+
+    },
+    "BannerTV can remind you before games for teams you star. You can change this later in Settings." : {
+
+    },
+    "BannerTV couldn't find saved settings in iCloud. They appear once iCloud Sync is on in Settings on your other device, and can take a moment to arrive. Try again shortly, or tap Get Started to set up here." : {
+
+    },
+    "Batting" : {
+
+    },
+    "Batting leaders" : {
+
+    },
+    "Behind Pace" : {
+
+    },
+    "Bench" : {
+
+    },
+    "BEST %@" : {
+
+    },
+    "BONUS" : {
+
+    },
+    "Brake" : {
+
+    },
+    "Brightness" : {
+
+    },
+    "Browse All Channels" : {
+
+    },
+    "Build My Guide" : {
+
+    },
+    "Build Your Guide" : {
+
+    },
+    "Build your sports feed" : {
+
+    },
+    "Build your team. Compete with friends. Watch your players live in Banner." : {
+
+    },
+    "Building your channel guide…" : {
+
+    },
+    "Calendar & results" : {
+      "comment" : "A link to the calendar and results.",
+      "isCommentAutoGenerated" : true
+    },
+    "Cancel" : {
+
+    },
+    "Cancel Reminder" : {
+
+    },
+    "Catch-up available" : {
+
+    },
+    "Category" : {
+      "comment" : "A section for filtering by category.",
+      "isCommentAutoGenerated" : true
+    },
+    "CFL game unavailable" : {
+
+    },
+    "CH" : {
+
+    },
+    "Channel" : {
+
+    },
+    "Channel Info" : {
+
+    },
+    "Channels" : {
+
+    },
+    "Channels you watch will appear here." : {
+
+    },
+    "Checking archive…" : {
+
+    },
+    "Checking for a live match" : {
+
+    },
+    "Choose a sport, draft real ESPN-backed players, then track points and games inside Banner." : {
+
+    },
+    "Choose Another" : {
+
+    },
+    "Choose stream source, %@" : {
+
+    },
+    "Choose Teams & Leagues" : {
+
+    },
+    "Choose what you actually watch." : {
+
+    },
+    "Choose what you actually watch.\nYou can change this anytime." : {
+
+    },
+    "Choose your plan" : {
+
+    },
+    "Clear All History" : {
+
+    },
+    "Clear EPG Offset" : {
+
+    },
+    "Clear Offset" : {
+
+    },
+    "Clear search" : {
+
+    },
+    "Clear Watch History" : {
+
+    },
+    "Close" : {
+
+    },
+    "Close guide" : {
+
+    },
+    "Close player" : {
+
+    },
+    "CLUB" : {
+
+    },
+    "Collapse drive ticker" : {
+
+    },
+    "COMING UP" : {
+
+    },
+    "Connect" : {
+
+    },
+    "Connect ESPN Fantasy" : {
+
+    },
+    "Connect Sleeper" : {
+
+    },
+    "Connect your fantasy league" : {
+
+    },
+    "CONNECT YOUR LEAGUE" : {
+
+    },
+    "Connected" : {
+
+    },
+    "CONNECTED" : {
+
+    },
+    "Connected sports APIs" : {
+
+    },
+    "CONNECTION" : {
+
+    },
+    "CONTINUE WATCHING" : {
+
+    },
+    "Correct" : {
+
+    },
+    "Couldn't load match details." : {
+
+    },
+    "Couldn't load this game." : {
+
+    },
+    "Create" : {
+
+    },
+    "Create a simulated league" : {
+
+    },
+    "Create Fantasy" : {
+
+    },
+    "Create Fantasy Team" : {
+
+    },
+    "Create League" : {
+
+    },
+    "Create your fantasy team" : {
+
+    },
+    "Credentials" : {
+
+    },
+    "Current" : {
+
+    },
+    "Current and completed drives will appear here when play-by-play is available." : {
+
+    },
+    "Current drive" : {
+
+    },
+    "Current Streak" : {
+
+    },
+    "Cycle PiP inset position" : {
+
+    },
+    "DATE" : {
+
+    },
+    "Default (Apple)" : {
+
+    },
+    "Default Playlist" : {
+
+    },
+    "Delete" : {
+      "comment" : "A button that deletes a group.",
+      "isCommentAutoGenerated" : true
+    },
+    "Delete All Local Data" : {
+
+    },
+    "Delete Local Data" : {
+
+    },
+    "Delete playlist" : {
+
+    },
+    "Deselect All" : {
+
+    },
+    "Detailed play-by-play is currently unavailable." : {
+
+    },
+    "DETAILS" : {
+
+    },
+    "Did not play" : {
+      "comment" : "A heading for players who did not play in a game.",
+      "isCommentAutoGenerated" : true
+    },
+    "Disconnect" : {
+
+    },
+    "Disconnect Fantasy?" : {
+
+    },
+    "Discover" : {
+
+    },
+    "Dismiss" : {
+
+    },
+    "Dismiss alert" : {
+
+    },
+    "Done" : {
+
+    },
+    "Draft" : {
+
+    },
+    "Draft Room" : {
+
+    },
+    "Draft time" : {
+
+    },
+    "Drive chart unavailable before kickoff." : {
+
+    },
+    "Drop Player" : {
+
+    },
+    "Dry" : {
+
+    },
+    "E" : {
+
+    },
+    "Edit" : {
+
+    },
+    "Edit %@" : {
+
+    },
+    "Edit credentials" : {
+
+    },
+    "Edit My Guide" : {
+
+    },
+    "Edit Playlist" : {
+
+    },
+    "ELIMINATED" : {
+
+    },
+    "Enter a custom display name for this channel. Leave blank to reset to the original name." : {
+
+    },
+    "Enter session cookies manually instead" : {
+
+    },
+    "Enter the server address for your subscription service. Compatible with Plex, Channels DVR, and other services that support the Xtream Codes API." : {
+
+    },
+    "Enter your Sleeper username. Banner stores the stable Sleeper user ID after lookup." : {
+
+    },
+    "EPG Offset" : {
+
+    },
+    "EPG Offset: %@" : {
+
+    },
+    "Episodes could not be loaded for this podcast." : {
+
+    },
+    "ESPN Fantasy" : {
+
+    },
+    "espn_s2" : {
+
+    },
+    "ESPN+" : {
+
+    },
+    "ESPN+ Exclusive" : {
+
+    },
+    "Event Centre" : {
+
+    },
+    "Event details" : {
+
+    },
+    "Every feature unlocked. Enjoy the game." : {
+
+    },
+    "Every sport.\nEvery moment. Unlocked." : {
+
+    },
+    "Expand drive ticker" : {
+
+    },
+    "Fantasy" : {
+
+    },
+    "Fantasy could not load" : {
+
+    },
+    "Fantasy points" : {
+
+    },
+    "FANTASY TRACKER" : {
+
+    },
+    "Fastest lap · %@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Fastest lap · %1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "Favorite Teams" : {
+
+    },
+    "Favourite" : {
+
+    },
+    "Favourite Channels" : {
+
+    },
+    "FAVOURITES" : {
+
+    },
+    "FEATURED" : {
+
+    },
+    "Featured for You" : {
+
+    },
+    "FEDEXCUP" : {
+
+    },
+    "Filter unplayed episodes only" : {
+
+    },
+    "Filters" : {
+
+    },
+    "FINAL" : {
+
+    },
+    "Finding your leagues…" : {
+
+    },
+    "Finding your stream…" : {
+
+    },
+    "Finish multiscreen selection" : {
+
+    },
+    "FIRST DOWN" : {
+
+    },
+    "FOCUSED EVENT" : {
+
+    },
+    "Follow" : {
+      "comment" : "A button that follows a podcast.",
+      "isCommentAutoGenerated" : true
+    },
+    "Follow %@" : {
+
+    },
+    "Follow a golfer from the leaderboard to see them here." : {
+
+    },
+    "Follow Show" : {
+
+    },
+    "Follow your favourite teams and leagues to see upcoming games, live events, scores and news here." : {
+
+    },
+    "Following" : {
+
+    },
+    "FOLLOWING" : {
+
+    },
+    "Following page" : {
+
+    },
+    "Football, Hockey, Basketball or Baseball — public or private leagues." : {
+
+    },
+    "For public leagues, enter your ESPN Fantasy team ID so Banner knows which roster is yours." : {
+
+    },
+    "Formation not supplied — starting XI:" : {
+
+    },
+    "Formula 1 · Live Timing + Jolpica" : {
+
+    },
+    "Formula 1 calendar" : {
+
+    },
+    "FotMob Rating %@" : {
+
+    },
+    "Free for 7 days · then billed monthly · cancel anytime" : {
+
+    },
+    "FROM YOUR TEAMS" : {
+
+    },
+    "Full" : {
+
+    },
+    "Full Roster" : {
+
+    },
+    "Full Schedule" : {
+
+    },
+    "Full Table" : {
+
+    },
+    "Game" : {
+
+    },
+    "Game %lld" : {
+
+    },
+    "Game actions" : {
+
+    },
+    "Game Center · Multiscreen · Play by Play" : {
+
+    },
+    "Game Centre" : {
+
+    },
+    "Game recap" : {
+
+    },
+    "Game Stats" : {
+
+    },
+    "GD" : {
+
+    },
+    "Gear" : {
+
+    },
+    "Get notified before your favourite teams play?" : {
+
+    },
+    "Get Started" : {
+
+    },
+    "Go Live" : {
+
+    },
+    "Go to live" : {
+
+    },
+    "Golf events are loaded from ESPN scoreboards as tournaments, with player standings surfaced through the match detail and leaders views when ESPN publishes them." : {
+
+    },
+    "Got it" : {
+
+    },
+    "Group" : {
+
+    },
+    "Group name" : {
+
+    },
+    "Guide filters" : {
+      "comment" : "A button that displays a sheet for filtering the TV guide.",
+      "isCommentAutoGenerated" : true
+    },
+    "H" : {
+
+    },
+    "H %lld · E %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "H %1$lld · E %2$lld"
+          }
+        }
+      }
+    },
+    "Head to Head" : {
+
+    },
+    "Here's what's happening" : {
+
+    },
+    "Hide" : {
+
+    },
+    "Hide Channel" : {
+
+    },
+    "Hide details" : {
+
+    },
+    "Hide more stats" : {
+
+    },
+    "Hide pitches and actions" : {
+
+    },
+    "Hide stories like this" : {
+
+    },
+    "Hides completed-game scores and result headlines." : {
+
+    },
+    "Highlights" : {
+
+    },
+    "HOLE %lld" : {
+
+    },
+    "Hole %lld • %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Hole %1$lld • %2$@"
+          }
+        }
+      }
+    },
+    "Hole %lld. Par %@. %@, %@ strokes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Hole %1$lld. Par %2$@. %3$@, %4$@ strokes."
+          }
+        }
+      }
+    },
+    "Hole %lld. Par %@. %@%@%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Hole %1$lld. Par %2$@. %3$@%4$@%5$@"
+          }
+        }
+      }
+    },
+    "Hole Stats Unavailable" : {
+
+    },
+    "Home" : {
+
+    },
+    "Home win probability" : {
+
+    },
+    "Home win probability · MLB" : {
+
+    },
+    "http://example.com/playlist.m3u" : {
+
+    },
+    "http://server.com:8080" : {
+
+    },
+    "I couldn't find a live or upcoming game for %@." : {
+
+    },
+    "I couldn't find an episode to play." : {
+
+    },
+    "I don't have programme information for %@ right now." : {
+
+    },
+    "IMPORTED LEAGUE" : {
+
+    },
+    "IN" : {
+
+    },
+    "In %lld min" : {
+
+    },
+    "In %lldh %lldm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "In %1$lldh %2$lldm"
+          }
+        }
+      }
+    },
+    "In-Game Stats" : {
+
+    },
+    "Incorrect" : {
+
+    },
+    "Injured" : {
+      "comment" : "A label indicating that a player is injured.",
+      "isCommentAutoGenerated" : true
+    },
+    "Injury Report" : {
+
+    },
+    "Invite" : {
+
+    },
+    "Invite code" : {
+
+    },
+    "Join a League" : {
+
+    },
+    "Join League" : {
+
+    },
+    "Jump to Live" : {
+
+    },
+    "JUMP TO LIVE" : {
+
+    },
+    "Keep" : {
+
+    },
+    "Lane %@ s" : {
+
+    },
+    "Lap %lld" : {
+
+    },
+    "LAST %@" : {
+
+    },
+    "LAST SEASON" : {
+
+    },
+    "Last season points" : {
+
+    },
+    "LATEST EPISODE" : {
+
+    },
+    "LATEST NEWS" : {
+
+    },
+    "Latest race control" : {
+
+    },
+    "LEADER" : {
+
+    },
+    "Leader: %@" : {
+
+    },
+    "Leaderboard" : {
+
+    },
+    "Leaderboard is not available yet." : {
+
+    },
+    "Leaderboard Unavailable" : {
+
+    },
+    "Leaderboard will appear when tournament scoring is available." : {
+
+    },
+    "LEADERS" : {
+
+    },
+    "League" : {
+
+    },
+    "LEAGUE" : {
+      "comment" : "The title of the league section.",
+      "isCommentAutoGenerated" : true
+    },
+    "LEAGUE ACTIVITY" : {
+
+    },
+    "League ID" : {
+
+    },
+    "LEAGUE LOBBY" : {
+
+    },
+    "League name" : {
+
+    },
+    "Left side" : {
+
+    },
+    "Lifetime" : {
+
+    },
+    "Lineups have not been announced yet." : {
+
+    },
+    "Lineups not yet announced" : {
+
+    },
+    "Live" : {
+
+    },
+    "LIVE" : {
+
+    },
+    "Live data delayed" : {
+
+    },
+    "LIVE FANTASY TICKER" : {
+
+    },
+    "Live Now" : {
+
+    },
+    "LIVE NOW" : {
+
+    },
+    "Live sports, scores, schedules,\nand your channels." : {
+
+    },
+    "LIVE STREAM" : {
+
+    },
+    "Live timing appears when Formula 1 publishes this session." : {
+
+    },
+    "Live timing temporarily unavailable" : {
+
+    },
+    "Live track positions unavailable" : {
+
+    },
+    "Load older commentary" : {
+
+    },
+    "Loading calendar" : {
+
+    },
+    "Loading channels…" : {
+
+    },
+    "Loading Game Centre" : {
+
+    },
+    "Loading game event" : {
+
+    },
+    "Loading game…" : {
+
+    },
+    "Loading match details…" : {
+
+    },
+    "Loading moneyline" : {
+
+    },
+    "Loading NFL schedule" : {
+
+    },
+    "Loading players" : {
+
+    },
+    "Loading plays" : {
+
+    },
+    "Loading Race Centre" : {
+
+    },
+    "Loading racers" : {
+
+    },
+    "Loading roster positions" : {
+
+    },
+    "Loading stats..." : {
+
+    },
+    "Loading table" : {
+
+    },
+    "Local CPU opponents, generated schedules, standings and draft order." : {
+
+    },
+    "M3U Playlist" : {
+
+    },
+    "M3U URL" : {
+
+    },
+    "Made" : {
+
+    },
+    "Make Default" : {
+
+    },
+    "Make preferred playlist" : {
+
+    },
+    "Make Your Pick" : {
+
+    },
+    "Manage" : {
+
+    },
+    "Manage %@" : {
+
+    },
+    "Manage following" : {
+
+    },
+    "Manager: %@" : {
+
+    },
+    "Mark as Played" : {
+
+    },
+    "Mark as Unplayed" : {
+
+    },
+    "MATCH CONTEXT" : {
+
+    },
+    "Match data is still loading." : {
+
+    },
+    "Match data unavailable for this broadcast." : {
+
+    },
+    "Match events and statistics will appear after kickoff." : {
+
+    },
+    "Match events will appear after kickoff." : {
+
+    },
+    "MATCH INFO" : {
+
+    },
+    "Match statistics will appear after kickoff." : {
+
+    },
+    "Match unavailable" : {
+
+    },
+    "Matched Streams" : {
+
+    },
+    "Matchup" : {
+
+    },
+    "Missed" : {
+
+    },
+    "ML" : {
+
+    },
+    "MLB · Direct on-device StatsAPI" : {
+
+    },
+    "MLB game unavailable" : {
+
+    },
+    "MLB home team win probability by plate appearance" : {
+
+    },
+    "Mode" : {
+
+    },
+    "more" : {
+
+    },
+    "More news" : {
+
+    },
+    "More options" : {
+
+    },
+    "More options for %@" : {
+
+    },
+    "More players" : {
+
+    },
+    "More stats" : {
+
+    },
+    "MOST POPULAR" : {
+
+    },
+    "moved down%@" : {
+
+    },
+    "moved up%@" : {
+
+    },
+    "Multiscreen" : {
+
+    },
+    "Mute this source" : {
+
+    },
+    "MUTED" : {
+
+    },
+    "My Favorites" : {
+
+    },
+    "My Groups" : {
+
+    },
+    "My Guide" : {
+
+    },
+    "MY LEAGUES" : {
+
+    },
+    "My Picks" : {
+
+    },
+    "My Playlist" : {
+
+    },
+    "MY TEAM" : {
+
+    },
+    "My Teams" : {
+
+    },
+    "Name" : {
+
+    },
+    "NBA · Direct on-device stats.nba.com + CDN" : {
+
+    },
+    "NEW" : {
+
+    },
+    "New group" : {
+
+    },
+    "New Group" : {
+
+    },
+    "News" : {
+
+    },
+    "Next" : {
+
+    },
+    "Next channel" : {
+
+    },
+    "Next: %@" : {
+
+    },
+    "NFL calendar & results" : {
+
+    },
+    "NFL game unavailable" : {
+
+    },
+    "NHL · Direct on-device API" : {
+
+    },
+    "NHL game unavailable" : {
+
+    },
+    "No active matchup linked" : {
+
+    },
+    "No article text available." : {
+
+    },
+    "No commentary yet" : {
+
+    },
+    "No confirmed broadcast available for that game." : {
+
+    },
+    "No data provider configured. Additional APIs can be connected independently." : {
+
+    },
+    "No episodes available" : {
+
+    },
+    "No events yet" : {
+
+    },
+    "No fantasy starters live right now" : {
+
+    },
+    "No fantasy starters loaded" : {
+
+    },
+    "No favorite teams yet. Open a league below to star some." : {
+
+    },
+    "No Followed Golfers" : {
+
+    },
+    "No games available for this week." : {
+
+    },
+    "No games today" : {
+
+    },
+    "No groups yet. Tap + to create one." : {
+
+    },
+    "No Guide Available" : {
+
+    },
+    "No guide data" : {
+
+    },
+    "No guide data available" : {
+
+    },
+    "No guide information for this channel." : {
+
+    },
+    "No live %@ right now." : {
+
+    },
+    "No live games for this sport right now." : {
+
+    },
+    "No live games right now" : {
+
+    },
+    "No matching channels were found for this match." : {
+
+    },
+    "No picks yet. Make your first prediction on any upcoming match." : {
+      "comment" : "A description displayed when a user has no picks.",
+      "isCommentAutoGenerated" : true
+    },
+    "No player statistics yet" : {
+
+    },
+    "No Players" : {
+
+    },
+    "No Playlists Yet" : {
+
+    },
+    "No plays match this filter." : {
+
+    },
+    "No plays yet" : {
+
+    },
+    "No plays yet.\nPlay-by-play will appear when the game begins." : {
+
+    },
+    "No race-control messages" : {
+
+    },
+    "No red-zone alerts yet" : {
+
+    },
+    "No results for \"%@\"" : {
+
+    },
+    "No saved articles" : {
+
+    },
+    "No Scorecard" : {
+
+    },
+    "No Shot Data" : {
+
+    },
+    "No shot data yet" : {
+
+    },
+    "No sources matched in your playlists" : {
+
+    },
+    "No statistics yet" : {
+
+    },
+    "No stories yet" : {
+
+    },
+    "No Streams Found" : {
+
+    },
+    "No team radio available" : {
+
+    },
+    "No team statistics yet" : {
+
+    },
+    "No upcoming events scheduled." : {
+
+    },
+    "No watch history" : {
+
+    },
+    "None of your teams are live." : {
+
+    },
+    "Not Now" : {
+
+    },
+    "Not on your playlist (%lld)" : {
+
+    },
+    "Not selected" : {
+
+    },
+    "Nothing is live right now." : {
+      "comment" : "A description of a view that appears when there is no live content.",
+      "isCommentAutoGenerated" : true
+    },
+    "Nothing playing" : {
+
+    },
+    "Nothing scheduled yet" : {
+
+    },
+    "Nothing to restore yet" : {
+
+    },
+    "Nothing today" : {
+
+    },
+    "Notifications" : {
+
+    },
+    "Now" : {
+
+    },
+    "NOW" : {
+
+    },
+    "NOW BATTING" : {
+
+    },
+    "Now playing" : {
+
+    },
+    "Now: %@" : {
+
+    },
+    "Observed position trails" : {
+
+    },
+    "Off" : {
+
+    },
+    "OK" : {
+
+    },
+    "On" : {
+
+    },
+    "ON AIR" : {
+
+    },
+    "On court" : {
+
+    },
+    "On Now" : {
+
+    },
+    "On Pace" : {
+
+    },
+    "One local roster for live scoring, season totals and Watch links." : {
+
+    },
+    "one-time" : {
+
+    },
+    "ONE-TIME" : {
+
+    },
+    "Open %@ Centre →" : {
+
+    },
+    "Open Draft Room" : {
+      "comment" : "A button that opens a draft room.",
+      "isCommentAutoGenerated" : true
+    },
+    "Open Golf Leaders" : {
+
+    },
+    "Open in Browser" : {
+
+    },
+    "Open in ESPN" : {
+
+    },
+    "Open Settings" : {
+
+    },
+    "Open this game from the %@ schedule." : {
+
+    },
+    "Open this game from the CFL schedule." : {
+
+    },
+    "Open this game from the MLB schedule." : {
+
+    },
+    "Open this game from the NFL schedule." : {
+
+    },
+    "Open this game from the NHL schedule to load its NHL Game Centre." : {
+
+    },
+    "Open this match from the %@ schedule." : {
+
+    },
+    "Opens %@ Centre" : {
+
+    },
+    "Opens Banner to the Live tab." : {
+
+    },
+    "Opens podcast details" : {
+
+    },
+    "Opens the %@ live stream" : {
+
+    },
+    "Options" : {
+
+    },
+    "OR START A BANNER LEAGUE" : {
+
+    },
+    "Or watch on" : {
+
+    },
+    "Other sports" : {
+
+    },
+    "OUT" : {
+
+    },
+    "OUTS" : {
+
+    },
+    "P%lld" : {
+
+    },
+    "Par %lld" : {
+
+    },
+    "PAR %lld" : {
+
+    },
+    "Password" : {
+
+    },
+    "Paste the M3U playlist URL provided by your subscription service — such as Plex, Channels DVR, fuboTV, or a cable/satellite provider that offers a live TV export." : {
+      "comment" : "Footer for the M3U URL section of the Add Playlist view.",
+      "isCommentAutoGenerated" : true
+    },
+    "Pause" : {
+
+    },
+    "Pause %@" : {
+
+    },
+    "PCT/GB" : {
+
+    },
+    "PENALTIES" : {
+
+    },
+    "Pending" : {
+
+    },
+    "Pending result" : {
+
+    },
+    "per year" : {
+
+    },
+    "Period · 00:00" : {
+
+    },
+    "Personal best lap" : {
+
+    },
+    "Pick a game source to add · select 2–4 total" : {
+
+    },
+    "PIT" : {
+
+    },
+    "Pit stop" : {
+
+    },
+    "Pit stops" : {
+
+    },
+    "Pitch location, %.1f feet horizontally, %.1f feet above ground" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Pitch location, %1$.1f feet horizontally, %2$.1f feet above ground"
+          }
+        }
+      }
+    },
+    "Pitching" : {
+
+    },
+    "Play" : {
+
+    },
+    "Play %@" : {
+
+    },
+    "Play ${channel}" : {
+
+    },
+    "Play ${podcast}" : {
+
+    },
+    "Play ${team}'s game" : {
+
+    },
+    "Play by Play" : {
+
+    },
+    "Play Channel" : {
+
+    },
+    "Play Latest Episode" : {
+
+    },
+    "Play latest episode, %@" : {
+
+    },
+    "Play Latest Podcast" : {
+
+    },
+    "Play Podcast" : {
+
+    },
+    "Play Sports Channel" : {
+
+    },
+    "Play Team's Game" : {
+
+    },
+    "Play-by-play is temporarily unavailable." : {
+
+    },
+    "Play-by-play unavailable" : {
+
+    },
+    "Play-by-play will appear when the game begins." : {
+
+    },
+    "Played" : {
+
+    },
+    "PLAYER" : {
+
+    },
+    "Player and event details" : {
+
+    },
+    "Player Card" : {
+
+    },
+    "Player details" : {
+
+    },
+    "PLAYER PACE PROJECTIONS" : {
+
+    },
+    "Player Positions" : {
+
+    },
+    "Player statistics will appear when available." : {
+
+    },
+    "Players" : {
+
+    },
+    "Playing %@ from %@." : {
+      "comment" : "The podcast title is used as the main result text.",
+      "isCommentAutoGenerated" : true,
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Playing %1$@ from %2$@."
+          }
+        }
+      }
+    },
+    "Playing %@ on Banner." : {
+
+    },
+    "Playing %@." : {
+
+    },
+    "Playlist credentials remain encrypted in Keychain and are not uploaded to iCloud." : {
+
+    },
+    "Playlists" : {
+
+    },
+    "Plays a sports channel's live audio on Banner." : {
+
+    },
+    "Plays the latest episode from your followed podcasts." : {
+
+    },
+    "Plays the latest episode of a followed podcast on Banner." : {
+
+    },
+    "Plays the live broadcast for a followed team's game on Banner." : {
+
+    },
+    "Podcast" : {
+
+    },
+    "Podcasts, analysis and conversations from across the sports world." : {
+
+    },
+    "POS" : {
+
+    },
+    "Position" : {
+
+    },
+    "Position %@, %@, %@. %@. %@ tyre. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Position %1$@, %2$@, %3$@. %4$@. %5$@ tyre. %6$@"
+          }
+        }
+      }
+    },
+    "Positive offset: your stream is ahead of the EPG listing.\nNegative offset: your stream is behind the EPG listing." : {
+
+    },
+    "Postseason" : {
+
+    },
+    "Preferences" : {
+
+    },
+    "Preferred playlist" : {
+
+    },
+    "Premium" : {
+
+    },
+    "PREMIUM" : {
+
+    },
+    "Premium Member" : {
+
+    },
+    "Preseason" : {
+
+    },
+    "Previous channel" : {
+
+    },
+    "Private League" : {
+
+    },
+    "Projected" : {
+
+    },
+    "Provider event details are available, but bout-level mapping is not normalized yet." : {
+
+    },
+    "PTS" : {
+      "comment" : "A column in a soccer standings table.",
+      "isCommentAutoGenerated" : true
+    },
+    "Q%lld" : {
+
+    },
+    "R" : {
+
+    },
+    "R%lld" : {
+
+    },
+    "Race Centre" : {
+
+    },
+    "Racer data isn't available for this event right now." : {
+
+    },
+    "Racers" : {
+
+    },
+    "Rain" : {
+
+    },
+    "Rank %@, %@, record %@, points for %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rank %1$@, %2$@, record %3$@, points for %4$@"
+          }
+        }
+      }
+    },
+    "Re-run the sport, league, and team picker." : {
+
+    },
+    "Read full story at %@" : {
+
+    },
+    "Reader Settings" : {
+
+    },
+    "Reads the current programme on a sports channel." : {
+
+    },
+    "RECENT" : {
+
+    },
+    "Recent Channels" : {
+
+    },
+    "RECENT HIGHLIGHTS" : {
+
+    },
+    "Recent radio" : {
+
+    },
+    "Recent scoring" : {
+
+    },
+    "Record" : {
+
+    },
+    "Recording unavailable" : {
+      "comment" : "A message displayed when a radio message does not have a URL.",
+      "isCommentAutoGenerated" : true
+    },
+    "RED ZONE" : {
+
+    },
+    "Redeem Code" : {
+
+    },
+    "Redo Setup" : {
+
+    },
+    "Refresh" : {
+
+    },
+    "Refresh Episodes" : {
+
+    },
+    "Refresh playlist" : {
+
+    },
+    "Refreshing" : {
+
+    },
+    "Regular season" : {
+
+    },
+    "Related News" : {
+
+    },
+    "RELATED NEWS" : {
+
+    },
+    "Remind me" : {
+
+    },
+    "Remind Me" : {
+
+    },
+    "Reminder Set" : {
+
+    },
+    "Remove" : {
+
+    },
+    "Remove %@ from favorites" : {
+
+    },
+    "Remove %@?" : {
+
+    },
+    "Remove from favourites" : {
+
+    },
+    "Remove from Favourites" : {
+
+    },
+    "Remove from My Guide" : {
+
+    },
+    "Remove Saved Article" : {
+
+    },
+    "Rename" : {
+
+    },
+    "Rename Channel" : {
+
+    },
+    "Rename Group" : {
+
+    },
+    "Rename…" : {
+
+    },
+    "Replay" : {
+
+    },
+    "Reset Local Fantasy Data" : {
+
+    },
+    "Reset Local Fantasy Data?" : {
+
+    },
+    "Reset Name" : {
+
+    },
+    "Reset Personalization" : {
+
+    },
+    "Reset to Default" : {
+
+    },
+    "Restore preferences" : {
+
+    },
+    "Restore Purchases" : {
+
+    },
+    "Resume" : {
+
+    },
+    "RETIRED" : {
+
+    },
+    "Retry" : {
+
+    },
+    "Reveal final score" : {
+
+    },
+    "Reveal Score" : {
+
+    },
+    "Reveal session result" : {
+
+    },
+    "Right side" : {
+
+    },
+    "Rink location, x %lld, y %lld. %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Rink location, x %1$lld, y %2$lld. %3$@"
+          }
+        }
+      }
+    },
+    "Roster" : {
+
+    },
+    "Roster isn't available for this team." : {
+
+    },
+    "Round %lld" : {
+
+    },
+    "RPM" : {
+
+    },
+    "Running guide benchmark…" : {
+
+    },
+    "S%lld · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "S%1$lld · %2$@"
+          }
+        }
+      }
+    },
+    "S%lldE%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "S%1$lldE%2$lld"
+          }
+        }
+      }
+    },
+    "Sample %@" : {
+
+    },
+    "Save" : {
+
+    },
+    "SAVE 25%" : {
+
+    },
+    "Save Article" : {
+
+    },
+    "Saved %@" : {
+
+    },
+    "Saved data · %@" : {
+
+    },
+    "Saved data · Last updated %@" : {
+
+    },
+    "Saved session · %@" : {
+
+    },
+    "Scanning all sports…" : {
+
+    },
+    "SCORE" : {
+
+    },
+    "Scores, schedules, Game Centre, rosters, player statistics and standings." : {
+
+    },
+    "Scoring" : {
+
+    },
+    "SCORING AVERAGE" : {
+
+    },
+    "Scoring play" : {
+
+    },
+    "Scoring summary" : {
+
+    },
+    "Scoring Summary" : {
+
+    },
+    "Search" : {
+
+    },
+    "Search channels" : {
+
+    },
+    "Search channels…" : {
+
+    },
+    "Search competitions" : {
+
+    },
+    "Search golfers" : {
+
+    },
+    "Search players" : {
+
+    },
+    "Search podcasts, teams, hosts" : {
+
+    },
+    "Search teams" : {
+
+    },
+    "Search teams, leagues, games, channels, players, news, highlights, and settings" : {
+
+    },
+    "Season" : {
+
+    },
+    "Season goal %lld" : {
+
+    },
+    "SEASON STATISTICS" : {
+
+    },
+    "Section" : {
+
+    },
+    "See All" : {
+
+    },
+    "See All Live" : {
+
+    },
+    "See upcoming schedule" : {
+
+    },
+    "Select 2–4 channels to watch together" : {
+
+    },
+    "Select a Golfer" : {
+
+    },
+    "Select All" : {
+
+    },
+    "Select Channels" : {
+
+    },
+    "Select multiscreen sources" : {
+
+    },
+    "Selected" : {
+
+    },
+    "Send Live Alert" : {
+
+    },
+    "Server" : {
+
+    },
+    "Session best lap" : {
+
+    },
+    "Session has not started" : {
+
+    },
+    "Set EPG Offset…" : {
+
+    },
+    "Set up later" : {
+
+    },
+    "Settings" : {
+
+    },
+    "Share" : {
+
+    },
+    "Share Episode" : {
+
+    },
+    "Share Show" : {
+
+    },
+    "Shot %lld. %@ to %@.%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Shot %1$lld. %2$@ to %3$@.%4$@"
+          }
+        }
+      }
+    },
+    "Shot trace unavailable for this hole" : {
+
+    },
+    "Shot tracking may not be available for this round." : {
+
+    },
+    "Show %lld more" : {
+
+    },
+    "Show all %lld plays" : {
+
+    },
+    "Show all episodes" : {
+
+    },
+    "Show controls" : {
+
+    },
+    "Show fewer" : {
+
+    },
+    "Show less" : {
+
+    },
+    "Show Live Games" : {
+
+    },
+    "Show more" : {
+
+    },
+    "Show or hide drive plays" : {
+
+    },
+    "Shows a red accent bar at the top of live match cards." : {
+
+    },
+    "Sign in with a different ESPN account" : {
+
+    },
+    "Sign in with ESPN" : {
+
+    },
+    "Sign in with ESPN to connect a private league without finding or pasting cookie values yourself. Banner only reads the resulting session cookies — never your ESPN password." : {
+
+    },
+    "Signed in to ESPN" : {
+
+    },
+    "Signing in…" : {
+
+    },
+    "Skip back 15 seconds" : {
+      "comment" : "A button that skips back 15 seconds in a podcast.",
+      "isCommentAutoGenerated" : true
+    },
+    "Skip forward 30 seconds" : {
+
+    },
+    "Sleeper username" : {
+
+    },
+    "Smart Alerts" : {
+
+    },
+    "Some game information is temporarily unavailable." : {
+
+    },
+    "Some match information is temporarily unavailable." : {
+
+    },
+    "Some providers only accept a specific player, e.g. VLC/3.0.20. Used for the playlist download and any channel that doesn't set its own." : {
+
+    },
+    "Sort" : {
+
+    },
+    "Sort channels" : {
+
+    },
+    "Sort episodes, currently %@" : {
+
+    },
+    "Sort podcasts, currently %@" : {
+      "comment" : "A button that sorts the list of podcasts.",
+      "isCommentAutoGenerated" : true
+    },
+    "Source unavailable" : {
+
+    },
+    "Speed" : {
+
+    },
+    "Speed %lld km/h" : {
+
+    },
+    "Speed traps · km/h" : {
+
+    },
+    "Sport" : {
+
+    },
+    "Sport filter" : {
+
+    },
+    "Sports Channel" : {
+
+    },
+    "Sports Data" : {
+
+    },
+    "SPORTS HIGHLIGHTS" : {
+
+    },
+    "Sports news and stories" : {
+
+    },
+    "Sports Talk" : {
+
+    },
+    "Stage" : {
+
+    },
+    "Standings" : {
+
+    },
+    "STANDINGS" : {
+
+    },
+    "Standings are not available for this league right now." : {
+
+    },
+    "Standings not available right now." : {
+
+    },
+    "Start" : {
+
+    },
+    "STARTED" : {
+
+    },
+    "Starter" : {
+
+    },
+    "STARTERS" : {
+
+    },
+    "STARTING" : {
+
+    },
+    "STARTING SOON" : {
+
+    },
+    "STARTS IN" : {
+
+    },
+    "Starts now" : {
+
+    },
+    "Stat Leaders" : {
+
+    },
+    "Statistics will appear when the game begins." : {
+
+    },
+    "Stats" : {
+
+    },
+    "Stats are not available for this game." : {
+
+    },
+    "Stats are not available yet." : {
+
+    },
+    "Stats available once the game begins" : {
+
+    },
+    "STOPPED" : {
+
+    },
+    "Stream" : {
+      "comment" : "A section of the channel info sheet that displays the channel's stream URL.",
+      "isCommentAutoGenerated" : true
+    },
+    "Stream: %@" : {
+
+    },
+    "Strk" : {
+
+    },
+    "SUBSTITUTES" : {
+
+    },
+    "Swap position with main screen" : {
+
+    },
+    "SWID" : {
+
+    },
+    "Swipe left or right on it to switch source" : {
+
+    },
+    "Swipe up or down to adjust" : {
+
+    },
+    "Switches to this channel" : {
+
+    },
+    "T" : {
+
+    },
+    "Team" : {
+
+    },
+    "Team list isn't available for this league." : {
+
+    },
+    "Team name" : {
+
+    },
+    "Team statistics will appear when available." : {
+
+    },
+    "Team stats" : {
+
+    },
+    "Team stats will appear here when the provider exposes them." : {
+
+    },
+    "Teams, leagues, games, channels, players" : {
+
+    },
+    "TEE %lld" : {
+
+    },
+    "Tee Times Unavailable" : {
+
+    },
+    "Telemetry" : {
+      "comment" : "A heading for telemetry data.",
+      "isCommentAutoGenerated" : true
+    },
+    "Telemetry unavailable" : {
+
+    },
+    "The next game starts in %@." : {
+
+    },
+    "Theme" : {
+
+    },
+    "These values are stored in Keychain and sent only as ESPN Cookie headers. Never enter your ESPN password." : {
+
+    },
+    "This article is only available to ESPN Insider subscribers." : {
+
+    },
+    "This removes Banner Fantasy teams, local leagues, rosters, lineups and transactions. It does not change IPTV playlists, favourites or imported ESPN Fantasy credentials." : {
+
+    },
+    "This removes the local Fantasy connection, provider credentials and Fantasy caches without changing playlists, favourites or other Banner settings." : {
+
+    },
+    "This stream offers a single quality." : {
+
+    },
+    "This will also remove your %@ league selections and any favorite teams." : {
+
+    },
+    "This will clear your watch history, saved articles, hidden articles, and muted sources. This cannot be undone." : {
+
+    },
+    "This will remove all %lld items from your watch history." : {
+
+    },
+    "Throttle %lld%%" : {
+
+    },
+    "THRU" : {
+
+    },
+    "Thru %@" : {
+
+    },
+    "Thru %@ • Today %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Thru %1$@ • Today %2$@"
+          }
+        }
+      }
+    },
+    "Timing not yet available" : {
+
+    },
+    "Timing remains available in the Timing tab." : {
+      "comment" : "A description of the timing tab.",
+      "isCommentAutoGenerated" : true
+    },
+    "TODAY" : {
+
+    },
+    "Today %@" : {
+
+    },
+    "Today %@ • Thru %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Today %1$@ • Thru %2$@"
+          }
+        }
+      }
+    },
+    "TOP HIGHLIGHTS" : {
+
+    },
+    "TOP MATCH" : {
+
+    },
+    "Total" : {
+
+    },
+    "TOTAL" : {
+
+    },
+    "Total Points" : {
+
+    },
+    "TOUGHEST HOLE" : {
+
+    },
+    "Tournament Centre" : {
+
+    },
+    "Tournament Field" : {
+
+    },
+    "Track %.0f°C" : {
+      "comment" : "A label displaying the temperature of the track and the air, and the wind speed. The first argument is the temperature of the track. The second argument is the temperature of the air. The third argument is the wind",
+      "isCommentAutoGenerated" : true
+    },
+    "Track your matchup, players and games directly from Banner." : {
+
+    },
+    "Try Again" : {
+
+    },
+    "Try another sport or refresh the feed." : {
+
+    },
+    "Turnover" : {
+
+    },
+    "Type" : {
+
+    },
+    "Tyre data unavailable" : {
+
+    },
+    "Unfavourite" : {
+
+    },
+    "Unfollow %@" : {
+
+    },
+    "Unfollow Show" : {
+
+    },
+    "Unhide" : {
+
+    },
+    "Unlock Premium" : {
+
+    },
+    "Unmute" : {
+
+    },
+    "Unplayed" : {
+
+    },
+    "Unplayed Episodes" : {
+
+    },
+    "Up Next" : {
+
+    },
+    "UP NEXT" : {
+
+    },
+    "Upcoming" : {
+
+    },
+    "Upcoming events will appear here as soon as schedules are available." : {
+
+    },
+    "Updated recently" : {
+
+    },
+    "Upgrade to Premium" : {
+
+    },
+    "Use Save Article from a story menu to keep it here." : {
+
+    },
+    "User-Agent (Optional)" : {
+
+    },
+    "Username" : {
+
+    },
+    "Using cached Fantasy data" : {
+
+    },
+    "VIDEO" : {
+
+    },
+    "View" : {
+
+    },
+    "View %@" : {
+
+    },
+    "View Full Leaderboard" : {
+
+    },
+    "View Full Schedule" : {
+
+    },
+    "View My Guide" : {
+
+    },
+    "View pitches and actions" : {
+
+    },
+    "VIP" : {
+
+    },
+    "VIP ONLY" : {
+
+    },
+    "Visibility" : {
+
+    },
+    "Volume" : {
+
+    },
+    "vs" : {
+
+    },
+    "VS" : {
+
+    },
+    "vs %@" : {
+
+    },
+    "Waivers" : {
+
+    },
+    "Want to save even more?" : {
+
+    },
+    "Watch" : {
+
+    },
+    "Watch %@" : {
+
+    },
+    "Watch %@ for %lld Fantasy players" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Watch %1$@ for %2$lld Fantasy players"
+          }
+        }
+      }
+    },
+    "Watch %@'s game" : {
+
+    },
+    "Watch at %@" : {
+
+    },
+    "Watch available" : {
+
+    },
+    "Watch Channel" : {
+
+    },
+    "Watch from Beginning" : {
+
+    },
+    "Watch goal" : {
+
+    },
+    "Watch Live" : {
+
+    },
+    "WATCH LIVE" : {
+
+    },
+    "Watch on %@" : {
+
+    },
+    "Watch this play" : {
+
+    },
+    "Watch when live" : {
+
+    },
+    "WATCH WHEN LIVE" : {
+
+    },
+    "Week" : {
+
+    },
+    "What's Playing" : {
+
+    },
+    "What's playing on ${channel}" : {
+
+    },
+    "When spoiler-free mode is enabled, completed-game scores and result headlines are hidden." : {
+
+    },
+    "Where to Watch" : {
+
+    },
+    "WIN PROBABILITY" : {
+
+    },
+    "Win probability is not available for this game." : {
+
+    },
+    "Wind %.0f km/h" : {
+
+    },
+    "Wind %lld mph" : {
+
+    },
+    "xG %@" : {
+
+    },
+    "Xtream Account" : {
+
+    },
+    "You called it! +%lld pts" : {
+
+    },
+    "You'll be taken through setup again. Playlists, followed teams, and data are not deleted." : {
+
+    },
+    "You're Premium" : {
+
+    },
+    "You've listened to all episodes of this show." : {
+
+    },
+    "YOUR FANTASY PLAYERS" : {
+
+    },
+    "Your Pick" : {
+
+    },
+    "YOUR SCHEDULE" : {
+
+    },
+    "YOUR SPORTS" : {
+      "comment" : "The title of the sports section in the app.",
+      "isCommentAutoGenerated" : true
+    },
+    "YOUR SPORTS DAY" : {
+
+    },
+    "YOUR STANDINGS" : {
+
+    },
+    "YOUR TEAM HIGHLIGHTS" : {
+
+    },
+    "Your team ID" : {
+
+    },
+    "Your team name" : {
+
+    }
   },
-  "version" : "1.0"
+  "version" : "1.1"
 }

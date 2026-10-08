@@ -36,10 +36,7 @@ struct TVPlayerView: View {
         let hasOtherChannels = playlistStore.channelsByPlaylist.values.contains { channels in
             channels.contains { $0.id != channel.id }
         }
-        guard hasOtherChannels else { return false }
-        // A single-connection (or unknown-limit) Xtream account can't safely open a
-        // second stream on top of the one already playing.
-        return !playlistStore.xtreamAccountStatus.blocksAdditionalConnection(forPlaylistID: channel.playlistID)
+        return hasOtherChannels
     }
 
     var body: some View {

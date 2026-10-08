@@ -14,11 +14,14 @@ enum Theme {
     static let accessibleAccent = dynamic(dark: 0x60A5FA, light: 0x1D4ED8)
     static let actionFill       = Color(hex: 0x1D4ED8)
     static let live             = Color(hex: 0xFF4D5E)
+    /// `live` as a fill behind a white label (3.2:1 on `live` itself; 4.8:1 here).
+    static let liveFill         = Color(hex: 0xD92D3F)
     static let starting         = Color(hex: 0xF5B942)
     static let upcoming         = Color(hex: 0x31C978)
     static let textPrimary      = dynamic(dark: 0xF7F8FA, light: 0x15181D)
     static let textSecondary    = dynamic(dark: 0x9BA3B2, light: 0x5C6470)
-    static let textTertiary     = dynamic(dark: 0x636B7A, light: 0x8F979F)
+    // Both pass 4.5:1 against every background and surface (was 3.2-3.7 dark, 2.5-3.0 light).
+    static let textTertiary     = dynamic(dark: 0x808898, light: 0x5F6672)
     static let hairline         = dynamic(dark: 0xFFFFFF, light: 0x000000, darkAlpha: 0.09, lightAlpha: 0.09)
 
     private static func dynamic(dark: UInt, light: UInt, darkAlpha: Double = 1, lightAlpha: Double = 1) -> Color {

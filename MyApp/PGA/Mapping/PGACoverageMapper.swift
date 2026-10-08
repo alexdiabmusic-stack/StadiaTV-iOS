@@ -3,6 +3,9 @@ import Foundation
 /// Maps `Coverage`. Metadata only — no playback/stream URLs are surfaced or
 /// used (STEP 55).
 nonisolated enum PGACoverageMapper {
+    // Built once; the ISO fallback runs for every coverage window. Never mutated, so sharing is safe.
+    private nonisolated(unsafe) static let isoDateFormatter = ISO8601DateFormatter()
+
     static func windows(_ value: PGAValue) -> [GolfCoverageWindow] {
         value["coverageType"].array.compactMap(window)
     }
@@ -24,8 +27,8 @@ nonisolated enum PGACoverageMapper {
             streamTitle: value["streamTitle"].string,
             channelTitle: value["channelTitle"].string,
             roundNumber: value["roundNumber"].int,
-            startTime: PGAMappingSupport.epochMillis(value["startTime"]) ?? ISO8601DateFormatter().date(from: value["startTime"].string ?? ""),
-            endTime: PGAMappingSupport.epochMillis(value["endTime"]) ?? ISO8601DateFormatter().date(from: value["endTime"].string ?? ""),
+            startTime: PGAMappingSupport.epochMillis(value["startTime"]) ?? isoDateFormatter.date(from: value["startTime"].string ?? ""),
+            endTime: PGAMappingSupport.epochMillis(value["endTime"]) ?? isoDateFormatter.date(from: value["endTime"].string ?? ""),
             liveStatusRaw: value["liveStatus"].string
         )
     }

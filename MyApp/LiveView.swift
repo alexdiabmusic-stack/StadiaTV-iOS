@@ -408,7 +408,12 @@ struct LiveView: View {
 
     private func setAlert(for match: Match) async {
         let scheduled = await MatchNotificationService.shared.scheduleReminder(for: match, leadTime: prefs.matchReminderLeadTime)
-        prefs.setMatchNotificationsEnabled(scheduled)
+        if scheduled {
+            prefs.setMatchNotificationsEnabled(true)
+        } else if !(await MatchNotificationService.shared.isAuthorized()) {
+            // A finished game can't be reminded about; only a revoked permission turns alerts off.
+            prefs.setMatchNotificationsEnabled(false)
+        }
         actionAlertMessage = scheduled
             ? (match.state == .live ? "Live alert sent for \(match.shortName)." : "Alert set for \(match.shortName).")
             : (match.state == .final ? "\(match.shortName) is already final." : "Notifications are disabled. Enable them in Settings to receive game alerts.")
@@ -633,8 +638,8 @@ struct LiveMatchCard: View {
     private var headToHeadScoreRow: some View {
         HStack(spacing: 0) {
             HStack(spacing: 8) {
-                TeamLogo(url: match.away.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.row : 36)
-                Text(match.away.shortName)
+                TeamLogo(url: match.leadingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.row : 36)
+                Text(match.leadingSide.shortName)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
@@ -642,19 +647,19 @@ struct LiveMatchCard: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 6) {
-                Text(match.away.score ?? "-")
+                Text(match.leadingSide.score ?? "-")
                 Text("–").foregroundStyle(Theme.textSecondary)
-                Text(match.home.score ?? "-")
+                Text(match.trailingSide.score ?? "-")
             }
             .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
             .foregroundStyle(Theme.textPrimary)
 
             HStack(spacing: 8) {
-                Text(match.home.shortName)
+                Text(match.trailingSide.shortName)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
-                TeamLogo(url: match.home.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.row : 36)
+                TeamLogo(url: match.trailingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.row : 36)
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
@@ -673,9 +678,9 @@ private struct CompactSoonCard: View {
 
             VStack(spacing: 8) {
                 HStack(spacing: 4) {
-                    TeamLogo(url: match.away.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 10 : 26)
+                    TeamLogo(url: match.leadingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 10 : 26)
                     Text("vs").font(.caption2.weight(.bold)).foregroundStyle(Theme.textSecondary)
-                    TeamLogo(url: match.home.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 10 : 26)
+                    TeamLogo(url: match.trailingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 10 : 26)
                 }
                 Text(match.shortName)
                     .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .semibold) : .caption.weight(.semibold))
@@ -701,6 +706,7 @@ private struct CompactSoonCard: View {
 // MARK: - Pulsing Live Badge
 
 struct PulsingLiveBadge: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulsing = false
 
     var body: some View {
@@ -708,8 +714,8 @@ struct PulsingLiveBadge: View {
             .fill(Theme.live)
             .frame(width: 8, height: 8)
             .opacity(pulsing ? 0.3 : 1)
-            .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulsing)
-            .onAppear { pulsing = true }
+            .animation(Theme.Motion.respecting(reduceMotion, .easeInOut(duration: 0.9).repeatForever(autoreverses: true)), value: pulsing)
+            .onAppear { if !reduceMotion { pulsing = true } }
     }
 }
 
@@ -806,7 +812,7 @@ final class LiveViewModel: ObservableObject {
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 60_000_000_000)
-                guard !Task.isCancelled, let self else { continue }
+                guard !Task.isCancelled, let self, AppActivity.shared.isActive else { continue }
                 await self.load(favoriteTeams: favoriteTeams, force: true)
             }
         }

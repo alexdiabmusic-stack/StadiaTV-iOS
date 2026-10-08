@@ -28,9 +28,10 @@ struct EPGRepositoryGuideImportTests {
 
         // A name/tvg-id pair virtually guaranteed not to match the curated catalog, so this
         // exercises the "unresolved stream" path `rebuildChannelToCanonicalMap()`'s ordering
-        // bug affected.
+        // bug affected. The name must avoid the words the catalog's hide rules drop outright
+        // (TEST, DEMO, 24/7...), or the stream never reaches the lineup at all.
         let channel = Channel(
-            id: "test-channel-zzz", name: "ZZZ Unmatched Test Channel 48219",
+            id: "test-channel-zzz", name: "ZZZ Unmatched Zebra Channel 48219",
             streamURL: URL(string: "https://example.com/s.m3u8")!, logoURL: nil, group: "Sports",
             playlistID: playlistID, playlistName: "Test", tvgId: "zzz.test.48219"
         )
@@ -45,7 +46,7 @@ struct EPGRepositoryGuideImportTests {
         let xml = """
         <?xml version="1.0" encoding="UTF-8"?>
         <tv>
-          <channel id="zzz.test.48219"><display-name>ZZZ Unmatched Test Channel 48219</display-name></channel>
+          <channel id="zzz.test.48219"><display-name>ZZZ Unmatched Zebra Channel 48219</display-name></channel>
           <programme start="\(fmt.string(from: start))" stop="\(fmt.string(from: end))" channel="zzz.test.48219">
             <title>Distant Game</title>
           </programme>

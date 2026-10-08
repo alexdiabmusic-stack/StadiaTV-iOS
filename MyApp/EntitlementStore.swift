@@ -26,13 +26,14 @@ final class EntitlementStore: ObservableObject {
     // MARK: Private
 
     private static let cacheKey = "bannertv.entitlement.premium.v1"
-    private static let unlockAllFeaturesByDefault = true
+    /// Build-time switch (see `AppConfiguration.unlocksAllFeatures`), read once.
+    private static let unlockAllFeaturesByDefault = AppConfiguration.unlocksAllFeatures
     private var updateListenerTask: Task<Void, Never>?
 
     // MARK: Init
 
     init() {
-        // Temporarily unlock all features while in-app purchases are hidden.
+        // With BANNER_UNLOCK_ALL_FEATURES = YES every feature is unlocked while in-app purchases are hidden.
         isPremium = Self.unlockAllFeaturesByDefault || UserDefaults.standard.bool(forKey: Self.cacheKey)
 
         guard !Self.unlockAllFeaturesByDefault else {
@@ -132,23 +133,8 @@ final class EntitlementStore: ObservableObject {
 
     // MARK: Private
 
-    // ⚠️ TESTFLIGHT ONLY — Remove this before App Store submission.
-    private static var isTestFlight: Bool {
-        get async {
-            guard case .verified(let tx) = try? await AppTransaction.shared else { return false }
-            return tx.environment == .sandbox
-        }
-    }
-
     private func refreshEntitlements() async {
         guard !Self.unlockAllFeaturesByDefault else {
-            isPremium = true
-            UserDefaults.standard.set(true, forKey: Self.cacheKey)
-            return
-        }
-
-        // ⚠️ TESTFLIGHT ONLY — Remove this block before App Store submission.
-        if await Self.isTestFlight {
             isPremium = true
             UserDefaults.standard.set(true, forKey: Self.cacheKey)
             return

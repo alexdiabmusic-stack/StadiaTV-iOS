@@ -149,7 +149,7 @@ struct TVHeroCard: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
-                        .background(Theme.accent, in: Capsule())
+                        .background(Theme.actionFill, in: Capsule())
                 }
                 .frame(maxWidth: .infinity)
 
@@ -345,6 +345,7 @@ struct TVShelfRow<Content: View>: View {
 // MARK: - TV Live Badge
 
 struct TVLiveBadge: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulsing = false
 
     var body: some View {
@@ -353,15 +354,15 @@ struct TVLiveBadge: View {
                 .fill(Theme.live)
                 .frame(width: 7, height: 7)
                 .opacity(pulsing ? 0.3 : 1)
-                .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: pulsing)
+                .animation(Theme.Motion.respecting(reduceMotion, .easeInOut(duration: 0.8).repeatForever(autoreverses: true)), value: pulsing)
             Text("LIVE")
                 .font(.caption2.weight(.bold))
                 .foregroundStyle(.white)
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 5)
-        .background(Theme.live, in: Capsule())
-        .onAppear { pulsing = true }
+        .background(Theme.liveFill, in: Capsule())
+        .onAppear { if !reduceMotion { pulsing = true } }
     }
 }
 
@@ -443,7 +444,7 @@ struct TVSourceTile: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 6)
-                    .background(Theme.accent, in: Capsule())
+                    .background(Theme.actionFill, in: Capsule())
             }
             .padding(18)
             .frame(width: 200, height: 220)

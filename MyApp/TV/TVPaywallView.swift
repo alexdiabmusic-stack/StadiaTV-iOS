@@ -103,7 +103,7 @@ struct TVPaywallView: View {
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 10).padding(.vertical, 4)
-                        .background(Theme.accent, in: Capsule())
+                        .background(Theme.actionFill, in: Capsule())
                 }
                 Text(product.displayName)
                     .font(.title2.weight(.bold))

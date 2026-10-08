@@ -80,9 +80,14 @@ nonisolated enum CFLFixtureMapper {
             venue: venueName, broadcasts: fixture["broadcasting_options"].array.compactMap(\.string),
             drives: [], plays: [], summaryUpdated: now, detailsUpdated: now)
     }
-    static func date(_ value: String) -> Date? {
+    // Built once: parsed for every fixture. Never mutated after creation, so sharing is safe.
+    private nonisolated(unsafe) static let isoPlain = ISO8601DateFormatter()
+    private nonisolated(unsafe) static let isoFractional: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
-        if let date = f.date(from: value) { return date }
-        f.formatOptions.insert(.withFractionalSeconds); return f.date(from: value)
+        f.formatOptions.insert(.withFractionalSeconds)
+        return f
+    }()
+    static func date(_ value: String) -> Date? {
+        isoPlain.date(from: value) ?? isoFractional.date(from: value)
     }
 }

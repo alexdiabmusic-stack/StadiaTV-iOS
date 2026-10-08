@@ -70,10 +70,11 @@ struct NewsView: View {
                 .foregroundStyle(isSelected ? .white : Theme.textSecondary)
                 .padding(.horizontal, 13)
                 .padding(.vertical, 7)
-                .background(isSelected ? Theme.accent : Theme.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(isSelected ? Theme.accent : Theme.hairline))
+                .background(isSelected ? Theme.actionFill : Theme.surface, in: Capsule())
+                .overlay(Capsule().strokeBorder(isSelected ? Theme.actionFill : Theme.hairline))
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     // MARK: Content

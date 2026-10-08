@@ -6,4 +6,9 @@
 ODDS_API_KEY =
 YOUTUBE_API_KEY =
 
+// Premium gating. YES unlocks every feature and never talks to StoreKit (the state while
+// in-app purchases are hidden). Set to NO to ship the paywall; scripts/check-release-config.sh
+// reports this flag, and fails the build when STRICT_RELEASE_CONFIG=1.
+BANNER_UNLOCK_ALL_FEATURES = YES
+
 #include? "Secrets.xcconfig"

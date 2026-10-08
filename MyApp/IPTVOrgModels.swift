@@ -2,58 +2,6 @@ import Foundation
 
 // MARK: - Provider Channel (raw Xtream / M3U provider record)
 
-struct ProviderChannel: Decodable, Identifiable {
-    let num: Int
-    let name: String
-    let streamType: String
-    let streamId: Int
-    let streamIcon: String?
-    let epgChannelId: String?
-    let added: String?
-    let categoryId: String?
-    let tvArchive: Int
-    let tvArchiveDuration: Int
-
-    var id: Int { streamId }
-    var archiveEnabled: Bool { tvArchive == 1 }
-    var iconURL: URL? {
-        guard let s = streamIcon, !s.isEmpty, let u = URL(string: s) else { return nil }
-        return u
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case num, name, added
-        case streamType = "stream_type"
-        case streamId = "stream_id"
-        case streamIcon = "stream_icon"
-        case epgChannelId = "epg_channel_id"
-        case categoryId = "category_id"
-        case tvArchive = "tv_archive"
-        case tvArchiveDuration = "tv_archive_duration"
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        num = try c.decode(Int.self, forKey: .num)
-        name = try c.decode(String.self, forKey: .name)
-        streamType = (try? c.decode(String.self, forKey: .streamType)) ?? "live"
-        streamId = try c.decode(Int.self, forKey: .streamId)
-        streamIcon = try? c.decode(String.self, forKey: .streamIcon)
-        epgChannelId = try? c.decode(String.self, forKey: .epgChannelId)
-        added = try? c.decode(String.self, forKey: .added)
-        categoryId = try? c.decode(String.self, forKey: .categoryId)
-        tvArchive = (try? c.decode(Int.self, forKey: .tvArchive)) ?? 0
-        // tv_archive_duration can be a String "2" or an Int 0
-        if let i = try? c.decode(Int.self, forKey: .tvArchiveDuration) {
-            tvArchiveDuration = i
-        } else if let s = try? c.decode(String.self, forKey: .tvArchiveDuration), let i = Int(s) {
-            tvArchiveDuration = i
-        } else {
-            tvArchiveDuration = 0
-        }
-    }
-}
-
 // MARK: - IPTV-org Channel
 
 struct IPTVOrgChannel: Decodable, Identifiable, Hashable {
@@ -149,42 +97,8 @@ struct ResolvedChannelLogo: Hashable {
 
 // MARK: - Identity Evidence and Conflicts
 
-enum IdentityMatchMethod: String, Hashable {
-    case manual
-    case providerEpgExact
-    case providerEpgCaseInsensitive
-    case curatedAlias
-    case curatedNormalizedExact
-    case iptvOrgExactId
-    case iptvOrgCaseInsensitiveId
-    case iptvOrgAltName
-    case networkMarket
-    case replacementChain
-    case fuzzy
-    case unmatched
-}
-
 struct IdentityConflict: Hashable {
     let field: String
     let expected: String
     let actual: String
-}
-
-struct ChannelIdentityEvidence {
-    let providerChannelId: String
-    let providerName: String
-    let normalizedName: String
-    let providerEpgId: String?
-    let providerCategoryId: String?
-    let providerIconURL: String?
-    let countryHint: String?
-    let networkHint: String?
-    let curatedCandidateKey: String?
-    let iptvOrgCandidateId: String?
-    let matchMethod: IdentityMatchMethod
-    let confidence: Double
-    let conflicts: [IdentityConflict]
-
-    var isHighConfidence: Bool { confidence >= 0.85 }
-    var hasConflicts: Bool { !conflicts.isEmpty }
 }

@@ -102,6 +102,8 @@ struct PlayerView: View {
     @State private var isShowingMultiscreenPicker = false
     @State private var selectedMultiChannelIDs: Set<String> = []
     @State private var multiscreenSession: PlayerMultiscreenSession?
+    /// Chosen in the picker; presented once the picker sheet has finished dismissing.
+    @State private var pendingMultiscreenSession: PlayerMultiscreenSession?
     #if os(iOS)
     @State private var brightnessDragStart: CGFloat?
     @State private var volumeDragStart: Float?
@@ -129,6 +131,9 @@ struct PlayerView: View {
     @State private var aspectMode: PlayerAspectMode = .fit
     /// True when the player is laid out wider than tall (device or orientation button).
     @State private var isLandscapeLayout = false
+    /// The player's own height. The swipe gestures measure against it rather than the screen's, which
+    /// is wrong in Split View and Stage Manager windows.
+    @State private var containerHeight: CGFloat = 0
     /// Lock-screen / Control Center metadata and remote play/pause while the player is open.
     @State private var nowPlaying = VideoNowPlaying()
     @StateObject private var liveTracker = FantasyLiveTrackerEngine.shared
@@ -296,6 +301,7 @@ struct PlayerView: View {
         .onGeometryChange(for: Bool.self) { $0.size.width > $0.size.height } action: { landscape in
             isLandscapeLayout = landscape
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { containerHeight = $0 }
         #if os(iOS)
         .offset(x: dismissalDragOffset.width, y: max(0, dismissalDragOffset.height))
         .scaleEffect(playerScaleForDismissal)
@@ -370,7 +376,13 @@ struct PlayerView: View {
         }
         .animation(Theme.Motion.snappy, value: showGestureHint)
         #endif
-        .sheet(isPresented: $isShowingMultiscreenPicker, onDismiss: { multiscreenChannels = [] }) {
+        .sheet(isPresented: $isShowingMultiscreenPicker, onDismiss: {
+            multiscreenChannels = []
+            if let session = pendingMultiscreenSession {
+                pendingMultiscreenSession = nil
+                multiscreenSession = session
+            }
+        }) {
             PlayerMultiscreenPicker(currentChannel: currentZapChannel,
                                     allChannels: multiscreenChannels,
                                     selectedChannelIDs: $selectedMultiChannelIDs,
@@ -657,7 +669,7 @@ struct PlayerView: View {
         if value.startLocation.x <= 24, horizontal > 18, abs(horizontal) > abs(vertical) * 1.25 {
             return .edgePop
         }
-        let upperPlayerLimit = UIScreen.main.bounds.height * 0.46
+        let upperPlayerLimit = containerHeight * 0.46
         if value.startLocation.y <= upperPlayerLimit, vertical > 18, abs(vertical) > abs(horizontal) * 1.2 {
             return .pullDown
         }
@@ -678,7 +690,7 @@ struct PlayerView: View {
                 guard value.translation.height < -80,
                       abs(value.translation.height) > abs(value.translation.width) * 1.5,
                       abs(value.predictedEndTranslation.height) > 160 else { return }
-                let videoAreaThreshold = UIScreen.main.bounds.height * 0.55
+                let videoAreaThreshold = containerHeight * 0.55
                 guard value.startLocation.y < videoAreaThreshold else { return }
                 toggleOrientation()
             }
@@ -732,13 +744,9 @@ struct PlayerView: View {
     private func startMultiscreen() {
         let channels = multiscreenChannels.filter { selectedMultiChannelIDs.contains($0.id) }
         guard channels.count >= 2 else { return }
-        let session = PlayerMultiscreenSession(channels: Array(channels.prefix(4)))
-        isShowingMultiscreenPicker = false
+        pendingMultiscreenSession = PlayerMultiscreenSession(channels: Array(channels.prefix(4)))
         selectedMultiChannelIDs.removeAll()
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 250_000_000)
-            multiscreenSession = session
-        }
+        isShowingMultiscreenPicker = false
     }
 
     private func requestOrientation(_ orientation: PlayerOrientation) {
@@ -3735,7 +3743,7 @@ private struct PlayerSourceBar: View {
                             .font(.system(size: 8, weight: .bold))
                             .foregroundStyle(.white)
                             .padding(3)
-                            .background(Theme.accent, in: Circle())
+                            .background(Theme.actionFill, in: Circle())
                             .offset(x: 4, y: -4)
                     }
                 }
@@ -3760,7 +3768,7 @@ private struct PlayerSourceBar: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
-                .background(Theme.live, in: Capsule())
+                .background(Theme.liveFill, in: Capsule())
         }
         .padding(12)
         .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
@@ -4040,7 +4048,7 @@ private struct LiveMatchPickerRow: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                     .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(Theme.live, in: Capsule())
+                    .background(Theme.liveFill, in: Capsule())
             }
 
             // Teams with logos and scores
@@ -4075,10 +4083,11 @@ private struct LiveMatchPickerRow: View {
                                 }
                                 .foregroundStyle(isSelected ? .white : Theme.textPrimary)
                                 .padding(.horizontal, 10).padding(.vertical, 6)
-                                .background(isSelected ? Theme.accent : Theme.surfaceElevated, in: Capsule())
+                                .background(isSelected ? Theme.actionFill : Theme.surfaceElevated, in: Capsule())
                                 .overlay(Capsule().strokeBorder(isSelected ? Color.clear : Theme.hairline))
                             }
                             .buttonStyle(.plain)
+                            .accessibilityAddTraits(isSelected ? .isSelected : [])
                             .disabled(!isSelected && isAtCapacity)
                         }
                     }
@@ -4237,12 +4246,13 @@ private struct PlayerCloseButton: View {
 
 private struct PulsingDot: View {
     let color: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulsing = false
     var body: some View {
         Circle().fill(color).frame(width: 8, height: 8)
             .opacity(pulsing ? 0.4 : 1)
-            .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: pulsing)
-            .onAppear { pulsing = true }
+            .animation(Theme.Motion.respecting(reduceMotion, .easeInOut(duration: 0.85).repeatForever(autoreverses: true)), value: pulsing)
+            .onAppear { if !reduceMotion { pulsing = true } }
     }
 }
 
@@ -4793,6 +4803,7 @@ private struct PlayerRecentsSheet: View {
     let onSelect: (Channel) -> Void
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var watchStore: WatchStore
+    @EnvironmentObject private var playlistStore: PlaylistStore
 
     var body: some View {
         NavigationStack {
@@ -4804,7 +4815,7 @@ private struct PlayerRecentsSheet: View {
                 } else {
                     List {
                         ForEach(watchStore.recents) { entry in
-                            if let ch = entry.saved.channel {
+                            if let ch = playlistStore.channel(for: entry.saved) {
                                 Button {
                                     onSelect(ch)
                                     dismiss()
@@ -4893,7 +4904,7 @@ private struct PlayerGestureHint: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 8)
-                .background(Theme.accent, in: Capsule())
+                .background(Theme.actionFill, in: Capsule())
         }
         .padding(24)
         .background(.black.opacity(0.84), in: RoundedRectangle(cornerRadius: 18, style: .continuous))

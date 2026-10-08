@@ -216,28 +216,40 @@ nonisolated final class BannerRSSParser: NSObject, XMLParserDelegate {
 
     // MARK: - Date parsing
 
+    // The formatters are built once: this runs for every item of every feed, and creating them is
+    // the expensive part. They are never mutated after creation, so sharing them is safe.
+    private nonisolated(unsafe) static let isoWithFractionalSeconds: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private nonisolated(unsafe) static let isoWithoutFractionalSeconds: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+    /// RFC 822 (RSS 2.0 pubDate), tried in this order.
+    private nonisolated(unsafe) static let rfc822Formatters: [DateFormatter] = [
+        "EEE, dd MMM yyyy HH:mm:ss Z",
+        "EEE, dd MMM yyyy HH:mm:ss z",
+        "dd MMM yyyy HH:mm:ss Z",
+        "EEE, dd MMM yyyy HH:mm Z",
+    ].map { format in
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.dateFormat = format
+        return fmt
+    }
+
     nonisolated static func parseDate(_ raw: String?) -> Date? {
         guard let raw, !raw.isEmpty else { return nil }
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // ISO 8601 (Atom/BBC/NBC)
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let d = iso.date(from: trimmed) { return d }
-        iso.formatOptions = [.withInternetDateTime]
-        if let d = iso.date(from: trimmed) { return d }
+        if let d = isoWithFractionalSeconds.date(from: trimmed) { return d }
+        if let d = isoWithoutFractionalSeconds.date(from: trimmed) { return d }
 
-        // RFC 822 (RSS 2.0 pubDate)
-        let rfc822Formats = [
-            "EEE, dd MMM yyyy HH:mm:ss Z",
-            "EEE, dd MMM yyyy HH:mm:ss z",
-            "dd MMM yyyy HH:mm:ss Z",
-            "EEE, dd MMM yyyy HH:mm Z",
-        ]
-        let fmt = DateFormatter()
-        fmt.locale = Locale(identifier: "en_US_POSIX")
-        for format in rfc822Formats {
-            fmt.dateFormat = format
+        for fmt in rfc822Formatters {
             if let d = fmt.date(from: trimmed) { return d }
         }
         return nil

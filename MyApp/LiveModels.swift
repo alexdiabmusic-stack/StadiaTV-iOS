@@ -45,17 +45,6 @@ nonisolated struct LiveProvider: Identifiable, Codable, Sendable, Hashable {
 
 // MARK: - Live Group
 
-/// A channel group/category within a provider.
-nonisolated struct LiveGroup: Identifiable, Codable, Sendable, Hashable {
-    let id: String              // "\(providerID)|\(title)"
-    let providerID: UUID
-    let title: String
-    var channelCount: Int
-
-    static func == (lhs: LiveGroup, rhs: LiveGroup) -> Bool { lhs.id == rhs.id }
-    func hash(into hasher: inout Hasher) { hasher.combine(id) }
-}
-
 // MARK: - StreamResolution extensions
 
 // Adds Codable + Sendable to the existing EPGModels.swift type.

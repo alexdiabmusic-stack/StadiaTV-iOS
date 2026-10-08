@@ -184,6 +184,7 @@ struct FantasyDriveTickerOverlayView: View {
                             .clipShape(Circle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(isExpanded ? "Collapse drive ticker" : "Expand drive ticker")
                 }
 
                 // Expanded play-by-play ticker list
@@ -263,6 +264,7 @@ struct ScoringPlayCard: View {
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Watch this play")
             }
         }
         .padding(.horizontal, 10)

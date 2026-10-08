@@ -12,11 +12,12 @@ struct MyApp: App {
     @StateObject private var guideStore = BannerAppEnvironment.shared.guideStore
     @StateObject private var streamStore = BannerAppEnvironment.shared.streamStore
     @StateObject private var eventChannelRefresh = BannerAppEnvironment.shared.eventChannelRefresh
-    @StateObject private var watchStore = WatchStore()
+    // WatchStore forwards favourites to the channel preferences store, so `init` builds them together.
+    @StateObject private var watchStore: WatchStore
     @StateObject private var entitlements = EntitlementStore()
     @StateObject private var predictions = PredictionsStore()
     @StateObject private var articleLibrary = ArticleLibraryStore()
-    @StateObject private var channelPrefsStore = ChannelPreferencesStore()
+    @StateObject private var channelPrefsStore: ChannelPreferencesStore
     @StateObject private var customGroupStore = CustomGroupStore()
     @StateObject private var groupPrefsStore = GroupPreferencesStore()
     @StateObject private var fantasyStore = FantasyStore.shared
@@ -24,8 +25,15 @@ struct MyApp: App {
     @StateObject private var launchCoordinator = StartupCoordinator()
 
     init() {
+        // WatchStore forwards favourites to the channel preferences store, so build them together.
+        let channelPrefs = ChannelPreferencesStore()
+        _channelPrefsStore = StateObject(wrappedValue: channelPrefs)
+        _watchStore = StateObject(wrappedValue: WatchStore(channelPreferences: channelPrefs))
         PlaybackPriority.launchDate = Date()
         AudioSessionManager.configureAtLaunch()
+        LegacyFeatureCleanup.runIfNeeded()
+        // Registers the notification delegate now so a tap that launches the app is delivered.
+        _ = MatchNotificationService.shared
     }
 
     var body: some Scene {
@@ -65,8 +73,6 @@ struct MyApp: App {
                 .environmentObject(fantasyStore)
                 .environmentObject(bannerFantasyStore)
                 .environmentObject(ProgrammeReminderStore.shared)
-                .environmentObject(RecordingService.shared)
-                .environmentObject(ParentalControlStore.shared)
                 .environmentObject(launchCoordinator)
                 .frame(minWidth: 480, minHeight: 420)
         }
@@ -108,10 +114,10 @@ struct MyApp: App {
             .environmentObject(fantasyStore)
             .environmentObject(bannerFantasyStore)
             .environmentObject(ProgrammeReminderStore.shared)
-            .environmentObject(RecordingService.shared)
-            .environmentObject(ParentalControlStore.shared)
             .environmentObject(launchCoordinator)
-            .task { channelPrefsStore.migrateLegacyFavorites(watchStore.favorites) }
+            .onOpenURL { url in
+                if let link = DeepLink(url: url) { DeepLinkRouter.shared.handle(link) }
+            }
             #if !os(tvOS)
             .dynamicTypeSize(Theme.isPad ? DynamicTypeSize.xLarge... : DynamicTypeSize.xSmall...)
             #endif
@@ -164,12 +170,9 @@ enum AppTab: String, Hashable {
 }
 
 struct RootView: View {
-    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var podcastStore: PodcastStore
     @EnvironmentObject private var playlistStore: PlaylistStore
-    @EnvironmentObject private var fantasyStore: FantasyStore
-    @EnvironmentObject private var bannerFantasyStore: BannerFantasyStore
     @StateObject private var liveViewModel = LiveViewModel()
     @EnvironmentObject private var epgRepository: EPGRepository
     @EnvironmentObject private var guideStore: GuideChannelStore
@@ -178,7 +181,11 @@ struct RootView: View {
     @EnvironmentObject private var appEnvironment: BannerAppEnvironment
     @State private var showingFavoriteNotificationPrompt = false
     @State private var selectedTab: AppTab = .home
+    // `banner://game/{eventID}` links from CarPlay, Live Activities and Siri (see BannerAppEnvironment).
     @State private var deepLinkMatch: Match?
+    // Notification taps and `banner://` tab/match links, which carry the league and date (see DeepLink).
+    @ObservedObject private var deepLinks = DeepLinkRouter.shared
+    @State private var notificationMatch: DeepLinkMatchTarget?
 
     // Applying safeAreaInset to each Tab's content (not the TabView) is the correct
     // way to place content between the tab content and the tab bar chrome.
@@ -279,61 +286,23 @@ struct RootView: View {
         .environmentObject(eventChannelRefresh)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: podcastStore.nowPlaying != nil)
         .task { updateFavoriteNotificationPrompt() }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await playlistStore.refreshAccountStatus() } }
-        }
-        .task { epgRepository.xtreamEPGFetcher = playlistStore.fetchXtreamEPG }
-        .task { await liveViewModel.load(favoriteTeams: prefs.favoriteTeams) }
-        .task(id: playlistStore.playlists) {
-            epgRepository.setupWithChannels(
-                playlistStore.allChannels,
-                customEPGURLs: playlistStore.playlists.compactMap(\.epgURL).compactMap(URL.init(string:))
-            )
-        }
-        .task(id: "\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.channelsRevision)-\(epgRepository.programmeRevision)") {
-            await streamStore.scanDebounced(
-                matches: liveViewModel.allLive + liveViewModel.startingSoon,
-                channels: playlistStore.allChannels,
-                epgRepository: epgRepository
-            )
-        }
-        .task(id: playlistStore.channelsRevision) {
-            for playlist in playlistStore.playlists {
-                eventChannelRefresh.noteChannelsLoaded(
-                    playlistID: playlist.id, channels: playlistStore.channelsByPlaylist[playlist.id] ?? []
-                )
-            }
-        }
-        // Keeps event-slot channel names (which carry the fixture and change during the day)
-        // current while the app is active — see MatchLinker/PROMPTS.md, Prompt 5.
-        .task {
-            while !Task.isCancelled {
-                let upcoming = liveViewModel.allLive + liveViewModel.startingSoon
-                let hot = upcoming.contains { match in
-                    abs(match.date.timeIntervalSinceNow) <= 30 * 60 && streamStore.confirmedCount(for: match.id) == 0
-                }
-                if await eventChannelRefresh.refreshIfDue(playlists: playlistStore, hot: hot) {
-                    await streamStore.linkService.invalidate()
-                    let horizon = Date().addingTimeInterval(12 * 3600)
-                    await streamStore.scan(
-                        matches: upcoming.filter { $0.date <= horizon },
-                        channels: playlistStore.allChannels,
-                        epgRepository: epgRepository
-                    )
-                }
-                try? await Task.sleep(nanoseconds: UInt64(hot ? 60 : 600) * 1_000_000_000)
-            }
-        }
-        .onChange(of: playlistStore.channelsRevision) {
-            epgRepository.setupWithChannels(
-                playlistStore.allChannels,
-                customEPGURLs: playlistStore.playlists.compactMap(\.epgURL).compactMap(URL.init(string:))
-            )
-            Task { await refreshFantasyContexts(force: true) }
-        }
+        .appOrchestration(
+            liveViewModel: liveViewModel,
+            epgRepository: epgRepository,
+            streamStore: streamStore,
+            eventChannelRefresh: eventChannelRefresh
+        )
         .onChange(of: liveViewModel.allLive) { _, live in updateLiveActivity(live) }
         .onChange(of: prefs.favoriteTeams) { updateFavoriteNotificationPrompt() }
         .onChange(of: prefs.matchNotificationsEnabled) { updateFavoriteNotificationPrompt() }
+        // A tapped notification or banner:// URL. `initial` picks up a link that arrived
+        // before this view existed (a cold launch from a notification).
+        .onChange(of: deepLinks.pending, initial: true) { _, link in
+            guard let link else { return }
+            deepLinks.clear()
+            open(link)
+        }
+        .sheet(item: $notificationMatch) { DeepLinkMatchSheet(target: $0) }
         .onChange(of: appEnvironment.pendingDeepLink) { _, link in
             guard let link else { return }
             appEnvironment.pendingDeepLink = nil
@@ -357,21 +326,16 @@ struct RootView: View {
         }
     }
 
-    private func refreshFantasyContexts(force: Bool = false) async {
-        await bannerFantasyStore.load()
-        await PlaybackPriority.waitForBackgroundSlot()
-        async let espnRefresh: Void = fantasyStore.refresh(
-            channels: playlistStore.allChannels,
-            preferredLanguages: prefs.preferredStreamLanguages,
-            force: force
-        )
-        async let eventContextRefresh: Void = bannerFantasyStore.refreshEventContexts(
-            channels: playlistStore.allChannels,
-            preferredLanguages: prefs.preferredStreamLanguages,
-            epgRepository: epgRepository,
-            streamStore: streamStore
-        )
-        _ = await (espnRefresh, eventContextRefresh)
+    private func open(_ link: DeepLink) {
+        switch link {
+        case .match(let leagueID, let matchID, let date):
+            notificationMatch = DeepLinkMatchTarget(leagueID: leagueID, matchID: matchID, date: date)
+        case .home: selectedTab = .home
+        case .following: selectedTab = .following
+        case .live: selectedTab = .live
+        case .discover: selectedTab = .discover
+        case .settings: selectedTab = .settings
+        }
     }
 
     /// Resolves a `banner://game/{eventID}` link to a `Match` and presents its Game Centre

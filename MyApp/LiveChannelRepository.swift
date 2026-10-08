@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// Coordinates provider adapters, the channel database, and user preferences
 /// to produce the `[Channel]` arrays consumed by existing UI code.
@@ -8,26 +9,27 @@ import Foundation
 /// - Preference isolation: user overlays live in `ChannelPreferencesStore`,
 ///   never in the provider data path.
 /// - Thread safety: `LiveChannelStore` is an actor so all DB operations run on
-///   its isolated executor, not the main thread.
+///   its isolated executor, not the main thread. Building the `[Channel]` models,
+///   tens of thousands for a big playlist, is done off the main actor too.
 @MainActor
 final class LiveChannelRepository {
 
     private let store = LiveChannelStore.shared
     private var refreshingProviders = Set<UUID>()
+    private let logger = Logger(subsystem: "BannerTV", category: "LiveChannels")
 
     // MARK: - Cache read
 
     /// Returns channels from the local SQLite cache for a playlist, or nil if no cache exists.
     /// Called on startup so the UI shows channels before the network is hit.
     func cachedChannels(for playlist: Playlist) async -> [Channel]? {
-        do {
-            guard try await store.hasChannels(for: playlist.id) else { return nil }
-            // store.channels() runs on the LiveChannelStore actor (off-main thread).
-            let liveChannels = try await store.channels(for: playlist.id)
-            return liveChannels.map { $0.asChannel(playlistName: playlist.name, defaultUserAgent: playlist.userAgent) }
-        } catch {
-            return nil
-        }
+        // store.channels() runs on the LiveChannelStore actor (off-main thread).
+        guard let liveChannels = try? await store.channels(for: playlist.id), !liveChannels.isEmpty else { return nil }
+        let playlistName = playlist.name
+        let userAgent = playlist.userAgent
+        return await Task.detached(priority: .userInitiated) {
+            liveChannels.map { $0.asChannel(playlistName: playlistName, defaultUserAgent: userAgent) }
+        }.value
     }
 
     // MARK: - Network refresh
@@ -36,7 +38,12 @@ final class LiveChannelRepository {
     /// persists them to the SQLite cache, and returns `[Channel]`.
     /// Concurrent calls for the same provider are coalesced — the second caller
     /// receives the cached value while the first is in flight.
-    func refreshChannels(for playlist: Playlist) async throws -> (channels: [Channel], epgURL: String?) {
+    ///
+    /// An automatic refresh of a playlist that already has a cached lineup throws the system's
+    /// Low Data Mode refusal (see `NetworkPolicy.isLowDataModeRefusal`) instead of downloading.
+    func refreshChannels(
+        for playlist: Playlist, origin: RefreshOrigin = .userInitiated, hasCachedCopy: Bool = false
+    ) async throws -> (channels: [Channel], epgURL: String?) {
         if refreshingProviders.contains(playlist.id) {
             return ((await cachedChannels(for: playlist)) ?? [], nil)
         }
@@ -44,16 +51,20 @@ final class LiveChannelRepository {
         defer { refreshingProviders.remove(playlist.id) }
 
         var provider = LiveProvider(playlist: playlist)
-        let adapter  = makeAdapter(for: provider)
+        let session = NetworkPolicy.bulkSession(deferrable: NetworkPolicy.defersInLowDataMode(origin, hasCachedCopy: hasCachedCopy))
+        let adapter = makeAdapter(for: provider, session: session)
 
         // Network + parsing happens inside the adapter (off-main via async/await or Task.detached).
         let (epgURL, adapterChannels) = try await adapter.loadChannels()
 
         // ID assignment and model construction — background-threaded.
-        let liveChannels: [LiveChannel] = await Task.detached(priority: .userInitiated) {
-            adapterChannels.map { ac in
-                LiveChannel.make(from: ac, providerID: provider.id, kind: provider.kind)
-            }
+        let providerID = provider.id
+        let kind = provider.kind
+        let playlistName = playlist.name
+        let userAgent = playlist.userAgent
+        let (liveChannels, channels) = await Task.detached(priority: .userInitiated) { () -> ([LiveChannel], [Channel]) in
+            let live = LiveChannel.makeAll(from: adapterChannels, providerID: providerID, kind: kind)
+            return (live, live.map { $0.asChannel(playlistName: playlistName, defaultUserAgent: userAgent) })
         }.value
 
         provider.channelCount    = liveChannels.count
@@ -61,20 +72,20 @@ final class LiveChannelRepository {
 
         // Persist asynchronously — the UI receives its channels immediately.
         let capturedProvider = provider
-        let capturedChannels = liveChannels
         let capturedStore    = store
+        let logger           = logger
         Task.detached(priority: .utility) {
             do {
                 try await capturedStore.upsertProvider(capturedProvider)
-                try await capturedStore.replaceChannels(capturedChannels, for: capturedProvider.id)
+                try await capturedStore.replaceChannels(liveChannels, for: capturedProvider.id)
             } catch {
-                #if DEBUG
-                print("LiveChannelRepository: DB write failed for \(capturedProvider.name): \(error)")
-                #endif
+                // A failed write leaves the cache stale (and empty on a first launch), so it is
+                // logged in every build, not just Debug.
+                logger.error("Channel cache write failed for \(capturedProvider.name, privacy: .private): \(error.localizedDescription, privacy: .public)")
             }
         }
 
-        return (liveChannels.map { $0.asChannel(playlistName: playlist.name, defaultUserAgent: playlist.userAgent) }, epgURL)
+        return (channels, epgURL)
     }
 
     /// When a playlist's channels were last fetched from the provider (nil if never).
@@ -100,10 +111,10 @@ final class LiveChannelRepository {
 
     // MARK: - Adapter factory
 
-    private func makeAdapter(for provider: LiveProvider) -> any LiveProviderAdapter {
+    private func makeAdapter(for provider: LiveProvider, session: URLSession) -> any LiveProviderAdapter {
         switch provider.kind {
-        case .m3u:    return M3UProviderAdapter(provider: provider)
-        case .xtream: return XtreamProviderAdapter(provider: provider)
+        case .m3u:    return M3UProviderAdapter(provider: provider, session: session)
+        case .xtream: return XtreamProviderAdapter(provider: provider, session: session)
         }
     }
 }

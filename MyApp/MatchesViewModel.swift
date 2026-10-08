@@ -129,6 +129,7 @@ final class MatchesViewModel: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 30 * 1_000_000_000)
                 guard !Task.isCancelled, let self else { break }
+                guard AppActivity.shared.isActive else { continue }
                 if let args = self.lastFollowingArgs {
                     await self.loadFollowing(leagues: args.leagues, favorites: args.favorites)
                 } else {

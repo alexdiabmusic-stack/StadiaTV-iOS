@@ -165,10 +165,15 @@ struct PodcastEpisode: Identifiable, Hashable, Codable {
 
     var cleanDescription: String { episodeDescription.strippingHTML }
 
-    var formattedPublishedDate: String {
+    /// Built once: every episode row asks for its date each time it is drawn.
+    private nonisolated(unsafe) static let publishedDateFormatter: DateFormatter = {
         let fmt = DateFormatter()
         fmt.dateFormat = "MMM d, yyyy"
-        return fmt.string(from: publishedAt).uppercased()
+        return fmt
+    }()
+
+    var formattedPublishedDate: String {
+        Self.publishedDateFormatter.string(from: publishedAt).uppercased()
     }
 
     var formattedDuration: String {

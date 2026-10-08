@@ -400,7 +400,7 @@ struct PodcastBrowserView: View {
                         )
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(mode.rawValue), \(isSelected ? "selected" : "")")
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
             Spacer()
         }
@@ -424,16 +424,16 @@ struct PodcastBrowserView: View {
                             .padding(.horizontal, 16)
                             .frame(height: 38)
                             .background(
-                                isSelected ? Theme.accent : Theme.surfaceElevated,
+                                isSelected ? Theme.actionFill : Theme.surfaceElevated,
                                 in: Capsule()
                             )
                             .overlay(
                                 Capsule()
-                                    .strokeBorder(isSelected ? Theme.accent : Theme.hairline, lineWidth: 1)
+                                    .strokeBorder(isSelected ? Theme.actionFill : Theme.hairline, lineWidth: 1)
                             )
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(topic.title), \(isSelected ? "selected" : "")")
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
             }
             .padding(.horizontal, 16)
@@ -1121,7 +1121,7 @@ ShareLink(item: podcast.feedURL) {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 20)
                         .frame(height: 44)
-                        .background(Theme.accent, in: Capsule())
+                        .background(Theme.actionFill, in: Capsule())
                         .shadow(color: Theme.accent.opacity(0.35), radius: 8, x: 0, y: 3)
                     }
                     .buttonStyle(.plain)
@@ -1165,11 +1165,6 @@ ShareLink(item: podcast.feedURL) {
     private func featuredLatestCard(_ episode: PodcastEpisode) -> some View {
         let isCurrent = store.nowPlaying?.id == episode.id
         let isPlaying = isCurrent && store.isPlaying
-        let progress = isCurrent
-            ? (store.totalDuration > 0 ? store.currentTime / store.totalDuration : 0)
-            : store.progressFraction(for: episode)
-        let isPlayed = store.isPlayed(episode)
-        let remainingFormatted = store.remainingTimeFormatted(for: episode)
 
         return VStack(alignment: .leading, spacing: 10) {
             Text("LATEST EPISODE")
@@ -1229,28 +1224,7 @@ ShareLink(item: podcast.feedURL) {
                 .accessibilityLabel(isPlaying ? "Pause \(episode.title)" : "Play \(episode.title)")
             }
 
-            if progress > 0 || isPlayed {
-                HStack(spacing: 10) {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(Color.white.opacity(0.12))
-                                .frame(height: 4)
-                            Capsule()
-                                .fill(Theme.accent)
-                                .frame(width: max(0, min(geo.size.width, geo.size.width * CGFloat(progress))), height: 4)
-                        }
-                    }
-                    .frame(height: 4)
-
-                    if let rem = remainingFormatted {
-                        Text(rem)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Theme.textSecondary)
-                    }
-                }
-                .padding(.top, 4)
-            }
+            PodcastEpisodeProgressLine(store: store, clock: store.clock, episode: episode, isCurrent: isCurrent)
         }
         .padding(18)
         .background(
@@ -1354,7 +1328,7 @@ ShareLink(item: podcast.feedURL) {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 8)
-                    .background(Theme.accent, in: Capsule())
+                    .background(Theme.actionFill, in: Capsule())
             }
             .buttonStyle(.plain)
             Spacer()
@@ -1431,7 +1405,7 @@ struct PodcastEpisodeRow: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 4))
+                            .background(Theme.actionFill, in: RoundedRectangle(cornerRadius: 4))
                     }
                 }
                 .padding(.top, 2)
@@ -1570,6 +1544,45 @@ struct PodcastDetailSkeletonView: View {
     }
 }
 
+/// The progress line and "m left" label under an episode card. For the episode that is playing it
+/// follows the playback clock, so the card around it isn't redrawn on every tick.
+private struct PodcastEpisodeProgressLine: View {
+    /// A plain reference: the parent card already observes the store.
+    let store: PodcastStore
+    @ObservedObject var clock: PodcastPlaybackClock
+    let episode: PodcastEpisode
+    let isCurrent: Bool
+
+    var body: some View {
+        let progress = isCurrent
+            ? (clock.totalDuration > 0 ? clock.currentTime / clock.totalDuration : 0)
+            : store.progressFraction(for: episode)
+        let isPlayed = store.isPlayed(episode)
+        if progress > 0 || isPlayed {
+            HStack(spacing: 10) {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.white.opacity(0.12))
+                            .frame(height: 4)
+                        Capsule()
+                            .fill(Theme.accent)
+                            .frame(width: max(0, min(geo.size.width, geo.size.width * CGFloat(progress))), height: 4)
+                    }
+                }
+                .frame(height: 4)
+
+                if let remaining = store.remainingTimeFormatted(for: episode) {
+                    Text(remaining)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+            .padding(.top, 4)
+        }
+    }
+}
+
 // MARK: - Mini player (floating bar above tab bar)
 
 struct PodcastMiniPlayer: View {
@@ -1578,8 +1591,6 @@ struct PodcastMiniPlayer: View {
 
     var body: some View {
         if let episode = store.nowPlaying {
-            let progress = store.totalDuration > 0 ? max(0, min(1, store.currentTime / store.totalDuration)) : 0
-
             Button { showingPlayer = true } label: {
                 VStack(spacing: 0) {
                     HStack(spacing: 12) {
@@ -1594,7 +1605,7 @@ struct PodcastMiniPlayer: View {
                                     .font(.system(size: 8, weight: .bold))
                                     .foregroundStyle(.white)
                                     .padding(2)
-                                    .background(Theme.accent, in: RoundedRectangle(cornerRadius: 3))
+                                    .background(Theme.actionFill, in: RoundedRectangle(cornerRadius: 3))
                             }
                         }
 
@@ -1639,17 +1650,7 @@ struct PodcastMiniPlayer: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
 
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.08))
-                                .frame(height: 2.5)
-                            Rectangle()
-                                .fill(Theme.accent)
-                                .frame(width: geo.size.width * CGFloat(progress), height: 2.5)
-                        }
-                    }
-                    .frame(height: 2.5)
+                    PodcastMiniProgressLine(clock: store.clock)
                 }
                 .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -1669,6 +1670,27 @@ struct PodcastMiniPlayer: View {
                 PodcastPlayerSheet()
             }
         }
+    }
+}
+
+/// The mini player's progress line. It observes the playback clock itself, so the rest of the
+/// mini player isn't redrawn on every tick.
+private struct PodcastMiniProgressLine: View {
+    @ObservedObject var clock: PodcastPlaybackClock
+
+    var body: some View {
+        let progress = clock.totalDuration > 0 ? max(0, min(1, clock.currentTime / clock.totalDuration)) : 0
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.white.opacity(0.08))
+                    .frame(height: 2.5)
+                Rectangle()
+                    .fill(Theme.accent)
+                    .frame(width: geo.size.width * CGFloat(progress), height: 2.5)
+            }
+        }
+        .frame(height: 2.5)
     }
 }
 
@@ -1696,6 +1718,7 @@ struct PodcastPlayerSheet: View {
                             .font(.title3.weight(.semibold))
                             .foregroundStyle(Theme.textPrimary)
                     }
+                    .accessibilityLabel("Close player")
                 }
             }
         }
@@ -1736,7 +1759,7 @@ struct PodcastPlayerSheet: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 3)
-                            .background(Theme.accent, in: RoundedRectangle(cornerRadius: 3))
+                            .background(Theme.actionFill, in: RoundedRectangle(cornerRadius: 3))
                     }
                 }
                 Text(episode.podcastTitle)
@@ -1748,7 +1771,7 @@ struct PodcastPlayerSheet: View {
             .padding(.horizontal, 32)
             Spacer().frame(height: 28)
             // Scrubber
-            scrubber(episode)
+            PodcastScrubber(clock: store.clock, seek: { store.seek(to: $0) })
                 .padding(.horizontal, 32)
             Spacer().frame(height: 28)
             // Controls
@@ -1764,31 +1787,6 @@ struct PodcastPlayerSheet: View {
         }
     }
 
-    @ViewBuilder
-    private func scrubber(_ episode: PodcastEpisode) -> some View {
-        VStack(spacing: 6) {
-            #if os(tvOS)
-            ProgressView(value: store.currentTime, total: max(store.totalDuration, 1))
-            #else
-            Slider(
-                value: Binding(
-                    get: { store.totalDuration > 0 ? store.currentTime / store.totalDuration : 0 },
-                    set: { store.seek(to: $0 * max(store.totalDuration, 1)) }
-                )
-            )
-            .tint(Theme.accent)
-            #endif
-            HStack {
-                Text(formatTime(store.currentTime))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(Theme.textSecondary)
-                Spacer()
-                Text(store.totalDuration > 0 ? "-\(formatTime(store.totalDuration - store.currentTime))" : "--:--")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(Theme.textSecondary)
-            }
-        }
-    }
 
     private var controls: some View {
         HStack(spacing: 44) {
@@ -1798,6 +1796,7 @@ struct PodcastPlayerSheet: View {
                     .foregroundStyle(Theme.textPrimary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Skip back 15 seconds")
 
             Button { store.togglePlayPause() } label: {
                 ZStack {
@@ -1810,6 +1809,7 @@ struct PodcastPlayerSheet: View {
                 }
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(store.isPlaying ? "Pause" : "Play")
 
             Button { store.skip(seconds: 30) } label: {
                 Image(systemName: "goforward.30")
@@ -1817,6 +1817,7 @@ struct PodcastPlayerSheet: View {
                     .foregroundStyle(Theme.textPrimary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Skip forward 30 seconds")
         }
     }
 
@@ -1836,7 +1837,40 @@ struct PodcastPlayerSheet: View {
         }
     }
 
-    private func formatTime(_ t: TimeInterval) -> String {
+}
+
+/// Position slider and elapsed / remaining labels. It observes the playback clock itself, so the
+/// player sheet around it isn't redrawn on every tick.
+private struct PodcastScrubber: View {
+    @ObservedObject var clock: PodcastPlaybackClock
+    let seek: (TimeInterval) -> Void
+
+    var body: some View {
+        VStack(spacing: 6) {
+            #if os(tvOS)
+            ProgressView(value: clock.currentTime, total: max(clock.totalDuration, 1))
+            #else
+            Slider(
+                value: Binding(
+                    get: { clock.totalDuration > 0 ? clock.currentTime / clock.totalDuration : 0 },
+                    set: { seek($0 * max(clock.totalDuration, 1)) }
+                )
+            )
+            .tint(Theme.accent)
+            #endif
+            HStack {
+                Text(Self.formatTime(clock.currentTime))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(Theme.textSecondary)
+                Spacer()
+                Text(clock.totalDuration > 0 ? "-\(Self.formatTime(clock.totalDuration - clock.currentTime))" : "--:--")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        }
+    }
+
+    private static func formatTime(_ t: TimeInterval) -> String {
         guard t.isFinite && t >= 0 else { return "0:00" }
         let h = Int(t) / 3600
         let m = (Int(t) % 3600) / 60

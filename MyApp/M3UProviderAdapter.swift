@@ -67,6 +67,10 @@ nonisolated struct M3UProviderAdapter: LiveProviderAdapter {
     /// (see `loadChannels()`): reads one line at a time via `URL.lines` instead of holding
     /// the whole file as a single in-memory `String`, so parsing a large playlist doesn't
     /// require a second full-size copy on top of the file already on disk.
+    ///
+    /// `@concurrent`: without it a nonisolated async function runs on its caller's actor, and the
+    /// caller here is the main actor, so tens of thousands of lines would be parsed on it.
+    @concurrent
     static func parseM3U(fileURL: URL) async throws -> (epgURL: String?, channels: [AdapterChannel]) {
         let state = ParseState()
         for try await line in fileURL.lines {

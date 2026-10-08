@@ -33,8 +33,15 @@ actor LiveChannelStore {
     }()
 
     init(url: URL) throws {
+        try self.init(path: url.path)
+    }
+
+    /// `path` goes to SQLite as given, so `":memory:"` is a private in-memory database. It must not
+    /// pass through a `URL`: `URL(fileURLWithPath: ":memory:")` resolves against the working
+    /// directory, which made the old fallback open (or fail to create) a file with that name.
+    private init(path: String) throws {
         guard sqlite3_open_v2(
-            url.path,
+            path,
             &db,
             SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX,
             nil
@@ -45,7 +52,7 @@ actor LiveChannelStore {
     }
 
     static func inMemory() throws -> LiveChannelStore {
-        try LiveChannelStore(url: URL(fileURLWithPath: ":memory:"))
+        try LiveChannelStore(path: ":memory:")
     }
 
     private static func empty() -> LiveChannelStore {
@@ -58,6 +65,10 @@ actor LiveChannelStore {
     deinit { sqlite3_close(db) }
 
     // MARK: - Schema
+
+    /// Recorded in `PRAGMA user_version`. 0 = a database from before versioning.
+    /// 1 = `live_channels.archive_enabled`, and the `(provider_id, sort_index)` index.
+    nonisolated private static let schemaVersion: Int32 = 1
 
     /// Static so the synchronous initializer can run it before the actor is fully set up.
     nonisolated private static func createSchema(on db: OpaquePointer?) throws {
@@ -88,6 +99,7 @@ actor LiveChannelStore {
             stream_url       TEXT NOT NULL,
             streams_json     TEXT NOT NULL DEFAULT '[]',
             sort_index       INTEGER NOT NULL DEFAULT 0,
+            archive_enabled  INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY(provider_id) REFERENCES live_providers(id) ON DELETE CASCADE
         );
 
@@ -100,14 +112,54 @@ actor LiveChannelStore {
             epg_offset              INTEGER NOT NULL DEFAULT 0
         );
 
-        CREATE INDEX IF NOT EXISTS idx_ch_provider
-            ON live_channels(provider_id);
         CREATE INDEX IF NOT EXISTS idx_ch_group
             ON live_channels(provider_id, group_title);
         CREATE INDEX IF NOT EXISTS idx_ch_tvg
             ON live_channels(tvg_id) WHERE tvg_id IS NOT NULL;
         """
         try exec(ddl, on: db)
+        try migrate(on: db)
+    }
+
+    /// Brings a database created by an earlier version up to `schemaVersion`. The channel tables
+    /// are only a cache of what the providers serve, but rewriting them in place keeps the
+    /// lineup available offline on the first launch after an update.
+    nonisolated private static func migrate(on db: OpaquePointer?) throws {
+        guard scalar("PRAGMA user_version", on: db) < Int(schemaVersion) else { return }
+        try exec("BEGIN IMMEDIATE TRANSACTION", on: db)
+        do {
+            // 1: a column instead of a text search through every channel's JSON.
+            if !columns(of: "live_channels", on: db).contains("archive_enabled") {
+                try exec("ALTER TABLE live_channels ADD COLUMN archive_enabled INTEGER NOT NULL DEFAULT 0", on: db)
+                try exec(#"UPDATE live_channels SET archive_enabled = 1 WHERE streams_json LIKE '%"archiveEnabled":true%'"#, on: db)
+            }
+            // Reads order by sort_index within one provider; this also covers `provider_id` alone.
+            try exec("CREATE INDEX IF NOT EXISTS idx_ch_provider_sort ON live_channels(provider_id, sort_index)", on: db)
+            try exec("DROP INDEX IF EXISTS idx_ch_provider", on: db)
+            try exec("PRAGMA user_version = \(schemaVersion)", on: db)
+            try exec("COMMIT", on: db)
+        } catch {
+            try? exec("ROLLBACK", on: db)
+            throw error
+        }
+    }
+
+    nonisolated private static func scalar(_ sql: String, on db: OpaquePointer?) -> Int {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return 0 }
+        defer { sqlite3_finalize(stmt) }
+        return sqlite3_step(stmt) == SQLITE_ROW ? Int(sqlite3_column_int64(stmt, 0)) : 0
+    }
+
+    nonisolated private static func columns(of table: String, on db: OpaquePointer?) -> Set<String> {
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "PRAGMA table_info(\(table))", -1, &stmt, nil) == SQLITE_OK else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        var names: Set<String> = []
+        while sqlite3_step(stmt) == SQLITE_ROW, let name = sqlite3_column_text(stmt, 1) {
+            names.insert(String(cString: name))
+        }
+        return names
     }
 
     // MARK: - Provider operations
@@ -153,11 +205,13 @@ actor LiveChannelStore {
                 guard sqlite3_step(stmt) == SQLITE_DONE else { throw StoreError.writeFailed }
             }
 
+            // OR REPLACE so one repeated ID can't fail the whole transaction and leave the cache
+            // stale; callers already give every channel a distinct ID (see `LiveChannelIDGenerator`).
             let insertSQL = """
-            INSERT INTO live_channels
+            INSERT OR REPLACE INTO live_channels
                 (id, provider_id, provider_kind, name, logo_url, group_title, tvg_id,
-                 xtream_stream_id, xtream_cat_id, stream_url, streams_json, sort_index)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 xtream_stream_id, xtream_cat_id, stream_url, streams_json, sort_index, archive_enabled)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
             let encoder = JSONEncoder()
             try withStatement(insertSQL) { stmt in
@@ -184,6 +238,7 @@ actor LiveChannelStore {
                     bindText(stmt, 10, streamURL)
                     bindText(stmt, 11, streamsJSON)
                     sqlite3_bind_int64(stmt, 12, Int64(index))
+                    sqlite3_bind_int(stmt, 13, ch.streams.contains { $0.archiveEnabled } ? 1 : 0)
                     guard sqlite3_step(stmt) == SQLITE_DONE else { throw StoreError.writeFailed }
                 }
             }
@@ -222,82 +277,7 @@ actor LiveChannelStore {
         try withStatement(sql) { stmt in
             bindText(stmt, 1, providerID.uuidString)
             while sqlite3_step(stmt) == SQLITE_ROW {
-                let id          = columnText(stmt, 0)
-                let kindRaw     = columnText(stmt, 1)
-                let kind        = LiveProviderKind(rawValue: kindRaw) ?? .m3u
-                let name        = columnText(stmt, 2)
-                let logoURL     = optionalText(stmt, 3).flatMap(URL.init(string:))
-                let groupTitle  = optionalText(stmt, 4)
-                let tvgID       = optionalText(stmt, 5)
-                let xStreamID   = sqlite3_column_type(stmt, 6) != SQLITE_NULL
-                                    ? Int(sqlite3_column_int64(stmt, 6)) : nil
-                let xCatID      = optionalText(stmt, 7)
-                let streamsJSON = optionalText(stmt, 8) ?? "[]"
-                let streams     = (try? decoder.decode(
-                                    [StreamDescriptor].self,
-                                    from: Data(streamsJSON.utf8))) ?? []
-
-                channels.append(LiveChannel(
-                    id: id,
-                    providerID: providerID,
-                    providerKind: kind,
-                    name: name,
-                    logoURL: logoURL,
-                    groupTitle: groupTitle,
-                    streams: streams,
-                    tvgID: tvgID,
-                    xtreamStreamID: xStreamID,
-                    xtreamCategoryID: xCatID
-                ))
-            }
-        }
-        return channels
-    }
-
-    /// Paginated channel read — useful for future UI virtualisation.
-    func channels(for providerID: UUID, offset: Int, limit: Int) throws -> [LiveChannel] {
-        let sql = """
-        SELECT id, provider_kind, name, logo_url, group_title, tvg_id,
-               xtream_stream_id, xtream_cat_id, streams_json
-          FROM live_channels
-         WHERE provider_id = ?
-         ORDER BY sort_index
-         LIMIT ? OFFSET ?
-        """
-        let decoder = JSONDecoder()
-        var channels: [LiveChannel] = []
-        try withStatement(sql) { stmt in
-            bindText(stmt, 1, providerID.uuidString)
-            sqlite3_bind_int64(stmt, 2, Int64(limit))
-            sqlite3_bind_int64(stmt, 3, Int64(offset))
-            while sqlite3_step(stmt) == SQLITE_ROW {
-                let id         = columnText(stmt, 0)
-                let kindRaw    = columnText(stmt, 1)
-                let kind       = LiveProviderKind(rawValue: kindRaw) ?? .m3u
-                let name       = columnText(stmt, 2)
-                let logoURL    = optionalText(stmt, 3).flatMap(URL.init(string:))
-                let groupTitle = optionalText(stmt, 4)
-                let tvgID      = optionalText(stmt, 5)
-                let xStreamID  = sqlite3_column_type(stmt, 6) != SQLITE_NULL
-                                   ? Int(sqlite3_column_int64(stmt, 6)) : nil
-                let xCatID     = optionalText(stmt, 7)
-                let json       = optionalText(stmt, 8) ?? "[]"
-                let streams    = (try? decoder.decode(
-                                   [StreamDescriptor].self,
-                                   from: Data(json.utf8))) ?? []
-
-                channels.append(LiveChannel(
-                    id: id,
-                    providerID: providerID,
-                    providerKind: kind,
-                    name: name,
-                    logoURL: logoURL,
-                    groupTitle: groupTitle,
-                    streams: streams,
-                    tvgID: tvgID,
-                    xtreamStreamID: xStreamID,
-                    xtreamCategoryID: xCatID
-                ))
+                channels.append(liveChannel(from: stmt, providerID: providerID, decoder: decoder))
             }
         }
         return channels
@@ -331,12 +311,9 @@ actor LiveChannelStore {
     }
 
     /// Returns all channel IDs where any stream has archiveEnabled = true.
-    /// Uses a JSON text search — fast enough for one-shot enrichment on channel load.
     func archiveEnabledChannelIDs() throws -> [String] {
         var ids: [String] = []
-        try withStatement(
-            #"SELECT id FROM live_channels WHERE streams_json LIKE '%"archiveEnabled":true%'"#
-        ) { stmt in
+        try withStatement("SELECT id FROM live_channels WHERE archive_enabled = 1") { stmt in
             while sqlite3_step(stmt) == SQLITE_ROW {
                 ids.append(columnText(stmt, 0))
             }
@@ -347,8 +324,8 @@ actor LiveChannelStore {
     /// Returns a single channel by its stable ID, or nil if not found.
     func channel(id: String) throws -> LiveChannel? {
         let sql = """
-        SELECT provider_id, provider_kind, name, logo_url, group_title, tvg_id,
-               xtream_stream_id, xtream_cat_id, streams_json
+        SELECT id, provider_kind, name, logo_url, group_title, tvg_id,
+               xtream_stream_id, xtream_cat_id, streams_json, provider_id
           FROM live_channels WHERE id = ?
         """
         let decoder = JSONDecoder()
@@ -356,33 +333,29 @@ actor LiveChannelStore {
         try withStatement(sql) { stmt in
             bindText(stmt, 1, id)
             if sqlite3_step(stmt) == SQLITE_ROW {
-                let providerID  = UUID(uuidString: columnText(stmt, 0)) ?? UUID()
-                let kind        = LiveProviderKind(rawValue: columnText(stmt, 1)) ?? .m3u
-                let name        = columnText(stmt, 2)
-                let logoURL     = optionalText(stmt, 3).flatMap(URL.init(string:))
-                let groupTitle  = optionalText(stmt, 4)
-                let tvgID       = optionalText(stmt, 5)
-                let xStreamID   = sqlite3_column_type(stmt, 6) != SQLITE_NULL
-                                    ? Int(sqlite3_column_int64(stmt, 6)) : nil
-                let xCatID      = optionalText(stmt, 7)
-                let json        = optionalText(stmt, 8) ?? "[]"
-                let streams     = (try? decoder.decode([StreamDescriptor].self,
-                                                       from: Data(json.utf8))) ?? []
-                result = LiveChannel(
-                    id: id,
-                    providerID: providerID,
-                    providerKind: kind,
-                    name: name,
-                    logoURL: logoURL,
-                    groupTitle: groupTitle,
-                    streams: streams,
-                    tvgID: tvgID,
-                    xtreamStreamID: xStreamID,
-                    xtreamCategoryID: xCatID
-                )
+                let providerID = UUID(uuidString: columnText(stmt, 9)) ?? UUID()
+                result = liveChannel(from: stmt, providerID: providerID, decoder: decoder)
             }
         }
         return result
+    }
+
+    /// Reads one row selected as `id, provider_kind, name, logo_url, group_title, tvg_id,
+    /// xtream_stream_id, xtream_cat_id, streams_json`.
+    private func liveChannel(from stmt: OpaquePointer?, providerID: UUID, decoder: JSONDecoder) -> LiveChannel {
+        let streamsJSON = optionalText(stmt, 8) ?? "[]"
+        return LiveChannel(
+            id: columnText(stmt, 0),
+            providerID: providerID,
+            providerKind: LiveProviderKind(rawValue: columnText(stmt, 1)) ?? .m3u,
+            name: columnText(stmt, 2),
+            logoURL: optionalText(stmt, 3).flatMap(URL.init(string:)),
+            groupTitle: optionalText(stmt, 4),
+            streams: (try? decoder.decode([StreamDescriptor].self, from: Data(streamsJSON.utf8))) ?? [],
+            tvgID: optionalText(stmt, 5),
+            xtreamStreamID: sqlite3_column_type(stmt, 6) != SQLITE_NULL ? Int(sqlite3_column_int64(stmt, 6)) : nil,
+            xtreamCategoryID: optionalText(stmt, 7)
+        )
     }
 
     // MARK: - SQLite helpers
@@ -409,13 +382,15 @@ actor LiveChannelStore {
         }
     }
 
+    // SQLITE_TRANSIENT copies the bytes before the call returns, so Swift's temporary C string
+    // is enough; there's no need to allocate an NSString per value.
     private func bindText(_ stmt: OpaquePointer?, _ col: Int32, _ val: String) {
-        sqlite3_bind_text(stmt, col, (val as NSString).utf8String, -1, kSQLiteTransient)
+        sqlite3_bind_text(stmt, col, val, -1, kSQLiteTransient)
     }
 
     private func bindOptionalText(_ stmt: OpaquePointer?, _ col: Int32, _ val: String?) {
         if let val {
-            sqlite3_bind_text(stmt, col, (val as NSString).utf8String, -1, kSQLiteTransient)
+            sqlite3_bind_text(stmt, col, val, -1, kSQLiteTransient)
         } else {
             sqlite3_bind_null(stmt, col)
         }

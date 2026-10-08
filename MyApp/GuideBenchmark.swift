@@ -164,7 +164,7 @@ enum GuideBenchmark {
         // URL is never fetched — it only satisfies Playlist/LiveProvider's field.
         let playlist = Playlist(name: "GuideBenchmark", kind: .m3u, m3uURL: "https://benchmark.invalid/playlist.m3u")
         let provider = LiveProvider(playlist: playlist)
-        let liveChannels = adapterChannels.map { LiveChannel.make(from: $0, providerID: provider.id, kind: provider.kind) }
+        let liveChannels = LiveChannel.makeAll(from: adapterChannels, providerID: provider.id, kind: provider.kind)
         return liveChannels.map { $0.asChannel(playlistName: playlist.name, defaultUserAgent: playlist.userAgent) }
     }
 
@@ -226,7 +226,7 @@ enum GuideBenchmark {
             print("GuideBenchmark: XtreamProviderAdapter.loadChannels() failed")
             return []
         }
-        let liveChannels = adapterChannels.map { LiveChannel.make(from: $0, providerID: provider.id, kind: provider.kind) }
+        let liveChannels = LiveChannel.makeAll(from: adapterChannels, providerID: provider.id, kind: provider.kind)
         return liveChannels.map { $0.asChannel(playlistName: playlist.name, defaultUserAgent: playlist.userAgent) }
     }
 

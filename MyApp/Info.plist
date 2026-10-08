@@ -48,6 +48,8 @@
 	<string>https://mlapi.bet/v1</string>
 	<key>OddsAPIKey</key>
 	<string>$(ODDS_API_KEY)</string>
+	<key>PremiumUnlockAllFeatures</key>
+	<string>$(BANNER_UNLOCK_ALL_FEATURES)</string>
 	<key>UIApplicationSceneManifest</key>
 	<array>
 		<dict>

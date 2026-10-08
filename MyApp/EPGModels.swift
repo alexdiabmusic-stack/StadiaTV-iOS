@@ -124,8 +124,61 @@ nonisolated enum StreamResolution: Int, Comparable, CaseIterable {
 
     static func < (lhs: StreamResolution, rhs: StreamResolution) -> Bool { lhs.rawValue < rhs.rawValue }
 
+    /// Runs once per channel in a playlist (twice across a refresh and a lineup import), so for the
+    /// usual all-ASCII name it scans bytes rather than compiling two regular expressions per call.
+    /// Names with any other character take `detectUnicode`, whose matching rules are the originals.
     nonisolated static func detect(from name: String) -> StreamResolution {
-        let n = name.uppercased()
+        var upper = name.uppercased()
+        let ascii: StreamResolution? = upper.withUTF8 { bytes in
+            if bytes.contains(where: { $0 >= 0x80 }) { return nil }
+            func contains(_ needle: StaticString) -> Bool {
+                firstIndex(of: UnsafeBufferPointer(start: needle.utf8Start, count: needle.utf8CodeUnitCount), in: bytes) != nil
+            }
+            /// `\bHD\b`: the token not touching a letter, digit or underscore on either side.
+            func containsWord(_ needle: StaticString) -> Bool {
+                let pattern = UnsafeBufferPointer(start: needle.utf8Start, count: needle.utf8CodeUnitCount)
+                var from = 0
+                while let index = firstIndex(of: pattern, in: bytes, from: from) {
+                    let end = index + pattern.count
+                    if (index == 0 || !isWordByte(bytes[index - 1])) && (end == bytes.count || !isWordByte(bytes[end])) { return true }
+                    from = index + 1
+                }
+                return false
+            }
+            if contains("4K") || contains("UHD") || contains("2160") { return .uhd }
+            if contains("FHD") || contains("1080") || contains("FULL HD") { return .fhd }
+            if containsWord("HD") || contains("720") { return .hd }
+            if containsWord("SD") { return .sd }
+            return .unknown
+        }
+        return ascii ?? detectUnicode(upper)
+    }
+
+    private nonisolated static func isWordByte(_ byte: UInt8) -> Bool {
+        (byte >= 0x30 && byte <= 0x39) || (byte >= 0x41 && byte <= 0x5A) || (byte >= 0x61 && byte <= 0x7A) || byte == 0x5F
+    }
+
+    private nonisolated static func firstIndex(of pattern: UnsafeBufferPointer<UInt8>, in bytes: UnsafeBufferPointer<UInt8>, from start: Int = 0) -> Int? {
+        guard pattern.count > 0, bytes.count >= pattern.count, start <= bytes.count - pattern.count else { return nil }
+        let first = pattern[0]
+        var index = start
+        let last = bytes.count - pattern.count
+        while index <= last {
+            if bytes[index] == first {
+                var matches = true
+                var offset = 1
+                while offset < pattern.count {
+                    if bytes[index + offset] != pattern[offset] { matches = false; break }
+                    offset += 1
+                }
+                if matches { return index }
+            }
+            index += 1
+        }
+        return nil
+    }
+
+    private nonisolated static func detectUnicode(_ n: String) -> StreamResolution {
         if n.contains("4K") || n.contains("UHD") || n.contains("2160") { return .uhd }
         if n.contains("FHD") || n.contains("1080") || n.contains("FULL HD") { return .fhd }
         if n.range(of: #"\bHD\b"#, options: .regularExpression) != nil || n.contains("720") { return .hd }
@@ -228,15 +281,6 @@ nonisolated enum EPGMatchMethod: String, Codable {
         let raw = try decoder.singleValueContainer().decode(String.self)
         self = EPGMatchMethod(rawValue: raw) ?? .normalizedExact
     }
-}
-
-nonisolated struct EPGChannelMapping: Codable, Hashable {
-    let canonicalChannelId: String
-    let xmltvChannelId: String
-    let sourceId: String
-    let matchMethod: EPGMatchMethod
-    let confidence: Double
-    let isManualOverride: Bool
 }
 
 // MARK: - Guide category

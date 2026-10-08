@@ -65,6 +65,7 @@ struct PreferencesView: View {
                             Image(systemName: "star.slash").foregroundStyle(Theme.textSecondary)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Remove \(fav.displayName) from favorites")
                     }
                     .listRowBackground(Theme.surface)
                 }

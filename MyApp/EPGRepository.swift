@@ -1201,8 +1201,14 @@ final class EPGRepository: ObservableObject {
     }
 
     /// The canonical channel a provider channel was matched to, via the prebuilt maps (no scans).
-    func canonicalChannel(forProviderChannelID id: String) -> CanonicalChannel? {
-        channelToCanonicalMap[id].flatMap { canonicalChannelsByID[$0] }
+    func canonicalChannel(forProviderChannelID id: String, playlistID: UUID? = nil) -> CanonicalChannel? {
+        guard let canonical = channelToCanonicalMap[id].flatMap({ canonicalChannelsByID[$0] }) else { return nil }
+        if let playlistID {
+            // Provider IDs can be reused by another account. Ambiguous mappings must not
+            // give playback the wrong feed's mirrors or programme information.
+            guard canonical.allStreams.contains(where: { $0.providerChannelId == id && $0.playlistID == playlistID }) else { return nil }
+        }
+        return canonical
     }
 
     private func rebuildCoverageIndex() {

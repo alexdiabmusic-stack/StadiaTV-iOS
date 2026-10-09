@@ -64,7 +64,7 @@ final class MyAppUITests: XCTestCase {
         // Let the initial guide import/scroll-to-now settle before measuring.
         Thread.sleep(forTimeInterval: 1.5)
 
-        measure(metrics: [XCTHitchMetric(during: .responsive)]) {
+        measure(metrics: [XCTOSSignpostMetric.scrollingAndDecelerationMetric]) {
             for _ in 0..<4 {
                 window.swipeUp(velocity: .fast)
                 window.swipeLeft(velocity: .fast)

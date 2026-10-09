@@ -1,5 +1,8 @@
 import SwiftUI
 import AVKit
+#if os(macOS)
+import AppKit
+#endif
 import Combine
 #if canImport(UIKit)
 import UIKit
@@ -20,6 +23,12 @@ private struct LiveCommandKeyboardHandler: View {
     let onOpenChannelList: () -> Void
     let onOpenRecents: () -> Void
     let onExit: () -> Void
+    let onMute: () -> Void
+    let onFullscreen: () -> Void
+    let onSports: () -> Void
+    let onPrevious: () -> Void
+    let onPictureInPicture: () -> Void
+    let onRestoreMultiview: (Int) -> Void
 
     var body: some View {
         #if !os(tvOS)
@@ -28,8 +37,19 @@ private struct LiveCommandKeyboardHandler: View {
             keyButton("chDown",  shortcut: .init(.downArrow, modifiers: []), action: onChannelDown)
             keyButton("chrome",  shortcut: .init(.space,     modifiers: []), action: onToggleChrome)
             keyButton("guide",   shortcut: .init("g",        modifiers: []), action: onOpenGuide)
-            keyButton("chList",  shortcut: .init("l",        modifiers: []), action: onOpenChannelList)
+            keyButton("chList",  shortcut: .init("c",        modifiers: []), action: onOpenChannelList)
             keyButton("recents", shortcut: .init("r",        modifiers: []), action: onOpenRecents)
+            keyButton("pip", shortcut: .init("p", modifiers: []), action: onPictureInPicture)
+            keyButton("mute", shortcut: .init("m", modifiers: []), action: onMute)
+            keyButton("fullscreen", shortcut: .init("f", modifiers: []), action: onFullscreen)
+            keyButton("sports", shortcut: .init("s", modifiers: []), action: onSports)
+            keyButton("next", shortcut: .init("n", modifiers: []), action: onChannelDown)
+            keyButton("previous", shortcut: .init("b", modifiers: []), action: onPrevious)
+            ForEach(1...4, id: \.self) { slot in
+                keyButton("layout\(slot)", shortcut: .init(KeyEquivalent(Character(String(slot))), modifiers: .command)) {
+                    onRestoreMultiview(slot)
+                }
+            }
             keyButton("exit",    shortcut: .init(.escape,    modifiers: []), action: onExit)
         }
         .frame(width: 0, height: 0)
@@ -81,6 +101,9 @@ struct PlayerView: View {
     @State private var currentZapChannel: Channel
     @State private var zapIndex: Int
     @State private var dwellTask: Task<Void, Never>?
+    @State private var previousChannel: Channel?
+    @State private var lastAppliedLoadToken: Int?
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
 
     // Playback options
     @State private var activeStreamMetadata: StreamRuntimeMetadata?
@@ -90,16 +113,63 @@ struct PlayerView: View {
     @State private var selectedAudioIndex: Int?
     @State private var selectedSubtitleIndex: Int?
 
+    private enum Panel {
+        case settings, channels, recents, guide, broadcasts, multiview, paywall, fantasy, sports
+    }
+    @StateObject private var playerGuideModel = TVGuideViewModel()
+    @State private var presentedPanel: Panel?
+
+    private func panelBinding(_ panel: Panel) -> Binding<Bool> {
+        Binding(get: { presentedPanel == panel }, set: { visible in
+            if visible { presentedPanel = panel }
+            else if presentedPanel == panel { presentedPanel = nil }
+        })
+    }
+
     // Player chrome panels
-    @State private var showingMore = false
-    @State private var showingChannelList = false
-    @State private var showingRecents = false
-    @State private var showingGuideFromPlayer = false
+    private var showingMore: Bool {
+        get { presentedPanel == .settings }
+        nonmutating set {
+            if newValue { presentedPanel = .settings }
+            else if presentedPanel == .settings { presentedPanel = nil }
+        }
+    }
+    private var showingChannelList: Bool {
+        get { presentedPanel == .channels }
+        nonmutating set {
+            if newValue { presentedPanel = .channels }
+            else if presentedPanel == .channels { presentedPanel = nil }
+        }
+    }
+    private var showingRecents: Bool {
+        get { presentedPanel == .recents }
+        nonmutating set {
+            if newValue { presentedPanel = .recents }
+            else if presentedPanel == .recents { presentedPanel = nil }
+        }
+    }
+    private var showingGuideFromPlayer: Bool {
+        get { presentedPanel == .guide }
+        nonmutating set {
+            if newValue { presentedPanel = .guide }
+            else if presentedPanel == .guide { presentedPanel = nil }
+        }
+    }
 
     @State private var isChromeVisible = true
+    @State private var controlsLocked = false
+    #if os(macOS)
+    @State private var desktopWindowState: (window: NSWindow, frame: NSRect, minimum: NSSize, aspect: NSSize, level: NSWindow.Level)?
+    #endif
     @State private var chromeHideTask: Task<Void, Never>?
     @State private var preferredOrientation: PlayerOrientation = .portrait
-    @State private var isShowingMultiscreenPicker = false
+    private var isShowingMultiscreenPicker: Bool {
+        get { presentedPanel == .multiview }
+        nonmutating set {
+            if newValue { presentedPanel = .multiview }
+            else if presentedPanel == .multiview { presentedPanel = nil }
+        }
+    }
     @State private var selectedMultiChannelIDs: Set<String> = []
     @State private var multiscreenSession: PlayerMultiscreenSession?
     /// Chosen in the picker; presented once the picker sheet has finished dismissing.
@@ -118,14 +188,50 @@ struct PlayerView: View {
 
     // Live score overlay
     @State private var liveScoreMatch: Match?
+    private func publishMatch(_ match: Match?) {
+        MatchNotificationService.shared.playerMatchID = match?.id
+        liveScoreMatch = match
+        spoilerBuffer.receive(match)
+        scoreDisplayDate = Date()
+    }
+    @State private var spoilerBuffer = PlayerSpoilerBuffer()
+    @State private var scoreDisplayDate = Date()
+    private var displayedScoreMatch: Match? {
+        guard !prefs.hidesSportsScores else { return nil }
+        return spoilerBuffer.snapshot(delay: prefs.sportsScoreDelaySeconds, now: scoreDisplayDate)
+    }
     @State private var isScoreDismissed = false
     @State private var scoreFetchTask: Task<Void, Never>?
     @State private var matchResolutionState: PlayerMatchResolutionState = .resolving
     @State private var selectedPlayerTab: SportPlayerTab = .game
-    @State private var isLandscapeGameCentreVisible = false
-    @State private var showPaywall = false
-    @State private var showingSourceSelector = false
-    @State private var showingFantasySidebar = false
+    private var isLandscapeGameCentreVisible: Bool {
+        get { presentedPanel == .sports }
+        nonmutating set {
+            if newValue { presentedPanel = .sports }
+            else if presentedPanel == .sports { presentedPanel = nil }
+        }
+    }
+    private var showPaywall: Bool {
+        get { presentedPanel == .paywall }
+        nonmutating set {
+            if newValue { presentedPanel = .paywall }
+            else if presentedPanel == .paywall { presentedPanel = nil }
+        }
+    }
+    private var showingSourceSelector: Bool {
+        get { presentedPanel == .broadcasts }
+        nonmutating set {
+            if newValue { presentedPanel = .broadcasts }
+            else if presentedPanel == .broadcasts { presentedPanel = nil }
+        }
+    }
+    private var showingFantasySidebar: Bool {
+        get { presentedPanel == .fantasy }
+        nonmutating set {
+            if newValue { presentedPanel = .fantasy }
+            else if presentedPanel == .fantasy { presentedPanel = nil }
+        }
+    }
     /// Shown briefly when Auto moves to another source after a failure.
     @State private var failoverNotice: String?
     @State private var aspectMode: PlayerAspectMode = .fit
@@ -188,10 +294,50 @@ struct PlayerView: View {
         _currentZapChannel = State(initialValue: context.channel)
         _zapIndex = State(initialValue: 0)
         // The match's other ranked sources become failover/cycle candidates, in rank order.
-        let candidates = context.rankedSources.prefix(StreamSelectionState.maxRawCandidates).map(\.channel)
+        let candidates = context.rankedSources.filter(\.isConfirmed).prefix(StreamSelectionState.maxRawCandidates).map(\.channel)
         _streamSelection = StateObject(wrappedValue: StreamSelectionState(channel: context.channel, candidates: Array(candidates)))
         _playback = StateObject(wrappedValue: BannerAppEnvironment.shared.playbackController)
         _initialTapDate = State(initialValue: tapDate ?? PlaybackTapClock.consume() ?? Date())
+    }
+
+    private var compactPlayerAction: (() -> Void)? {
+        #if os(macOS)
+        return { toggleDesktopCompact() }
+        #else
+        return nil
+        #endif
+    }
+
+    #if os(macOS)
+    private func toggleDesktopCompact() {
+        if desktopWindowState != nil { restoreDesktopWindow(); return }
+        guard let window = NSApplication.shared.keyWindow,
+              !window.styleMask.contains(.fullScreen) else { return }
+        desktopWindowState = (window, window.frame, window.contentMinSize, window.contentAspectRatio, window.level)
+        presentedPanel = nil
+        window.contentMinSize = NSSize(width: 480, height: 270)
+        window.contentAspectRatio = NSSize(width: 16, height: 9)
+        window.setContentSize(NSSize(width: 640, height: 360))
+        window.level = .floating
+    }
+
+    private func restoreDesktopWindow() {
+        guard let saved = desktopWindowState else { return }
+        saved.window.level = saved.level
+        saved.window.contentMinSize = saved.minimum
+        saved.window.contentAspectRatio = saved.aspect
+        saved.window.setFrame(saved.frame, display: true)
+        desktopWindowState = nil
+    }
+    #endif
+
+    private var pictureInPictureAction: (() -> Void)? {
+        #if os(iOS)
+        guard let controller = pipController, controller.isPictureInPicturePossible else { return nil }
+        return { controller.startPictureInPicture() }
+        #else
+        return nil
+        #endif
     }
 
     private var canonicalChannel: CanonicalChannel? {
@@ -243,13 +389,16 @@ struct PlayerView: View {
         MatchPlayerScreen(
             channel: activePlaybackChannel,
             canonicalChannel: canonicalChannel,
-            match: liveScoreMatch,
-            scoreBugMatch: prefs.showLiveScoreBadge && !isScoreDismissed ? liveScoreMatch : nil,
+            match: prefs.spoilerFreeMode ? nil : liveScoreMatch,
+            scoreBugMatch: prefs.showLiveScoreBadge && !isScoreDismissed ? displayedScoreMatch : nil,
             matchResolutionState: matchResolutionState,
             selectedTab: $selectedPlayerTab,
-            isChromeVisible: isChromeVisible,
-            isLandscapeGameCentreVisible: $isLandscapeGameCentreVisible,
-            streamSummary: streamSelection.currentSummary,
+            isChromeVisible: isChromeVisible && !controlsLocked,
+            isLandscapeGameCentreVisible: panelBinding(.sports),
+            streamSummary: activeStreamMetadata.map { metadata in
+                [metadata.height.map { "\($0)p" }, metadata.frameRate.map { String(format: "%.0f fps", $0) }]
+                    .compactMap { $0 }.joined(separator: " · ")
+            } ?? "Live",
             canStartMultiscreen: canStartMultiscreen,
             hasPreviousChannel: zapIndex > 0,
             hasNextChannel: zapIndex < zapChannels.count - 1,
@@ -273,11 +422,7 @@ struct PlayerView: View {
             onSourceSelector: { showingSourceSelector = true; revealChromeTemporarily() },
             onCycleSource: cycleSource(direction:),
             onToggleOrientation: { toggleOrientation() },
-            onPiP: {
-                #if os(iOS)
-                pipController?.startPictureInPicture()
-                #endif
-            },
+            onPiP: pictureInPictureAction,
             orientation: preferredOrientation
         ) {
             PlayerSurface(controller: playback, videoGravity: aspectMode.videoGravity) { controller in
@@ -285,19 +430,24 @@ struct PlayerView: View {
                 pipController = controller
                 #endif
             }
+            .modifier(OriginalVideoSize(mode: aspectMode, videoSize: playback.player.currentItem?.presentationSize ?? .zero))
             .overlay { PlaybackStatusOverlay(controller: playback, channel: activePlaybackChannel, failoverNotice: failoverNotice) }
+            #if os(macOS)
+            .onTapGesture(count: 2) { NSApplication.shared.keyWindow?.toggleFullScreen(nil) }
+            #endif
             #if os(iOS)
-            .overlay { playerGestureZones }
+            .overlay { playerGestureZones.allowsHitTesting(!controlsLocked) }
             #endif
         } channelPage: {
             PlayerChannelInfoPage(
                 channel: activePlaybackChannel,
-                canonicalChannel: canonicalChannel ?? stores?.epgRepository.canonicalChannel(forProviderChannelID: activePlaybackChannel.id),
+                canonicalChannel: canonicalChannel ?? stores?.epgRepository.canonicalChannel(forProviderChannelID: activePlaybackChannel.id, playlistID: activePlaybackChannel.playlistID),
                 isResolvingMatch: matchResolutionState.isPending,
                 relatedChannels: relatedChannels,
                 onSelectChannel: { switchChannel(to: $0) }
             )
         }
+        .overlay(alignment: .topTrailing) { PlayerSportsAlertBanner() }
         .onGeometryChange(for: Bool.self) { $0.size.width > $0.size.height } action: { landscape in
             isLandscapeLayout = landscape
         }
@@ -308,6 +458,15 @@ struct PlayerView: View {
         .opacity(playerDimForDismissal)
         .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.86), value: dismissalDragOffset)
         #endif
+        .overlay(alignment: .topTrailing) {
+            if controlsLocked {
+                Button { controlsLocked = false; revealChromeTemporarily() } label: {
+                    Label("Unlock controls", systemImage: "lock.open.fill")
+                        .padding(12).background(.black.opacity(0.75), in: Capsule())
+                }
+                .foregroundStyle(.white).padding()
+            }
+        }
         .contentShape(Rectangle())
         #if os(iOS)
         .simultaneousGesture(playerDismissalGesture)
@@ -349,7 +508,8 @@ struct PlayerView: View {
                     message: message,
                     tryAgain: { streamSelection.retryActiveStream(); revealChromeTemporarily() },
                     chooseAnother: streamSelection.hasSelectableStreams ? { showingSourceSelector = true; revealChromeTemporarily() } : nil,
-                    switchToAuto: { streamSelection.selectAuto(); revealChromeTemporarily() }
+                    switchToAuto: { streamSelection.selectAuto(); revealChromeTemporarily() },
+                    returnToGuide: { showingGuideFromPlayer = true }
                 )
                 .padding(24)
                 .transition(.opacity.combined(with: .scale(scale: 0.96)))
@@ -376,7 +536,7 @@ struct PlayerView: View {
         }
         .animation(Theme.Motion.snappy, value: showGestureHint)
         #endif
-        .sheet(isPresented: $isShowingMultiscreenPicker, onDismiss: {
+        .sheet(isPresented: panelBinding(.multiview), onDismiss: {
             multiscreenChannels = []
             if let session = pendingMultiscreenSession {
                 pendingMultiscreenSession = nil
@@ -388,7 +548,7 @@ struct PlayerView: View {
                                     selectedChannelIDs: $selectedMultiChannelIDs,
                                     startAction: startMultiscreen)
         }
-        .sheet(isPresented: $showingSourceSelector) {
+        .sheet(isPresented: panelBinding(.broadcasts)) {
             NavigationStack {
                 StreamSourceSelectionView(selection: streamSelection)
                     .toolbar {
@@ -400,7 +560,7 @@ struct PlayerView: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showingMore) {
+        .sheet(isPresented: panelBinding(.settings)) {
             PlayerMoreSheet(
                 channel: activePlaybackChannel,
                 streamSelection: streamSelection,
@@ -414,54 +574,63 @@ struct PlayerView: View {
                 ),
                 aspect: Binding(get: { aspectMode }, set: { setAspect($0) }),
                 audioGroup: audioGroup,
-                selectedAudioIndex: $selectedAudioIndex,
+                selectedAudioIndex: Binding(get: { selectedAudioIndex }, set: { selectedAudioIndex = $0; applyAudioTrack(index: $0) }),
                 subtitleGroup: subtitleGroup,
-                selectedSubtitleIndex: $selectedSubtitleIndex,
+                selectedSubtitleIndex: Binding(get: { selectedSubtitleIndex }, set: { selectedSubtitleIndex = $0; applySubtitleTrack(index: $0) }),
                 streamMetadata: activeStreamMetadata,
                 canStartMultiscreen: canStartMultiscreen,
-                multiscreenAction: { showingMore = false; showMultiscreenPicker() }
+                multiscreenAction: { showingMore = false; showMultiscreenPicker() },
+                lockAction: { showingMore = false; controlsLocked = true },
+                compactAction: compactPlayerAction,
+                recommendationAction: { channel in showingMore = false; switchChannel(to: channel) }
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showingChannelList) {
+        .sheet(isPresented: panelBinding(.channels)) {
             PlayerChannelListSheet(
-                channels: zapChannels,
-                currentChannelID: currentZapChannel.id,
-                onSelect: { _, index in zapTo(index: index) }
+                channels: stores?.playlistStore.allChannels ?? zapChannels,
+                currentChannelID: StreamLinkerAdapters.streamID(currentZapChannel),
+                onSelect: { channel, _ in switchChannel(to: channel) }
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .sheet(isPresented: $showingRecents) {
+        .sheet(isPresented: panelBinding(.recents)) {
             PlayerRecentsSheet(
-                currentChannelID: currentZapChannel.id,
+                currentChannelID: StreamLinkerAdapters.streamID(currentZapChannel),
                 onSelect: { ch in switchChannel(to: ch) }
             )
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
         #if os(macOS)
-        .sheet(isPresented: $showingGuideFromPlayer) {
+        .sheet(isPresented: panelBinding(.guide)) {
             TVGuideView(onChannelSelected: { canonicalChannel in
                 if let ch = canonicalChannel.playableChannel {
                     switchChannel(to: ch, canonicalChannel: canonicalChannel)
                 }
                 showingGuideFromPlayer = false
-            })
+            }, onCatchupSelected: { channel in
+                switchChannel(to: channel)
+                showingGuideFromPlayer = false
+            }, viewModel: playerGuideModel, preview: AnyView(VideoSurface(player: playback.player, showsPlaybackControls: false, allowsPictureInPicture: false) { _ in }))
         }
         #else
-        .fullScreenCover(isPresented: $showingGuideFromPlayer) {
+        .fullScreenCover(isPresented: panelBinding(.guide)) {
             TVGuideView(onChannelSelected: { canonicalChannel in
                 if let ch = canonicalChannel.playableChannel {
                     switchChannel(to: ch, canonicalChannel: canonicalChannel)
                 }
                 showingGuideFromPlayer = false
-            })
+            }, onCatchupSelected: { channel in
+                switchChannel(to: channel)
+                showingGuideFromPlayer = false
+            }, viewModel: playerGuideModel, preview: AnyView(VideoSurface(player: playback.player, showsPlaybackControls: false, allowsPictureInPicture: false) { _ in }))
         }
         #endif
         .overlay(alignment: .trailing) {
-            if showingFantasySidebar {
+            if showingFantasySidebar && !prefs.spoilerFreeMode {
                 FantasyMatchupSidebarView(
                     onWatchChannel: { ch in
                         withAnimation(Theme.Motion.snappy) { showingFantasySidebar = false }
@@ -477,7 +646,7 @@ struct PlayerView: View {
             }
         }
         .overlay(alignment: .topTrailing) {
-            if liveTracker.showToastAlert, let alert = liveTracker.recentAlert {
+            if !prefs.spoilerFreeMode, prefs.notificationSettings.enabled, prefs.notificationSettings.liveAlerts, liveTracker.showToastAlert, let alert = liveTracker.recentAlert {
                 FantasyRedZoneToastView(
                     alert: alert,
                     onWatchChannel: { ch in
@@ -494,7 +663,7 @@ struct PlayerView: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if !showingFantasySidebar && isChromeVisible {
+            if !prefs.spoilerFreeMode && !showingFantasySidebar && isChromeVisible {
                 FantasyDriveTickerOverlayView(onWatchChannel: { ch in
                     zapToChannel(ch)
                 })
@@ -508,14 +677,14 @@ struct PlayerView: View {
         }
         #if os(macOS)
         .sheet(item: $multiscreenSession) { session in
-            MultiScreenPlayerView(channels: session.channels)
+            MultiScreenPlayerView(channels: session.channels, initialLayout: session.savedLayout, initialAudioChannelID: session.audioChannelID)
         }
         #else
         .fullScreenCover(item: $multiscreenSession) { session in
-            MultiScreenPlayerView(channels: session.channels)
+            MultiScreenPlayerView(channels: session.channels, initialLayout: session.savedLayout, initialAudioChannelID: session.audioChannelID)
         }
         #endif
-        .sheet(isPresented: $showPaywall) {
+        .sheet(isPresented: panelBinding(.paywall)) {
             PaywallView()
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
@@ -526,7 +695,15 @@ struct PlayerView: View {
     private var accessiblePlayer: some View {
         let playPauseName = Text(playback.isUserPaused ? "Play" : "Pause")
         return playerCore
-            .overlay { keyboardCommandHandler }
+            .overlay { if !isAnySheetPresented && !controlsLocked { keyboardCommandHandler } }
+            #if os(macOS)
+            .onContinuousHover { phase in
+                switch phase {
+                case .active: revealChromeTemporarily()
+                case .ended: break
+                }
+            }
+            #endif
             .accessibilityAction(named: playPauseName) { playback.togglePlayPause() }
             .accessibilityAction(named: Text("Next channel")) { zapTo(index: zapIndex + 1) }
             .accessibilityAction(named: Text("Previous channel")) { zapTo(index: zapIndex - 1) }
@@ -555,12 +732,22 @@ struct PlayerView: View {
             }
         }
         #endif
+        .task(id: prefs.sportsScoreDelaySeconds) {
+            guard prefs.sportsScoreDelaySeconds > 0 else { return }
+            while !Task.isCancelled {
+                scoreDisplayDate = Date()
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
+        .onChange(of: prefs.spoilerFreeMode) { _, hidden in
+            if hidden && (presentedPanel == .sports || presentedPanel == .fantasy) { presentedPanel = nil }
+        }
         .onChange(of: playback.isUserPaused) { _, paused in
             // Controls stay up while paused; resume the auto-hide when playing again.
             if paused { chromeHideTask?.cancel(); isChromeVisible = true } else { revealChromeTemporarily() }
             updateNowPlaying()
         }
-        .onChange(of: activePlaybackChannel.id) {
+        .onChange(of: StreamLinkerAdapters.streamID(activePlaybackChannel)) {
             aspectMode = PlayerAspectMode.saved(for: activePlaybackChannel.id)
             updateNowPlaying()
         }
@@ -568,24 +755,32 @@ struct PlayerView: View {
             dwellTask?.cancel()
             chromeHideTask?.cancel()
             scoreFetchTask?.cancel()
-            endPlayback()
+            // A guide cover is navigation within this playback session.
+            if !showingGuideFromPlayer { endPlayback() }
             #if os(iOS)
             brightnessDragStart = nil
             volumeDragStart = nil
             #endif
             requestOrientation(.portrait)
         }
+        .onChange(of: multiscreenSession?.id) { _, session in
+            if session != nil { playback.stop() }
+            else { startPlayback() }
+        }
         .onChange(of: streamSelection.loadToken) {
             // A new channel, source, failover or retry: swap the item on the same player.
             loadActiveStream()
         }
-        .onChange(of: selectedAudioIndex) { _, idx in applyAudioTrack(index: idx) }
-        .onChange(of: selectedSubtitleIndex) { _, idx in applySubtitleTrack(index: idx) }
-        .task(id: currentZapChannel.id) {
+        .task(id: StreamLinkerAdapters.streamID(currentZapChannel)) {
             isScoreDismissed = false
             scoreFetchTask?.cancel()
-            if let ctx = matchPlaybackContext {
-                liveScoreMatch = ctx.match
+            publishMatch(nil)
+            if let ctx = matchPlaybackContext,
+               ctx.channel.id == currentZapChannel.id,
+               ctx.channel.playlistID == currentZapChannel.playlistID,
+               await matchCandidateScore(ctx.match, channel: currentZapChannel, programme: currentProgramme(for: currentZapChannel)) >= 70 {
+                guard !Task.isCancelled else { return }
+                publishMatch(ctx.match)
                 matchResolutionState = .connected
                 let match = ctx.match
                 scoreFetchTask = Task { await pollMatchUpdates(for: match) }
@@ -603,8 +798,8 @@ struct PlayerView: View {
     private var playerGestureZones: some View {
         GeometryReader { proxy in
             HStack(spacing: 0) {
-                gestureZone(side: .brightness, height: proxy.size.height, doubleTap: { zapTo(index: zapIndex - 1) })
-                gestureZone(side: .volume, height: proxy.size.height, doubleTap: { zapTo(index: zapIndex + 1) })
+                gestureZone(side: .brightness, height: proxy.size.height, doubleTap: { handleDoubleTap(direction: -1) })
+                gestureZone(side: .volume, height: proxy.size.height, doubleTap: { handleDoubleTap(direction: 1) })
             }
             .simultaneousGesture(
                 MagnifyGesture()
@@ -664,6 +859,7 @@ struct PlayerView: View {
     }
 
     private func dismissalGestureKind(for value: DragGesture.Value) -> PlayerDismissalGestureKind? {
+        guard !controlsLocked else { return nil }
         let horizontal = value.translation.width
         let vertical = value.translation.height
         if value.startLocation.x <= 24, horizontal > 18, abs(horizontal) > abs(vertical) * 1.25 {
@@ -686,7 +882,7 @@ struct PlayerView: View {
     private var landscapeSwipeGesture: some Gesture {
         DragGesture(minimumDistance: 80, coordinateSpace: .global)
             .onEnded { value in
-                guard preferredOrientation == .portrait else { return }
+                guard !controlsLocked, preferredOrientation == .portrait else { return }
                 guard value.translation.height < -80,
                       abs(value.translation.height) > abs(value.translation.width) * 1.5,
                       abs(value.predictedEndTranslation.height) > 160 else { return }
@@ -701,12 +897,52 @@ struct PlayerView: View {
         LiveCommandKeyboardHandler(
             onChannelUp:       { zapTo(index: zapIndex - 1) },
             onChannelDown:     { zapTo(index: zapIndex + 1) },
-            onToggleChrome:    { toggleChromeVisibility() },
+            onToggleChrome:    { togglePlayPause() },
             onOpenGuide:       { showingGuideFromPlayer = true; revealChromeTemporarily() },
             onOpenChannelList: { showingChannelList = true; revealChromeTemporarily() },
             onOpenRecents:     { showingRecents = true; revealChromeTemporarily() },
-            onExit:            { dismiss() }
+            onExit:            { handleBack() },
+            onMute:            { playback.setMuted(!playback.isMuted) },
+            onFullscreen:      {
+                #if os(macOS)
+                NSApplication.shared.keyWindow?.toggleFullScreen(nil)
+                #else
+                toggleOrientation()
+                #endif
+            },
+            onSports:          { if liveScoreMatch != nil && !prefs.spoilerFreeMode { isLandscapeGameCentreVisible.toggle() } },
+            onPrevious:        { if let previousChannel { switchChannel(to: previousChannel) } },
+            onPictureInPicture: {
+                #if os(macOS)
+                toggleDesktopCompact()
+                #else
+                pictureInPictureAction?()
+                #endif
+            },
+            onRestoreMultiview: restoreMultiview
         )
+    }
+
+    private func restoreMultiview(slot: Int) {
+        guard let saved = prefs.savedMultiview(slot: slot), let stores else { return }
+        guard entitlements.isPremium else { showPaywall = true; return }
+        let channels = saved.channelIDs.compactMap { id in
+            stores.playlistStore.allChannels.first { StreamLinkerAdapters.streamID($0) == id }
+        }
+        guard !channels.isEmpty else { return }
+        multiscreenSession = PlayerMultiscreenSession(channels: Array(channels.prefix(min(PlaybackController.multiviewCapacity, prefs.playerMaximumStreams))), savedLayout: saved.layout, audioChannelID: saved.audioChannelID)
+    }
+
+    private func handleBack() {
+        if isLandscapeGameCentreVisible { isLandscapeGameCentreVisible = false; return }
+        if showingFantasySidebar { showingFantasySidebar = false; return }
+        #if os(macOS)
+        if let window = NSApplication.shared.keyWindow, window.styleMask.contains(.fullScreen) {
+            window.toggleFullScreen(nil)
+            return
+        }
+        #endif
+        dismiss()
     }
 
     private func toggleOrientation() {
@@ -720,7 +956,7 @@ struct PlayerView: View {
             showPaywall = true
             return
         }
-        selectedMultiChannelIDs = [activePlaybackChannel.id]
+        selectedMultiChannelIDs = [StreamLinkerAdapters.streamID(activePlaybackChannel)]
         isShowingMultiscreenPicker = true
         revealChromeTemporarily()
         // Sorting a big playlist is expensive, so it only happens when the picker opens.
@@ -728,12 +964,12 @@ struct PlayerView: View {
         let current = activePlaybackChannel
         Task {
             multiscreenChannels = await Task.detached(priority: .userInitiated) {
-                var seenIDs: Set<String> = [current.id]
+                var seenIDs: Set<String> = [StreamLinkerAdapters.streamID(current)]
                 var result = [current]
                 let sorted = channels.sorted {
                     $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
                 }
-                for candidate in sorted where seenIDs.insert(candidate.id).inserted {
+                for candidate in sorted where seenIDs.insert(StreamLinkerAdapters.streamID(candidate)).inserted {
                     result.append(candidate)
                 }
                 return result
@@ -742,9 +978,9 @@ struct PlayerView: View {
     }
 
     private func startMultiscreen() {
-        let channels = multiscreenChannels.filter { selectedMultiChannelIDs.contains($0.id) }
+        let channels = multiscreenChannels.filter { selectedMultiChannelIDs.contains(StreamLinkerAdapters.streamID($0)) }
         guard channels.count >= 2 else { return }
-        pendingMultiscreenSession = PlayerMultiscreenSession(channels: Array(channels.prefix(4)))
+        pendingMultiscreenSession = PlayerMultiscreenSession(channels: Array(channels.prefix(PlaybackController.multiviewCapacity)))
         selectedMultiChannelIDs.removeAll()
         isShowingMultiscreenPicker = false
     }
@@ -783,7 +1019,7 @@ struct PlayerView: View {
             try? await Task.sleep(for: .seconds(prefs.playerPanelTimeoutSeconds))
             guard !Task.isCancelled else { return }
             // Never hide while paused, buffering or while a sheet/panel is open; check again later.
-            if playback.isUserPaused || playback.showsBufferingIndicator || isAnySheetPresented {
+            if voiceOverEnabled || playback.isUserPaused || playback.showsBufferingIndicator || isAnySheetPresented {
                 scheduleChromeHide()
                 return
             }
@@ -794,6 +1030,12 @@ struct PlayerView: View {
     private var isAnySheetPresented: Bool {
         showingMore || showingChannelList || showingRecents || showingGuideFromPlayer
             || showingSourceSelector || isShowingMultiscreenPicker || showingFantasySidebar || showPaywall
+    }
+
+    private func handleDoubleTap(direction: Int) {
+        if prefs.playerDoubleTapSeeks { playback.seek(by: Double(direction) * 10) }
+        else { zapTo(index: zapIndex + direction) }
+        revealChromeTemporarily()
     }
 
     private func togglePlayPause() {
@@ -845,9 +1087,9 @@ struct PlayerView: View {
     ///   the channel's canonical match is looked up so its other mirrors are available for failover.
     private func switchChannel(to newChannel: Channel, canonicalChannel explicitCanonical: CanonicalChannel? = nil) {
         if let explicitCanonical, explicitCanonical.id == canonicalChannel?.id { return }
-        if explicitCanonical == nil, newChannel.id == activePlaybackChannel.id { return }
+        if explicitCanonical == nil, newChannel.id == activePlaybackChannel.id, newChannel.playlistID == activePlaybackChannel.playlistID { return }
 
-        let canonical = explicitCanonical ?? stores?.epgRepository.canonicalChannel(forProviderChannelID: newChannel.id)
+        let canonical = explicitCanonical ?? stores?.epgRepository.canonicalChannel(forProviderChannelID: newChannel.id, playlistID: newChannel.playlistID)
         dwellTask?.cancel()
         currentPlayerItem = nil
         audioGroup = nil
@@ -856,14 +1098,19 @@ struct PlayerView: View {
         selectedSubtitleIndex = nil
         activeStreamMetadata = nil
         failoverNotice = nil
-        if let index = zapChannels.firstIndex(where: { $0.id == newChannel.id }) {
+        if let index = zapChannels.firstIndex(where: { $0.id == newChannel.id && $0.playlistID == newChannel.playlistID }) {
             zapIndex = index
         }
+        previousChannel = currentZapChannel
+        scoreFetchTask?.cancel()
+        publishMatch(nil)
+        matchResolutionState = .resolving
         currentZapChannel = newChannel
         // From a list the user picked this exact mirror, so start on it; from the guide, let Auto rank.
         streamSelection.reset(to: newChannel,
                               canonicalChannel: canonical,
                               preferredStreamID: explicitCanonical == nil ? newChannel.id : nil)
+        loadActiveStream()
         startDwellTimer()
         revealChromeTemporarily()
         #if os(iOS)
@@ -874,11 +1121,20 @@ struct PlayerView: View {
     // MARK: Playback lifecycle
 
     private func startPlayback() {
+        MatchNotificationService.shared.playerIsVisible = true
         playback.setBufferProfile(prefs.playerBufferProfile)
         aspectMode = PlayerAspectMode.saved(for: activePlaybackChannel.id)
         nowPlaying.activate(controller: playback)
         updateNowPlaying()
+        if let context = matchPlaybackContext, let stores,
+           context.channel.id == currentZapChannel.id, context.channel.playlistID == currentZapChannel.playlistID {
+            streamSelection.broadcastValidator = { [weak streamStore = stores.streamStore, weak playlistStore = stores.playlistStore, weak epg = stores.epgRepository] candidate in
+                guard let streamStore, let playlistStore, let epg else { return false }
+                return await streamStore.confirmsCurrentBroadcast(match: context.match, channel: candidate, channels: playlistStore.allChannels, epgRepository: epg)
+            }
+        }
         playback.onFailure = { reason in
+            guard playback.channel == streamSelection.activeChannel else { return }
             let tokenBefore = streamSelection.loadToken
             streamSelection.handlePlaybackFailure(message: reason)
             if streamSelection.loadToken != tokenBefore {
@@ -891,27 +1147,32 @@ struct PlayerView: View {
             }
         }
         playback.onFirstFrame = { playedChannel, _ in
-            streamSelection.recordPlaybackSuccess(streamID: playedChannel.id)
+            guard playedChannel == streamSelection.activeChannel else { return }
+            streamSelection.recordPlaybackSuccess(streamID: streamSelection.activeStream?.id ?? playedChannel.id)
             failoverNotice = nil
         }
         playback.onItemReady = { item in
             handlePlayerItemReady(item)
         }
         playback.onMetadata = { metadata in
+            guard playback.channel == streamSelection.activeChannel else { return }
             activeStreamMetadata = metadata
-            if let streamID = playback.channel?.id {
+            if let streamID = streamSelection.activeStream?.id {
                 streamSelection.updateRuntimeMetadata(metadata, for: streamID)
             }
         }
         // onAppear can fire again (e.g. after a full-screen cover); only load if nothing is
         // playing — including nothing already started by CarPlay on this same shared controller.
-        if playback.channel?.id != activePlaybackChannel.id || playback.currentItem == nil {
+        if playback.channel != activePlaybackChannel || playback.currentItem == nil {
             playback.notePendingTapDate(initialTapDate)
             loadActiveStream()
         }
     }
 
     private func loadActiveStream() {
+        guard lastAppliedLoadToken != streamSelection.loadToken || playback.currentItem == nil
+                || playback.channel != streamSelection.activeChannel else { return }
+        lastAppliedLoadToken = streamSelection.loadToken
         currentPlayerItem = nil
         audioGroup = nil
         subtitleGroup = nil
@@ -921,6 +1182,10 @@ struct PlayerView: View {
     }
 
     private func endPlayback() {
+        MatchNotificationService.shared.playerIsVisible = false
+        MatchNotificationService.shared.playerMatchID = nil
+        streamSelection.cancelPendingValidation()
+        streamSelection.broadcastValidator = nil
         // The controller's closures capture this view; clear them so nothing leaks after dismissal.
         playback.onFailure = nil
         playback.onFirstFrame = nil
@@ -929,6 +1194,9 @@ struct PlayerView: View {
         #if os(iOS)
         // Keep the player (and its lock-screen controls) alive while Picture in Picture is showing it.
         if pipController?.isPictureInPictureActive == true { return }
+        #endif
+        #if os(macOS)
+        restoreDesktopWindow()
         #endif
         nowPlaying.deactivate()
         playback.stop()
@@ -958,32 +1226,22 @@ struct PlayerView: View {
 
     private func handlePlayerItemReady(_ item: AVPlayerItem) {
         currentPlayerItem = item
-        let asset = item.asset
         Task { @MainActor in
-            if let audio = try? await asset.loadMediaSelectionGroup(for: .audible),
-               audio.options.count > 1 {
-                audioGroup = audio
-            }
-            if let subs = try? await asset.loadMediaSelectionGroup(for: .legible),
-               !subs.options.isEmpty {
-                subtitleGroup = subs
-            }
+            guard let tracks = await playback.mediaSelections(for: item, preferences: prefs),
+                  currentPlayerItem === item else { return }
+            audioGroup = tracks.audio
+            subtitleGroup = tracks.subtitles
+            selectedAudioIndex = tracks.audioIndex
+            selectedSubtitleIndex = tracks.subtitleIndex
         }
     }
 
     private func applyAudioTrack(index: Int?) {
-        guard let item = currentPlayerItem, let group = audioGroup, let idx = index,
-              group.options.indices.contains(idx) else { return }
-        item.select(group.options[idx], in: group)
+        playback.selectMedia(index: index, group: audioGroup, isSubtitle: false, preferences: prefs)
     }
 
     private func applySubtitleTrack(index: Int?) {
-        guard let item = currentPlayerItem, let group = subtitleGroup else { return }
-        if let idx = index, group.options.indices.contains(idx) {
-            item.select(group.options[idx], in: group)
-        } else {
-            item.select(nil, in: group)
-        }
+        playback.selectMedia(index: index, group: subtitleGroup, isSubtitle: true, preferences: prefs)
     }
 
     // MARK: Live score tracking
@@ -996,9 +1254,15 @@ struct PlayerView: View {
             try? await Task.sleep(nanoseconds: 30_000_000_000)
             guard !Task.isCancelled else { break }
             if let updated = try? await SportsRepository.shared.legacyScoreboard(for: match.league).first(where: { $0.id == match.id }) {
-                liveScoreMatch = await SportsRepository.shared.enrichedLegacyMatch(updated)
+                let enriched = await SportsRepository.shared.enrichedLegacyMatch(updated)
+                guard !Task.isCancelled else { return }
+                guard updated.state == .live, abs(updated.date.timeIntervalSinceNow) < 12 * 3600 else {
+                    publishMatch(nil)
+                    matchResolutionState = .unavailable
+                    return
+                }
+                publishMatch(enriched)
                 matchResolutionState = .connected
-                if updated.state == .final { break }
             } else {
                 matchResolutionState = .apiFailed
             }
@@ -1025,7 +1289,7 @@ struct PlayerView: View {
         // Only sports channels are looked up, and only in the leagues they hint at.
         let leagues = PlayerLiveMatchLeagueHint.leagues(channelName: channel.name, group: channel.group, programme: programme)
         guard !leagues.isEmpty else {
-            liveScoreMatch = nil
+            publishMatch(nil)
             matchResolutionState = .unavailable
             return
         }
@@ -1050,16 +1314,19 @@ struct PlayerView: View {
         let uniqueCandidates = candidates.filter { seenIDs.insert($0.id).inserted }
         var bestMatch: Match?
         var bestScore = 0
+        var confirmedCount = 0
         for match in uniqueCandidates {
             let score = await matchCandidateScore(match, channel: channel, programme: programme)
+            if score >= 70 { confirmedCount += 1 }
             if score > bestScore {
                 bestScore = score
                 bestMatch = match
             }
         }
 
-        guard let match = bestMatch, bestScore >= 48 else {
-            liveScoreMatch = nil
+        guard !Task.isCancelled else { return }
+        guard let match = bestMatch, bestScore >= 70, confirmedCount == 1 else {
+            publishMatch(nil)
             matchResolutionState = .unavailable
             return
         }
@@ -1067,16 +1334,22 @@ struct PlayerView: View {
         matchResolutionState = .loadingData
         let enriched = await SportsRepository.shared.enrichedLegacyMatch(match)
         guard !Task.isCancelled else { return }
-        liveScoreMatch = enriched
+        publishMatch(enriched)
         matchResolutionState = .connected
 
         while !Task.isCancelled {
             try? await Task.sleep(nanoseconds: 30_000_000_000)
             guard !Task.isCancelled else { break }
             if let updated = try? await SportsRepository.shared.legacyScoreboard(for: match.league).first(where: { $0.id == match.id }) {
-                liveScoreMatch = await SportsRepository.shared.enrichedLegacyMatch(updated)
+                let enriched = await SportsRepository.shared.enrichedLegacyMatch(updated)
+                guard !Task.isCancelled else { return }
+                guard updated.state == .live, abs(updated.date.timeIntervalSinceNow) < 12 * 3600 else {
+                    publishMatch(nil)
+                    matchResolutionState = .unavailable
+                    return
+                }
+                publishMatch(enriched)
                 matchResolutionState = .connected
-                if updated.state == .final { break }
             } else {
                 matchResolutionState = .apiFailed
             }
@@ -1088,45 +1361,21 @@ struct PlayerView: View {
         if let canonicalChannel {
             return epgRepository.currentProgramme(for: canonicalChannel.id)
         }
-        if let canonicalID = epgRepository.channelToCanonicalMap[channel.id] {
-            return epgRepository.currentProgramme(for: canonicalID)
+        if let canonical = epgRepository.canonicalChannel(forProviderChannelID: channel.id, playlistID: channel.playlistID) {
+            return epgRepository.currentProgramme(for: canonical.id)
         }
         return nil
     }
 
     private func matchCandidateScore(_ match: Match, channel: Channel, programme: EPGProgramme?) async -> Int {
-        var score = 0
-        if let stores {
-            score = await stores.streamStore.confidenceScore(
-                match: match, channel: channel, channels: stores.playlistStore.allChannels, epgRepository: stores.epgRepository
-            )
-        }
-        let programmeText = [programme?.title, programme?.subtitle, programme?.description, programme?.categories.joined(separator: " ")]
-            .compactMap { $0 }
-            .joined(separator: " ")
-        if !programmeText.isEmpty {
-            score += metadataMatchScore(match: match, text: programmeText)
-        }
-        if let programme, programme.isOnNow() {
-            score += 8
-        }
-        return score
-    }
-
-    private func metadataMatchScore(match: Match, text: String) -> Int {
-        let normalizedText = PlayerMatchTextNormalizer.normalized(text)
-        guard !normalizedText.isEmpty else { return 0 }
-        var score = 0
-        let titleTokens = PlayerMatchTextNormalizer.tokens(from: [match.name, match.shortName].joined(separator: " "))
-        let teamTokens = PlayerMatchTextNormalizer.tokens(from: [
-            match.away.displayName, match.away.shortName, match.away.abbreviation,
-            match.home.displayName, match.home.shortName, match.home.abbreviation
-        ].joined(separator: " "))
-        let leagueTokens = PlayerMatchTextNormalizer.tokens(from: ([match.league.name, match.league.shortName] + match.league.keywords).joined(separator: " "))
-        score += titleTokens.filter { normalizedText.contains($0) }.count * 12
-        score += teamTokens.filter { normalizedText.contains($0) }.count * 10
-        score += leagueTokens.filter { normalizedText.contains($0) }.count * 4
-        return score
+        // The shared linker checks both teams, time windows and replay evidence.
+        // A channel-name/league token bonus must never promote an unverified feed.
+        guard match.state == .live, abs(match.date.timeIntervalSinceNow) < 12 * 3600,
+              let stores else { return 0 }
+        return await stores.streamStore.confidenceScore(
+            match: match, channel: channel, channels: stores.playlistStore.allChannels,
+            epgRepository: stores.epgRepository
+        )
     }
 
     #if os(iOS)
@@ -1692,6 +1941,19 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
 
+                if let match, !isChromeVisible {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            LiveScoreBug(match: match, sport: sport)
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, max(horizontalSafeArea, Theme.Spacing.md))
+                    .padding(.top, max(topSafeArea, Theme.Spacing.md))
+                    .allowsHitTesting(false)
+                }
+
                 if isChromeVisible {
                     // Scrims keep white controls legible over bright video.
                     VStack(spacing: 0) {
@@ -1943,6 +2205,7 @@ private struct ProgrammeProgressBar: View {
 }
 
 private struct LiveScoreBug: View {
+    @EnvironmentObject private var prefs: PreferencesStore
     let match: Match
     let sport: BannerSport
 
@@ -1969,8 +2232,12 @@ private struct LiveScoreBug: View {
                 if match.state == .live {
                     Spacer(minLength: 6)
                     HStack(spacing: 5) {
-                        PulsingDot(color: Theme.live)
-                        Text("LIVE")
+                        if prefs.sportsScoreDelaySeconds == 0 {
+                            PulsingDot(color: Theme.live)
+                            Text("LIVE")
+                        } else {
+                            Text("Delayed \(prefs.sportsScoreDelaySeconds)s")
+                        }
                     }
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.live)
@@ -2085,6 +2352,73 @@ private struct MatchTabs: View {
                     .buttonStyle(.plain)
                 }
             }
+        }
+    }
+}
+
+/// Shared sports presentation for the remote player; reuses the phone's game-centre views.
+struct PlayerSportsPanel: View {
+    let match: Match
+    let broadcasts: [RankedSource]
+    let onSelectBroadcast: (Channel) -> Void
+    let onClose: () -> Void
+    @State private var selectedTab: SportPlayerTab = .game
+    @State private var showsBroadcasts = false
+    @State private var pendingBroadcast: Channel?
+    @State private var broadcastRequest = 0
+    @State private var broadcastError = false
+    @EnvironmentObject private var streamStore: StreamAvailabilityStore
+    @EnvironmentObject private var playlistStore: PlaylistStore
+    @EnvironmentObject private var epgRepository: EPGRepository
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                HStack {
+                    Text(match.shortName).font(.headline)
+                    Spacer()
+                    Button("Close", systemImage: "xmark", action: onClose)
+                }
+                Toggle("Alternative broadcasts", isOn: $showsBroadcasts)
+                if showsBroadcasts {
+                    let confirmed = broadcasts.filter(\.isConfirmed)
+                    if confirmed.isEmpty {
+                        Text("No verified alternative broadcasts available.").foregroundStyle(Theme.textSecondary)
+                    }
+                    if broadcastError {
+                        Text("No confirmed stream found.").foregroundStyle(Theme.textSecondary)
+                        Button("Retry") {
+                            broadcastError = false
+                            broadcastRequest &+= 1
+                        }
+                    }
+                    ForEach(confirmed) { source in
+                        Button {
+                            broadcastError = false
+                            pendingBroadcast = source.channel
+                            broadcastRequest &+= 1
+                        } label: {
+                            HStack {
+                                ChannelLogo(url: source.channel.logoURL, name: source.channel.name, size: 40)
+                                Text(source.channel.name)
+                            }
+                        }
+                    }
+                } else {
+                    MatchTabs(tabs: BannerSport(league: match.league).tabs, selection: $selectedTab)
+                    SportGameCentre(match: match, state: .connected, sport: BannerSport(league: match.league), selectedTab: selectedTab)
+                }
+            }
+            .padding(Theme.Spacing.lg)
+        }
+        .background(Theme.background)
+        .task(id: broadcastRequest) {
+            guard let pendingBroadcast else { return }
+            let confirmed = await streamStore.confirmsCurrentBroadcast(match: match, channel: pendingBroadcast,
+                channels: playlistStore.allChannels, epgRepository: epgRepository)
+            guard !Task.isCancelled else { return }
+            if confirmed { onSelectBroadcast(pendingBroadcast) }
+            else { broadcastError = true }
         }
     }
 }
@@ -2287,13 +2621,15 @@ private struct PlayerChannelInfoPage: View {
 
     private func currentProgramme(for channelID: String, at date: Date) -> EPGProgramme? {
         guard let epg = stores?.epgRepository else { return nil }
-        let canonicalID = channelID == channel.id ? (canonicalChannel?.id ?? epg.channelToCanonicalMap[channelID]) : epg.channelToCanonicalMap[channelID]
+        let canonicalID = channelID == channel.id
+            ? (canonicalChannel?.id ?? epg.canonicalChannel(forProviderChannelID: channelID, playlistID: channel.playlistID)?.id)
+            : nil
         return canonicalID.flatMap { epg.currentProgramme(for: $0, at: date) }
     }
 
     private func nextProgramme(after date: Date) -> EPGProgramme? {
         guard let epg = stores?.epgRepository,
-              let canonicalID = canonicalChannel?.id ?? epg.channelToCanonicalMap[channel.id] else { return nil }
+              let canonicalID = canonicalChannel?.id ?? epg.canonicalChannel(forProviderChannelID: channel.id, playlistID: channel.playlistID)?.id else { return nil }
         return epg.nextProgramme(for: canonicalID, after: date)
     }
 
@@ -2904,6 +3240,7 @@ private struct StreamFailurePanel: View {
     /// Nil when there is no other source to choose.
     let chooseAnother: (() -> Void)?
     let switchToAuto: () -> Void
+    let returnToGuide: () -> Void
 
     var body: some View {
         VStack(spacing: 14) {
@@ -2917,13 +3254,15 @@ private struct StreamFailurePanel: View {
             HStack(spacing: 10) {
                 Button("Try Again", action: tryAgain)
                 if let chooseAnother {
-                    Button("Choose Another", action: chooseAnother)
+                    Button("Choose Another Broadcast", action: chooseAnother)
                     Button("Auto", action: switchToAuto)
                 }
             }
             .font(.subheadline.weight(.bold))
             .buttonStyle(.borderedProminent)
             .tint(Theme.accent)
+            Button("Return to Guide", action: returnToGuide)
+                .foregroundStyle(.white)
         }
         .padding(18)
         .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
@@ -2947,6 +3286,8 @@ private struct AirPlayButton: UIViewRepresentable {
 private struct PlayerMultiscreenSession: Identifiable {
     let id = UUID()
     let channels: [Channel]
+    var savedLayout: String? = nil
+    var audioChannelID: String? = nil
 }
 
 /// Layout style for MultiScreen player.
@@ -2954,6 +3295,7 @@ private enum MultiScreenLayout: String, CaseIterable, Identifiable {
     case twoVertical
     case twoHorizontal
     case pipInset
+    case three
     case four
 
     var id: String { rawValue }
@@ -2962,6 +3304,8 @@ private enum MultiScreenLayout: String, CaseIterable, Identifiable {
         switch self {
         case .twoVertical, .twoHorizontal, .pipInset:
             return 2
+        case .three:
+            return 3
         case .four:
             return 4
         }
@@ -2975,6 +3319,8 @@ private enum MultiScreenLayout: String, CaseIterable, Identifiable {
             return "Left/right"
         case .pipInset:
             return "Picture in Picture"
+        case .three:
+            return "3-up"
         case .four:
             return "4-up"
         }
@@ -2988,17 +3334,19 @@ private enum MultiScreenLayout: String, CaseIterable, Identifiable {
             return "rectangle.split.1x2"
         case .pipInset:
             return "rectangle.inset.filled"
+        case .three:
+            return "rectangle.split.1x2"
         case .four:
             return "rectangle.grid.2x2"
         }
     }
 
     static func defaultLayout(for channelCount: Int) -> MultiScreenLayout {
-        channelCount > 2 ? .four : .pipInset
+        channelCount >= 4 ? .four : (channelCount == 3 ? .three : .twoHorizontal)
     }
 
     static func options(for channelCount: Int) -> [MultiScreenLayout] {
-        channelCount > 2 ? [.pipInset, .twoVertical, .twoHorizontal, .four] : [.pipInset, .twoVertical, .twoHorizontal]
+        channelCount >= 4 ? [.twoHorizontal, .three, .four, .pipInset] : (channelCount == 3 ? [.twoHorizontal, .three, .pipInset] : [.twoHorizontal, .twoVertical, .pipInset])
     }
 }
 
@@ -3033,26 +3381,35 @@ private enum PiPAlignment: String, CaseIterable, Identifiable {
 /// Plays up to four channels at once with interactive PiP and multi-stream grid layouts.
 struct MultiScreenPlayerView: View {
     let channels: [Channel]
+    var initialLayout: String? = nil
+    var initialAudioChannelID: String? = nil
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var watchStore: WatchStore
+    @EnvironmentObject private var prefs: PreferencesStore
+    @EnvironmentObject private var playlistStore: PlaylistStore
+    @State private var replacingChannel: Channel?
+    @State private var maximizedChannel: Channel?
     @State private var activeChannels: [Channel] = []
+    @State private var controllers: [String: PlaybackController] = [:]
     @State private var layout: MultiScreenLayout = .pipInset
     @State private var primaryChannelID: String?
+    @State private var resourceCapacity = PlaybackController.multiviewCapacity
     @State private var pipAlignment: PiPAlignment = .bottomTrailing
 
     private var visibleChannels: [Channel] {
-        Array(activeChannels.prefix(layout.capacity))
+        Array(activeChannels.prefix(min(layout.capacity, min(resourceCapacity, prefs.playerMaximumStreams))))
     }
 
     private var activePrimaryID: String? {
-        if let primaryChannelID, visibleChannels.contains(where: { $0.id == primaryChannelID }) {
+        if let maximizedChannel { return StreamLinkerAdapters.streamID(maximizedChannel) }
+        if let primaryChannelID, visibleChannels.contains(where: { StreamLinkerAdapters.streamID($0) == primaryChannelID }) {
             return primaryChannelID
         }
-        return visibleChannels.first?.id
+        return visibleChannels.first.map(StreamLinkerAdapters.streamID)
     }
 
     private var layoutOptions: [MultiScreenLayout] {
-        MultiScreenLayout.options(for: activeChannels.count)
+        MultiScreenLayout.options(for: min(activeChannels.count, min(resourceCapacity, prefs.playerMaximumStreams)))
     }
 
     var body: some View {
@@ -3065,13 +3422,44 @@ struct MultiScreenPlayerView: View {
                 .padding(.top, 10)
         }
         .onAppear {
-            activeChannels = channels
-            layout = MultiScreenLayout.defaultLayout(for: channels.count)
-            primaryChannelID = channels.first?.id
-            for channel in channels {
+            guard controllers.isEmpty else { return }
+            activeChannels = Array(channels.prefix(min(resourceCapacity, prefs.playerMaximumStreams)))
+            let saved = initialLayout.flatMap(MultiScreenLayout.init(rawValue:))
+            layout = saved.flatMap { layoutOptions.contains($0) ? $0 : nil } ?? MultiScreenLayout.defaultLayout(for: activeChannels.count)
+            primaryChannelID = initialAudioChannelID ?? activeChannels.first.map(StreamLinkerAdapters.streamID)
+            synchronizeSessions()
+            for channel in activeChannels {
                 watchStore.recordWatch(channel)
             }
         }
+        .sheet(item: $replacingChannel) { previous in
+            PlayerChannelListSheet(channels: playlistStore.allChannels.filter { !activeChannels.contains($0) }, currentChannelID: StreamLinkerAdapters.streamID(previous)) { replacement, _ in
+                replace(previous, with: replacement)
+            }
+        }
+        .onDisappear {
+            guard replacingChannel == nil else { return }
+            controllers.values.forEach { $0.stop() }
+            controllers.removeAll()
+        }
+        .onChange(of: primaryChannelID) { _, _ in updateAudio() }
+        .onChange(of: layout) { _, _ in synchronizeSessions() }
+        .onChange(of: maximizedChannel) { _, _ in synchronizeSessions() }
+        .onChange(of: prefs.playerMaximumStreams) { _, _ in synchronizeSessions() }
+        .task {
+            for await _ in NotificationCenter.default.notifications(named: ProcessInfo.thermalStateDidChangeNotification) {
+                resourceCapacity = PlaybackController.multiviewCapacity
+                synchronizeSessions()
+            }
+        }
+        #if os(iOS)
+        .task {
+            for await _ in NotificationCenter.default.notifications(named: UIApplication.didReceiveMemoryWarningNotification) {
+                resourceCapacity = 2
+                synchronizeSessions()
+            }
+        }
+        #endif
         .onChange(of: activeChannels.count) { _, newCount in
             if !MultiScreenLayout.options(for: newCount).contains(layout) {
                 layout = MultiScreenLayout.defaultLayout(for: newCount)
@@ -3089,6 +3477,30 @@ struct MultiScreenPlayerView: View {
                 .textCase(.uppercase)
 
             Spacer()
+            Menu {
+                Menu("Save layout") {
+                    ForEach(1...4, id: \.self) { slot in
+                        Button("Slot \(slot)") {
+                            prefs.saveMultiview(channelIDs: activeChannels.map(StreamLinkerAdapters.streamID), layout: layout.rawValue, slot: slot, audioChannelID: activePrimaryID)
+                        }
+                    }
+                }
+                Menu("Restore layout") {
+                    ForEach(1...4, id: \.self) { slot in
+                        Button("Slot \(slot)") { restoreSavedLayout(slot: slot) }
+                            .disabled(prefs.savedMultiview(slot: slot) == nil)
+                            #if !os(tvOS)
+                            .keyboardShortcut(KeyEquivalent(Character(String(slot))), modifiers: .command)
+                            #endif
+                    }
+                }
+                if maximizedChannel != nil {
+                    Button("Return to grid") { maximizedChannel = nil }
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle").font(.title2)
+            }
+            .accessibilityLabel("Multiview options")
 
             if layout == .pipInset {
                 Button {
@@ -3140,16 +3552,21 @@ struct MultiScreenPlayerView: View {
     }
 
     @ViewBuilder private var screenGrid: some View {
+        if let maximizedChannel { tile(for: maximizedChannel) }
+        else { gridContent }
+    }
+
+    @ViewBuilder private var gridContent: some View {
         switch layout {
         case .twoVertical:
             VStack(spacing: 0) {
-                ForEach(visibleChannels) { channel in
+                ForEach(visibleChannels, id: \.self) { channel in
                     tile(for: channel)
                 }
             }
         case .twoHorizontal:
             HStack(spacing: 0) {
-                ForEach(visibleChannels) { channel in
+                ForEach(visibleChannels, id: \.self) { channel in
                     tile(for: channel)
                 }
             }
@@ -3169,13 +3586,21 @@ struct MultiScreenPlayerView: View {
                             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
                             .overlay(
                                 RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-                                    .strokeBorder(secondary.id == activePrimaryID ? Theme.accent : .white.opacity(0.3), lineWidth: 2)
+                                    .strokeBorder(StreamLinkerAdapters.streamID(secondary) == activePrimaryID ? Theme.accent : .white.opacity(0.3), lineWidth: 2)
                             )
                             .shadow(color: .black.opacity(0.6), radius: 10, x: 0, y: 4)
                             .padding(16)
                             .padding(.top, 50)
                             .transition(.scale.combined(with: .opacity))
                     }
+                }
+            }
+        case .three:
+            HStack(spacing: 2) {
+                gridSlot(at: 0)
+                VStack(spacing: 2) {
+                    gridSlot(at: 1)
+                    gridSlot(at: 2)
                 }
             }
         case .four:
@@ -3200,14 +3625,16 @@ struct MultiScreenPlayerView: View {
         }
     }
 
-    private func tile(for channel: Channel, isPiPInset: Bool = false) -> some View {
-        let isPrimary = channel.id == activePrimaryID
-        return StreamTile(
+    @ViewBuilder private func tile(for channel: Channel, isPiPInset: Bool = false) -> some View {
+        let isPrimary = StreamLinkerAdapters.streamID(channel) == activePrimaryID
+        if let controller = controllers[StreamLinkerAdapters.streamID(channel)] {
+        StreamTile(
+            playback: controller,
             channel: channel,
             isPrimary: isPrimary,
             showsChrome: true,
             onToggleAudio: {
-                primaryChannelID = channel.id
+                primaryChannelID = StreamLinkerAdapters.streamID(channel)
             },
             onSwap: {
                 swapWithPrimary(channel: channel)
@@ -3215,6 +3642,19 @@ struct MultiScreenPlayerView: View {
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped()
+        .contextMenu {
+            Button("Maximize") {
+                maximizedChannel = channel
+                primaryChannelID = StreamLinkerAdapters.streamID(channel)
+            }
+            Button("Replace channel") { replacingChannel = channel }
+            Button("Remove stream") {
+                controllers.removeValue(forKey: StreamLinkerAdapters.streamID(channel))?.stop()
+                activeChannels.removeAll { $0 == channel }
+                if maximizedChannel == channel { maximizedChannel = nil }
+                synchronizeSessions()
+            }
+        }
         .overlay(
             Group {
                 if !isPiPInset {
@@ -3223,13 +3663,67 @@ struct MultiScreenPlayerView: View {
                 }
             }
         )
+        }
+    }
+
+    private func replace(_ previous: Channel, with replacement: Channel) {
+        guard let index = activeChannels.firstIndex(of: previous) else { return }
+        controllers.removeValue(forKey: StreamLinkerAdapters.streamID(previous))?.stop()
+        activeChannels[index] = replacement
+        if primaryChannelID == StreamLinkerAdapters.streamID(previous) {
+            primaryChannelID = StreamLinkerAdapters.streamID(replacement)
+        }
+        if maximizedChannel == previous { maximizedChannel = replacement }
+        synchronizeSessions()
+        watchStore.recordWatch(replacement)
+    }
+
+    private func restoreSavedLayout(slot: Int) {
+        guard let configuration = prefs.savedMultiview(slot: slot) else { return }
+        let available = playlistStore.allChannels
+        let restored = configuration.channelIDs.compactMap { id in
+            available.first { StreamLinkerAdapters.streamID($0) == id }
+        }
+        guard !restored.isEmpty else { return }
+        controllers.values.forEach { $0.stop() }
+        controllers.removeAll()
+        activeChannels = Array(restored.prefix(min(resourceCapacity, prefs.playerMaximumStreams)))
+        let saved = MultiScreenLayout(rawValue: configuration.layout)
+        layout = saved.flatMap { layoutOptions.contains($0) ? $0 : nil } ?? MultiScreenLayout.defaultLayout(for: activeChannels.count)
+        maximizedChannel = nil
+        primaryChannelID = configuration.audioChannelID ?? activeChannels.first.map(StreamLinkerAdapters.streamID)
+        synchronizeSessions()
+    }
+
+    /// Only visible tiles own decoders. Reopening a tile rebuilds that tile alone.
+    private func synchronizeSessions() {
+        let visible = maximizedChannel.map { [$0] } ?? visibleChannels
+        let wanted = Set(visible.map(StreamLinkerAdapters.streamID))
+        for id in Array(controllers.keys) where !wanted.contains(id) {
+            controllers.removeValue(forKey: id)?.stop()
+        }
+        for channel in visible {
+            let id = StreamLinkerAdapters.streamID(channel)
+            guard controllers[id] == nil else { continue }
+            let controller = PlaybackController()
+            controller.setMuted(true)
+            controllers[id] = controller
+            controller.load(channel)
+        }
+        updateAudio()
+    }
+
+    private func updateAudio() {
+        // Mute every session before enabling one; layout changes cannot leave hidden audio playing.
+        controllers.values.forEach { $0.setMuted(true) }
+        if let id = activePrimaryID { controllers[id]?.setMuted(false) }
     }
 
     private func swapWithPrimary(channel: Channel) {
-        guard let index = activeChannels.firstIndex(where: { $0.id == channel.id }), index != 0 else { return }
+        guard let index = activeChannels.firstIndex(where: { $0 == channel }), index != 0 else { return }
         withAnimation(Theme.Motion.snappy) {
             activeChannels.swapAt(0, index)
-            primaryChannelID = activeChannels.first?.id
+            primaryChannelID = activeChannels.first.map(StreamLinkerAdapters.streamID)
         }
     }
 
@@ -3259,15 +3753,14 @@ private final class PiPHolder: ObservableObject {
 #endif
 
 private struct StreamTile: View {
+    @ObservedObject var playback: PlaybackController
     let channel: Channel
     let isPrimary: Bool
     let showsChrome: Bool
     var onToggleAudio: (() -> Void)? = nil
     var onSwap: (() -> Void)? = nil
 
-    @State private var player: AVPlayer?
-    @State private var failed = false
-    @State private var statusTask: Task<Void, Never>?
+    private var player: AVPlayer { playback.player }
     #if os(iOS)
     @StateObject private var pipHolder = PiPHolder()
     #endif
@@ -3276,23 +3769,15 @@ private struct StreamTile: View {
         ZStack {
             Color.black
 
-            if let player {
-                VideoSurface(player: player, showsPlaybackControls: false, allowsPictureInPicture: !showsChrome) { pip in
-                    #if os(iOS)
-                    pipHolder.controller = pip
-                    #endif
-                }
-            } else if failed {
+            VideoSurface(player: player, showsPlaybackControls: false, allowsPictureInPicture: false) { _ in }
+            if case let .failed(message) = playback.state {
                 VStack(spacing: 10) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.title2)
-                    Text("Source unavailable")
-                        .font(.caption.weight(.semibold))
+                    Text(message).font(.caption).multilineTextAlignment(.center)
+                    Button("Retry") { playback.load(channel) }
                 }
-                .foregroundStyle(Theme.textSecondary)
-            } else {
-                ProgressView()
-                    .tint(Theme.accent)
+                .foregroundStyle(.white)
+            } else if !playback.firstFrameRendered || playback.showsBufferingIndicator {
+                ProgressView().tint(Theme.accent)
             }
         }
         .overlay(alignment: .topLeading) {
@@ -3348,58 +3833,6 @@ private struct StreamTile: View {
                 )
             }
         }
-        .onAppear(perform: start)
-        .onDisappear(perform: stop)
-        .onChange(of: isPrimary) { _, newValue in
-            player?.isMuted = !newValue
-        }
-    }
-
-    /// Multiscreen tiles each own a player; items are built with the same factory as the
-    /// main player so they get the provider headers and fast-start settings too.
-    private func start() {
-        guard player == nil else { return }
-        AudioSessionManager.activateForVideo()
-        NotificationCenter.default.post(name: .bannerVideoPlaybackWillStart, object: nil)
-
-        let url = PlaybackItemFactory.playbackURLCandidates(for: channel.streamURL)[0]
-        let item = PlaybackItemFactory.makeItem(url: url, headers: channel.httpHeaders, profile: .balanced)
-        let player = AVPlayer(playerItem: item)
-        PlaybackItemFactory.apply(.balanced, to: player)
-        player.allowsExternalPlayback = true
-        player.appliesMediaSelectionCriteriaAutomatically = true
-        player.isMuted = !isPrimary
-        self.player = player
-        player.play()
-
-        // Only an item failure counts as "unavailable"; HLS assets never expose tracks
-        // on the asset, so track-based checks would flag healthy streams.
-        statusTask = Task { @MainActor in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(500))
-                switch item.status {
-                case .readyToPlay:
-                    player.playImmediately(atRate: 1)
-                    return
-                case .failed:
-                    failed = true
-                    self.player = nil
-                    return
-                default:
-                    continue
-                }
-            }
-        }
-    }
-
-    private func stop() {
-        statusTask?.cancel()
-        #if os(iOS)
-        // Keep the player alive while PiP is active so video continues in the overlay.
-        guard !pipHolder.isActive else { return }
-        #endif
-        player?.pause()
-        player = nil
     }
 }
 
@@ -3679,8 +4112,8 @@ private struct PlaybackStatusOverlay: View {
     private var isStarting: Bool {
         guard !controller.firstFrameRendered else { return false }
         switch controller.state {
-        case .loading, .buffering, .playing, .paused: return true
-        case .idle, .failed: return false
+        case .loading, .preparing, .connecting, .recovering, .buffering, .playing, .paused: return true
+        case .idle, .failed, .ended: return false
         }
     }
 
@@ -3799,7 +4232,7 @@ private struct PlayerMultiscreenPicker: View {
     @State private var query = ""
 
     private var canStart: Bool { selectedChannelIDs.count >= 2 }
-    private var isAtCapacity: Bool { selectedChannelIDs.count >= 4 }
+    private var isAtCapacity: Bool { selectedChannelIDs.count >= min(PlaybackController.multiviewCapacity, prefs.playerMaximumStreams) }
 
     private var filteredEntries: [LiveMatchEntry] {
         guard let sport = selectedSport else { return liveEntries }
@@ -3917,7 +4350,7 @@ private struct PlayerMultiscreenPicker: View {
 
                 // Browse all channels
                 Section {
-                    ForEach(filteredChannels) { channel in
+                    ForEach(filteredChannels, id: \.self) { channel in
                         channelRow(for: channel)
                     }
                 } header: {
@@ -3950,38 +4383,35 @@ private struct PlayerMultiscreenPicker: View {
                 .background(Theme.background)
             }
         }
-        .task { await loadLiveGames() }
-        .onChange(of: showAllSports) { _, _ in
-            liveEntries = []
+        .task(id: showAllSports) {
             selectedSport = nil
-            isLoadingLive = true
-            Task { await loadLiveGames() }
+            await loadLiveGames()
         }
     }
 
     @ViewBuilder
     private func channelRow(for channel: Channel) -> some View {
         Button {
-            if selectedChannelIDs.contains(channel.id) {
-                selectedChannelIDs.remove(channel.id)
+            if selectedChannelIDs.contains(StreamLinkerAdapters.streamID(channel)) {
+                selectedChannelIDs.remove(StreamLinkerAdapters.streamID(channel))
             } else if !isAtCapacity {
-                selectedChannelIDs.insert(channel.id)
+                selectedChannelIDs.insert(StreamLinkerAdapters.streamID(channel))
             }
             #if os(iOS)
             UISelectionFeedbackGenerator().selectionChanged()
             #endif
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: selectedChannelIDs.contains(channel.id) ? "checkmark.circle.fill" : "circle")
+                Image(systemName: selectedChannelIDs.contains(StreamLinkerAdapters.streamID(channel)) ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(selectedChannelIDs.contains(channel.id) ? Theme.accent : Theme.textSecondary)
+                    .foregroundStyle(selectedChannelIDs.contains(StreamLinkerAdapters.streamID(channel)) ? Theme.accent : Theme.textSecondary)
                     .frame(width: 28)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(channel.name)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(1)
-                    Text(channel.id == currentChannel.id ? "Current source" : (channel.group ?? channel.playlistName))
+                    Text(StreamLinkerAdapters.streamID(channel) == StreamLinkerAdapters.streamID(currentChannel) ? "Current source" : (channel.group ?? channel.playlistName))
                         .font(.caption)
                         .foregroundStyle(Theme.textSecondary)
                         .lineLimit(1)
@@ -3990,7 +4420,7 @@ private struct PlayerMultiscreenPicker: View {
             }
         }
         .buttonStyle(.plain)
-        .disabled(!selectedChannelIDs.contains(channel.id) && isAtCapacity)
+        .disabled(!selectedChannelIDs.contains(StreamLinkerAdapters.streamID(channel)) && isAtCapacity)
     }
 
     private func loadLiveGames() async {
@@ -4012,15 +4442,20 @@ private struct PlayerMultiscreenPicker: View {
 
         // One batched link pass for every live match, instead of scoring each one
         // independently — the linker builds its playlist index once and reuses it.
+        guard !Task.isCancelled else { return }
         await streamStore.scan(matches: liveMatches, channels: channels, epgRepository: epgRepository)
+        guard !Task.isCancelled else { return }
         liveEntries = liveMatches.map { match in
-            LiveMatchEntry(match: match, sources: streamStore.topRanked(for: match.id, limit: 4))
+            LiveMatchEntry(match: match, sources: streamStore.topRanked(for: match.id, limit: 4).filter(\.isConfirmed))
         }
         liveEntries.sort(by: liveEntrySort)
         isLoadingLive = false
     }
 
     private func liveEntrySort(_ lhs: LiveMatchEntry, _ rhs: LiveMatchEntry) -> Bool {
+        if prefs.isFavoriteMatch(lhs.match) != prefs.isFavoriteMatch(rhs.match) {
+            return prefs.isFavoriteMatch(lhs.match)
+        }
         if lhs.match.league.group.rawValue != rhs.match.league.group.rawValue {
             return lhs.match.league.group.rawValue < rhs.match.league.group.rawValue
         }
@@ -4029,6 +4464,7 @@ private struct PlayerMultiscreenPicker: View {
 }
 
 private struct LiveMatchPickerRow: View {
+    @EnvironmentObject private var prefs: PreferencesStore
     let match: Match
     let sources: [RankedSource]
     @Binding var selectedIDs: Set<String>
@@ -4042,7 +4478,7 @@ private struct LiveMatchPickerRow: View {
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.textSecondary)
                 Spacer(minLength: 4)
-                Label(match.statusDetail, systemImage: "dot.radiowaves.left.and.right")
+                Label(prefs.spoilerFreeMode ? "Live" : match.statusDetail, systemImage: "dot.radiowaves.left.and.right")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.white)
                     .lineLimit(1)
@@ -4067,10 +4503,10 @@ private struct LiveMatchPickerRow: View {
                     HStack(spacing: 6) {
                         ForEach(sources.prefix(3)) { ranked in
                             let ch = ranked.channel
-                            let isSelected = selectedIDs.contains(ch.id)
+                            let isSelected = selectedIDs.contains(StreamLinkerAdapters.streamID(ch))
                             Button {
-                                if isSelected { selectedIDs.remove(ch.id) }
-                                else if !isAtCapacity { selectedIDs.insert(ch.id) }
+                                if isSelected { selectedIDs.remove(StreamLinkerAdapters.streamID(ch)) }
+                                else if !isAtCapacity { selectedIDs.insert(StreamLinkerAdapters.streamID(ch)) }
                             } label: {
                                 HStack(spacing: 4) {
                                     if isSelected {
@@ -4105,7 +4541,7 @@ private struct LiveMatchPickerRow: View {
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(1)
             Spacer()
-            if let score = team.score {
+            if !prefs.spoilerFreeMode, let score = team.score {
                 Text(score)
                     .font(.subheadline.weight(.bold).monospacedDigit())
                     .foregroundStyle(team.isWinner ? Theme.textPrimary : Theme.textSecondary)
@@ -4258,7 +4694,34 @@ private struct PulsingDot: View {
 
 // MARK: - Player More Sheet
 
-private struct PlayerMoreSheet: View {
+private struct PlayerDiagnosticsView: View {
+    @ObservedObject var playback: PlaybackController
+    let requestedChannel: Channel
+    let metadata: StreamRuntimeMetadata?
+
+    var body: some View {
+        List {
+            LabeledContent("Engine", value: "AVPlayer")
+            LabeledContent("Requested channel", value: requestedChannel.name)
+            LabeledContent("Active channel", value: playback.channel?.name ?? "None")
+            LabeledContent("Channel ID", value: requestedChannel.id.contains("://") ? "Redacted" : requestedChannel.id)
+            LabeledContent("State", value: String(describing: playback.state))
+            LabeledContent("Recovery attempt", value: "\(playback.reconnectAttempt) / \(PlaybackController.maxReconnectAttempts)")
+            if let metadata {
+                if let codec = metadata.codec { LabeledContent("Video codec", value: codec) }
+                if let height = metadata.height { LabeledContent("Resolution", value: "\(metadata.width ?? 0) × \(height)") }
+                if let fps = metadata.frameRate { LabeledContent("Frame rate", value: String(format: "%.2f fps", fps)) }
+                if let bitrate = metadata.bitrate { LabeledContent("Bitrate estimate", value: String(format: "%.2f Mbps", bitrate / 1_000_000)) }
+            }
+            if let summary = playback.metricsSummary { Text(summary).font(.caption.monospaced()) }
+            Text("Unknown metrics are omitted. Provider URLs and authorization headers are not displayed.")
+                .font(.caption).foregroundStyle(Theme.textSecondary)
+        }
+        .navigationTitle("Diagnostics")
+    }
+}
+
+struct PlayerMoreSheet: View {
     let channel: Channel
     @ObservedObject var streamSelection: StreamSelectionState
     @ObservedObject var playback: PlaybackController
@@ -4271,9 +4734,13 @@ private struct PlayerMoreSheet: View {
     let streamMetadata: StreamRuntimeMetadata?
     let canStartMultiscreen: Bool
     let multiscreenAction: () -> Void
+    let lockAction: () -> Void
+    let compactAction: (() -> Void)?
+    var recommendationAction: ((Channel) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var watchStore: WatchStore
     @EnvironmentObject private var entitlements: EntitlementStore
+    @EnvironmentObject private var prefs: PreferencesStore
 
     var body: some View {
         NavigationStack {
@@ -4282,6 +4749,9 @@ private struct PlayerMoreSheet: View {
                     optionsHeader
 
                     PlayerOptionSection(title: "Playback") {
+                        if let compactAction {
+                            Button("Compact player / Restore window", systemImage: "pip", action: compactAction)
+                        }
                         #if os(iOS)
                         HStack {
                             PlayerOptionLabel(systemImage: "airplayvideo", title: "AirPlay", subtitle: "Cast to nearby screens")
@@ -4362,6 +4832,38 @@ private struct PlayerMoreSheet: View {
                         }
                     }
 
+                    PlayerOptionSection(title: "Player preferences") {
+                        Button("Lock controls", systemImage: "lock.fill", action: lockAction)
+                        Toggle("Hide sports scores", isOn: Binding(get: { prefs.hidesSportsScores }, set: prefs.setSpoilerFreeMode))
+                        Picker("Score delay", selection: Binding(get: { prefs.sportsScoreDelaySeconds }, set: prefs.setSportsScoreDelaySeconds)) {
+                            Text("Real-time").tag(0)
+                            ForEach([15, 30, 60, 120], id: \.self) { Text("\($0) seconds").tag($0) }
+                        }
+                        Text("Delayed scores use received snapshots, not exact video synchronization. Other score surfaces stay hidden while a delay is active.")
+                            .font(.caption).foregroundStyle(Theme.textSecondary)
+                        Toggle("Double-tap to seek when available", isOn: Binding(get: { prefs.playerDoubleTapSeeks }, set: prefs.setPlayerDoubleTapSeeks))
+                        Text("When disabled, double-tap changes channels. Seeking requires a seekable stream.")
+                            .font(.caption).foregroundStyle(Theme.textSecondary)
+                        Picker("Hide controls after", selection: Binding(get: { prefs.playerPanelTimeoutSeconds }, set: prefs.setPlayerPanelTimeoutSeconds)) {
+                            ForEach(2...30, id: \.self) { seconds in
+                                Text("\(seconds) seconds").tag(seconds)
+                            }
+                        }
+                        Toggle("Favourite-team score updates", isOn: Binding(get: { prefs.scoreChangeAlertsEnabled }, set: prefs.setScoreChangeAlertsEnabled))
+                        Toggle("Verified broadcast alerts", isOn: Binding(get: { prefs.broadcastAlertsEnabled }, set: prefs.setBroadcastAlertsEnabled))
+                        Text("Alerts require notification permission and enabled match notifications. Score alerts are suppressed by spoiler protection.")
+                            .font(.caption).foregroundStyle(Theme.textSecondary)
+                        Picker("Maximum simultaneous streams", selection: Binding(get: { prefs.playerMaximumStreams }, set: prefs.setPlayerMaximumStreams)) {
+                            ForEach(2...4, id: \.self) { Text("\($0) streams").tag($0) }
+                        }
+                        Text("The device may reduce this limit under resource pressure.")
+                            .font(.caption).foregroundStyle(Theme.textSecondary)
+                        TextField("Default channel category", text: Binding(get: { prefs.playerDefaultCategory }, set: prefs.setPlayerDefaultCategory))
+                        Toggle("Commercial Break Mode", isOn: Binding(get: { prefs.commercialBreakMode }, set: prefs.setCommercialBreakMode))
+                        Text("Automatic detection unavailable: this source has no verified commercial-break integration. Audio will not be muted automatically.")
+                            .font(.caption).foregroundStyle(Theme.textSecondary)
+                    }
+
                     PlayerOptionSection(title: "Picture") {
                         NavigationLink {
                             AspectSelectionView(selection: $aspect)
@@ -4370,6 +4872,14 @@ private struct PlayerMoreSheet: View {
                         }
                     }
 
+                    if let recommendationAction {
+                        NavigationLink("Recommended games") {
+                            PlayerRecommendationsView(onWatch: recommendationAction)
+                        }
+                    }
+                    NavigationLink("Advanced diagnostics") {
+                        PlayerDiagnosticsView(playback: playback, requestedChannel: channel, metadata: streamMetadata)
+                    }
                     if let diagnostics = diagnosticsSummary {
                         PlayerOptionSection(title: "Stream Summary") {
                             Text(diagnostics)
@@ -4633,7 +5143,7 @@ private struct StreamQualitySelectionView: View {
             }
 
             if offeredHeights.isEmpty {
-                Text("This stream offers a single quality.")
+                Text("No selectable representations are currently advertised by this stream.")
                     .font(Theme.Typography.caption)
                     .foregroundStyle(Theme.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -4642,12 +5152,10 @@ private struct StreamQualitySelectionView: View {
         }
     }
 
-    /// Standard caps that match (±10 %) a variant the stream advertises.
+    /// Only offer resolution caps backed by representations advertised by this asset.
     private var offeredHeights: [Int] {
         guard playback.availableHeights.count > 1 else { return [] }
-        return PlayerQualityCap.standardHeights.filter { standard in
-            playback.availableHeights.contains { abs($0 - standard) <= standard / 10 }
-        }
+        return playback.availableHeights.filter { $0 > 0 }.sorted(by: >)
     }
 
     private var currentDetail: String? {
@@ -4754,51 +5262,130 @@ private struct SelectionRow: View {
 
 // MARK: - Player Channel List Sheet
 
-private struct PlayerChannelListSheet: View {
+struct PlayerChannelListSheet: View {
     let channels: [Channel]
     let currentChannelID: String
     let onSelect: (Channel, Int) -> Void
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var watchStore: WatchStore
+    @SceneStorage("player.drawer.query") private var query = ""
+    @SceneStorage("player.drawer.favorites") private var favoritesOnly = false
+    @SceneStorage("player.drawer.category") private var selectedCategory = ""
+    @EnvironmentObject private var prefs: PreferencesStore
+    @State private var filteredChannels: [Channel] = []
+    @State private var categories: [String] = []
 
     var body: some View {
         NavigationStack {
             List {
-                ForEach(Array(channels.enumerated()), id: \.element.id) { index, ch in
+                Section {
+                    Toggle("Favourites only", isOn: $favoritesOnly)
+                    Picker("Category", selection: $selectedCategory) {
+                        Text("All channels").tag("")
+                        ForEach(categories, id: \.self) { Text($0).tag($0) }
+                    }
+                }
+                ForEach(filteredChannels, id: \.self) { channel in
                     Button {
-                        onSelect(ch, index)
+                        onSelect(channel, channels.firstIndex(of: channel) ?? 0)
                         dismiss()
                     } label: {
-                        HStack(spacing: Theme.Spacing.sm) {
-                            ChannelLogo(url: ch.logoURL, name: ch.name, size: 40)
-                            Text(ch.name).font(Theme.Typography.headline).foregroundStyle(Theme.textPrimary).lineLimit(1)
-                            Spacer()
-                            if ch.id == currentChannelID {
-                                Image(systemName: "play.fill").foregroundStyle(Theme.accent).font(Theme.Typography.caption)
-                                    .accessibilityLabel("Now playing")
-                            }
-                        }
-                        .frame(minHeight: 52)
-                        .contentShape(Rectangle())
+                        PlayerChannelGuideRow(channel: channel, isActive: StreamLinkerAdapters.streamID(channel) == currentChannelID)
                     }
                     .buttonStyle(.plain)
-                    .listRowBackground(ch.id == currentChannelID ? Theme.accent.opacity(0.12) : Theme.surface)
+                    .contextMenu {
+                        Button(watchStore.isFavorite(channel) ? "Remove Favourite" : "Add to Favourites") {
+                            watchStore.toggleFavorite(channel)
+                            updateFilter()
+                        }
+                    }
+                    .listRowBackground(StreamLinkerAdapters.streamID(channel) == currentChannelID ? Theme.accent.opacity(0.12) : Theme.surface)
                 }
             }
             .listStyle(.plain)
             .hidesScrollContentBackground()
-            .navigationTitle("Channels")
+            .searchable(text: $query, prompt: "Search channels")
+            .navigationTitle("Channels & Guide")
             .inlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
             }
+            .onAppear {
+                categories = Array(Set(channels.compactMap(\.group))).sorted()
+                if selectedCategory.isEmpty, categories.contains(prefs.playerDefaultCategory) { selectedCategory = prefs.playerDefaultCategory }
+                if !selectedCategory.isEmpty, !categories.contains(selectedCategory) { selectedCategory = "" }
+                updateFilter()
+            }
+            .onChange(of: query) { _, _ in updateFilter() }
+            .onChange(of: watchStore.favoriteChannelIDs) { _, _ in updateFilter() }
+            .onChange(of: favoritesOnly) { _, _ in updateFilter() }
+            .onChange(of: selectedCategory) { _, _ in updateFilter() }
         }
         .tint(Theme.accent)
+    }
+
+    private func updateFilter() {
+        filteredChannels = channels.filter {
+            (selectedCategory.isEmpty || $0.group == selectedCategory)
+                && (!favoritesOnly || watchStore.isFavorite($0))
+                && (query.isEmpty || $0.name.localizedStandardContains(query))
+        }
+    }
+}
+
+/// EPG lookups are limited to visible list rows, using the existing in-memory index.
+private struct PlayerChannelGuideRow: View {
+    let channel: Channel
+    let isActive: Bool
+    @EnvironmentObject private var repository: EPGRepository
+    @EnvironmentObject private var watchStore: WatchStore
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            let canonicalID = repository.canonicalChannel(forProviderChannelID: channel.id, playlistID: channel.playlistID)?.id
+            let current = canonicalID.flatMap { repository.currentProgramme(for: $0) }
+            let next = canonicalID.flatMap { repository.nextProgramme(for: $0) }
+            HStack(spacing: Theme.Spacing.sm) {
+                ChannelLogo(url: channel.logoURL, name: channel.name, size: 40)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(channel.name).font(Theme.Typography.headline).lineLimit(1)
+                    if let current {
+                        Text(current.title).font(.subheadline).lineLimit(1)
+                        Text("\(current.start.formatted(date: .omitted, time: .shortened)) – \(current.end.formatted(date: .omitted, time: .shortened))")
+                            .font(.caption).foregroundStyle(Theme.textSecondary)
+                        let duration = current.end.timeIntervalSince(current.start)
+                        if duration > 0 {
+                            ProgressView(value: min(1, max(0, context.date.timeIntervalSince(current.start) / duration)))
+                                .tint(Theme.accent)
+                        }
+                    } else {
+                        Text("Programme information unavailable").font(.caption).foregroundStyle(Theme.textSecondary)
+                    }
+                    if let next {
+                        Text("Next: \(next.title)").font(.caption).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                    }
+                    if let category = channel.group {
+                        Text(category).font(.caption2).foregroundStyle(Theme.textSecondary).lineLimit(1)
+                    }
+                }
+                Spacer()
+                if watchStore.isFavorite(channel) {
+                    Image(systemName: "heart.fill").foregroundStyle(Theme.accent).accessibilityLabel("Favourite")
+                }
+                if isActive {
+                    Image(systemName: "play.fill").foregroundStyle(Theme.accent).accessibilityLabel("Now playing")
+                }
+            }
+            .foregroundStyle(Theme.textPrimary)
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
+        }
     }
 }
 
 // MARK: - Player Recents Sheet
 
-private struct PlayerRecentsSheet: View {
+struct PlayerRecentsSheet: View {
     let currentChannelID: String
     let onSelect: (Channel) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -4827,7 +5414,7 @@ private struct PlayerRecentsSheet: View {
                                             Text(relativeTime(entry.watchedAt)).font(Theme.Typography.caption).foregroundStyle(Theme.textSecondary)
                                         }
                                         Spacer()
-                                        if ch.id == currentChannelID {
+                                        if StreamLinkerAdapters.streamID(ch) == currentChannelID {
                                             Image(systemName: "play.fill").foregroundStyle(Theme.accent).font(Theme.Typography.caption)
                                                 .accessibilityLabel("Now playing")
                                         }
@@ -4836,7 +5423,7 @@ private struct PlayerRecentsSheet: View {
                                     .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
-                                .listRowBackground(ch.id == currentChannelID ? Theme.accent.opacity(0.12) : Theme.surface)
+                                .listRowBackground(StreamLinkerAdapters.streamID(ch) == currentChannelID ? Theme.accent.opacity(0.12) : Theme.surface)
                             }
                         }
                     }
@@ -4948,3 +5535,158 @@ private struct PlayerAdjustmentHUD: View {
     }
 }
 #endif
+
+
+/// Uses the existing schedule cache and broadcast matcher; browsing never owns a player.
+struct PlayerRecommendationsView: View {
+    let onWatch: (Channel) -> Void
+    @EnvironmentObject private var prefs: PreferencesStore
+    @EnvironmentObject private var playlistStore: PlaylistStore
+    @EnvironmentObject private var repository: EPGRepository
+    @EnvironmentObject private var streams: StreamAvailabilityStore
+    @State private var matches: [Match] = []
+    @State private var loading = true
+    @State private var selection: Channel?
+    @State private var selectedMatch: Match?
+    @State private var refreshID = UUID()
+    @State private var failure: String?
+
+    var body: some View {
+        List {
+            if loading { ProgressView("Finding games…") }
+            if let failure { Text(failure).foregroundStyle(Theme.textSecondary) }
+            ForEach(matches) { match in
+                let sources = streams.topRanked(for: match.id, limit: 4).filter(\.isConfirmed)
+                Section {
+                    if match.state == .pre {
+                        Text("Upcoming · \(match.date.formatted(date: .abbreviated, time: .shortened))")
+                        Button("Remind me") {
+                            Task {
+                                if !(await MatchNotificationService.shared.scheduleReminder(for: match, leadTime: prefs.matchReminderLeadTime)) {
+                                    failure = "Reminder unavailable. Check notification permissions."
+                                }
+                            }
+                        }
+                        #if os(tvOS)
+                        .disabled(true)
+                        #endif
+                    } else if sources.isEmpty {
+                        Text("Unavailable through current IPTV sources")
+                            .foregroundStyle(Theme.textSecondary)
+                    } else {
+                        ForEach(sources) { source in
+                            Button("Watch now · \(source.channel.name)") {
+                                failure = nil
+                                selectedMatch = match
+                                selection = source.channel
+                            }
+                        }
+                    }
+                } header: {
+                    Text("\(match.league.shortName) · \(match.away.shortName) vs \(match.home.shortName)")
+                }
+            }
+            if !loading && matches.isEmpty && failure == nil {
+                Text("No live or upcoming games in your followed leagues.")
+            }
+        }
+        .navigationTitle("Recommended games")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("Refresh", systemImage: "arrow.clockwise") { refreshID = UUID() }
+                    .disabled(loading)
+            }
+        }
+        .task(id: prefs.followedLeagues.map(\.path) + [refreshID.uuidString]) {
+            loading = true
+            failure = nil
+            selection = nil
+            selectedMatch = nil
+            var result: [Match] = []
+            var failedLeagues = 0
+            await withTaskGroup(of: [Match]?.self) { group in
+                for league in prefs.followedLeagues {
+                    group.addTask { try? await SportsRepository.shared.legacyScoreboard(for: league) }
+                }
+                for await batch in group {
+                    if let batch { result.append(contentsOf: batch) }
+                    else { failedLeagues += 1 }
+                }
+            }
+            guard !Task.isCancelled else { return }
+            if failedLeagues > 0 {
+                failure = "Some schedules could not be loaded. Refresh to try again."
+            }
+            let now = Date()
+            var seen = Set<String>()
+            matches = result.filter { seen.insert($0.id).inserted }.filter {
+                ($0.state == .live && abs($0.date.timeIntervalSince(now)) < 12 * 3600)
+                    || ($0.state == .pre && $0.date >= now && $0.date < now.addingTimeInterval(86400))
+            }.sorted {
+                if prefs.isFavoriteMatch($0) != prefs.isFavoriteMatch($1) { return prefs.isFavoriteMatch($0) }
+                if $0.state != $1.state { return $0.state == .live }
+                return $0.date < $1.date
+            }
+            await streams.scan(matches: matches, channels: playlistStore.allChannels, epgRepository: repository)
+            guard !Task.isCancelled else { return }
+            loading = false
+        }
+        .task(id: [selectedMatch?.id ?? "", selection.map(StreamLinkerAdapters.streamID) ?? ""]) {
+            guard let selection, let selectedMatch else { return }
+            let confirmed = await streams.confirmsCurrentBroadcast(match: selectedMatch, channel: selection,
+                channels: playlistStore.allChannels, epgRepository: repository)
+            guard !Task.isCancelled else { return }
+            if confirmed { onWatch(selection) }
+            else { failure = "No confirmed stream found."; self.selection = nil }
+        }
+    }
+}
+
+
+/// Shown only for notifications delivered through the existing system delegate.
+struct PlayerSportsAlertBanner: View {
+    @State private var alert: PlannedNotification?
+    @EnvironmentObject private var prefs: PreferencesStore
+
+    var body: some View {
+        Group {
+            if let alert, prefs.matchNotificationsEnabled, prefs.allowsMatchNotification(alert.userInfo) {
+                HStack(alignment: .top, spacing: 12) {
+                    Button {
+                        if let link = DeepLink(notificationUserInfo: alert.userInfo) {
+                            DeepLinkRouter.shared.handle(link)
+                        }
+                        self.alert = nil
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(alert.title).font(.subheadline.bold()).lineLimit(2)
+                            Text(alert.body).font(.caption).lineLimit(2)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    Button { self.alert = nil } label: {
+                        Image(systemName: "xmark").frame(minWidth: 44, minHeight: 44)
+                    }
+                    .accessibilityLabel("Dismiss sports alert")
+                }
+                .padding(12).frame(maxWidth: 340)
+                .foregroundStyle(.white)
+                .background(.black.opacity(0.85), in: RoundedRectangle(cornerRadius: 12))
+                .padding()
+            }
+        }
+        .task {
+            for await value in NotificationCenter.default.notifications(named: .bannerPlayerSportsAlert)
+                .compactMap({ $0.userInfo?["alert"] as? PlannedNotification }) {
+                guard !Task.isCancelled else { return }
+                alert = value
+            }
+        }
+        .task(id: alert?.identifier) {
+            guard alert != nil else { return }
+            do { try await Task.sleep(for: .seconds(8)) } catch { return }
+            alert = nil
+        }
+        .onChange(of: prefs.spoilerFreeMode) { _, _ in alert = nil }
+    }
+}

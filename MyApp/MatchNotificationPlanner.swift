@@ -161,7 +161,7 @@ nonisolated enum MatchNotificationPlanner {
         PlannedNotification(
             identifier: liveIdentifier(match.matchID),
             title: "\(match.leadingShortName) vs \(match.trailingShortName) is live",
-            body: match.statusDetail,
+            body: "The game is now live.",
             fireDate: nil,
             userInfo: userInfo(for: match, type: "gameLive", origin: origin)
         )
@@ -175,6 +175,22 @@ nonisolated enum MatchNotificationPlanner {
             fireDate: nil,
             userInfo: userInfo(for: match, type: "closeGame", origin: origin)
         )
+    }
+
+    static func broadcastAlert(for match: NotificationCandidate) -> PlannedNotification {
+        PlannedNotification(
+            identifier: "\(identifierPrefix)broadcast.\(match.matchID)",
+            title: "Broadcast available",
+            body: "\(match.leadingShortName) vs \(match.trailingShortName) has another verified broadcast.",
+            fireDate: nil, userInfo: userInfo(for: match, type: "broadcastAvailable", origin: favoriteSyncOrigin))
+    }
+
+    static func scoreChangeAlert(for match: NotificationCandidate) -> PlannedNotification {
+        PlannedNotification(
+            identifier: "\(identifierPrefix)score.\(match.matchID).\(match.awayScore ?? "").\(match.homeScore ?? "")",
+            title: "Score update: \(match.leadingShortName) vs \(match.trailingShortName)",
+            body: "\(match.leadingScore ?? "-")–\(match.trailingScore ?? "-")",
+            fireDate: nil, userInfo: userInfo(for: match, type: "scoreChange", origin: favoriteSyncOrigin))
     }
 
     /// Every identifier the sync could own for `candidates`, whether or not it is wanted right now.
@@ -260,4 +276,8 @@ private extension PendingNotificationSnapshot {
         case (nil, _?): return false
         }
     }
+}
+
+extension Notification.Name {
+    static let bannerPlayerSportsAlert = Notification.Name("bannertv.player.sportsAlert")
 }

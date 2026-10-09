@@ -148,11 +148,11 @@ struct SourceMatcherRegressionTests {
 @Suite("News pagination regressions")
 struct NewsPaginationTests {
 
-    @Test("Yahoo — supportsPagination is false")
-    func yahooDoesNotSupportPagination() {
-        let yahoo = YahooSportsProvider()
-        #expect(!yahoo.supportsPagination,
-                "YahooSportsProvider must declare supportsPagination = false so page-2+ requests skip it")
+    @Test("RSS providers do not support pagination")
+    func rssDoesNotSupportPagination() {
+        // YahooSportsProvider was removed; keep the pagination contract covered by an active RSS provider.
+        #expect(!BBCSportNewsProvider().supportsPagination,
+                "RSS providers must skip page-2+ requests")
     }
 
     @Test("Default supportsPagination — protocol extension defaults to true")

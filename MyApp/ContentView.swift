@@ -293,6 +293,7 @@ struct RootView: View {
             eventChannelRefresh: eventChannelRefresh
         )
         .onChange(of: liveViewModel.allLive) { _, live in updateLiveActivity(live) }
+        .onChange(of: prefs.spoilerFreeMode) { updateLiveActivity(liveViewModel.allLive) }
         .onChange(of: prefs.favoriteTeams) { updateFavoriteNotificationPrompt() }
         .onChange(of: prefs.matchNotificationsEnabled) { updateFavoriteNotificationPrompt() }
         // A tapped notification or banner:// URL. `initial` picks up a link that arrived
@@ -359,7 +360,7 @@ struct RootView: View {
         let favoriteIDs = Set(live.filter { prefs.isFavoriteMatch($0) }.map(\.id))
         let followedLeagueIDs = Set(live.filter { prefs.followedLeagues.contains($0.league) }.map(\.id))
         LiveActivityManager.shared.reconcile(
-            liveMatches: live,
+            liveMatches: prefs.spoilerFreeMode ? [] : live,
             favoriteMatchIDs: favoriteIDs,
             listeningMatchID: appEnvironment.activeLivePlaybackContext?.match.id,
             followedTeamMatchIDs: favoriteIDs,

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import AVFoundation
 #if os(iOS)
 import MediaPlayer
@@ -16,7 +17,7 @@ extension Notification.Name {
 
 /// How the video fills the player area. Remembered per channel.
 enum PlayerAspectMode: String, CaseIterable, Identifiable {
-    case fit, fill, stretch
+    case fit, fill, stretch, original
 
     var id: String { rawValue }
 
@@ -25,6 +26,7 @@ enum PlayerAspectMode: String, CaseIterable, Identifiable {
         case .fit: return "Fit"
         case .fill: return "Fill"
         case .stretch: return "Stretch"
+        case .original: return "Original"
         }
     }
 
@@ -33,6 +35,7 @@ enum PlayerAspectMode: String, CaseIterable, Identifiable {
         case .fit: return "Whole picture, may letterbox"
         case .fill: return "Fill the screen, may crop edges"
         case .stretch: return "Fill the screen, may distort"
+        case .original: return "Native pixel size, reduced only to fit"
         }
     }
 
@@ -41,12 +44,13 @@ enum PlayerAspectMode: String, CaseIterable, Identifiable {
         case .fit: return "rectangle.arrowtriangle.2.inward"
         case .fill: return "rectangle.arrowtriangle.2.outward"
         case .stretch: return "arrow.left.and.right.square"
+        case .original: return "1.magnifyingglass"
         }
     }
 
     var videoGravity: AVLayerVideoGravity {
         switch self {
-        case .fit: return .resizeAspect
+        case .fit, .original: return .resizeAspect
         case .fill: return .resizeAspectFill
         case .stretch: return .resize
         }
@@ -56,7 +60,8 @@ enum PlayerAspectMode: String, CaseIterable, Identifiable {
         switch self {
         case .fit: return .fill
         case .fill: return .stretch
-        case .stretch: return .fit
+        case .stretch: return .original
+        case .original: return .fit
         }
     }
 
@@ -193,5 +198,29 @@ final class VideoNowPlaying {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         NotificationCenter.default.post(name: .bannerVideoReleasedRemoteCommands, object: nil)
         #endif
+    }
+}
+
+
+/// Original mode never enlarges a decoded pixel beyond one display pixel.
+/// Unknown presentation sizes fall back to fit until AVPlayer publishes dimensions.
+struct OriginalVideoSize: ViewModifier {
+    let mode: PlayerAspectMode
+    let videoSize: CGSize
+    @Environment(\.displayScale) private var displayScale
+
+    func body(content: Content) -> some View {
+        GeometryReader { geometry in
+            let size = Self.size(mode: mode, video: videoSize, available: geometry.size, scale: displayScale)
+            content.frame(width: size.width, height: size.height)
+                .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+    }
+
+    static func size(mode: PlayerAspectMode, video: CGSize, available: CGSize, scale: CGFloat) -> CGSize {
+        guard mode == .original, video.width > 0, video.height > 0, scale > 0 else { return available }
+        let natural = CGSize(width: video.width / scale, height: video.height / scale)
+        let ratio = min(1, min(available.width / natural.width, available.height / natural.height))
+        return CGSize(width: natural.width * ratio, height: natural.height * ratio)
     }
 }

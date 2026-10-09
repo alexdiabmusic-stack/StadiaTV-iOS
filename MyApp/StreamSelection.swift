@@ -245,6 +245,11 @@ final class StreamSelectionState: ObservableObject {
     /// (a plain channel, or the ranked sources of a match).
     private var rawStreams: [ChannelStream] = []
     private var rawChannels: [String: Channel] = [:]
+    /// Event-aware callers supply the existing shared linker's fresh confirmation.
+    var broadcastValidator: ((Channel) async -> Bool)?
+    private var validationTask: Task<Void, Never>?
+    private var validationGeneration = 0
+    private var rejectedSelection: (stream: ChannelStream, mode: StreamSelectionMode)?
 
     private static var sessionManualSelections: [String: String] = [:]
     private var attemptedAutoStreamIDs: Set<String> = []
@@ -269,15 +274,17 @@ final class StreamSelectionState: ObservableObject {
     }
 
     private func configure(channel: Channel, canonicalChannel: CanonicalChannel?, candidates: [Channel], preferredStreamID: String?) {
+        cancelPendingValidation()
+        broadcastValidator = nil
         fallbackChannel = channel
         self.canonicalChannel = canonicalChannel
         rawStreams = []
         rawChannels = [:]
         if canonicalChannel == nil {
             var seen = Set<String>()
-            let ordered = ([channel] + candidates).filter { seen.insert($0.id).inserted }.prefix(Self.maxRawCandidates)
+            let ordered = ([channel] + candidates).filter { seen.insert(StreamLinkerAdapters.streamID($0)).inserted }.prefix(Self.maxRawCandidates)
             rawStreams = ordered.map(Self.stream(from:))
-            rawChannels = Dictionary(uniqueKeysWithValues: ordered.map { ($0.id, $0) })
+            rawChannels = Dictionary(uniqueKeysWithValues: ordered.map { (StreamLinkerAdapters.streamID($0), $0) })
         }
         mode = .auto
         attemptedAutoStreamIDs.removeAll()
@@ -289,7 +296,9 @@ final class StreamSelectionState: ObservableObject {
             mode = .manual(streamID)
             activeStream = stream
             autoSelectedStream = nil
-        } else if let preferredStreamID, let stream = usableStreams.first(where: { $0.id == preferredStreamID }) {
+        } else if let preferredStreamID, let stream = usableStreams.first(where: {
+            $0.id == preferredStreamID || ($0.providerChannelId == preferredStreamID && $0.playlistID == channel.playlistID)
+        }) {
             activeStream = stream
             autoSelectedStream = stream
         } else {
@@ -338,6 +347,11 @@ final class StreamSelectionState: ObservableObject {
     }
 
     func selectAuto() {
+        if broadcastValidator != nil, let stream = autoOrderedStreams().first {
+            validateSelection(stream: stream, mode: .auto)
+            return
+        }
+        cancelPendingValidation()
         mode = .auto
         if let canonicalChannel {
             Self.sessionManualSelections[canonicalChannel.id] = nil
@@ -350,19 +364,66 @@ final class StreamSelectionState: ObservableObject {
     }
 
     func selectManual(streamID: String) {
-        guard let stream = usableStreams.first(where: { $0.id == streamID }) else { return }
-        mode = .manual(streamID)
-        if let canonicalChannel {
-            Self.sessionManualSelections[canonicalChannel.id] = streamID
+        let legacyMatches = usableStreams.filter { $0.providerChannelId == streamID }
+        guard let stream = usableStreams.first(where: { $0.id == streamID })
+                ?? (legacyMatches.count == 1 ? legacyMatches.first : nil) else { return }
+        if broadcastValidator != nil {
+            validateSelection(stream: stream, mode: .manual(stream.id))
+            return
         }
+        cancelPendingValidation()
+        commitSelection(stream: stream, mode: .manual(stream.id))
+    }
+
+    private func commitSelection(stream: ChannelStream, mode: StreamSelectionMode) {
+        self.mode = mode
+        if let canonicalChannel {
+            Self.sessionManualSelections[canonicalChannel.id] = mode == .auto ? nil : stream.id
+        }
+        attemptedAutoStreamIDs.removeAll()
         switchState = .idle
         activeStream = stream
+        autoSelectedStream = mode == .auto ? stream : nil
         loadToken &+= 1
-        logSelection(reason: "user_manual")
+        logSelection(reason: "user_selection")
+    }
+
+    private func validateSelection(stream: ChannelStream, mode: StreamSelectionMode) {
+        guard let validator = broadcastValidator else { return }
+        cancelPendingValidation()
+        let request = validationGeneration
+        let token = loadToken
+        let candidate = channel(for: stream)
+        switchState = .switching
+        validationTask = Task { [weak self] in
+            let confirmed = await validator(candidate)
+            guard !Task.isCancelled, let self,
+                  self.validationGeneration == request, self.loadToken == token else { return }
+            self.validationTask = nil
+            guard confirmed else {
+                self.rejectedSelection = (stream, mode)
+                self.switchState = .failed("No confirmed stream found.")
+                return
+            }
+            self.commitSelection(stream: stream, mode: mode)
+        }
+    }
+
+    func cancelPendingValidation() {
+        validationGeneration &+= 1
+        validationTask?.cancel()
+        validationTask = nil
+        rejectedSelection = nil
+        if switchState == .switching { switchState = .idle }
     }
 
     /// Reloads the current source after clearing its failure record.
     func retryActiveStream() {
+        if let rejectedSelection, broadcastValidator != nil {
+            validateSelection(stream: rejectedSelection.stream, mode: rejectedSelection.mode)
+            return
+        }
+        cancelPendingValidation()
         if let activeStream { clearFailure(for: activeStream.id) }
         attemptedAutoStreamIDs.removeAll()
         switchState = .idle
@@ -405,6 +466,7 @@ final class StreamSelectionState: ObservableObject {
     /// a second connection to probe a candidate while the main stream is live is exactly what
     /// kicks the viewer on those accounts. See MatchLinker/PROMPTS.md, Prompt 6.
     func preflightAlternates() async {
+        let requestedToken = loadToken
         guard let active = activeStream else { return }
         let activePlaylistID = channel(for: active).playlistID
         guard !XtreamAccountStatusStore.shared.blocksAdditionalConnection(forPlaylistID: activePlaylistID) else { return }
@@ -425,6 +487,7 @@ final class StreamSelectionState: ObservableObject {
             for await result in group { collected.append(result) }
             return collected
         }
+        guard !Task.isCancelled, loadToken == requestedToken else { return }
         for (streamID, result) in results where result == .dead {
             PlaybackMetrics.logger.info("Preflight: candidate \(streamID, privacy: .private) unreachable; skipping it for failover")
             recordFailure(for: streamID)
@@ -432,6 +495,12 @@ final class StreamSelectionState: ObservableObject {
     }
 
     private func failoverFromAuto(message: String) {
+        // Raw match candidates may be different regional/language broadcasts.
+        // Only the canonical feed's mirrors may be selected without user intent.
+        guard canonicalChannel != nil else {
+            switchState = .failed(message)
+            return
+        }
         if let next = autoOrderedStreams().first(where: { !attemptedAutoStreamIDs.contains($0.id) && !isUnavailable($0.id) }) {
             switchState = .idle
             activeStream = next
@@ -489,7 +558,7 @@ final class StreamSelectionState: ObservableObject {
 
     private static func stream(from channel: Channel) -> ChannelStream {
         var stream = ChannelStream(
-            id: channel.id,
+            id: StreamLinkerAdapters.streamID(channel),
             providerChannelId: channel.id,
             originalName: channel.name,
             normalizedName: channel.name.lowercased(),
@@ -508,10 +577,10 @@ final class StreamSelectionState: ObservableObject {
 
     private func logSelection(reason: String) {
         #if DEBUG
-        let canonicalID = canonicalChannel?.id ?? "raw-channel"
-        let streamID = activeStream?.id ?? fallbackChannel.id
+        let sourceKind = canonicalChannel == nil ? "raw-channel" : "canonical"
+        let modeLabel = mode == .auto ? "Auto" : "Manual"
         let metadata = activeStream.flatMap { runtimeMetadata[$0.id] }
-        print("StreamSelection canonical=\(canonicalID) candidates=\(usableStreams.count) active=\(streamID) mode=\(mode) reason=\(reason) quality=\(activeStream.map { StreamRanker.qualityLabel(for: $0, metadata: metadata) } ?? "unknown") codec=\(activeStream.flatMap { StreamRanker.codecLabel(for: $0, metadata: metadata) } ?? "unknown")")
+        print("StreamSelection kind=\(sourceKind) candidates=\(usableStreams.count) mode=\(modeLabel) reason=\(reason) quality=\(activeStream.map { StreamRanker.qualityLabel(for: $0, metadata: metadata) } ?? "unknown") codec=\(activeStream.flatMap { StreamRanker.codecLabel(for: $0, metadata: metadata) } ?? "unknown")")
         #endif
     }
 }

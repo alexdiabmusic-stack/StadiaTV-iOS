@@ -6,13 +6,25 @@ import Combine
 struct TVGuideView: View {
     /// When non-nil, channel taps call this closure instead of presenting a new PlayerView.
     var onChannelSelected: ((CanonicalChannel) -> Void)? = nil
+    var onCatchupSelected: ((Channel) -> Void)? = nil
 
     @EnvironmentObject private var repository: EPGRepository
     @EnvironmentObject private var watchStore: WatchStore
+    @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var guideStore: GuideChannelStore
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
-    @StateObject private var vm = TVGuideViewModel()
+    @StateObject private var vm: TVGuideViewModel
+    var preview: AnyView? = nil
+
+    init(onChannelSelected: ((CanonicalChannel) -> Void)? = nil,
+         onCatchupSelected: ((Channel) -> Void)? = nil,
+         viewModel: TVGuideViewModel? = nil, preview: AnyView? = nil) {
+        self.onChannelSelected = onChannelSelected
+        self.onCatchupSelected = onCatchupSelected
+        self.preview = preview
+        _vm = StateObject(wrappedValue: viewModel ?? TVGuideViewModel())
+    }
 
     @Environment(\.dismiss) private var dismiss
 
@@ -69,12 +81,17 @@ struct TVGuideView: View {
                         if ch.playableChannel != nil {
                             watchStore.recordWatch(ch.playableChannel!)
                             PlaybackTapClock.record()
-                            playingChannel = ch
+                            if let onChannelSelected {
+                                selectedProgramme = nil
+                                onChannelSelected(ch)
+                            } else {
+                                playingChannel = ch
+                            }
                         }
                     },
                     onPlayCatchup: { url in
                         guard let playable = ch.playableChannel else { return }
-                        catchupChannel = Channel(
+                        let channel = Channel(
                             id: "\(playable.id)-catchup",
                             name: ch.name,
                             streamURL: url,
@@ -83,6 +100,9 @@ struct TVGuideView: View {
                             playlistID: playable.playlistID,
                             playlistName: playable.playlistName
                         )
+                        selectedProgramme = nil
+                        if let onCatchupSelected { onCatchupSelected(channel) }
+                        else { catchupChannel = channel }
                     }
                 )
             }
@@ -142,6 +162,12 @@ struct TVGuideView: View {
 
     private var guideContent: some View {
         VStack(spacing: 0) {
+            if let preview {
+                preview
+                    .aspectRatio(16 / 9, contentMode: .fit)
+                    .frame(maxHeight: 180)
+                    .accessibilityLabel("Current channel preview")
+            }
             guideHeader
             Divider().overlay(Theme.hairline)
             if guideStore.guideMode == .myGuide && !guideStore.hasConfigured {
@@ -151,7 +177,7 @@ struct TVGuideView: View {
                 // onProgramTap below) and threaded down as plain values, so the grid's
                 // cell-rendering layer doesn't subscribe to either store directly and
                 // re-render on every unrelated fantasy update.
-                let showsFantasyIndicators = fantasyStore.settings.showFantasyIndicatorsInGuide
+                let showsFantasyIndicators = !prefs.spoilerFreeMode && fantasyStore.settings.showFantasyIndicatorsInGuide
                 let fantasyRevision = guideFantasyRevision
                 EPGGuideGrid(
                     vm: vm,
@@ -484,7 +510,7 @@ struct EPGGuideGrid: View {
     }
 
     private func triggerScrollToNow() {
-        guard !hasScrolledToNow,
+        guard vm.savedScrollOffset == nil, !hasScrolledToNow,
               !vm.visibleChannels.isEmpty,
               scrollState.viewSize.width > 0 else { return }
         hasScrolledToNow = true
@@ -549,6 +575,14 @@ private struct ProgrammeGridView: View {
         }
         .defaultScrollAnchor(.topLeading)
         .scrollPosition($scrollPos)
+        .onAppear {
+            if let offset = vm.savedScrollOffset {
+                updateRenderedRows(firstRow: max(0, Int((offset.y - rulerH) / rowH)), visibleRows: 24)
+                updateRenderedMinutes(offsetX: offset.x, viewWidth: scrollState.viewSize.width)
+                scrollPos = ScrollPosition(x: offset.x, y: offset.y)
+            }
+        }
+        .onDisappear { vm.savedScrollOffset = scrollState.offset }
         .onScrollGeometryChange(for: CGPoint.self, of: { $0.contentOffset }) { _, offset in
             scrollState.offset = offset
             let firstRow = max(0, Int((offset.y - rulerH) / rowH))
@@ -1041,6 +1075,7 @@ struct ProgrammeDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var guideStore: GuideChannelStore
     @EnvironmentObject private var reminderStore: ProgrammeReminderStore
+    @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
 
@@ -1181,7 +1216,7 @@ struct ProgrammeDetailSheet: View {
     @ViewBuilder
     private var fantasyProgrammeContext: some View {
         let games = fantasyStore.fantasyGames(for: programme, channel: channel) + nativeFantasyStore.fantasyGames(for: programme, channel: channel)
-        if fantasyStore.settings.showFantasyIndicatorsInGuide, !games.isEmpty {
+        if !prefs.spoilerFreeMode, fantasyStore.settings.showFantasyIndicatorsInGuide, !games.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 Label(games.count == 1 ? "1 Fantasy player" : "\(games.count) Fantasy players", systemImage: "star.fill")
                     .font(.subheadline.weight(.bold))

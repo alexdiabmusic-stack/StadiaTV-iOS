@@ -199,6 +199,12 @@ struct FavoritePlayer: Codable, Hashable, Identifiable {
     }
 }
 
+struct SavedMultiviewLayout: Codable, Equatable {
+    var channelIDs: [String]
+    var layout: String
+    var audioChannelID: String? = nil
+}
+
 struct UserPreferences: Codable, Equatable {
     var hasCompletedOnboarding = false
     var selectedLeagueIDs: Set<String> = []   // League.path values
@@ -210,10 +216,13 @@ struct UserPreferences: Codable, Equatable {
     var morningDigestHour = 8
     var liveAlertsEnabled = true
     var closeGameAlertsEnabled = true
+    var scoreChangeAlertsEnabled = false
+    var broadcastAlertsEnabled = false
     var cloudSyncEnabled = false
     var appearance: AppAppearance = .dark
     var preferredStreamLanguages: Set<String> = ["en"]   // StreamLanguage.code values
     var spoilerFreeMode = false
+    var sportsScoreDelaySeconds = 0
     var showLiveScoreBadge = true
     var showLiveScoreBar = false
 
@@ -221,6 +230,15 @@ struct UserPreferences: Codable, Equatable {
     var showChannelNumbers: Bool = false
     var guideProgrammeTitleLines: Int = 1
     var epgHighlightCurrentProgramme: Bool = true
+    var playerMaximumStreams = 4
+    var playerDefaultCategory = ""
+    var playerDoubleTapSeeks = true
+    var commercialBreakMode = false
+    var savedMultiviewChannelIDs: [String] = []
+    var savedMultiviewLayout = "twoHorizontal"
+    var savedMultiviewSlots: [String: SavedMultiviewLayout] = [:]
+    var preferredAudioLanguage = ""
+    var preferredSubtitleLanguage = ""
     var playerPanelTimeoutSeconds: Int = 4
     var guideTimeScaleMinutes: Int = 60
     var playerBarActions: [String] = PlayerBarAction.defaultOrder.map(\.rawValue)
@@ -234,12 +252,34 @@ struct UserPreferences: Codable, Equatable {
 
     init() {}
 
+    /// Recheck queued alerts against the current choices at scheduling and presentation.
+    func allowsMatchNotification(_ userInfo: [String: String]) -> Bool {
+        let kind = userInfo["notificationType"] ?? ""
+        if ["closeGame", "scoreChange"].contains(kind),
+           spoilerFreeMode || sportsScoreDelaySeconds > 0 { return false }
+        let explicitlyRequested = userInfo["origin"] == MatchNotificationPlanner.userOrigin
+        if explicitlyRequested { return true }
+        switch kind {
+        case "gameTimeReminder": return matchNotificationsEnabled
+        case "gameLive": return matchNotificationsEnabled && liveAlertsEnabled
+        case "closeGame": return matchNotificationsEnabled && closeGameAlertsEnabled
+        case "scoreChange": return matchNotificationsEnabled && scoreChangeAlertsEnabled
+        case "broadcastAvailable": return matchNotificationsEnabled && broadcastAlertsEnabled
+        case "morningDigest": return morningDigestEnabled
+        default: return true
+        }
+    }
+
     private enum CodingKeys: String, CodingKey {
         case hasCompletedOnboarding, selectedLeagueIDs, favoriteTeams, favoritePlayers
         case matchNotificationsEnabled, matchReminderLeadTime, morningDigestEnabled, cloudSyncEnabled
-        case morningDigestHour, liveAlertsEnabled, closeGameAlertsEnabled
+        case morningDigestHour, liveAlertsEnabled, closeGameAlertsEnabled, scoreChangeAlertsEnabled, broadcastAlertsEnabled
+        case sportsScoreDelaySeconds
         case appearance, preferredStreamLanguages, spoilerFreeMode, showLiveScoreBadge, showLiveScoreBar
         case showChannelNumbers, guideProgrammeTitleLines, epgHighlightCurrentProgramme
+        case savedMultiviewChannelIDs, savedMultiviewLayout, savedMultiviewSlots
+        case playerMaximumStreams, playerDefaultCategory
+        case playerDoubleTapSeeks, commercialBreakMode, preferredAudioLanguage, preferredSubtitleLanguage
         case playerPanelTimeoutSeconds, guideTimeScaleMinutes, playerBarActions
         case playerBufferProfile, preferUHDStreams
         case selectedCatalogLeagueIDs, selectedCatalogSportIDs
@@ -258,17 +298,30 @@ struct UserPreferences: Codable, Equatable {
         morningDigestEnabled = try container.decodeIfPresent(Bool.self, forKey: .morningDigestEnabled) ?? false
         morningDigestHour = min(max(try container.decodeIfPresent(Int.self, forKey: .morningDigestHour) ?? 8, 0), 23)
         liveAlertsEnabled = try container.decodeIfPresent(Bool.self, forKey: .liveAlertsEnabled) ?? true
+        scoreChangeAlertsEnabled = try container.decodeIfPresent(Bool.self, forKey: .scoreChangeAlertsEnabled) ?? false
+        broadcastAlertsEnabled = try container.decodeIfPresent(Bool.self, forKey: .broadcastAlertsEnabled) ?? false
         closeGameAlertsEnabled = try container.decodeIfPresent(Bool.self, forKey: .closeGameAlertsEnabled) ?? true
         cloudSyncEnabled = try container.decodeIfPresent(Bool.self, forKey: .cloudSyncEnabled) ?? false
         appearance = try container.decodeIfPresent(AppAppearance.self, forKey: .appearance) ?? .dark
         preferredStreamLanguages = try container.decodeIfPresent(Set<String>.self, forKey: .preferredStreamLanguages) ?? ["en"]
         spoilerFreeMode = try container.decodeIfPresent(Bool.self, forKey: .spoilerFreeMode) ?? false
+        let delay = try container.decodeIfPresent(Int.self, forKey: .sportsScoreDelaySeconds) ?? 0
+        sportsScoreDelaySeconds = [0, 15, 30, 60, 120].contains(delay) ? delay : 0
         showLiveScoreBadge = try container.decodeIfPresent(Bool.self, forKey: .showLiveScoreBadge) ?? true
         showLiveScoreBar = try container.decodeIfPresent(Bool.self, forKey: .showLiveScoreBar) ?? false
         showChannelNumbers = try container.decodeIfPresent(Bool.self, forKey: .showChannelNumbers) ?? false
         guideProgrammeTitleLines = try container.decodeIfPresent(Int.self, forKey: .guideProgrammeTitleLines) ?? 1
         epgHighlightCurrentProgramme = try container.decodeIfPresent(Bool.self, forKey: .epgHighlightCurrentProgramme) ?? true
-        playerPanelTimeoutSeconds = try container.decodeIfPresent(Int.self, forKey: .playerPanelTimeoutSeconds) ?? 4
+        playerMaximumStreams = min(4, max(2, try container.decodeIfPresent(Int.self, forKey: .playerMaximumStreams) ?? 4))
+        playerDefaultCategory = try container.decodeIfPresent(String.self, forKey: .playerDefaultCategory) ?? ""
+        playerDoubleTapSeeks = try container.decodeIfPresent(Bool.self, forKey: .playerDoubleTapSeeks) ?? true
+        commercialBreakMode = try container.decodeIfPresent(Bool.self, forKey: .commercialBreakMode) ?? false
+        savedMultiviewChannelIDs = try container.decodeIfPresent([String].self, forKey: .savedMultiviewChannelIDs) ?? []
+        savedMultiviewLayout = try container.decodeIfPresent(String.self, forKey: .savedMultiviewLayout) ?? "twoHorizontal"
+        savedMultiviewSlots = try container.decodeIfPresent([String: SavedMultiviewLayout].self, forKey: .savedMultiviewSlots) ?? [:]
+        preferredAudioLanguage = try container.decodeIfPresent(String.self, forKey: .preferredAudioLanguage) ?? ""
+        preferredSubtitleLanguage = try container.decodeIfPresent(String.self, forKey: .preferredSubtitleLanguage) ?? ""
+        playerPanelTimeoutSeconds = min(30, max(2, try container.decodeIfPresent(Int.self, forKey: .playerPanelTimeoutSeconds) ?? 4))
         guideTimeScaleMinutes = try container.decodeIfPresent(Int.self, forKey: .guideTimeScaleMinutes) ?? 60
         playerBarActions = try container.decodeIfPresent([String].self, forKey: .playerBarActions)
             ?? PlayerBarAction.defaultOrder.map(\.rawValue)
@@ -375,17 +428,26 @@ final class PreferencesStore: ObservableObject {
         return true
     }
 
+    var scoreChangeAlertsEnabled: Bool { prefs.scoreChangeAlertsEnabled }
+    func setScoreChangeAlertsEnabled(_ value: Bool) { prefs.scoreChangeAlertsEnabled = value; persist() }
+    var broadcastAlertsEnabled: Bool { prefs.broadcastAlertsEnabled }
+    func setBroadcastAlertsEnabled(_ value: Bool) { prefs.broadcastAlertsEnabled = value; persist() }
+
     var matchNotificationsEnabled: Bool { prefs.matchNotificationsEnabled }
     var matchReminderLeadTime: MatchReminderLeadTime { prefs.matchReminderLeadTime }
     var morningDigestEnabled: Bool { prefs.morningDigestEnabled }
     var cloudSyncEnabled: Bool { prefs.cloudSyncEnabled }
+
+    func allowsMatchNotification(_ userInfo: [String: String]) -> Bool {
+        prefs.allowsMatchNotification(userInfo)
+    }
 
     var notificationSettings: NotificationSettings {
         NotificationSettings(
             enabled: prefs.matchNotificationsEnabled,
             leadTime: prefs.matchReminderLeadTime,
             liveAlerts: prefs.liveAlertsEnabled,
-            closeGameAlerts: prefs.closeGameAlertsEnabled,
+            closeGameAlerts: prefs.closeGameAlertsEnabled && !spoilerFreeMode,
             morningDigest: prefs.morningDigestEnabled,
             morningDigestHour: prefs.morningDigestHour
         )
@@ -470,7 +532,14 @@ final class PreferencesStore: ObservableObject {
 
     // MARK: Spoiler-Free Mode
 
-    var spoilerFreeMode: Bool { prefs.spoilerFreeMode }
+    // Surfaces without timestamped snapshots hide results while delayed mode is active.
+    var spoilerFreeMode: Bool { prefs.spoilerFreeMode || prefs.sportsScoreDelaySeconds > 0 }
+    var hidesSportsScores: Bool { prefs.spoilerFreeMode }
+    var sportsScoreDelaySeconds: Int { prefs.sportsScoreDelaySeconds }
+    func setSportsScoreDelaySeconds(_ value: Int) {
+        prefs.sportsScoreDelaySeconds = [0, 15, 30, 60, 120].contains(value) ? value : 0
+        persist()
+    }
 
     func setSpoilerFreeMode(_ enabled: Bool) {
         prefs.spoilerFreeMode = enabled
@@ -505,6 +574,40 @@ final class PreferencesStore: ObservableObject {
 
     var epgHighlightCurrentProgramme: Bool { prefs.epgHighlightCurrentProgramme }
     func setEPGHighlightCurrentProgramme(_ v: Bool) { prefs.epgHighlightCurrentProgramme = v; persist() }
+
+    var savedMultiviewChannelIDs: [String] { prefs.savedMultiviewChannelIDs }
+    var savedMultiviewLayout: String { prefs.savedMultiviewLayout }
+    func savedMultiview(slot: Int) -> SavedMultiviewLayout? {
+        guard (1...4).contains(slot) else { return nil }
+        if let saved = prefs.savedMultiviewSlots[String(slot)] { return saved }
+        guard slot == 1, !prefs.savedMultiviewChannelIDs.isEmpty else { return nil }
+        return SavedMultiviewLayout(channelIDs: prefs.savedMultiviewChannelIDs, layout: prefs.savedMultiviewLayout)
+    }
+
+    func saveMultiview(channelIDs: [String], layout: String, slot: Int = 1, audioChannelID: String? = nil) {
+        guard (1...4).contains(slot) else { return }
+        let saved = SavedMultiviewLayout(channelIDs: Array(channelIDs.prefix(4)), layout: layout, audioChannelID: audioChannelID)
+        prefs.savedMultiviewSlots[String(slot)] = saved
+        if slot == 1 {
+            prefs.savedMultiviewChannelIDs = saved.channelIDs
+            prefs.savedMultiviewLayout = layout
+        }
+        persist()
+    }
+
+    var playerMaximumStreams: Int { prefs.playerMaximumStreams }
+    func setPlayerMaximumStreams(_ value: Int) { prefs.playerMaximumStreams = min(4, max(2, value)); persist() }
+    var playerDefaultCategory: String { prefs.playerDefaultCategory }
+    func setPlayerDefaultCategory(_ value: String) { prefs.playerDefaultCategory = value; persist() }
+
+    var playerDoubleTapSeeks: Bool { prefs.playerDoubleTapSeeks }
+    func setPlayerDoubleTapSeeks(_ value: Bool) { prefs.playerDoubleTapSeeks = value; persist() }
+    var commercialBreakMode: Bool { prefs.commercialBreakMode }
+    func setCommercialBreakMode(_ value: Bool) { prefs.commercialBreakMode = value; persist() }
+    var preferredAudioLanguage: String { prefs.preferredAudioLanguage }
+    func setPreferredAudioLanguage(_ value: String) { prefs.preferredAudioLanguage = value; persist() }
+    var preferredSubtitleLanguage: String { prefs.preferredSubtitleLanguage }
+    func setPreferredSubtitleLanguage(_ value: String) { prefs.preferredSubtitleLanguage = value; persist() }
 
     var playerPanelTimeoutSeconds: Int { prefs.playerPanelTimeoutSeconds }
     func setPlayerPanelTimeoutSeconds(_ v: Int) { prefs.playerPanelTimeoutSeconds = max(2, min(30, v)); persist() }
@@ -627,5 +730,23 @@ final class PreferencesStore: ObservableObject {
                 || favorite.providerAliases.contains { matchIDs.contains($0.id) }
                 || matchNames.contains(favorite.displayName.lowercased())
         }
+    }
+}
+
+/// A bounded history of received snapshots, never presented as exact video synchronization.
+/// Kept in memory by each playback presentation; changing event clears the previous history.
+struct PlayerSpoilerBuffer {
+    private var samples: [(receivedAt: Date, match: Match)] = []
+
+    mutating func receive(_ match: Match?, at date: Date = Date()) {
+        guard let match else { samples.removeAll(); return }
+        if samples.last?.match.id != match.id || samples.last?.match.league.path != match.league.path { samples.removeAll() }
+        samples.append((date, match))
+        samples.removeAll { date.timeIntervalSince($0.receivedAt) > 180 }
+        if samples.count > 64 { samples.removeFirst(samples.count - 64) }
+    }
+
+    func snapshot(delay: Int, now: Date = Date()) -> Match? {
+        samples.last { $0.receivedAt <= now.addingTimeInterval(-Double(delay)) }?.match
     }
 }

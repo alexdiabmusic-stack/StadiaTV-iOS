@@ -9,6 +9,7 @@ import UIKit
 struct PaywallView: View {
     @EnvironmentObject private var entitlements: EntitlementStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.purchase) private var purchase
 
     @State private var selectedID = EntitlementStore.monthlyID
     @State private var isRestoring = false
@@ -456,7 +457,7 @@ struct PaywallView: View {
         Button {
             Task {
                 if let product = selectedProduct {
-                    await entitlements.purchase(product)
+                    await entitlements.purchase(product) { try await purchase(product) }
                 }
             }
         } label: {

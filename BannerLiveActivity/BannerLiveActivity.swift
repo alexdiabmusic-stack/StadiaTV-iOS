@@ -1,4 +1,4 @@
-#if os(iOS) || os(visionOS)
+#if (os(iOS) || os(visionOS)) && canImport(ActivityKit)
 import ActivityKit
 #endif
 import BannerSharedKit
@@ -10,7 +10,7 @@ import SwiftUI
 /// given — no sports/priority logic lives here.
 struct BannerGameLiveActivity: Widget {
     var body: some WidgetConfiguration {
-        #if os(iOS) || os(visionOS)
+        #if (os(iOS) || os(visionOS)) && canImport(ActivityKit)
         ActivityConfiguration(for: GameLiveActivityAttributes.self) { context in
             BannerLiveActivityLockScreenView(context: context)
                 .activityBackgroundTint(Color.black)
@@ -50,7 +50,7 @@ struct BannerGameLiveActivity: Widget {
     }
 }
 
-#if os(iOS) || os(visionOS)
+#if (os(iOS) || os(visionOS)) && canImport(ActivityKit)
 private struct BannerLiveActivityLockScreenView: View {
     let context: ActivityViewContext<GameLiveActivityAttributes>
 

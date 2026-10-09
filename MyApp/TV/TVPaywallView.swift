@@ -5,6 +5,7 @@ import StoreKit
 struct TVPaywallView: View {
     @EnvironmentObject private var entitlements: EntitlementStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.purchase) private var purchase
 
     var body: some View {
         ZStack {
@@ -95,7 +96,7 @@ struct TVPaywallView: View {
 
     private func productButton(product: Product, badge: String?) -> some View {
         Button {
-            Task { await entitlements.purchase(product) }
+            Task { await entitlements.purchase(product) { try await purchase(product) } }
         } label: {
             VStack(spacing: 10) {
                 if let badge {

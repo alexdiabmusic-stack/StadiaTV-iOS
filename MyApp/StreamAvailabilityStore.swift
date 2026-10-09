@@ -150,7 +150,7 @@ final class StreamAvailabilityStore: ObservableObject {
         if !channels.isEmpty {
             // Rebuild the linker only when the playlist or guide actually changed since the
             // last scan — cheap to check, so every debounced trigger can call this.
-            let signature = "\(channels.count)|\(epgRepository.programmeRevision)"
+            let signature = linkerSignature(channels: channels, programmeRevision: epgRepository.programmeRevision)
             await linkService.rebuildIfNeeded(signature: signature, channels: channels) {
                 let now = Date()
                 return (try? await EPGProgrammeStore.shared.snapshot(
@@ -210,6 +210,7 @@ final class StreamAvailabilityStore: ObservableObject {
         confirmedCountByMatchId = mergedConfirmed
         sourcesByMatchId = mergedSources
         recordLeagueVisibility(matches: nonFinal.filter { winningIds.contains($0.id) }, confirmedCounts: freshConfirmedCounts)
+        await MatchNotificationService.shared.observePlayerEvents(matches: nonFinal.filter { winningIds.contains($0.id) }, sources: mergedSources)
     }
 
     func count(for matchId: String) -> Int { countByMatchId[matchId] ?? 0 }
@@ -220,6 +221,32 @@ final class StreamAvailabilityStore: ObservableObject {
         Array((sourcesByMatchId[matchId] ?? []).prefix(limit))
     }
 
+    /// Revalidate an explicit alternative immediately before switching; an API failure only
+    /// declines the switch and must never tear down the stream the user is currently watching.
+    func confirmsCurrentBroadcast(match: Match, channel: Channel, channels: [Channel], epgRepository: EPGRepository) async -> Bool {
+        guard let configuredChannel = channels.first(where: { StreamLinkerAdapters.streamID($0) == StreamLinkerAdapters.streamID(channel) }),
+              configuredChannel.streamURL == channel.streamURL, configuredChannel.httpHeaders == channel.httpHeaders,
+              let current = try? await SportsRepository.shared.legacyScoreboard(for: match.league).first(where: { $0.id == match.id }),
+              !Task.isCancelled, current.state == .live,
+              abs(current.date.timeIntervalSinceNow) < 12 * 3600 else { return false }
+        let confidence = await confidenceScore(match: current, channel: configuredChannel, channels: channels, epgRepository: epgRepository)
+        return !Task.isCancelled && confidence >= 70
+    }
+
+    /// A provider can rename event slots or replace a playlist without changing its size.
+    /// Hash the actual identities and matching metadata; never expose source URLs in this key.
+    private func linkerSignature(channels: [Channel], programmeRevision: Int) -> String {
+        var hasher = Hasher()
+        for channel in channels {
+            hasher.combine(channel.playlistID)
+            hasher.combine(channel.id)
+            hasher.combine(channel.name)
+            hasher.combine(channel.group)
+            hasher.combine(channel.tvgId)
+        }
+        return "\(hasher.finalize())|\(programmeRevision)"
+    }
+
     /// Rebuilds the linker for `channels` if needed, then answers "does this match link to
     /// this channel, and how confidently?" — a 0...100 scale matching `RankedSource.score`'s
     /// convention, for the reverse (channel-you're-watching -> which live match is this?)
@@ -227,7 +254,7 @@ final class StreamAvailabilityStore: ObservableObject {
     /// which need the full per-match cache this store otherwise maintains.
     func confidenceScore(match: Match, channel: Channel, channels: [Channel], epgRepository: EPGRepository) async -> Int {
         guard match.state != .final else { return 0 }
-        let signature = "\(channels.count)|\(epgRepository.programmeRevision)"
+        let signature = linkerSignature(channels: channels, programmeRevision: epgRepository.programmeRevision)
         await linkService.rebuildIfNeeded(signature: signature, channels: channels) {
             let now = Date()
             return (try? await EPGProgrammeStore.shared.snapshot(

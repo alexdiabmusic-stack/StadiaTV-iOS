@@ -236,7 +236,9 @@ struct PodcastBrowserView: View {
                         .padding(.top, 4)
                         .padding(.bottom, store.nowPlaying != nil ? 96 : 36)
                     }
+                    #if !os(visionOS)
                     .scrollDismissesKeyboard(.interactively)
+                    #endif
                 }
             }
         }

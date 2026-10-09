@@ -21,6 +21,9 @@ final class TVGuideViewModel: ObservableObject {
     /// Incremented by scrollToNow() so EPGGuideGrid can observe and react.
     @Published private(set) var scrollToNowToken: Int = 0
 
+    /// Transient scroll restoration, retained by the presenting player rather than persisted.
+    var savedScrollOffset: CGPoint?
+
     private weak var repository: EPGRepository?
     private var guideStore: GuideChannelStore?
     private var myGuideIDs: Set<String> = []

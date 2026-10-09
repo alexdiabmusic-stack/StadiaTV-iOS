@@ -23,6 +23,10 @@ final class PlaybackController: ObservableObject {
     enum State: Equatable {
         case idle
         case loading
+        case preparing
+        case connecting
+        case recovering
+        case ended
         case playing
         case buffering
         case paused
@@ -86,6 +90,7 @@ final class PlaybackController: ObservableObject {
     private var urlIndex = 0
     /// Bumped whenever the current item is replaced; async work from older items checks it and bails.
     private var generation = 0
+    private var isWaitingToReconnect = false
     /// The current item reached `.playing` at least once.
     private var itemHasPlayed = false
     private var didNotifyItemReady = false
@@ -109,7 +114,9 @@ final class PlaybackController: ObservableObject {
     init(tapDate: Date? = nil, bufferProfile: PlayerBufferProfile = .balanced) {
         self.pendingTapDate = tapDate
         self.bufferProfile = bufferProfile
+        #if !os(visionOS)
         player.allowsExternalPlayback = true
+        #endif
         player.appliesMediaSelectionCriteriaAutomatically = true
         PlaybackItemFactory.apply(bufferProfile, to: player)
         observePlayer()
@@ -117,6 +124,41 @@ final class PlaybackController: ObservableObject {
     }
 
     // MARK: - Public API
+
+    /// Loads the engine's actual track groups for any platform presentation.
+    /// Re-check item ownership after each suspension; old track menus must never reach a new feed.
+    func mediaSelections(for item: AVPlayerItem, preferences: PreferencesStore) async -> (audio: AVMediaSelectionGroup?, subtitles: AVMediaSelectionGroup?, audioIndex: Int?, subtitleIndex: Int?)? {
+        let requestGeneration = generation
+        let audio = try? await item.asset.loadMediaSelectionGroup(for: .audible)
+        guard !Task.isCancelled, generation == requestGeneration, currentItem === item else { return nil }
+        let subtitles = try? await item.asset.loadMediaSelectionGroup(for: .legible)
+        guard !Task.isCancelled, generation == requestGeneration, currentItem === item else { return nil }
+        if let audio, let option = audio.options.first(where: { $0.extendedLanguageTag == preferences.preferredAudioLanguage }) {
+            item.select(option, in: audio)
+        }
+        if let subtitles {
+            if preferences.preferredSubtitleLanguage == "off" { item.select(nil, in: subtitles) }
+            else if let option = subtitles.options.first(where: { $0.extendedLanguageTag == preferences.preferredSubtitleLanguage }) {
+                item.select(option, in: subtitles)
+            }
+        }
+        let audioIndex = audio.flatMap { group in
+            item.currentMediaSelection.selectedMediaOption(in: group).flatMap { group.options.firstIndex(of: $0) }
+        }
+        let subtitleIndex = subtitles.flatMap { group in
+            item.currentMediaSelection.selectedMediaOption(in: group).flatMap { group.options.firstIndex(of: $0) }
+        }
+        return (audio, subtitles, audioIndex, subtitleIndex)
+    }
+
+    func selectMedia(index: Int?, group: AVMediaSelectionGroup?, isSubtitle: Bool, preferences: PreferencesStore) {
+        guard let item = currentItem, let group else { return }
+        let option = index.flatMap { group.options.indices.contains($0) ? group.options[$0] : nil }
+        guard option != nil || isSubtitle else { return }
+        item.select(option, in: group)
+        if isSubtitle { preferences.setPreferredSubtitleLanguage(option == nil ? "off" : (option?.extendedLanguageTag ?? "")) }
+        else { preferences.setPreferredAudioLanguage(option?.extendedLanguageTag ?? "") }
+    }
 
     /// Records the tap timestamp for the *next* `load()` call's time-to-first-frame metric.
     /// The controller is now a long-lived shared instance (one per process, reused across
@@ -133,12 +175,16 @@ final class PlaybackController: ObservableObject {
     ///   no video surface will be attached. Defaults to false (today's phone `PlayerView`
     ///   behavior, unchanged).
     func load(_ channel: Channel, audioOnly: Bool = false) {
+        state = .preparing
+        isWaitingToReconnect = false
         isAudioOnlySession = audioOnly
         let now = Date()
         let tapDate = pendingTapDate ?? now
         pendingTapDate = nil
 
+        generation += 1
         cancelTasks()
+        currentItem?.cancelPendingSeeks()
         detachItemObservers()
         self.channel = channel
         urlCandidates = PlaybackItemFactory.playbackURLCandidates(for: channel.streamURL)
@@ -157,7 +203,7 @@ final class PlaybackController: ObservableObject {
         hasLoadedOnce = true
 
         guard channel.streamURL.scheme?.lowercased() != "about" else {
-            fail("No stream is available for this channel.")
+            fail("No confirmed stream found.")
             return
         }
 
@@ -229,12 +275,22 @@ final class PlaybackController: ObservableObject {
 
     /// Jumps to the live point of a live stream.
     func seekToLiveEdge() {
-        guard let item = currentItem, let range = item.seekableTimeRanges.last?.timeRangeValue else { return }
-        let end = CMTimeRangeGetEnd(range)
-        let offset = item.recommendedTimeOffsetFromLive
-        let target = offset.isValid && offset.seconds > 0 ? CMTimeSubtract(end, offset) : end
-        player.seek(to: target)
+        guard let item = currentItem, item.duration.isIndefinite,
+              let range = item.seekableTimeRanges.last?.timeRangeValue,
+              let target = Self.liveSeekTarget(
+                rangeStart: range.start.seconds,
+                rangeEnd: CMTimeRangeGetEnd(range).seconds,
+                recommendedOffset: item.recommendedTimeOffsetFromLive.seconds
+              ) else { return }
+        player.seek(to: CMTime(seconds: target, preferredTimescale: 600))
         isBehindLiveEdge = false
+    }
+
+    /// A server-provided offset may exceed a short DVR window or be nonnumeric.
+    static func liveSeekTarget(rangeStart: Double, rangeEnd: Double, recommendedOffset: Double) -> Double? {
+        guard rangeStart.isFinite, rangeEnd.isFinite, rangeEnd > rangeStart else { return nil }
+        let offset = recommendedOffset.isFinite ? max(0, recommendedOffset) : 0
+        return max(rangeStart, rangeEnd - offset)
     }
 
     /// Called by the video surface when its AVPlayerLayer has a frame to show.
@@ -246,6 +302,7 @@ final class PlaybackController: ObservableObject {
 
     private func startCurrentURL() {
         guard let channel, urlCandidates.indices.contains(urlIndex) else { return }
+        isWaitingToReconnect = false
         generation += 1
         let generation = generation
         detachItemObservers()
@@ -260,7 +317,7 @@ final class PlaybackController: ObservableObject {
         item.preferredMaximumResolution = qualityCap.maximumResolution
         attachObservers(to: item)
         currentItem = item
-        if reconnectAttempt == 0 { state = .loading }
+        state = isUserPaused ? .paused : (reconnectAttempt == 0 ? .connecting : .recovering)
         metrics?.record(.itemCreated)
         publishMetrics()
 
@@ -301,7 +358,8 @@ final class PlaybackController: ObservableObject {
         watchdogTask?.cancel()
         monitorTask?.cancel()
         stallTask?.cancel()
-        state = .buffering
+        isWaitingToReconnect = true
+        state = .recovering
         setBuffering(true)
 
         reconnectTask?.cancel()
@@ -434,7 +492,8 @@ final class PlaybackController: ObservableObject {
     }
 
     private func updateLiveEdgeDistance(for item: AVPlayerItem) {
-        guard let range = item.seekableTimeRanges.last?.timeRangeValue,
+        guard item.duration.isIndefinite,
+              let range = item.seekableTimeRanges.last?.timeRangeValue,
               range.duration.isNumeric, range.duration.seconds > Self.behindLiveThreshold * 2 else {
             if isBehindLiveEdge { isBehindLiveEdge = false }
             return
@@ -455,7 +514,7 @@ final class PlaybackController: ObservableObject {
     }
 
     private func timeControlStatusChanged() {
-        guard currentItem != nil else { return }
+        guard currentItem != nil, !isWaitingToReconnect else { return }
         switch player.timeControlStatus {
         case .playing:
             itemHasPlayed = true
@@ -508,22 +567,82 @@ final class PlaybackController: ObservableObject {
     }
 
     private func attachObservers(to item: AVPlayerItem) {
+        let observedGeneration = generation
         itemObservations = [
-            item.observe(\.status, options: [.new]) { @Sendable [weak self] _, _ in
-                Task { @MainActor [weak self] in self?.itemStatusChanged() }
+            item.observe(\.status, options: [.new]) { @Sendable [weak self, weak item] _, _ in
+                Task { @MainActor [weak self, weak item] in
+                    guard let self, let item, self.generation == observedGeneration,
+                          self.currentItem === item else { return }
+                    self.itemStatusChanged()
+                }
             }
         ]
         let center = NotificationCenter.default
         itemTokens.add(center.addObserver(forName: AVPlayerItem.failedToPlayToEndTimeNotification, object: item, queue: .main) { [weak self] note in
-            let message = (note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error)?.localizedDescription
-            MainActor.assumeIsolated { self?.itemFailedMidStream(message) }
+            let message = Self.safeErrorMessage(note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error)
+            MainActor.assumeIsolated {
+                guard self?.generation == observedGeneration else { return }
+                self?.itemFailedMidStream(message)
+            }
+        })
+        itemTokens.add(center.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.generation == observedGeneration else { return }
+                self.cancelTasks()
+                self.setHoldsPlaybackPriority(false)
+                self.setBuffering(false)
+                self.state = .ended
+            }
         })
         itemTokens.add(center.addObserver(forName: AVPlayerItem.playbackStalledNotification, object: item, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.itemStalled() }
+            MainActor.assumeIsolated {
+                guard self?.generation == observedGeneration else { return }
+                self?.itemStalled()
+            }
         })
         itemTokens.add(center.addObserver(forName: AVPlayerItem.newErrorLogEntryNotification, object: item, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.logLatestErrorLogEntry() }
+            MainActor.assumeIsolated {
+                guard self?.generation == observedGeneration else { return }
+                self?.logLatestErrorLogEntry()
+            }
         })
+    }
+
+    /// Never surface provider error descriptions: they may contain signed URLs or credentials.
+    nonisolated static func safeErrorMessage(_ error: Error?) -> String {
+        guard let error = error as NSError? else { return "Stream unavailable. Try again or choose another broadcast." }
+        if error.domain == NSURLErrorDomain {
+            switch error.code {
+            case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost:
+                return "Network unavailable. Check your connection and retry."
+            case NSURLErrorTimedOut:
+                return "The stream timed out. Try again."
+            case NSURLErrorUserAuthenticationRequired, NSURLErrorUserCancelledAuthentication:
+                return "Access denied. Check your IPTV account."
+            case NSURLErrorCannotDecodeContentData, NSURLErrorCannotDecodeRawData:
+                return "The stream could not be decoded. Choose another broadcast."
+            default: break
+            }
+        }
+        return "Stream unavailable or unsupported. Try again or choose another broadcast."
+    }
+
+    /// A conservative resource budget, not a guarantee of simultaneous codec support.
+    static var multiviewCapacity: Int {
+        let info = ProcessInfo.processInfo
+        if info.isLowPowerModeEnabled || info.thermalState == .serious || info.thermalState == .critical {
+            return 2
+        }
+        return info.physicalMemory >= 6 * 1_024 * 1_024 * 1_024 ? 4 : 2
+    }
+
+    func seek(by seconds: Double) {
+        guard let item = currentItem, let range = item.seekableTimeRanges.last?.timeRangeValue,
+              range.duration.isNumeric, range.duration.seconds > 30,
+              range.start.seconds.isFinite, CMTimeRangeGetEnd(range).seconds.isFinite,
+              seconds.isFinite, item.currentTime().seconds.isFinite else { return }
+        let target = min(CMTimeRangeGetEnd(range).seconds, max(range.start.seconds, item.currentTime().seconds + seconds))
+        player.seek(to: CMTime(seconds: target, preferredTimescale: 600))
     }
 
     private func detachItemObservers() {
@@ -545,7 +664,7 @@ final class PlaybackController: ObservableObject {
                 loadAvailableHeights(for: item)
             }
         case .failed:
-            let reason = item.error?.localizedDescription ?? "Couldn't play this stream."
+            let reason = Self.safeErrorMessage(item.error)
             if itemHasPlayed {
                 reconnect(reason: reason)
             } else {
@@ -670,9 +789,7 @@ final class PlaybackController: ObservableObject {
     }
 
     private func publishMetrics() {
-        #if DEBUG
         metricsSummary = metrics?.summary
-        #endif
     }
 }
 

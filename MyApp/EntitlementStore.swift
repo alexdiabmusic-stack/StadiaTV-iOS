@@ -72,7 +72,7 @@ final class EntitlementStore: ObservableObject {
     }
 
     /// Initiates a purchase for the given product.
-    func purchase(_ product: Product) async {
+    func purchase(_ product: Product, perform: () async throws -> Product.PurchaseResult) async {
         guard !Self.unlockAllFeaturesByDefault else {
             isPremium = true
             UserDefaults.standard.set(true, forKey: Self.cacheKey)
@@ -84,7 +84,7 @@ final class EntitlementStore: ObservableObject {
         defer { isPurchasing = false }
 
         do {
-            let result = try await product.purchase()
+            let result = try await perform()
             switch result {
             case .success(let verification):
                 let transaction = try verification.payloadValue

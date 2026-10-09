@@ -6,6 +6,8 @@ import UserNotifications
 @MainActor
 final class MatchNotificationService {
     static let shared = MatchNotificationService()
+    var playerIsVisible = false
+    var playerMatchID: String?
 
     private init() {}
 
@@ -15,6 +17,7 @@ final class MatchNotificationService {
     func remindedMatchIDs() async -> Set<String> { [] }
     func cancelReminder(forMatchID matchID: String) async {}
     func syncNotifications(matches: [Match], favorites: [FavoriteTeam], settings: NotificationSettings) async {}
+    func observePlayerEvents(matches: [Match], sources: [String: [RankedSource]]) async {}
     func scheduleMorningDigest(matches: [Match], hour: Int) async {}
     func removeMorningDigests() async {}
     func removeAllMatchNotifications() {}
@@ -23,8 +26,13 @@ final class MatchNotificationService {
 @MainActor
 final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate {
     static let shared = MatchNotificationService()
+    var playerIsVisible = false
+    var playerMatchID: String?
 
     private typealias Planner = MatchNotificationPlanner
+
+    private var lastScores: [String: String] = [:]
+    private var knownBroadcasts: [String: Set<String>] = [:]
 
     private let center = UNUserNotificationCenter.current()
     /// Identifier → when its notification was due or sent. Stops alerts repeating on every refresh.
@@ -41,7 +49,25 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+        let info = notification.request.content.userInfo
+        let matchID = info["matchID"] as? String
+        let title = notification.request.content.title
+        let body = notification.request.content.body
+        let identifier = notification.request.identifier
+        let payload = info.reduce(into: [String: String]()) { result, entry in
+            if let key = entry.key as? String, let value = entry.value as? String { result[key] = value }
+        }
+        let handled = await MainActor.run {
+            let prefs = BannerAppEnvironment.shared.preferences
+            let currentID = self.playerMatchID ?? BannerAppEnvironment.shared.activeLivePlaybackContext?.match.id
+            if let matchID, matchID == currentID { return true }
+            guard prefs.allowsMatchNotification(payload) else { return true }
+            guard self.playerIsVisible, matchID != nil, prefs.matchNotificationsEnabled else { return false }
+            let alert = PlannedNotification(identifier: identifier, title: title, body: body, fireDate: nil, userInfo: payload)
+            NotificationCenter.default.post(name: .bannerPlayerSportsAlert, object: nil, userInfo: ["alert": alert])
+            return true
+        }
+        return handled ? [] : [.banner, .list, .sound]
     }
 
     /// A tap on a delivered notification opens whatever it was about.
@@ -102,11 +128,15 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
         }
 
         var ledger = loadLedger()
+        var scheduled = false
         for notification in planned {
-            if await add(notification) { ledger[notification.identifier] = notification.fireDate ?? now }
+            if await add(notification) {
+                ledger[notification.identifier] = notification.fireDate ?? now
+                scheduled = true
+            }
         }
         saveLedger(Planner.prunedLedger(ledger, now: now))
-        return true
+        return scheduled
     }
 
     /// Match IDs that currently have a start reminder waiting, however it was scheduled.
@@ -168,6 +198,48 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
         saveLedger(Planner.prunedLedger(ledger, now: now))
     }
 
+    /// Called by the existing broadcast scan. The first snapshot establishes a baseline;
+    /// only subsequent verified changes can alert, and delivery uses the existing ledger.
+    func observePlayerEvents(matches: [Match], sources: [String: [RankedSource]]) async {
+        let prefs = BannerAppEnvironment.shared.preferences
+        var alerts: [PlannedNotification] = []
+        let currentID = playerMatchID ?? BannerAppEnvironment.shared.activeLivePlaybackContext?.match.id
+        for match in matches {
+            let feeds = Set((sources[match.id] ?? []).filter(\.isConfirmed).map { StreamLinkerAdapters.streamID($0.channel) })
+            let oldFeeds = knownBroadcasts.updateValue(feeds, forKey: match.id)
+            let score = "\(match.away.score ?? "")-\(match.home.score ?? "")"
+            let oldScore = lastScores.updateValue(score, forKey: match.id)
+            guard match.state == .live, abs(match.date.timeIntervalSinceNow) < 12 * 3600,
+                  match.id != currentID, prefs.isFavoriteMatch(match), prefs.matchNotificationsEnabled else { continue }
+            let candidate = Self.candidate(from: match)
+            if prefs.broadcastAlertsEnabled, let oldFeeds, !feeds.subtracting(oldFeeds).isEmpty {
+                alerts.append(Planner.broadcastAlert(for: candidate))
+            }
+            if prefs.scoreChangeAlertsEnabled, !prefs.spoilerFreeMode, let oldScore, oldScore != score,
+               Int(match.away.score ?? "") != nil, Int(match.home.score ?? "") != nil {
+                alerts.append(Planner.scoreChangeAlert(for: candidate))
+            }
+        }
+        if lastScores.count > 500 {
+            let ids = Set(matches.map(\.id))
+            lastScores = lastScores.filter { ids.contains($0.key) }
+            knownBroadcasts = knownBroadcasts.filter { ids.contains($0.key) }
+        }
+        guard !alerts.isEmpty, await isAuthorized() else { return }
+        for alert in alerts {
+            var ledger = loadLedger()
+            guard ledger[alert.identifier] == nil else { continue }
+            // Reserve before awaiting delivery so overlapping refreshes cannot duplicate it.
+            ledger[alert.identifier] = Date()
+            saveLedger(Planner.prunedLedger(ledger, now: Date()))
+            if !(await add(alert)) {
+                var currentLedger = loadLedger()
+                currentLedger.removeValue(forKey: alert.identifier)
+                saveLedger(Planner.prunedLedger(currentLedger, now: Date()))
+            }
+        }
+    }
+
     // MARK: - Morning briefing
 
     /// One-shot briefings for the next week at `hour`, replacing any repeating one an older
@@ -224,6 +296,7 @@ final class MatchNotificationService: NSObject, UNUserNotificationCenterDelegate
     }
 
     private func add(_ planned: PlannedNotification) async -> Bool {
+        guard BannerAppEnvironment.shared.preferences.allowsMatchNotification(planned.userInfo) else { return false }
         let content = UNMutableNotificationContent()
         content.title = planned.title
         content.body = planned.body

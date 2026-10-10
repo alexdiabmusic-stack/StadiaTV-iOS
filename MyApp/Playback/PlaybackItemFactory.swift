@@ -86,30 +86,16 @@ nonisolated enum PlaybackItemFactory {
         player.currentItem?.preferredForwardBufferDuration = profile.forwardBufferDuration
     }
 
-    /// URLs to try, in order, for a stream. AVPlayer can't play raw MPEG-TS, so an
-    /// Xtream-shaped `.ts` or extension-less URL is tried as its HLS `.m3u8` form first,
-    /// keeping the original as a fallback.
+    /// URLs to try, in order, as HLS for a stream. AVPlayer can't play raw MPEG-TS, so an Xtream-shaped `.ts` or
+    /// extension-less URL is tried as its HLS `.m3u8` form first, keeping the original as a fallback. (The ways of
+    /// playing a channel, including converting a transport stream, are `PlaybackCandidates`.)
     static func playbackURLCandidates(for url: URL) -> [URL] {
-        guard let hls = xtreamHLSURL(for: url), hls != url else { return [url] }
-        return [hls, url]
+        PlaybackCandidates.hlsURLCandidates(for: url)
     }
 
     /// Rewrites `http(s)://host[:port]/{user}/{pass}/{id}` and
     /// `/live/{user}/{pass}/{id}[.ts]` to `/live/{user}/{pass}/{id}.m3u8`.
     static func xtreamHLSURL(for url: URL) -> URL? {
-        guard let scheme = url.scheme?.lowercased(), scheme == "http" || scheme == "https",
-              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
-        var parts = components.path.split(separator: "/").map(String.init)
-        if parts.count == 4, parts[0].lowercased() == "live" {
-            parts.removeFirst()
-        }
-        guard parts.count == 3 else { return nil }
-        let last = parts[2]
-        let ext = (last as NSString).pathExtension.lowercased()
-        let streamID = (last as NSString).deletingPathExtension
-        guard ext.isEmpty || ext == "ts",
-              !streamID.isEmpty, streamID.allSatisfy(\.isNumber) else { return nil }
-        components.path = "/live/\(parts[0])/\(parts[1])/\(streamID).m3u8"
-        return components.url
+        PlaybackCandidates.xtreamHLSURL(for: url)
     }
 }

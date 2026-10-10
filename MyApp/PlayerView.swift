@@ -350,6 +350,7 @@ struct PlayerView: View {
             if case let .failed(message) = streamSelection.switchState {
                 StreamFailurePanel(
                     message: message,
+                    detail: playback.failureDetail,
                     tryAgain: { streamSelection.retryActiveStream(); revealChromeTemporarily() },
                     chooseAnother: streamSelection.hasSelectableStreams ? { showingSourceSelector = true; revealChromeTemporarily() } : nil,
                     switchToAuto: { streamSelection.selectAuto(); revealChromeTemporarily() }
@@ -2910,6 +2911,8 @@ private extension String {
 
 private struct StreamFailurePanel: View {
     let message: String
+    /// What the player, the converter and the provider say about why, when they say anything.
+    let detail: String?
     let tryAgain: () -> Void
     /// Nil when there is no other source to choose.
     let chooseAnother: (() -> Void)?
@@ -2924,6 +2927,14 @@ private struct StreamFailurePanel: View {
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
+            if let detail {
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.72))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(10)
+                    .frame(maxWidth: 420)
+            }
             HStack(spacing: 10) {
                 Button("Try Again", action: tryAgain)
                 if let chooseAnother {

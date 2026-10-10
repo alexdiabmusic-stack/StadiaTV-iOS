@@ -252,6 +252,11 @@ struct LocalHTTPServerTests {
 /// stream does.
 private final class ProviderStub: URLProtocol {
     static let goodStream = SyntheticTransportStream().data(seconds: 13)
+    static var radioStream: Data {
+        var stream = SyntheticTransportStream()
+        stream.videoType = nil
+        return stream.data(seconds: 8)
+    }
     static var mpeg2Stream: Data {
         var stream = SyntheticTransportStream()
         stream.videoType = 0x02
@@ -264,7 +269,7 @@ private final class ProviderStub: URLProtocol {
 
     override class func canInit(with request: URLRequest) -> Bool {
         ["good.test", "forbidden.test", "page.test", "longpage.test", "mpeg2.test", "message.test", "agent.test",
-         "drop.test", "flaky.test"].contains(request.url?.host ?? "")
+         "drop.test", "flaky.test", "radio.test"].contains(request.url?.host ?? "")
     }
 
     /// How many requests this host has had so far.
@@ -303,6 +308,7 @@ private final class ProviderStub: URLProtocol {
         case "message.test": respond(200, type: "application/json", body: Data(#"{"error":"Account suspended"}"#.utf8))
         case "mpeg2.test": respond(200, type: "video/mp2t", body: Self.mpeg2Stream, keepOpen: true)
         case "drop.test": respond(200, type: "video/mp2t", body: Self.shortStream)
+        case "radio.test": respond(200, type: "video/mp2t", body: Self.radioStream, keepOpen: true)
         case "flaky.test":
             // Good for the first connection, which then ends; every connection after it is refused with a web page.
             if nth == 1 { respond(200, type: "video/mp2t", body: Self.shortStream) }
@@ -338,6 +344,7 @@ struct TransportStreamProxyTests {
         let names = text.split(separator: "\n").filter { $0.hasSuffix(".ts") }.map(String.init)
         #expect(names.count >= 3)
         #expect(proxy.streamSummary == "H.264 video, AAC audio")
+        #expect(proxy.carriesVideo == true, "the player is told a picture is to be expected")
 
         for name in names.prefix(3) {
             let part = try await request(playlistURL.deletingLastPathComponent().appendingPathComponent(name))
@@ -424,6 +431,17 @@ struct TransportStreamProxyTests {
         defer { message.stop() }
         let messageReply = try await request(messageURL)
         #expect(messageReply.status == 502 && String(decoding: messageReply.body, as: UTF8.self).contains("Account suspended"))
+    }
+
+    @Test("A radio stream says it carries no video, so the player doesn't wait for a picture")
+    func radio() async throws {
+        let (proxy, playlistURL) = try startedProxy("radio.test")
+        defer { proxy.stop() }
+        #expect(proxy.carriesVideo == nil, "not known before the program table has been read")
+        let playlist = try await request(playlistURL)
+        #expect(playlist.status == 200)
+        #expect(proxy.streamSummary == "AAC audio")
+        #expect(proxy.carriesVideo == false)
     }
 
     @Test("Video the player can't decode is reported rather than waited on")

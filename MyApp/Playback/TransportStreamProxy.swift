@@ -47,6 +47,9 @@ nonisolated final class TransportStreamProxy: @unchecked Sendable {
     /// What the stream carries, e.g. "H.264 video, AAC audio", once its program table has been read.
     var streamSummary: String? { currentReader?.summary }
 
+    /// Whether the stream carries video, once its program table has been read; nil until then.
+    var carriesVideo: Bool? { streamSummary.map { $0.contains(" video") } }
+
     private var currentReader: UpstreamReader? {
         lock.lock()
         defer { lock.unlock() }

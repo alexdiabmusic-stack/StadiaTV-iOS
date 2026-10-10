@@ -286,6 +286,14 @@ struct TVPlayerView: View {
                     .font(Theme.Typography.headline)
                     .foregroundStyle(.white)
                     .multilineTextAlignment(.center)
+                if let detail = playback.failureDetail {
+                    Text(detail)
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(.white.opacity(0.72))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(10)
+                        .frame(maxWidth: 900)
+                }
                 Button("Try Again") {
                     self.failureMessage = nil
                     playback.load(channel)

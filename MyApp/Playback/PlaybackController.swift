@@ -59,6 +59,9 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var qualityCap: PlayerQualityCap = .auto
     /// DEBUG-only start-up timing line for the on-screen overlay.
     @Published private(set) var metricsSummary: String?
+    /// What the player's log, the converter and the provider say about why the last stream failed, once known. Shown
+    /// under the failure message; nil while a stream is loading or playing.
+    @Published private(set) var failureDetail: String?
 
     let player = AVPlayer()
     private(set) var channel: Channel?
@@ -82,8 +85,17 @@ final class PlaybackController: ObservableObject {
     private var metrics: PlaybackMetrics?
     private var pendingTapDate: Date?
     private var hasLoadedOnce = false
-    private var urlCandidates: [URL] = []
-    private var urlIndex = 0
+    /// The ways of playing the current channel, in order, and which one is being tried.
+    private var candidates: [PlaybackCandidate] = []
+    private var candidateIndex = 0
+    /// The converter serving the current candidate when it is a transport stream.
+    private var proxy: TransportStreamProxy?
+    private let formatMemory = PlaybackFormatMemory()
+    /// When the current channel last needed a reconnect; see `PlaybackPolicy.reconnectBudgetSpent`.
+    private var recentReconnects: [Date] = []
+    /// Why the last attempts to play this channel failed, for the failure panel: a way that didn't start, or the
+    /// reason a stream was lost, which the generic "lost connection" message would otherwise hide.
+    private var attemptNotes: [String] = []
     /// Bumped whenever the current item is replaced; async work from older items checks it and bails.
     private var generation = 0
     /// The current item reached `.playing` at least once.
@@ -105,6 +117,9 @@ final class PlaybackController: ObservableObject {
     private var reconnectTask: Task<Void, Never>?
     private var monitorTask: Task<Void, Never>?
     private var bufferingTask: Task<Void, Never>?
+    private var firstFrameDeadlineTask: Task<Void, Never>?
+    private var candidateDeadlineTask: Task<Void, Never>?
+    private var diagnosisTask: Task<Void, Never>?
 
     init(tapDate: Date? = nil, bufferProfile: PlayerBufferProfile = .balanced) {
         self.pendingTapDate = tapDate
@@ -140,10 +155,16 @@ final class PlaybackController: ObservableObject {
 
         cancelTasks()
         detachItemObservers()
+        stopProxy()
         self.channel = channel
-        urlCandidates = PlaybackItemFactory.playbackURLCandidates(for: channel.streamURL)
-        urlIndex = 0
+        candidates = PlaybackCandidates.candidates(
+            for: channel.streamURL, prefersTransportStream: formatMemory.prefersTransportStream(for: channel.streamURL)
+        )
+        candidateIndex = 0
         reconnectAttempt = 0
+        recentReconnects.removeAll()
+        attemptNotes.removeAll()
+        failureDetail = nil
         availableHeights = []
         firstFrameRendered = false
         isUserPaused = false
@@ -157,6 +178,8 @@ final class PlaybackController: ObservableObject {
         hasLoadedOnce = true
 
         guard channel.streamURL.scheme?.lowercased() != "about" else {
+            // What was playing before says nothing about why this channel has no stream.
+            currentItem = nil
             fail("No stream is available for this channel.")
             return
         }
@@ -165,6 +188,7 @@ final class PlaybackController: ObservableObject {
         NotificationCenter.default.post(name: .bannerVideoPlaybackWillStart, object: nil)
         setHoldsPlaybackPriority(true)
         startCurrentURL()
+        startFirstFrameDeadline()
     }
 
     func play() {
@@ -174,6 +198,7 @@ final class PlaybackController: ObservableObject {
         }
         pausedAt = nil
         resumePlayback()
+        rearmStartTimersIfNeeded()
     }
 
     func pause() {
@@ -190,12 +215,16 @@ final class PlaybackController: ObservableObject {
         setHoldsPlaybackPriority(false)
         generation += 1
         cancelTasks()
+        stopProxy()
         detachItemObservers()
         player.pause()
         player.replaceCurrentItem(with: nil)
         currentItem = nil
         channel = nil
         state = .idle
+        failureDetail = nil
+        attemptNotes.removeAll()
+        recentReconnects.removeAll()
         setBuffering(false)
     }
 
@@ -245,17 +274,41 @@ final class PlaybackController: ObservableObject {
     // MARK: - Item lifecycle
 
     private func startCurrentURL() {
-        guard let channel, urlCandidates.indices.contains(urlIndex) else { return }
+        guard let channel, candidates.indices.contains(candidateIndex) else { return }
         generation += 1
         let generation = generation
         detachItemObservers()
         watchdogTask?.cancel()
         monitorTask?.cancel()
+        candidateDeadlineTask?.cancel()
+        // A stall timer from the item being replaced mustn't stand in the way of the new item's own.
+        stallTask?.cancel()
+        stallTask = nil
+        stopProxy()
         itemHasPlayed = false
         didNotifyItemReady = false
 
-        let url = urlCandidates[urlIndex]
-        let item = PlaybackItemFactory.makeItem(url: url, headers: channel.httpHeaders,
+        let candidate = candidates[candidateIndex]
+        var url = candidate.url
+        var headers = channel.httpHeaders
+        if candidate.source == .convertedTransportStream {
+            // Apple's player can't open a transport stream, so it is turned into HLS here and the player is given
+            // the local copy. The provider's headers go to the provider, not to the player.
+            let converter = TransportStreamProxy(upstream: candidate.url, headers: channel.httpHeaders)
+            let identity = ObjectIdentifier(converter)
+            converter.onFailure { [weak self] reason in
+                Task { @MainActor [weak self] in self?.converterFailed(reason, identity: identity) }
+            }
+            do {
+                url = try converter.start()
+                headers = nil
+                proxy = converter
+            } catch {
+                startupFailed("Couldn't start the stream converter.")
+                return
+            }
+        }
+        let item = PlaybackItemFactory.makeItem(url: url, headers: headers,
                                                 profile: bufferProfile, peakBitRate: peakBitRate)
         item.preferredMaximumResolution = qualityCap.maximumResolution
         attachObservers(to: item)
@@ -268,6 +321,7 @@ final class PlaybackController: ObservableObject {
         if !isUserPaused { player.play() }
 
         startWatchdog(generation: generation)
+        startCandidateDeadline(generation: generation)
         startMonitor(item: item, generation: generation)
     }
 
@@ -275,21 +329,59 @@ final class PlaybackController: ObservableObject {
     private func startupFailed(_ reason: String) {
         if reconnectAttempt > 0 {
             reconnect(reason: reason)
-        } else if urlIndex + 1 < urlCandidates.count {
-            urlIndex += 1
-            PlaybackMetrics.logger.info("Start-up failed (\(reason, privacy: .public)); trying fallback URL \(self.urlIndex + 1)/\(self.urlCandidates.count)")
-            startCurrentURL()
+        } else if candidateIndex + 1 < candidates.count {
+            startNextCandidate(after: reason)
         } else {
             fail(reason)
         }
     }
 
+    /// Gives up on the current way of playing the channel and starts the next.
+    private func startNextCandidate(after reason: String) {
+        noteFailedAttempt(reason)
+        candidateIndex += 1
+        reconnectAttempt = 0
+        reconnectTask?.cancel()
+        PlaybackMetrics.logger.info("Start-up failed (\(reason, privacy: .public)); trying fallback \(self.candidateIndex + 1)/\(self.candidates.count)")
+        startCurrentURL()
+    }
+
+    /// Keeps what went wrong with the current way of playing the channel. For a stream the player opened itself its
+    /// own error log says most; for a converted one the log is about the local copy, so the reason the converter
+    /// gave is all there is.
+    private func noteFailedAttempt(_ reason: String) {
+        guard candidates.indices.contains(candidateIndex) else { return }
+        let source = candidates[candidateIndex].source
+        let logged = source == .direct ? loggedError() : nil
+        let label = source == .direct ? "As HLS" : "As MPEG-TS"
+        let note = PlaybackPolicy.combine(["\(label): \(reason)", logged], separator: " ") ?? label
+        if !attemptNotes.contains(note) { attemptNotes.append(note) }
+        if attemptNotes.count > 2 { attemptNotes.removeFirst() }
+    }
+
+    /// The latest entry in the current item's error log, worded for a person.
+    private func loggedError() -> String? {
+        guard let event = currentItem?.errorLog()?.events.last else { return nil }
+        return PlaybackPolicy.describeLoggedError(statusCode: event.errorStatusCode, domain: event.errorDomain, comment: event.errorComment)
+    }
+
     /// Rebuilds the item for the same URL after a mid-stream failure or long stall.
     private func reconnect(reason: String) {
-        guard reconnectAttempt < Self.maxReconnectAttempts else {
+        // A channel that has never shown a picture isn't being reconnected: this way of playing it isn't working, so
+        // the next is tried rather than the same one again.
+        if !firstFrameRendered, candidateIndex + 1 < candidates.count {
+            startNextCandidate(after: reason)
+            return
+        }
+        noteFailedAttempt(reason)
+        let now = Date()
+        recentReconnects = recentReconnects.filter { now.timeIntervalSince($0) < PlaybackPolicy.reconnectWindow }
+        guard reconnectAttempt < Self.maxReconnectAttempts,
+              !PlaybackPolicy.reconnectBudgetSpent(reconnects: recentReconnects, now: now) else {
             fail("Lost connection to the stream.")
             return
         }
+        recentReconnects.append(now)
         reconnectAttempt += 1
         let attempt = reconnectAttempt
         let delay = Self.reconnectDelays[min(attempt - 1, Self.reconnectDelays.count - 1)]
@@ -301,6 +393,9 @@ final class PlaybackController: ObservableObject {
         watchdogTask?.cancel()
         monitorTask?.cancel()
         stallTask?.cancel()
+        // The converter's connection to the provider is let go now, not when the next one starts: an account often
+        // allows one connection, and the new one would find the old still there.
+        stopProxy()
         state = .buffering
         setBuffering(true)
 
@@ -314,9 +409,12 @@ final class PlaybackController: ObservableObject {
 
     /// Gives up on the current stream and hands the decision to the owner.
     private func fail(_ reason: String) {
+        // What the player and the converter know is read before the item and the converter are let go.
+        let known = describeFailure()
         setHoldsPlaybackPriority(false)
         generation += 1
         cancelTasks()
+        stopProxy()
         detachItemObservers()
         player.pause()
         player.replaceCurrentItem(with: nil)
@@ -324,17 +422,75 @@ final class PlaybackController: ObservableObject {
         reconnectAttempt = 0
         setBuffering(false)
         state = .failed(reason)
+        failureDetail = known
         metrics?.record(.failed, reason: reason)
         publishMetrics()
         if let channel {
             StreamHealthStore.shared.recordFailure(streamID: channel.id)
         }
+        scheduleDiagnosis()
         onFailure?(reason)
+    }
+
+    /// The converter gave up on the provider's stream: it was refused, wasn't a stream, or kept dropping.
+    private func converterFailed(_ reason: String, identity: ObjectIdentifier) {
+        guard let proxy, ObjectIdentifier(proxy) == identity, currentItem != nil else { return }
+        PlaybackMetrics.logger.info("Converter failed: \(reason, privacy: .public)")
+        if itemHasPlayed { reconnect(reason: reason) } else { startupFailed(reason) }
+    }
+
+    private func stopProxy() {
+        proxy?.stop()
+        proxy = nil
+    }
+
+    /// What is known about why this stream is failing, other than the message itself: what went wrong with the ways
+    /// of playing it that were tried first, then the player's own error log or how far the converter got.
+    private func describeFailure() -> String? {
+        var parts: [String?] = attemptNotes
+        if candidates.indices.contains(candidateIndex), candidates[candidateIndex].source == .convertedTransportStream {
+            if let proxy, proxy.failure == nil { parts.append(proxy.progress) }
+        } else {
+            parts.append(loggedError())
+        }
+        return PlaybackPolicy.combine(parts)
+    }
+
+    /// The converter's own reason when it has one, which says more than the player's.
+    private func startFailureReason(_ fallback: String) -> String {
+        proxy?.failure ?? fallback
+    }
+
+    /// Asks the provider what it actually sends for this channel's HLS address, once the failure has settled (Auto
+    /// may start another source straight after `onFailure`), and adds what it finds to `failureDetail`.
+    private func scheduleDiagnosis() {
+        guard let hls = candidates.first(where: { $0.source == .direct }),
+              ["http", "https"].contains(hls.url.scheme?.lowercased() ?? "") else { return }
+        let failedGeneration = generation
+        let headers = channel?.httpHeaders
+        let triedConverting = candidates.contains { $0.source == .convertedTransportStream }
+        diagnosisTask?.cancel()
+        diagnosisTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            guard let self, !Task.isCancelled, self.generation == failedGeneration, case .failed = self.state else { return }
+            let report = await StreamProbe.run(url: hls.url, headers: headers)
+            guard !Task.isCancelled, self.generation == failedGeneration, case let .failed(message) = self.state else { return }
+            PlaybackMetrics.logger.info("Stream check: \(report.technical, privacy: .public)")
+            // A raw transport stream is what the converter was given, and it has its own reason; telling the person
+            // to ask the provider for HLS would be no help. Nor is saying again what the message already says.
+            if report.verdict == .rawTransportStream, triedConverting { return }
+            if report.summary == message || (self.failureDetail ?? "").contains(report.summary) { return }
+            self.failureDetail = PlaybackPolicy.combine([self.failureDetail, report.summary])
+        }
     }
 
     private func markFirstFrame() {
         guard !firstFrameRendered, currentItem != nil else { return }
         firstFrameRendered = true
+        firstFrameDeadlineTask?.cancel()
+        candidateDeadlineTask?.cancel()
+        attemptNotes.removeAll()
+        rememberWorkingFormat()
         setHoldsPlaybackPriority(false)
         metrics?.record(.firstFrame)
         publishMetrics()
@@ -359,14 +515,66 @@ final class PlaybackController: ObservableObject {
     /// Fails over when an item never starts playing within the profile's start-up window.
     private func startWatchdog(generation: Int) {
         watchdogTask?.cancel()
-        let timeout = bufferProfile.startupTimeout
+        guard candidates.indices.contains(candidateIndex) else { return }
+        let timeout = PlaybackPolicy.startupLimit(for: candidates[candidateIndex].source, startupTimeout: bufferProfile.startupTimeout)
         watchdogTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(timeout))
             guard let self, !Task.isCancelled, self.generation == generation,
                   !self.itemHasPlayed, !self.isUserPaused else { return }
             PlaybackMetrics.logger.info("No playback within \(timeout) s")
-            self.startupFailed("The stream didn't start in time.")
+            self.startupFailed(self.startFailureReason("The stream didn't start in time."))
         }
+    }
+
+    /// While another way of playing the channel is waiting, this one gets a little longer than the start-up
+    /// watchdog to show a picture. The watchdog stands down as soon as the player says `.playing`, which a stream
+    /// that keeps stalling does again and again, and the next way would otherwise never be reached.
+    private func startCandidateDeadline(generation: Int) {
+        candidateDeadlineTask?.cancel()
+        guard !firstFrameRendered, candidateIndex + 1 < candidates.count else { return }
+        let seconds = PlaybackPolicy.candidateDeadline(for: candidates[candidateIndex].source, startupTimeout: bufferProfile.startupTimeout)
+        candidateDeadlineTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard let self, !Task.isCancelled, self.generation == generation, !self.firstFrameRendered,
+                  !self.isUserPaused, self.player.timeControlStatus != .paused else { return }
+            PlaybackMetrics.logger.info("No picture within \(seconds) s; trying the next way of playing it")
+            self.startupFailed(self.startFailureReason("The stream didn't start in time."))
+        }
+    }
+
+    /// A last resort for a channel that never shows a picture, however the other timers are reset: the watchdog
+    /// stands down when the player reports `.playing`, and a reconnect starts its count again, so a stream that
+    /// keeps flapping between playing and waiting would otherwise show the loading screen for ever. Only the first
+    /// frame, a failure or a new load stops this one.
+    private func startFirstFrameDeadline() {
+        firstFrameDeadlineTask?.cancel()
+        guard !firstFrameRendered, currentItem != nil else { return }
+        let seconds = PlaybackPolicy.firstFrameDeadline(startupTimeout: bufferProfile.startupTimeout, sources: candidates.map(\.source))
+        firstFrameDeadlineTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard let self, !Task.isCancelled, !self.firstFrameRendered, self.currentItem != nil,
+                  !self.isUserPaused, self.player.timeControlStatus != .paused else { return }
+            PlaybackMetrics.logger.info("No picture within \(seconds) s")
+            self.fail(self.startFailureReason("The stream still hasn't started."))
+        }
+    }
+
+    /// Pausing cancels the start-up timers; a resume before the first frame needs them back, or a stream that never
+    /// starts would load for ever.
+    private func rearmStartTimersIfNeeded() {
+        guard currentItem != nil, !firstFrameRendered else { return }
+        if !itemHasPlayed { startWatchdog(generation: generation) }
+        startFirstFrameDeadline()
+        startCandidateDeadline(generation: generation)
+    }
+
+    /// Which way of playing a provider's channels worked, so a provider whose HLS never started is tried as a
+    /// transport stream first from then on, and HLS working again clears that.
+    private func rememberWorkingFormat() {
+        guard candidates.contains(where: { $0.source == .direct }),
+              candidates.contains(where: { $0.source == .convertedTransportStream }),
+              candidates.indices.contains(candidateIndex), let url = channel?.streamURL else { return }
+        formatMemory.record(candidates[candidateIndex].source, for: url)
     }
 
     /// Once-a-second checks for the current item: first-frame fallback, videoless
@@ -400,14 +608,22 @@ final class PlaybackController: ObservableObject {
                 // A picture-less stream is only broken if its manifest advertises video;
                 // genuine audio-only channels (radio) are left alone and count as started.
                 if secondsPlayingWithoutPicture >= 3, advertisesVideo == nil {
-                    let result = await Self.manifestAdvertisesVideo(item)
+                    // A converted stream's playlist lists segments, not variants, so what the converter read from
+                    // the stream's own program table says whether it carries video.
+                    let result: Bool
+                    if let proxy = self.proxy {
+                        result = proxy.carriesVideo ?? false
+                    } else {
+                        result = await Self.manifestAdvertisesVideo(item)
+                    }
                     guard !Task.isCancelled, self.generation == generation else { return }
                     advertisesVideo = result
                     if !result { self.markFirstFrame() }
                 }
                 if advertisesVideo == true, secondsPlayingWithoutPicture >= Self.videolessFailureSeconds {
                     PlaybackMetrics.logger.info("Playing \(secondsPlayingWithoutPicture) s with no picture on a video stream")
-                    self.fail("This source is playing without a picture.")
+                    // Another way of playing the channel may do better; with none left this fails as it always has.
+                    self.startupFailed("This source is playing without a picture.")
                     return
                 }
 
@@ -464,6 +680,7 @@ final class PlaybackController: ObservableObject {
             if reconnectAttempt > 0 {
                 PlaybackMetrics.logger.info("Reconnected after \(self.reconnectAttempt) attempt(s)")
                 reconnectAttempt = 0
+                attemptNotes.removeAll()
             }
             state = .playing
             setBuffering(false)
@@ -545,7 +762,7 @@ final class PlaybackController: ObservableObject {
                 loadAvailableHeights(for: item)
             }
         case .failed:
-            let reason = item.error?.localizedDescription ?? "Couldn't play this stream."
+            let reason = startFailureReason(item.error?.localizedDescription ?? "Couldn't play this stream.")
             if itemHasPlayed {
                 reconnect(reason: reason)
             } else {
@@ -635,6 +852,7 @@ final class PlaybackController: ObservableObject {
                 }
                 pausedAt = nil
                 resumePlayback()
+                rearmStartTimersIfNeeded()
             }
             wasPlayingBeforeInterruption = false
         @unknown default:
@@ -667,6 +885,9 @@ final class PlaybackController: ObservableObject {
         reconnectTask?.cancel()
         monitorTask?.cancel()
         bufferingTask?.cancel()
+        firstFrameDeadlineTask?.cancel()
+        candidateDeadlineTask?.cancel()
+        diagnosisTask?.cancel()
     }
 
     private func publishMetrics() {

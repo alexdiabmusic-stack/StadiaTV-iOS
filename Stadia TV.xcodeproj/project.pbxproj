@@ -7,10 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		D2B5925B3077054D007B21D7 /* CarPlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D2B5925A3077054D007B21D7 /* CarPlay.framework */; platformFilter = ios; };
-		D2B5925D30770571007B21D7 /* CarPlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D2B5925A3077054D007B21D7 /* CarPlay.framework */; platformFilter = ios; };
-		D2F2344930745D0000AA9DC4 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D2F2344830745D0000AA9DC4 /* WidgetKit.framework */; };
-		D2F2344B30745D0000AA9DC4 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D2F2344A30745D0000AA9DC4 /* SwiftUI.framework */; };
+		D293D34C3079ED4B0001A23C /* CarPlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D2B5925A3077054D007B21D7 /* CarPlay.framework */; platformFilter = ios; };
+		D293D34E3079ED6B0001A23C /* CarPlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D2B5925A3077054D007B21D7 /* CarPlay.framework */; platformFilter = ios; };
+		D293D3513079ED6D0001A23C /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D2F2344830745D0000AA9DC4 /* WidgetKit.framework */; };
+		D293D3523079ED6D0001A23C /* WidgetKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D2F2344830745D0000AA9DC4 /* WidgetKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		D293D3533079ED6F0001A23C /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D2F2344A30745D0000AA9DC4 /* SwiftUI.framework */; };
+		D293D3543079ED6F0001A23C /* SwiftUI.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D2F2344A30745D0000AA9DC4 /* SwiftUI.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		D2F2345630745D0200AA9DC4 /* BannerLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = D2F2344630745D0000AA9DC4 /* BannerLiveActivityExtension.appex */; platformFilters = (ios, xros, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		D2F2347530746CBE00AA9DC4 /* BannerSharedKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D2F2346F30746CBE00AA9DC4 /* BannerSharedKit.framework */; };
 		D2F2347630746CBE00AA9DC4 /* BannerSharedKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = D2F2346F30746CBE00AA9DC4 /* BannerSharedKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
@@ -48,6 +50,16 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		D293D3503079ED6B0001A23C /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "";
+			dstSubfolder = Frameworks;
+			files = (
+				D293D3543079ED6F0001A23C /* SwiftUI.framework in Embed Frameworks */,
+				D293D3523079ED6D0001A23C /* WidgetKit.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+		};
 		D2F2345B30745D0200AA9DC4 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			dstPath = "";
@@ -155,15 +167,15 @@
 			isa = PBXFrameworksBuildPhase;
 			files = (
 				D2F2347530746CBE00AA9DC4 /* BannerSharedKit.framework in Frameworks */,
-				D2B5925D30770571007B21D7 /* CarPlay.framework in Frameworks */,
+				D293D34C3079ED4B0001A23C /* CarPlay.framework in Frameworks */,
 			);
 		};
 		D2F2344330745D0000AA9DC4 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
-				D2F2344B30745D0000AA9DC4 /* SwiftUI.framework in Frameworks */,
-				D2F2344930745D0000AA9DC4 /* WidgetKit.framework in Frameworks */,
-				D2B5925B3077054D007B21D7 /* CarPlay.framework in Frameworks */,
+				D293D34E3079ED6B0001A23C /* CarPlay.framework in Frameworks */,
+				D293D3533079ED6F0001A23C /* SwiftUI.framework in Frameworks */,
+				D293D3513079ED6D0001A23C /* WidgetKit.framework in Frameworks */,
 			);
 		};
 		D2F2346C30746CBE00AA9DC4 /* Frameworks */ = {
@@ -277,6 +289,7 @@
 				D2F2344230745D0000AA9DC4 /* Sources */,
 				D2F2344330745D0000AA9DC4 /* Frameworks */,
 				D2F2344430745D0000AA9DC4 /* Resources */,
+				D293D3503079ED6B0001A23C /* Embed Frameworks */,
 			);
 			buildRules = (
 			);

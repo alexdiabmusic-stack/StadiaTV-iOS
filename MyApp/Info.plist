@@ -51,26 +51,24 @@
 	<key>PremiumUnlockAllFeatures</key>
 	<string>$(BANNER_UNLOCK_ALL_FEATURES)</string>
 	<key>UIApplicationSceneManifest</key>
-	<array>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<true/>
+		<key>UISceneConfigurations</key>
 		<dict>
-			<key>UIApplicationSupportsMultipleScenes</key>
-			<true/>
-			<key>UISceneConfigurations</key>
-			<dict>
-				<key>CPTemplateApplicationSceneSessionRoleApplication</key>
-				<array>
-					<dict>
-						<key>UISceneClassName</key>
-						<string>CPTemplateApplicationScene</string>
-						<key>UISceneConfigurationName</key>
-						<string>CarPlay Configuration</string>
-						<key>UISceneDelegateClassName</key>
-						<string>$(PRODUCT_MODULE_NAME).CarPlaySceneDelegate</string>
-					</dict>
-				</array>
-			</dict>
+			<key>CPTemplateApplicationSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>CPTemplateApplicationScene</string>
+					<key>UISceneConfigurationName</key>
+					<string>CarPlay Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).CarPlaySceneDelegate</string>
+				</dict>
+			</array>
 		</dict>
-	</array>
+	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UIBackgroundModes</key>

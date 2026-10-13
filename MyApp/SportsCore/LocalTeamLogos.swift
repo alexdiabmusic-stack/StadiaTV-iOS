@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 
 nonisolated enum TeamLogoAssetResolver {
     static func assetURL(leaguePath: String, abbreviation: String?, displayName: String? = nil, providerTeamID: String? = nil) -> URL? {
@@ -68,9 +69,22 @@ nonisolated enum TeamLogoAssetResolver {
     }
 
     static func soccerAssetURL(leaguePath: String, displayName: String?) -> URL? {
-        guard let displayName, let leagueName = msiLeagueName(for: leaguePath) else { return nil }
-        let asset = "MSILogo_\(assetSuffix("\(leagueName)_\(displayName)").lowercased())"
-        return URL.bannerImageAsset(named: asset)
+        guard let displayName else { return nil }
+        // A club's crest doesn't change by competition, but assets are bundled under a single
+        // competition's name (e.g. a Champions League side may only have a domestic-league asset).
+        // Try the matched competition first, then fall back across every bundled competition name.
+        let preferredLeagueName = msiLeagueName(for: leaguePath)
+        var candidateLeagueNames = [String]()
+        if let preferredLeagueName { candidateLeagueNames.append(preferredLeagueName) }
+        candidateLeagueNames.append(contentsOf: allMSILeagueNames.filter { $0 != preferredLeagueName })
+
+        for leagueName in candidateLeagueNames {
+            let asset = "MSILogo_\(assetSuffix("\(leagueName)_\(displayName)").lowercased())"
+            if UIImage(named: asset) != nil {
+                return URL.bannerImageAsset(named: asset)
+            }
+        }
+        return nil
     }
 
     static func normalizedAbbreviation(_ value: String?) -> String? {
@@ -113,6 +127,12 @@ nonisolated enum TeamLogoAssetResolver {
         default: return nil
         }
     }
+
+    /// Every competition name a soccer crest might be bundled under, used as a cross-competition
+    /// fallback when a team's asset isn't tagged under the competition that's currently being shown.
+    private static let allMSILeagueNames: [String] = [
+        "Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "Liga Portugal", "Champions League", "MLS"
+    ]
 
     private static let nbaNameAbbreviations: [String: String] = [
         "atlanta hawks": "ATL", "boston celtics": "BOS", "brooklyn nets": "BKN",

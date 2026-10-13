@@ -149,6 +149,10 @@ final class MatchesViewModel: ObservableObject {
         let favoriteIDs = Set(favorites.map(\.id))
         let canonicalFavoriteIDs = Set(favorites.map(\.canonicalTeamID))
         let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
+        let favoriteAbbreviations = Set(favorites.compactMap { favorite -> String? in
+            guard !favorite.abbreviation.isEmpty else { return nil }
+            return "\(favorite.leaguePath)-\(favorite.abbreviation.lowercased())"
+        })
         return matches.filter { match in
             [match.home, match.away].contains { side in
                 if let teamID = side.teamID, favoriteIDs.contains("\(match.league.path)-\(teamID)") {
@@ -157,7 +161,13 @@ final class MatchesViewModel: ObservableObject {
                 if let canonicalID = side.canonicalIDString, canonicalFavoriteIDs.contains(canonicalID) {
                     return true
                 }
-                return favoriteNames.contains(side.displayName.lowercased())
+                if favoriteNames.contains(side.displayName.lowercased()) {
+                    return true
+                }
+                // League-scoped abbreviation fallback: the native NHL feed only exposes the
+                // mascot name (e.g. "Senators" instead of "Ottawa Senators"), which fails the
+                // name check above, so match on the standardized team abbreviation instead.
+                return !side.abbreviation.isEmpty && favoriteAbbreviations.contains("\(match.league.path)-\(side.abbreviation.lowercased())")
             }
         }
     }

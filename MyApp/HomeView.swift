@@ -567,8 +567,10 @@ private struct HomeFantasySummary {
 /// canonical ID, or display-name fallback).
 private func favoriteSide(of match: Match, favorites: [FavoriteTeam]) -> TeamSide? {
     guard !favorites.isEmpty else { return nil }
-    let favoriteIDs = Set(favorites.flatMap { favorite in
-        [favorite.id, favorite.canonicalTeamID, favorite.teamID, "\(favorite.leaguePath)-\(favorite.teamID)"] + favorite.providerAliases.map(\.id)
+    let favoriteIDs = Set(favorites.flatMap { favorite -> [String] in
+        var keys = [favorite.id, favorite.canonicalTeamID, favorite.teamID, "\(favorite.leaguePath)-\(favorite.teamID)"] + favorite.providerAliases.map(\.id)
+        if !favorite.abbreviation.isEmpty { keys.append("\(favorite.leaguePath)-\(favorite.abbreviation.lowercased())") }
+        return keys
     })
     let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
     for side in [match.home, match.away] {
@@ -582,6 +584,12 @@ private func favoriteSide(of match: Match, favorites: [FavoriteTeam]) -> TeamSid
             return side
         }
         if favoriteNames.contains(side.displayName.lowercased()) {
+            return side
+        }
+        // Falls back to a league-scoped abbreviation match: ESPN-adjacent providers return
+        // the full team name, but the native NHL feed only gives the mascot name (e.g.
+        // "Senators" instead of "Ottawa Senators"), which fails the name check above.
+        if !side.abbreviation.isEmpty && favoriteIDs.contains("\(match.league.path)-\(side.abbreviation.lowercased())") {
             return side
         }
     }
@@ -2346,8 +2354,10 @@ final class HomeViewModel: ObservableObject {
         var seenDiscoveryLeagueIDs: Set<String> = []
         let discoveryLeagues = (leagues + League.all).filter { seenDiscoveryLeagueIDs.insert($0.id).inserted }
         let discoveryLeagueIDs = Set(discoveryLeagues.map(\.id))
-        let favoriteIDs = Set(favorites.flatMap { favorite in
-            [favorite.id, favorite.canonicalTeamID, favorite.teamID, "\(favorite.leaguePath)-\(favorite.teamID)"] + favorite.providerAliases.map(\.id)
+        let favoriteIDs = Set(favorites.flatMap { favorite -> [String] in
+            var keys = [favorite.id, favorite.canonicalTeamID, favorite.teamID, "\(favorite.leaguePath)-\(favorite.teamID)"] + favorite.providerAliases.map(\.id)
+            if !favorite.abbreviation.isEmpty { keys.append("\(favorite.leaguePath)-\(favorite.abbreviation.lowercased())") }
+            return keys
         })
         let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
         let favoriteSignature = favorites
@@ -2797,7 +2807,11 @@ final class HomeViewModel: ObservableObject {
             if let canonicalID = side.canonicalIDString, favoriteIDs.contains(canonicalID) {
                 return true
             }
-            return favoriteNames.contains(side.displayName.lowercased())
+            if favoriteNames.contains(side.displayName.lowercased()) {
+                return true
+            }
+            // League-scoped abbreviation fallback — see favoriteSide(of:favorites:) above.
+            return !side.abbreviation.isEmpty && favoriteIDs.contains("\(match.league.path)-\(side.abbreviation.lowercased())")
         }
     }
 }

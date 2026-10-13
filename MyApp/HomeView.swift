@@ -492,7 +492,7 @@ struct HomeView: View {
 
     private var scheduleSection: some View {
         ScheduleSection(
-            upcoming: viewModel.upcoming,
+            upcoming: viewModel.favoriteTeamUpcoming,
             selectedDay: $selectedScheduleDay
         )
     }
@@ -2075,9 +2075,9 @@ private struct ScheduleSection: View {
 
     private var emptyText: String {
         switch selectedDay {
-        case .today: return "No games for your followed leagues today."
+        case .today: return "No games for your favourite teams today."
         case .tomorrow: return "No announced games for tomorrow yet."
-        case .weekend: return "No weekend games found for your leagues."
+        case .weekend: return "No weekend games found for your favourite teams."
         }
     }
 }

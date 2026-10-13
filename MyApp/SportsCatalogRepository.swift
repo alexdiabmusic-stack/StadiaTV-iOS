@@ -30,7 +30,6 @@ final class SportsCatalogRepository {
     /// Only these leagues appear in onboarding, team pickers, and news.
     private static let activeCatalogLeagueIDs: Set<String> = [
         "football:national-football-league",
-        "football:canadian-football-league",
         "basketball:nba",
         "basketball:wnba",
         "baseball:major-league-baseball",
@@ -39,6 +38,10 @@ final class SportsCatalogRepository {
         // (no SportsRepository provider — see SportsCatalogProviderCoverageTests), so leaving
         // it selectable here let a user pick it in onboarding/the team picker only to have it
         // silently vanish everywhere else. See MatchLinker/PROMPTS.md, Prompt 7.
+        //
+        // CFL ("football:canadian-football-league") is also deliberately absent: it isn't
+        // matching streams yet, so it only produced frozen "LIVE NOW" cards with nothing to
+        // watch. See Models.swift League.all and SportsRepository.init.
         "soccer:premier-league",
         "soccer:major-league-soccer",
         "racing:formula-1",

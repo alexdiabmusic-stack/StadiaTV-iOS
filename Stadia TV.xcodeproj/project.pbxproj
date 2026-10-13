@@ -654,6 +654,7 @@
 			baseConfigurationReference = A1C0FF1E0000000000000001 /* App.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = MyApp/MyApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMPILER_INDEX_STORE_ENABLE = NO;
 				CURRENT_PROJECT_VERSION = 1;
@@ -713,6 +714,7 @@
 			baseConfigurationReference = A1C0FF1E0000000000000001 /* App.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = MyApp/MyApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMPILER_INDEX_STORE_ENABLE = NO;
 				CURRENT_PROJECT_VERSION = 1;

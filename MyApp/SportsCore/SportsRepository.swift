@@ -10,7 +10,7 @@ nonisolated struct SportsLiveMatchSnapshot: Sendable {
 nonisolated struct SportsRepository: Sendable {
     static let shared = SportsRepository()
     private let providers: [String: any NativeSportsProvider]
-    init(providers: [any NativeSportsProvider] = [NHLProvider(), MLBProvider(), F1Provider(), NFLProvider(), CFLProvider(), NBAProvider(), WNBAProvider(), EPLProvider(), MLSProvider(), LaLigaProvider(), PGAProvider()]) {
+    init(providers: [any NativeSportsProvider] = [NHLProvider(), MLBProvider(), F1Provider(), NFLProvider(), NBAProvider(), WNBAProvider(), EPLProvider(), MLSProvider(), LaLigaProvider(), PGAProvider()]) {
         self.providers = Dictionary(providers.map { ($0.leaguePath, $0) }, uniquingKeysWith: { _, new in new })
     }
     private func provider(_ league: League, _ capability: SportsDataCapability) throws -> any NativeSportsProvider {

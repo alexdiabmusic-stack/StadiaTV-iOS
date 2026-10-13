@@ -81,8 +81,9 @@ nonisolated struct League: Identifiable, Hashable {
     nonisolated static let all: [League] = [
         League(name: "NFL", shortName: "NFL", path: "football/nfl", group: .football,
                keywords: ["nfl", "football", "sunday", "monday night", "thursday night"]),
-        League(name: "CFL", shortName: "CFL", path: "football/cfl", group: .football,
-               keywords: ["cfl", "canadian football"]),
+        // CFL is deliberately absent: it isn't matching streams yet, so leaving it
+        // selectable surfaced frozen "LIVE NOW" cards with no watchable source.
+        // See SportsCatalogRepository.activeCatalogLeagueIDs (mirrors the Liga MX precedent).
         League(name: "NBA", shortName: "NBA", path: "basketball/nba", group: .basketball,
                keywords: ["nba", "basketball"]),
         League(name: "WNBA", shortName: "WNBA", path: "basketball/wnba", group: .basketball,

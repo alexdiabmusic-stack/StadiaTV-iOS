@@ -56,6 +56,7 @@ struct HomeView: View {
     @State private var selectedScheduleDay: ScheduleDay = .today
     @State private var showingNotificationAlert = false
     @State private var notificationAlertMessage = ""
+    @State private var showingTeamEditor = false
     // Launch reveal state — each section animates in independently with stagger.
     @State private var homeRevealed = false   // drives search button + re-appearance guard
     @State private var showGreeting = false
@@ -88,6 +89,7 @@ struct HomeView: View {
                     .presentationDragIndicator(.visible)
                 #endif
             }
+            .sheet(isPresented: $showingTeamEditor) { TeamEditorView() }
         }
         .tint(Theme.accent)
         .task(id: loadPreferencesKey) {
@@ -382,64 +384,18 @@ struct HomeView: View {
 
     // MARK: - Sports Day Summary
 
-    @ViewBuilder
     private var sportsDaySummaryCard: some View {
-        let matches = viewModel.favoriteTeamMatchesToday
-
-        if !matches.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("YOUR SPORTS DAY")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Theme.textSecondary)
-
-                ForEach(matches) { match in
-                    NavigationLink(value: match) {
-                        ScheduleRow(match: match)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        } else if !prefs.favoriteTeams.isEmpty {
-            noTeamsPlayingCard
-        }
-    }
-
-    private var noTeamsPlayingCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "calendar.badge.clock")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Theme.accent)
-                Text("YOUR SPORTS DAY")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Theme.textSecondary)
-            }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text("No games today")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(Theme.textPrimary)
-                if let next = viewModel.favoriteTeamUpcoming.first {
-                    Text("Next: \(next.shortName)")
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.textSecondary)
-                    Text(next.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))
-                        .font(.caption)
-                        .foregroundStyle(Theme.textTertiary)
-                }
-            }
-
-            Button("See upcoming schedule") {
-                switchToFollowing?()
-            }
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(Theme.accent)
-            .buttonStyle(.plain)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
+        YourSportsDayCard(
+            matches: viewModel.favoriteTeamMatchesToday,
+            favorites: prefs.favoriteTeams,
+            nextUpcoming: viewModel.favoriteTeamUpcoming.first,
+            spoilerFreeMode: prefs.spoilerFreeMode,
+            hasConfirmedStream: { streamStore.confirmedCount(for: $0.id) > 0 },
+            onWatch: { quickStreamMatch = $0 },
+            onSetAlert: { match in Task { await setAlert(for: match) } },
+            onSeeAll: { switchToFollowing?() },
+            onFollowTeams: { showingTeamEditor = true }
+        )
     }
 
     // MARK: - Fantasy Context
@@ -602,6 +558,479 @@ private struct HomeFantasySummary {
     let subtitle: String
     let isLive: Bool
     let watchChannel: Channel?
+}
+
+// MARK: - Your Sports Day
+
+/// Which side of `match` (if any) belongs to one of the user's favourite teams, matched the
+/// same way `HomeViewModel.involvesFavorite` does (provider team ID, league-qualified ID,
+/// canonical ID, or display-name fallback).
+private func favoriteSide(of match: Match, favorites: [FavoriteTeam]) -> TeamSide? {
+    guard !favorites.isEmpty else { return nil }
+    let favoriteIDs = Set(favorites.flatMap { favorite in
+        [favorite.id, favorite.canonicalTeamID, favorite.teamID, "\(favorite.leaguePath)-\(favorite.teamID)"] + favorite.providerAliases.map(\.id)
+    })
+    let favoriteNames = Set(favorites.map { $0.displayName.lowercased() })
+    for side in [match.home, match.away] {
+        if let teamID = side.teamID,
+           favoriteIDs.contains(teamID) ||
+           favoriteIDs.contains("\(match.league.path)-\(teamID)") ||
+           favoriteIDs.contains("\(match.league.bannerKey)-\(teamID)") {
+            return side
+        }
+        if let canonicalID = side.canonicalIDString, favoriteIDs.contains(canonicalID) {
+            return side
+        }
+        if favoriteNames.contains(side.displayName.lowercased()) {
+            return side
+        }
+    }
+    return nil
+}
+
+/// "TONIGHT" after 6pm local, otherwise "TODAY" — every match passed in here is already known
+/// to be today's, so the only distinction worth making is evening vs. daytime.
+private func sportsDayTimePrefix(for date: Date) -> String {
+    Calendar.current.component(.hour, from: date) >= 18 ? "TONIGHT" : "TODAY"
+}
+
+/// Compact, personalised scoreboard for the teams the user follows. Deliberately kept small
+/// (roughly 160–230pt for a single matchup) so it reads as a quick-glance dashboard rather than
+/// a second hero banner — Banner TV already has `heroSection` and `liveNowSection` for that.
+private struct YourSportsDayCard: View {
+    let matches: [Match]
+    let favorites: [FavoriteTeam]
+    let nextUpcoming: Match?
+    let spoilerFreeMode: Bool
+    let hasConfirmedStream: (Match) -> Bool
+    let onWatch: (Match) -> Void
+    let onSetAlert: (Match) -> Void
+    let onSeeAll: () -> Void
+    let onFollowTeams: () -> Void
+
+    private var hasFavoriteTeams: Bool { !favorites.isEmpty }
+
+    /// Live games surface first, then soonest-starting, then anything already final.
+    private var sortedMatches: [Match] {
+        func priority(_ match: Match) -> Int {
+            switch match.state {
+            case .live: return 0
+            case .pre: return 1
+            case .final: return 2
+            }
+        }
+        return matches.sorted { lhs, rhs in
+            let lp = priority(lhs), rp = priority(rhs)
+            return lp != rp ? lp < rp : lhs.date < rhs.date
+        }
+    }
+
+    private var liveCount: Int { matches.filter { $0.state == .live }.count }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            content
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if sortedMatches.isEmpty {
+            if hasFavoriteTeams { noGamesTodayState } else { noFollowedTeamsState }
+        } else if sortedMatches.count == 1, let only = sortedMatches.first {
+            titleRow { singleGameBadge(for: only) }
+            SportsDaySingleGameCard(
+                match: only,
+                favoriteSide: favoriteSide(of: only, favorites: favorites),
+                spoilerFreeMode: spoilerFreeMode,
+                hasConfirmedStream: hasConfirmedStream(only),
+                onWatch: onWatch,
+                onSetAlert: onSetAlert
+            )
+        } else {
+            multiGameList
+        }
+    }
+
+    @ViewBuilder
+    private func titleRow<Trailing: View>(@ViewBuilder trailing: () -> Trailing) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+            Text("YOUR SPORTS DAY")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Theme.textSecondary)
+            Spacer()
+            trailing()
+        }
+    }
+
+    @ViewBuilder
+    private func singleGameBadge(for match: Match) -> some View {
+        switch match.state {
+        case .live:
+            HStack(spacing: 4) {
+                Circle().fill(Color.white).frame(width: 5, height: 5)
+                Text("1 LIVE")
+            }
+            .font(.caption2.weight(.bold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Theme.liveFill, in: Capsule())
+        case .pre:
+            Text("1 UPCOMING")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(Theme.textSecondary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Theme.surfaceElevated, in: Capsule())
+        case .final:
+            EmptyView()
+        }
+    }
+
+    private var noFollowedTeamsState: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            titleRow { EmptyView() }
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Follow your teams")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(Theme.textPrimary)
+                Text("Get a personalised scoreboard for the teams you care about.")
+                    .font(.subheadline)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            Button(action: onFollowTeams) {
+                Label("Follow Teams", systemImage: "star")
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(Theme.accent)
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var noGamesTodayState: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            titleRow { EmptyView() }
+            VStack(alignment: .leading, spacing: 3) {
+                Text("No games today")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(Theme.textPrimary)
+                if let next = nextUpcoming {
+                    Text("Next: \(next.shortName)")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.textSecondary)
+                    Text(next.date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute()))
+                        .font(.caption)
+                        .foregroundStyle(Theme.textTertiary)
+                }
+            }
+            Button("See upcoming schedule", action: onSeeAll)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Theme.accent)
+                .buttonStyle(.plain)
+        }
+    }
+
+    private var multiGameList: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            titleRow {
+                Button("See All", action: onSeeAll)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                    .buttonStyle(.plain)
+            }
+            HStack(spacing: 8) {
+                Text("\(matches.count) of your teams play today")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Theme.textPrimary)
+                if liveCount > 0 {
+                    Text("\(liveCount) LIVE")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Theme.liveFill, in: Capsule())
+                }
+            }
+            ForEach(sortedMatches.prefix(2)) { match in
+                SportsDayCompactRow(
+                    match: match,
+                    favoriteSide: favoriteSide(of: match, favorites: favorites),
+                    spoilerFreeMode: spoilerFreeMode
+                )
+            }
+            if matches.count > 2 {
+                Button(action: onSeeAll) {
+                    HStack(spacing: 4) {
+                        Text("View all \(matches.count) games")
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.accent)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+/// Full detail card for exactly one of today's favourite-team games: team crests, live/upcoming/
+/// final status and the appropriate primary action (watch, reminder, or match info). The whole
+/// status/score area is one `NavigationLink` to Game Centre; buttons below it are separate,
+/// explicit controls rather than nested taps on the same link.
+private struct SportsDaySingleGameCard: View {
+    let match: Match
+    let favoriteSide: TeamSide?
+    let spoilerFreeMode: Bool
+    let hasConfirmedStream: Bool
+    let onWatch: (Match) -> Void
+    let onSetAlert: (Match) -> Void
+
+    private var leadingSide: TeamSide { match.leadingSide }
+    private var trailingSide: TeamSide { match.trailingSide }
+    private var hideScore: Bool { spoilerFreeMode && match.state == .final }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            NavigationLink(value: match) {
+                VStack(alignment: .leading, spacing: 10) {
+                    statusRow
+                    teamsRow
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            actionRow
+        }
+    }
+
+    private var statusRow: some View {
+        HStack(spacing: 6) {
+            if favoriteSide != nil {
+                Image(systemName: "star.fill")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.starting)
+            }
+            Text("YOUR TEAM • \(match.league.shortName)")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(Theme.textSecondary)
+            Spacer()
+            statusBadge
+        }
+    }
+
+    @ViewBuilder
+    private var statusBadge: some View {
+        switch match.state {
+        case .live:
+            HStack(spacing: 5) {
+                PulsingLiveBadge()
+                Text("LIVE • \(match.statusDetail)")
+            }
+            .font(.caption.weight(.bold))
+            .foregroundStyle(Theme.live)
+        case .pre:
+            Text("\(sportsDayTimePrefix(for: match.date)) • \(match.date.formatted(date: .omitted, time: .shortened))")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Theme.accent)
+        case .final:
+            Text("FINAL")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Theme.textSecondary)
+        }
+    }
+
+    private var teamsRow: some View {
+        HStack {
+            teamColumn(leadingSide)
+            Spacer()
+            centerColumn
+            Spacer()
+            teamColumn(trailingSide)
+        }
+    }
+
+    private func teamColumn(_ side: TeamSide) -> some View {
+        VStack(spacing: 4) {
+            TeamLogo(url: side.logoURL, size: 44)
+            Text(side.abbreviation.isEmpty ? side.shortName : side.abbreviation)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+        }
+    }
+
+    @ViewBuilder
+    private var centerColumn: some View {
+        switch match.state {
+        case .live:
+            VStack(spacing: 2) {
+                Text(scoreText)
+                    .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
+                    .foregroundStyle(Theme.textPrimary)
+                Text(match.statusDetail)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        case .pre:
+            VStack(spacing: 2) {
+                Text("VS")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Theme.textSecondary)
+                Text(match.date.formatted(date: .omitted, time: .shortened))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        case .final:
+            VStack(spacing: 2) {
+                if hideScore {
+                    Text("FINAL")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Theme.textSecondary)
+                } else {
+                    Text(scoreText)
+                        .font(.system(size: 22, weight: .bold, design: .rounded).monospacedDigit())
+                        .foregroundStyle(Theme.textPrimary)
+                    if let favoriteSide {
+                        Text(favoriteSide.isWinner ? "W" : "L")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(favoriteSide.isWinner ? Theme.Palette.positive : Theme.live)
+                    }
+                }
+            }
+        }
+    }
+
+    private var scoreText: String { "\(leadingSide.score ?? "0") – \(trailingSide.score ?? "0")" }
+
+    @ViewBuilder
+    private var actionRow: some View {
+        HStack(spacing: 10) {
+            switch match.state {
+            case .live:
+                if hasConfirmedStream {
+                    Button { onWatch(match) } label: {
+                        actionLabel("Watch Live", icon: "play.fill", primary: true)
+                    }
+                    .buttonStyle(.plain)
+                }
+                NavigationLink(value: match) {
+                    actionLabel("Game Center", icon: "chart.bar.fill", primary: !hasConfirmedStream)
+                }
+                .buttonStyle(.plain)
+            case .pre:
+                Button { onSetAlert(match) } label: {
+                    actionLabel("Game Reminder", icon: "bell", primary: false)
+                }
+                .buttonStyle(.plain)
+                NavigationLink(value: match) {
+                    actionLabel("Match Info", icon: "info.circle", primary: true)
+                }
+                .buttonStyle(.plain)
+            case .final:
+                NavigationLink(value: match) {
+                    actionLabel("Game Center", icon: "chart.bar.fill", primary: true)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func actionLabel(_ title: String, icon: String, primary: Bool) -> some View {
+        Label(title, systemImage: icon)
+            .font(.caption.weight(.bold))
+            .foregroundStyle(primary ? .white : Theme.textPrimary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(primary ? Theme.accent : Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+    }
+}
+
+/// One row of the multi-game "Your Sports Day" list — condensed matchup, league, favourite-team
+/// marker and status, all as a single tap target into Game Centre.
+private struct SportsDayCompactRow: View {
+    let match: Match
+    let favoriteSide: TeamSide?
+    let spoilerFreeMode: Bool
+
+    private var hideScore: Bool { spoilerFreeMode && match.state == .final }
+
+    var body: some View {
+        NavigationLink(value: match) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 4) {
+                    Text(match.league.shortName)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(Theme.textSecondary)
+                    if favoriteSide != nil {
+                        Text("•")
+                            .foregroundStyle(Theme.textTertiary)
+                        Image(systemName: "star.fill")
+                            .font(.caption2)
+                            .foregroundStyle(Theme.starting)
+                        Text("Following")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                    Spacer()
+                    statusText
+                }
+                HStack(spacing: 6) {
+                    Text("\(match.leadingSide.abbreviation) vs \(match.trailingSide.abbreviation)")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(Theme.textPrimary)
+                        .lineLimit(1)
+                    Spacer()
+                    Text(trailingText)
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(Theme.textSecondary)
+                    Image(systemName: "chevron.right")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Theme.textSecondary.opacity(0.4))
+                }
+            }
+            .padding(12)
+            .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var statusText: some View {
+        switch match.state {
+        case .live:
+            Text("LIVE • \(match.statusDetail)")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(Theme.live)
+        case .pre:
+            Text(sportsDayTimePrefix(for: match.date))
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(Theme.accent)
+        case .final:
+            Text("FINAL")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(Theme.textSecondary)
+        }
+    }
+
+    private var trailingText: String {
+        switch match.state {
+        case .pre:
+            return match.date.formatted(date: .omitted, time: .shortened)
+        case .live:
+            return "\(match.leadingSide.score ?? "0")–\(match.trailingSide.score ?? "0")"
+        case .final:
+            return hideScore ? "" : "\(match.leadingSide.score ?? "0")–\(match.trailingSide.score ?? "0")"
+        }
+    }
 }
 
 // MARK: - Home Filter Bar

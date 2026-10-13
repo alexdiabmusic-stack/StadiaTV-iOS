@@ -12,3 +12,7 @@ YOUTUBE_API_KEY =
 BANNER_UNLOCK_ALL_FEATURES = YES
 
 #include? "Secrets.xcconfig"
+
+// CarPlay Audio requires Apple approval and a matching provisioning profile.
+CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*] = Config/CarPlay.entitlements
+CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*] = Config/CarPlay.entitlements

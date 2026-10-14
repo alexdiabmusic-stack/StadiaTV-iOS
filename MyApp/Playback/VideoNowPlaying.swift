@@ -126,11 +126,13 @@ final class VideoNowPlaying {
     private var targets: [(MPRemoteCommand, Any)] = []
     private var artworkTask: Task<Void, Never>?
     #endif
+    private let ownershipID = UUID()
     private(set) var isActive = false
 
     func activate(controller: PlaybackController) {
         #if os(iOS)
         guard !isActive else { return }
+        NowPlayingOwnership.shared.claim(ownershipID) { [weak self] in self?.deactivate() }
         isActive = true
         NotificationCenter.default.post(name: .bannerVideoTookRemoteCommands, object: nil)
         let center = MPRemoteCommandCenter.shared()
@@ -195,7 +197,9 @@ final class VideoNowPlaying {
         artworkTask?.cancel()
         for (command, target) in targets { command.removeTarget(target) }
         targets.removeAll()
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        if NowPlayingOwnership.shared.release(ownershipID) {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        }
         NotificationCenter.default.post(name: .bannerVideoReleasedRemoteCommands, object: nil)
         #endif
     }

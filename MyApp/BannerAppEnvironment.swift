@@ -14,6 +14,7 @@ final class BannerAppEnvironment: ObservableObject {
     static let shared = BannerAppEnvironment()
 
     let preferences = PreferencesStore()
+    let channelPreferences = ChannelPreferencesStore()
     let playlistStore = PlaylistStore()
     let podcastStore = PodcastStore()
     let epgRepository = EPGRepository()
@@ -43,7 +44,15 @@ final class BannerAppEnvironment: ObservableObject {
     /// and on a specific tab. `RootView` observes this and clears it after switching.
     @Published var requestedTab: AppTab?
 
-    private init() {}
+    private init() {
+        playbackController.onPlaybackRequested = { [weak self] in
+            self?.podcastStore.pause()
+        }
+        podcastStore.onPlaybackRequested = { [weak self] in
+            self?.playbackController.stop()
+            CarPlayPlaybackCoordinator.shared.relinquishPlayback()
+        }
+    }
 
     func noteActiveLivePlayback(_ context: MatchPlaybackContext?) {
         activeLivePlaybackContext = context

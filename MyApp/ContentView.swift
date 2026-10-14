@@ -2,6 +2,9 @@ import SwiftUI
 
 @main
 struct MyApp: App {
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(BannerApplicationDelegate.self) private var applicationDelegate
+    #endif
     // Sourced from BannerAppEnvironment.shared so CarPlay (a separate scene with no
     // SwiftUI environment of its own) reads/drives the same instances instead of
     // duplicating stores or polling loops. See BannerAppEnvironment.swift.
@@ -26,7 +29,7 @@ struct MyApp: App {
 
     init() {
         // WatchStore forwards favourites to the channel preferences store, so build them together.
-        let channelPrefs = ChannelPreferencesStore()
+        let channelPrefs = BannerAppEnvironment.shared.channelPreferences
         _channelPrefsStore = StateObject(wrappedValue: channelPrefs)
         _watchStore = StateObject(wrappedValue: WatchStore(channelPreferences: channelPrefs))
         PlaybackPriority.launchDate = Date()

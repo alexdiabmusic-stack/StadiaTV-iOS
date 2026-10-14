@@ -379,6 +379,7 @@ final class PreferencesStore: ObservableObject {
     }
 
     private func persist() {
+        defer { NotificationCenter.default.post(name: .bannerPreferencesChanged, object: nil) }
         if let data = try? JSONEncoder().encode(prefs) {
             UserDefaults.standard.set(data, forKey: defaultsKey)
         }
@@ -391,6 +392,7 @@ final class PreferencesStore: ObservableObject {
               let cloud: UserPreferences = CloudSyncService.shared.load(UserPreferences.self, for: .preferences),
               cloud != prefs else { return }
         prefs = cloud
+        NotificationCenter.default.post(name: .bannerPreferencesChanged, object: nil)
         StreamRankingSettings.preferUHD = prefs.preferUHDStreams
         if let data = try? JSONEncoder().encode(prefs) {
             UserDefaults.standard.set(data, forKey: defaultsKey)

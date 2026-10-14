@@ -38,12 +38,13 @@ struct PlayTeamGameIntent: AppIntent {
             throw BannerIntentError.noGameFound(team.name)
         }
         let snapshot = await SportsRepository.shared.liveMatchSnapshot(leagues: [league], startingSoonWindow: 24 * 3600, nextLimit: 10)
-        let candidates = (snapshot.live + snapshot.startingSoon).filter { env.preferences.isFavoriteMatch($0) }
-        guard let match = candidates.first(where: { $0.state == .live }) ?? candidates.first else {
-            throw BannerIntentError.noGameFound(team.name)
-        }
-        CarPlayPlaybackCoordinator.shared.listenLive(to: match)
-        guard let context = CarPlayPlaybackCoordinator.shared.currentContext, context.match.id == match.id else {
+        guard let favorite = env.preferences.favoriteTeams.first(where: { $0.canonicalTeamID == team.id }),
+              let match = snapshot.live.first(where: { match in
+                  [match.home, match.away].contains {
+                      $0.canonicalIDString == favorite.canonicalTeamID || $0.teamID == favorite.teamID
+                  }
+              }) else { throw BannerIntentError.noGameFound(team.name) }
+        guard await CarPlayPlaybackCoordinator.shared.playVerifiedGame(match) else {
             throw BannerIntentError.noConfirmedBroadcast
         }
         return .result(dialog: "Playing \(CarPlayPlaybackCoordinator.shared.matchTitle(match)) on Banner.")
@@ -105,8 +106,10 @@ struct PlayLatestPodcastIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let store = BannerAppEnvironment.shared.podcastStore
-        let subscribed = store.catalog.filter { store.subscribedIDs.contains($0.feedURL.absoluteString) }.map { $0.toPodcast() }
-        let latest = subscribed.compactMap { store.episodes(for: $0).first }.max { $0.publishedAt < $1.publishedAt }
+        await store.ensureCatalogLoaded()
+        let subscribed = store.followedPodcasts
+        for podcast in subscribed.prefix(12) { await store.loadEpisodes(for: podcast.feedURL) }
+        let latest = subscribed.flatMap { store.episodes(for: $0) }.max { $0.publishedAt < $1.publishedAt }
         guard let latest else { throw BannerIntentError.noEpisodeAvailable }
         store.play(latest)
         return .result(dialog: "Playing \(latest.title) from \(latest.podcastTitle).")
@@ -127,10 +130,14 @@ struct PlayPodcastIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let store = BannerAppEnvironment.shared.podcastStore
-        guard let feed = store.catalog.first(where: { $0.feedURL.absoluteString == podcast.id }) else {
+        await store.ensureCatalogLoaded()
+        guard let show = store.followedPodcasts.first(where: { $0.id == podcast.id }) else {
             throw BannerIntentError.noEpisodeAvailable
         }
-        guard let episode = store.episodes(for: feed.toPodcast()).first else { throw BannerIntentError.noEpisodeAvailable }
+        await store.loadEpisodes(for: show.feedURL)
+        guard let episode = store.episodes(for: show).max(by: { $0.publishedAt < $1.publishedAt }) else {
+            throw BannerIntentError.noEpisodeAvailable
+        }
         store.play(episode)
         return .result(dialog: "Playing \(episode.title).")
     }

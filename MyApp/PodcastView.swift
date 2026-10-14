@@ -50,6 +50,7 @@ struct PodcastBrowserView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @Environment(\.dismiss) private var dismiss
 
+    @State private var showsListeningLibrary = false
     @State private var browseMode: PodcastBrowseMode = .forYou
     @State private var selectedTopic: PodcastTopic?
     @State private var searchText = ""
@@ -268,6 +269,9 @@ struct PodcastBrowserView: View {
             }
         }
         .task { await store.ensureCatalogLoaded() }
+        .sheet(isPresented: $showsListeningLibrary) {
+            PodcastListeningView().environmentObject(store)
+        }
     }
 
     // MARK: - Custom Navigation Bar
@@ -292,6 +296,9 @@ struct PodcastBrowserView: View {
             Spacer()
 
             Menu {
+                Button { showsListeningLibrary = true } label: {
+                    Label("Listening, Queue & Downloads", systemImage: "list.bullet")
+                }
                 Button {
                     Task {
                         if case .team(let team) = activeTopic {
@@ -1444,6 +1451,22 @@ struct PodcastEpisodeRow: View {
                 .accessibilityLabel(isPlaying ? "Pause \(episode.title)" : "Play \(episode.title)")
 
                 Menu {
+                    Button { store.enqueue(episode) } label: {
+                        Label("Add to Queue", systemImage: "text.badge.plus")
+                    }
+                    if store.downloads.localURL(for: episode) != nil {
+                        Button("Remove Download", role: .destructive) { store.downloads.remove(episode) }
+                            .disabled(isPlaying)
+                    } else if store.downloads.downloadingIDs.contains(episode.id) {
+                        Text("Downloading…")
+                    } else if !episode.isVideo {
+                        Button {
+                            Task { await store.downloads.download(episode) }
+                        } label: {
+                            Label("Download Episode", systemImage: "arrow.down.circle")
+                        }
+                    }
+                    if let error = store.downloads.errors[episode.id] { Text(error) }
                     if isPlayed {
                         Button {
                             store.markUnplayed(episode)

@@ -81,7 +81,7 @@ struct BannerPodcastEntity: AppEntity {
 struct BannerPodcastEntityQuery: EntityQuery, EntityStringQuery {
     @MainActor private var subscribed: [Podcast] {
         let store = BannerAppEnvironment.shared.podcastStore
-        return store.catalog.filter { store.subscribedIDs.contains($0.feedURL.absoluteString) }.map { $0.toPodcast() }
+        return store.followedPodcasts
     }
 
     @MainActor func entities(for identifiers: [String]) async throws -> [BannerPodcastEntity] {

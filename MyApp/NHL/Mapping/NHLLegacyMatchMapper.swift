@@ -11,9 +11,9 @@ nonisolated extension NHLGameMapper {
         var result = Match(id: String(game.id), league: league, date: game.start,
                            name: "\(game.away.name) at \(game.home.name)",
                            shortName: "\(game.away.abbreviation) @ \(game.home.abbreviation)",
-                           state: game.status.legacyGameState, statusDetail: game.statusLabel + (game.status == .live ? " " + (game.clock ?? "") : ""),
+                           state: game.status.legacyGameState, statusDetail: game.statusLabel + (game.status == .live && !game.intermission ? " " + (game.clock ?? "") : ""),
                            home: side(game.home), away: side(game.away), broadcasts: game.broadcasts, venue: game.venue,
-                           liveContext: MatchLiveContext(clock: MatchClock(displayValue: game.clock, remainingSeconds: game.secondsRemaining, isRunning: game.clockRunning),
+                           liveContext: MatchLiveContext(clock: MatchClock(displayValue: game.intermission ? nil : game.clock, remainingSeconds: game.intermission ? nil : game.secondsRemaining, isRunning: game.clockRunning && !game.intermission),
                                                          period: MatchPeriod(number: game.period.number, displayName: game.period.label)))
         result.canonicalID = "game:\(league.bannerKey):nhl:\(game.id)"
         return result

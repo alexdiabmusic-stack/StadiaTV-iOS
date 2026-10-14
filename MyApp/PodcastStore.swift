@@ -4,6 +4,9 @@ import SwiftUI
 import Combine
 import MediaPlayer
 import OSLog
+#if canImport(CarPlay)
+import CarPlay
+#endif
 #if canImport(UIKit)
 import UIKit
 #elseif os(macOS)
@@ -13,7 +16,7 @@ import AppKit
 // MARK: - Playback speed
 
 enum PodcastSpeed: Float, CaseIterable, Identifiable {
-    case x075 = 0.75, x1 = 1.0, x125 = 1.25, x15 = 1.5, x2 = 2.0
+    case x075 = 0.75, x1 = 1.0, x125 = 1.25, x15 = 1.5, x175 = 1.75, x2 = 2.0
     var id: Float { rawValue }
     var label: String {
         switch self {
@@ -21,6 +24,7 @@ enum PodcastSpeed: Float, CaseIterable, Identifiable {
         case .x1:   return "1×"
         case .x125: return "1.25×"
         case .x15:  return "1.5×"
+        case .x175: return "1.75×"
         case .x2:   return "2×"
         }
     }
@@ -48,6 +52,14 @@ final class PodcastStore: ObservableObject {
     @Published private(set) var nowPlaying: PodcastEpisode?
     @Published private(set) var isPlaying = false
     let clock = PodcastPlaybackClock()
+    let listeningLibrary = PodcastListeningLibrary()
+    let downloads = PodcastDownloads()
+    @Published private(set) var playbackError: String?
+    private var interruptionTask: Task<Void, Never>?
+    private var routeTask: Task<Void, Never>?
+    private var resumeAfterInterruption = false
+    private var playbackGeneration = UUID()
+    private var lastProgressSave: TimeInterval = 0
     /// Whole minutes of the current episode played. "12m left" labels change about once a minute,
     /// so this is what the store publishes; the clock carries every tick.
     @Published private(set) var playbackMinute = 0
@@ -81,6 +93,8 @@ final class PodcastStore: ObservableObject {
 
     @Published private(set) var episodesByFeed: [String: [PodcastEpisode]] = [:]
     @Published private(set) var loadingFeedIDs: Set<String> = []
+    @Published private(set) var feedErrors: [String: String] = [:]
+    private var feedTasks: [String: Task<Void, Never>] = [:]
     @Published private(set) var podcastMetaCache: [String: Podcast] = [:] {  // feedURL -> Podcast
         didSet { metaCacheNeedsWrite = true }
     }
@@ -117,7 +131,6 @@ final class PodcastStore: ObservableObject {
         loadPersistedState()
         // The bundled catalogs (~340 KB of JSON) are decoded lazily off the main thread;
         // see ensureCatalogLoaded().
-        setupRemoteCommands()
         prefetchTopArtwork()
         setupAppLifecycleObservers()
     }
@@ -274,9 +287,25 @@ final class PodcastStore: ObservableObject {
 
     func loadEpisodes(for feedURL: URL) async {
         let key = feedURL.absoluteString
+        if let task = feedTasks[key] { await task.value; return }
+        let sharedTask = Task { [weak self] in
+            guard let self else { return }
+            await self.fetchEpisodes(for: feedURL)
+        }
+        feedTasks[key] = sharedTask
+        await sharedTask.value
+        feedTasks[key] = nil
+    }
+
+    private func fetchEpisodes(for feedURL: URL) async {
+        let key = feedURL.absoluteString
         guard !loadingFeedIDs.contains(key) else { return }
         loadingFeedIDs.insert(key)
-        defer { loadingFeedIDs.remove(key) }
+        feedErrors[key] = nil
+        defer {
+            loadingFeedIDs.remove(key)
+            notifyLibraryChanged()
+        }
 
         // Try PodcastIndex first
         do {
@@ -309,7 +338,8 @@ final class PodcastStore: ObservableObject {
         } catch {}
 
         // Fallback: direct RSS fetch + parse
-        if let (data, _) = try? await URLSession.shared.data(from: feedURL) {
+        if let (data, response) = try? await URLSession.shared.data(from: feedURL),
+           let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) {
             let parser = RSSFeedParser(feedURL: feedURL)
             let parsed = parser.parse(data: data)
             episodesByFeed[key] = parsed.episodes
@@ -331,6 +361,8 @@ final class PodcastStore: ObservableObject {
                     )
                 }
             }
+        } else {
+            feedErrors[key] = String(localized: "Unable to load episodes. Try again.")
         }
     }
 
@@ -433,19 +465,39 @@ final class PodcastStore: ObservableObject {
 
     // MARK: - Playback
 
+    /// The application composition root coordinates exclusive ownership with live playback.
+    var onPlaybackRequested: (() -> Void)?
+
+    func pause() {
+        resumeAfterInterruption = false
+        guard isPlaying else { return }
+        player?.pause()
+        isPlaying = false
+        saveProgress()
+        updateNowPlayingPlayback()
+    }
+
     func play(_ episode: PodcastEpisode) {
+        saveProgress()
+        playbackGeneration = UUID()
+        resumeAfterInterruption = false
+        playbackError = nil
+        onPlaybackRequested?()
+        setupRemoteCommands()
         configureAudioSession()
         teardownPlayer()
 
-        let item = AVPlayerItem(url: episode.audioURL)
+        let item = AVPlayerItem(url: downloads.localURL(for: episode) ?? episode.audioURL)
         player = AVPlayer(playerItem: item)
         player?.volume = 1.0
         player?.isMuted = false
         player?.automaticallyWaitsToMinimizeStalling = true
         player?.rate = speed.rawValue
         nowPlaying = episode
+        listeningLibrary.select(episode)
         totalDuration = episode.duration > 0 ? episode.duration : 0
-        currentTime = episodeProgress[episode.id] ?? 0
+        currentTime = isPlayed(episode) ? 0 : (episodeProgress[episode.id] ?? 0)
+        lastProgressSave = currentTime
         isPlaying = true
         videoPlayer = episode.isVideo ? player : nil
 
@@ -457,25 +509,36 @@ final class PodcastStore: ObservableObject {
 
         setupObservers()
         configureNowPlaying(for: episode)
+        updateQueueCommands()
+        notifyLibraryChanged()
     }
 
     func togglePlayPause() {
-        guard player != nil else { return }
+        guard player != nil else {
+            if let episode = continueListeningEpisode { play(episode) }
+            return
+        }
         if isPlaying {
             player?.pause()
             isPlaying = false
             saveProgress()
         } else {
+            onPlaybackRequested?()
+            setupRemoteCommands()
+            configureAudioSession()
             player?.play()
             player?.rate = speed.rawValue
             isPlaying = true
         }
+        if let episode = nowPlaying { configureNowPlaying(for: episode) }
         updateNowPlayingPlayback()
     }
 
     func seek(to seconds: TimeInterval) {
-        player?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
-        currentTime = seconds
+        guard seconds.isFinite else { return }
+        let position = max(0, totalDuration > 0 ? min(seconds, totalDuration) : seconds)
+        player?.seek(to: CMTime(seconds: position, preferredTimescale: 600))
+        currentTime = position
         updateNowPlayingPlayback()
     }
 
@@ -486,6 +549,7 @@ final class PodcastStore: ObservableObject {
 
     func setSpeed(_ newSpeed: PodcastSpeed) {
         speed = newSpeed
+        UserDefaults.standard.set(newSpeed.rawValue, forKey: "bannertv.podcasts.speed.v1")
         if isPlaying { player?.rate = newSpeed.rawValue }
         updateNowPlayingPlayback()
     }
@@ -523,7 +587,58 @@ final class PodcastStore: ObservableObject {
 
     func progressFraction(for episode: PodcastEpisode) -> Double {
         guard episode.duration > 0 else { return 0 }
-        return min(1, (episodeProgress[episode.id] ?? 0) / episode.duration)
+        let position = nowPlaying?.id == episode.id ? currentTime : (episodeProgress[episode.id] ?? 0)
+        return max(0, min(1, position / episode.duration))
+    }
+
+    var followedPodcasts: [Podcast] {
+        var shows = podcastMetaCache
+        for feed in catalog where shows[feed.feedURL.absoluteString] == nil {
+            shows[feed.feedURL.absoluteString] = feed.toPodcast()
+        }
+        return subscribedIDs.compactMap { shows[$0] }.sorted {
+            $0.title.localizedStandardCompare($1.title) == .orderedAscending
+        }
+    }
+
+    var continueListeningEpisode: PodcastEpisode? {
+        if let nowPlaying, !isPlayed(nowPlaying) { return nowPlaying }
+        return listeningLibrary.history.first {
+            !isPlayed($0) && (episodeProgress[$0.id] ?? 0) > 0
+        }
+    }
+
+    func playQueue(_ episodes: [PodcastEpisode]) {
+        guard let first = episodes.first else { return }
+        listeningLibrary.replaceQueue(with: episodes)
+        play(first)
+    }
+
+    func enqueue(_ episode: PodcastEpisode) {
+        listeningLibrary.enqueue(episode)
+        updateQueueCommands()
+    }
+
+    func playNext() {
+        guard let next = listeningLibrary.nextEpisode else { return }
+        play(next)
+    }
+
+    func playPrevious() {
+        if currentTime > 3 { seek(to: 0); return }
+        guard let previous = listeningLibrary.previousEpisode else { return }
+        play(previous)
+    }
+
+    private func notifyLibraryChanged() {
+        NotificationCenter.default.post(name: .bannerAudioLibraryChanged, object: nil)
+    }
+
+    private func updateQueueCommands() {
+        guard NowPlayingOwnership.shared.owns(ownershipID) else { return }
+        let center = MPRemoteCommandCenter.shared()
+        center.nextTrackCommand.isEnabled = listeningLibrary.nextEpisode != nil
+        center.previousTrackCommand.isEnabled = nowPlaying != nil
     }
 
     // MARK: - Audio session
@@ -547,17 +662,26 @@ final class PodcastStore: ObservableObject {
 
         resetTimeObserver(interval: isAppInBackground ? 30.0 : 0.5)
 
-        statusObserver = player.currentItem?.observe(\.status) { [weak self] item, _ in
+        let generation = playbackGeneration
+        statusObserver = player.currentItem?.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
             Task { @MainActor [weak self] in
-                self?.isBuffering = item.status == .unknown
-                if item.status == .failed { self?.isPlaying = false }
+                guard let self, self.playbackGeneration == generation else { return }
+                self.isBuffering = item.status == .unknown
+                if item.status == .failed {
+                    self.isPlaying = false
+                    self.playbackError = String(localized: "This episode is unavailable. Try another episode.")
+                }
+                self.notifyLibraryChanged()
             }
         }
 
         rateObserver = player.observe(\.rate) { [weak self] p, _ in
             Task { @MainActor [weak self] in
-                self?.isPlaying = p.rate > 0
-                if p.rate == 0 { self?.saveProgress() }
+                guard let self, self.playbackGeneration == generation else { return }
+                self.isPlaying = p.rate > 0
+                if p.rate == 0 { self.saveProgress() }
+                self.updateNowPlayingPlayback()
+                self.notifyLibraryChanged()
             }
         }
 
@@ -570,9 +694,12 @@ final class PodcastStore: ObservableObject {
             object: player.currentItem, queue: .main
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                if let ep = self?.nowPlaying { self?.markPlayed(ep) }
-                self?.isPlaying = false
-                self?.updateNowPlayingPlayback()
+                guard let self, self.playbackGeneration == generation else { return }
+                if let episode = self.nowPlaying { self.markPlayed(episode) }
+                self.isPlaying = false
+                self.updateNowPlayingPlayback()
+                if self.listeningLibrary.automaticallyAdvance { self.playNext() }
+                self.notifyLibraryChanged()
             }
         }
     }
@@ -584,6 +711,7 @@ final class PodcastStore: ObservableObject {
             timeObserverToken = nil
         }
 
+        let generation = playbackGeneration
         timeObserverToken = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: interval, preferredTimescale: 600),
             queue: .main
@@ -592,7 +720,11 @@ final class PodcastStore: ObservableObject {
             let t = time.seconds
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                guard t.isFinite && t >= 0 else { return }
+                guard self.playbackGeneration == generation, t.isFinite && t >= 0 else { return }
+                if abs(t - self.lastProgressSave) >= 15 {
+                    self.lastProgressSave = t
+                    self.saveProgress()
+                }
 
                 if self.isAppInBackground {
                     // When backgrounded: avoid invalidating SwiftUI state every 500ms since no UI is rendered.
@@ -641,34 +773,41 @@ final class PodcastStore: ObservableObject {
         }
         #endif
 
-        // The live TV player owns the lock-screen controls while it's on screen.
-        NotificationCenter.default.addObserver(
-            forName: .bannerVideoTookRemoteCommands,
-            object: nil, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.releaseRemoteCommands() }
-        }
-        NotificationCenter.default.addObserver(
-            forName: .bannerVideoReleasedRemoteCommands,
-            object: nil, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.setupRemoteCommands()
-                if let episode = self.nowPlaying { self.configureNowPlaying(for: episode) }
+        #if os(iOS) || os(tvOS)
+        interruptionTask = Task { [weak self] in
+            let changes = NotificationCenter.default.notifications(named: AVAudioSession.interruptionNotification)
+                .compactMap { notification -> [UInt]? in
+                    guard let type = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt else { return nil }
+                    return [type, notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0]
+                }
+            for await change in changes {
+                guard !Task.isCancelled, let self else { return }
+                if change[0] == AVAudioSession.InterruptionType.began.rawValue {
+                    let shouldResume = self.isPlaying
+                    self.pause()
+                    self.resumeAfterInterruption = shouldResume
+                } else {
+                    let shouldResume = self.resumeAfterInterruption
+                    self.resumeAfterInterruption = false
+                    if shouldResume, !self.isPlaying,
+                       NowPlayingOwnership.shared.owns(self.ownershipID),
+                       AVAudioSession.InterruptionOptions(rawValue: change[1]).contains(.shouldResume) {
+                        self.togglePlayPause()
+                    }
+                }
             }
         }
+        routeTask = Task { [weak self] in
+            let changes = NotificationCenter.default.notifications(named: AVAudioSession.routeChangeNotification)
+                .compactMap { $0.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt }
+            for await reason in changes {
+                guard !Task.isCancelled else { return }
+                if reason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue { self?.pause() }
+            }
+        }
+        #endif
 
-        // A live TV stream is starting; don't keep the episode playing over it.
-        NotificationCenter.default.addObserver(
-            forName: .bannerVideoPlaybackWillStart,
-            object: nil, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self, self.isPlaying else { return }
-                self.togglePlayPause()
-            }
-        }
+        // Media control handoff is synchronous through NowPlayingOwnership.
     }
 
     private func handleDidEnterBackground() {
@@ -715,26 +854,34 @@ final class PodcastStore: ObservableObject {
     }
 
     private func saveProgress() {
+        if let position = player?.currentTime().seconds, position.isFinite, position >= 0 {
+            currentTime = position
+        }
         guard let episode = nowPlaying, currentTime > 0 else { return }
         episodeProgress[episode.id] = currentTime
+        let duration = totalDuration > 0 ? totalDuration : episode.duration
+        if duration > 0, currentTime / duration >= 0.95 {
+            playedEpisodeIDs.insert(episode.id)
+        }
         persistState()
     }
 
     // MARK: - Now Playing info (lock screen / Control Center / Dynamic Island)
 
     private func configureNowPlaying(for episode: PodcastEpisode) {
+        guard NowPlayingOwnership.shared.owns(ownershipID) else { return }
         let info: [String: Any] = [
             MPMediaItemPropertyTitle: episode.title,
             MPMediaItemPropertyArtist: episode.podcastTitle,
             MPMediaItemPropertyAlbumTitle: episode.podcastTitle,
             MPMediaItemPropertyPlaybackDuration: episode.duration > 0 ? episode.duration : 0,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: currentTime,
-            MPNowPlayingInfoPropertyPlaybackRate: Double(speed.rawValue),
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? Double(speed.rawValue) : 0.0,
             MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
             MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue
         ]
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-        MPNowPlayingInfoCenter.default().playbackState = .playing
+        MPNowPlayingInfoCenter.default().playbackState = isPlaying ? .playing : .paused
 
         // Fetch artwork asynchronously and update once loaded
         if let artworkURL = episode.podcastArtworkURL {
@@ -746,7 +893,9 @@ final class PodcastStore: ObservableObject {
                 guard let image = NSImage(data: data) else { return }
                 #endif
                 let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
-                guard var current = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
+                guard self.nowPlaying?.id == episode.id,
+                      NowPlayingOwnership.shared.owns(self.ownershipID),
+                      var current = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
                 current[MPMediaItemPropertyArtwork] = artwork
                 MPNowPlayingInfoCenter.default().nowPlayingInfo = current
             }
@@ -754,7 +903,8 @@ final class PodcastStore: ObservableObject {
     }
 
     private func updateNowPlayingPlayback() {
-        guard var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
+        guard !remoteCommandTargets.isEmpty,
+              var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
         info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? Double(speed.rawValue) : 0.0
         if totalDuration > 0 { info[MPMediaItemPropertyPlaybackDuration] = totalDuration }
@@ -763,7 +913,8 @@ final class PodcastStore: ObservableObject {
     }
 
     private func tickNowPlayingTime(_ time: TimeInterval) {
-        guard var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
+        guard !remoteCommandTargets.isEmpty,
+              var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else { return }
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = time
         if totalDuration > 0 { info[MPMediaItemPropertyPlaybackDuration] = totalDuration }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
@@ -773,27 +924,60 @@ final class PodcastStore: ObservableObject {
 
     /// Target tokens, kept so the live TV player can take over the remote commands
     /// (lock screen, Control Center, AirPods) while it's on screen.
+    private let ownershipID = UUID()
     private var remoteCommandTargets: [(MPRemoteCommand, Any)] = []
 
     private func setupRemoteCommands() {
         guard remoteCommandTargets.isEmpty else { return }
+        NowPlayingOwnership.shared.claim(ownershipID) { [weak self] in
+            self?.releaseRemoteCommands()
+            self?.pause()
+        }
+        #if canImport(CarPlay)
+        if #available(iOS 26.0, *) { CPNowPlayingTemplate.shared.nowPlayingMode = nil }
+        #endif
         let center = MPRemoteCommandCenter.shared()
+        center.stopCommand.isEnabled = false
+        center.nextTrackCommand.isEnabled = false
+        center.previousTrackCommand.isEnabled = false
 
         center.playCommand.isEnabled = true
         remoteCommandTargets.append((center.playCommand, center.playCommand.addTarget { [weak self] _ in
-            Task { @MainActor [weak self] in self?.togglePlayPause() }
+            Task { @MainActor [weak self] in
+                guard let self, !self.isPlaying else { return }
+                self.togglePlayPause()
+            }
             return .success
         }))
 
         center.pauseCommand.isEnabled = true
         remoteCommandTargets.append((center.pauseCommand, center.pauseCommand.addTarget { [weak self] _ in
-            Task { @MainActor [weak self] in self?.togglePlayPause() }
+            Task { @MainActor [weak self] in self?.pause() }
             return .success
         }))
 
         center.togglePlayPauseCommand.isEnabled = true
         remoteCommandTargets.append((center.togglePlayPauseCommand, center.togglePlayPauseCommand.addTarget { [weak self] _ in
             Task { @MainActor [weak self] in self?.togglePlayPause() }
+            return .success
+        }))
+
+        center.nextTrackCommand.isEnabled = listeningLibrary.nextEpisode != nil
+        remoteCommandTargets.append((center.nextTrackCommand, center.nextTrackCommand.addTarget { [weak self] _ in
+            Task { @MainActor in self?.playNext() }
+            return .success
+        }))
+        center.previousTrackCommand.isEnabled = true
+        remoteCommandTargets.append((center.previousTrackCommand, center.previousTrackCommand.addTarget { [weak self] _ in
+            Task { @MainActor in self?.playPrevious() }
+            return .success
+        }))
+        center.changePlaybackRateCommand.isEnabled = true
+        center.changePlaybackRateCommand.supportedPlaybackRates = PodcastSpeed.allCases.map { NSNumber(value: $0.rawValue) }
+        remoteCommandTargets.append((center.changePlaybackRateCommand, center.changePlaybackRateCommand.addTarget { [weak self] event in
+            guard let event = event as? MPChangePlaybackRateCommandEvent,
+                  let speed = PodcastSpeed(rawValue: event.playbackRate) else { return .commandFailed }
+            Task { @MainActor in self?.setSpeed(speed) }
             return .success
         }))
 
@@ -822,6 +1006,7 @@ final class PodcastStore: ObservableObject {
     }
 
     private func releaseRemoteCommands() {
+        NowPlayingOwnership.shared.release(ownershipID)
         for (command, target) in remoteCommandTargets {
             command.removeTarget(target)
         }
@@ -835,6 +1020,7 @@ final class PodcastStore: ObservableObject {
         defaults.set(Array(subscribedIDs), forKey: subscribedKey)
         if let data = try? JSONEncoder().encode(episodeProgress) { defaults.set(data, forKey: progressKey) }
         defaults.set(Array(playedEpisodeIDs), forKey: playedKey)
+        notifyLibraryChanged()
         if metaCacheNeedsWrite,
            let data = try? JSONEncoder().encode(Dictionary(uniqueKeysWithValues: podcastMetaCache.map { ($0.key, $0.value) })) {
             defaults.set(data, forKey: "bannertv.podcasts.meta.v1")
@@ -844,6 +1030,8 @@ final class PodcastStore: ObservableObject {
 
     private func loadPersistedState() {
         let defaults = UserDefaults.standard
+        let savedSpeed = defaults.float(forKey: "bannertv.podcasts.speed.v1")
+        speed = PodcastSpeed(rawValue: savedSpeed) ?? .x1
         subscribedIDs = Set(defaults.stringArray(forKey: subscribedKey) ?? [])
         playedEpisodeIDs = Set(defaults.stringArray(forKey: playedKey) ?? [])
         if let data = defaults.data(forKey: progressKey),

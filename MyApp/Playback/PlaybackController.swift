@@ -77,6 +77,15 @@ final class PlaybackController: ObservableObject {
     /// Called when the current stream can't be played (after fallback URLs and reconnects
     /// are exhausted). The owner decides whether to fail over or show an error.
     var onFailure: ((String) -> Void)?
+    private var failureObservers: [UUID: (String) -> Void] = [:]
+
+    func observeFailures(owner: UUID, handler: @escaping (String) -> Void) {
+        failureObservers[owner] = handler
+    }
+
+    func removeFailureObserver(owner: UUID) {
+        failureObservers.removeValue(forKey: owner)
+    }
     /// Called once per channel when the first frame renders, with time-to-first-frame in ms.
     var onFirstFrame: ((Channel, Int?) -> Void)?
     /// Called when a new item becomes ready, e.g. to read its audio/subtitle groups.
@@ -174,7 +183,10 @@ final class PlaybackController: ObservableObject {
     ///   `.spokenAudio` session instead of claiming the video/movie-playback session, since
     ///   no video surface will be attached. Defaults to false (today's phone `PlayerView`
     ///   behavior, unchanged).
+    var onPlaybackRequested: (() -> Void)?
+
     func load(_ channel: Channel, audioOnly: Bool = false) {
+        onPlaybackRequested?()
         state = .preparing
         isWaitingToReconnect = false
         isAudioOnlySession = audioOnly
@@ -214,6 +226,7 @@ final class PlaybackController: ObservableObject {
     }
 
     func play() {
+        onPlaybackRequested?()
         isUserPaused = false
         if let pausedAt, Date().timeIntervalSince(pausedAt) > Self.staleBufferInterval {
             seekToLiveEdge()
@@ -388,6 +401,7 @@ final class PlaybackController: ObservableObject {
             StreamHealthStore.shared.recordFailure(streamID: channel.id)
         }
         onFailure?(reason)
+        for handler in Array(failureObservers.values) { handler(reason) }
     }
 
     private func markFirstFrame() {

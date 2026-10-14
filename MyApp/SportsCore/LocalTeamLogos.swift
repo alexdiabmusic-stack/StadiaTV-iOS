@@ -1,5 +1,9 @@
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 nonisolated enum TeamLogoAssetResolver {
     static func assetURL(leaguePath: String, abbreviation: String?, displayName: String? = nil, providerTeamID: String? = nil) -> URL? {
@@ -80,11 +84,21 @@ nonisolated enum TeamLogoAssetResolver {
 
         for leagueName in candidateLeagueNames {
             let asset = "MSILogo_\(assetSuffix("\(leagueName)_\(displayName)").lowercased())"
-            if UIImage(named: asset) != nil {
+            if assetExists(named: asset) {
                 return URL.bannerImageAsset(named: asset)
             }
         }
         return nil
+    }
+
+    private static func assetExists(named name: String) -> Bool {
+        #if canImport(UIKit)
+        return UIImage(named: name) != nil
+        #elseif canImport(AppKit)
+        return NSImage(named: name) != nil
+        #else
+        return false
+        #endif
     }
 
     static func normalizedAbbreviation(_ value: String?) -> String? {

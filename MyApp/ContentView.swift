@@ -278,6 +278,10 @@ struct RootView: View {
                 }
             }
             .tabViewStyle(.sidebarAdaptable)
+            #if os(iOS)
+            .toolbarBackground(Theme.background, for: .tabBar)
+            .toolbarBackground(.visible, for: .tabBar)
+            #endif
             #endif
         }
         .tint(Theme.accent)
@@ -287,7 +291,7 @@ struct RootView: View {
         .environmentObject(guideStore)
         .environmentObject(streamStore)
         .environmentObject(eventChannelRefresh)
-        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: podcastStore.nowPlaying != nil)
+        .animation(Theme.Motion.smooth, value: podcastStore.nowPlaying != nil)
         .task { updateFavoriteNotificationPrompt() }
         .appOrchestration(
             liveViewModel: liveViewModel,

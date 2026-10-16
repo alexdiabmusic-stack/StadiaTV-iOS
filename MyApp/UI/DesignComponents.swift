@@ -34,10 +34,10 @@ struct Chip: View {
                 Text(title).lineLimit(1)
             }
             .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .semibold) : Theme.Typography.caption)
-            .foregroundStyle(isSelected ? Color.white : Theme.textPrimary)
+            .foregroundStyle(isSelected ? Theme.accessibleAccent : Theme.textSecondary)
             .padding(.horizontal, Theme.isMac ? Theme.Mac.Spacing.s20 - 4 : Theme.Spacing.sm)
-            .frame(minHeight: Theme.isMac ? Theme.Mac.ControlHeight.sm : 32)
-            .background(isSelected ? Theme.actionFill : Theme.surfaceElevated,
+            .frame(minHeight: Theme.isMac ? Theme.Mac.ControlHeight.sm : 44)
+            .background(isSelected ? Theme.accent.opacity(0.22) : Theme.surface,
                         in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
             .contentShape(Rectangle())
         }
@@ -55,6 +55,7 @@ struct LiveBadge: View {
         HStack(spacing: Theme.Spacing.xxs) {
             PulsingLiveDot()
             Text(title)
+                .fixedSize(horizontal: true, vertical: false)
         }
         .font(Theme.Typography.overline)
         .foregroundStyle(.white)
@@ -67,18 +68,12 @@ struct LiveBadge: View {
 }
 
 private struct PulsingLiveDot: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulsing = false
-
     var body: some View {
         Circle()
             .fill(.white)
             .frame(width: 6, height: 6)
-            .opacity(pulsing ? 0.35 : 1)
-            .onAppear {
-                guard !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true)) { pulsing = true }
-            }
+            .modifier(GentlePulse())
+            .accessibilityHidden(true)
     }
 }
 
@@ -135,13 +130,14 @@ struct SectionHeader: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(title)
-                .font(Theme.isMac ? .system(size: Theme.Mac.Typography.sectionTitle, weight: .semibold) : Theme.Typography.headline)
+                .font(Theme.isMac ? .system(size: Theme.Mac.Typography.sectionTitle, weight: .semibold) : Theme.Typography.section)
                 .foregroundStyle(Theme.textPrimary)
             Spacer()
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
                     .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : Theme.Typography.caption)
                     .foregroundStyle(Theme.accessibleAccent)
+                    .frame(minHeight: 44)
             }
         }
         .accessibilityAddTraits(.isHeader)
@@ -239,8 +235,6 @@ struct EmptyStateView: View {
 
 /// Placeholder row shown while channels load.
 struct SkeletonRow: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var dimmed = false
 
     var body: some View {
         HStack(spacing: Theme.Spacing.sm) {
@@ -253,12 +247,9 @@ struct SkeletonRow: View {
             Spacer()
         }
         .foregroundStyle(Theme.surfaceElevated)
-        .opacity(dimmed ? 0.5 : 1)
+        .modifier(GentlePulse())
         .frame(height: 72)
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) { dimmed = true }
-        }
+
         .accessibilityHidden(true)
     }
 }

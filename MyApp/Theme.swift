@@ -7,22 +7,22 @@ import AppKit
 
 /// BannerTV visual language — neutral foundation with colour reserved for meaning.
 enum Theme {
-    static let background       = dynamic(dark: 0x080A0F, light: 0xF4F5F7)
-    static let surface          = dynamic(dark: 0x12151C, light: 0xFFFFFF)
-    static let surfaceElevated  = dynamic(dark: 0x181C24, light: 0xE8EAEF)
-    static let accent           = Color(hex: 0x3B82F6)
+    static let background       = dynamic(dark: 0x080B12, light: 0xF4F5F7)
+    static let surface          = dynamic(dark: 0x141923, light: 0xFFFFFF)
+    static let surfaceElevated  = dynamic(dark: 0x1D2533, light: 0xE8EAEF)
+    static let accent           = Color(hex: 0x4B86F7)
     static let accessibleAccent = dynamic(dark: 0x60A5FA, light: 0x1D4ED8)
     static let actionFill       = Color(hex: 0x1D4ED8)
-    static let live             = Color(hex: 0xFF4D5E)
+    static let live             = Color(hex: 0xEF5966)
     /// `live` as a fill behind a white label (3.2:1 on `live` itself; 4.8:1 here).
     static let liveFill         = Color(hex: 0xD92D3F)
-    static let starting         = Color(hex: 0xF5B942)
-    static let upcoming         = Color(hex: 0x31C978)
+    static let starting         = Color(hex: 0xE6B65D)
+    static let upcoming         = Color(hex: 0x54BC8A)
     static let textPrimary      = dynamic(dark: 0xF7F8FA, light: 0x15181D)
-    static let textSecondary    = dynamic(dark: 0x9BA3B2, light: 0x5C6470)
+    static let textSecondary    = dynamic(dark: 0x9BA4B5, light: 0x5C6470)
     // Both pass 4.5:1 against every background and surface (was 3.2-3.7 dark, 2.5-3.0 light).
     static let textTertiary     = dynamic(dark: 0x808898, light: 0x5F6672)
-    static let hairline         = dynamic(dark: 0xFFFFFF, light: 0x000000, darkAlpha: 0.09, lightAlpha: 0.09)
+    static let hairline         = dynamic(dark: 0xFFFFFF, light: 0x000000, darkAlpha: 0.07, lightAlpha: 0.09)
 
     private static func dynamic(dark: UInt, light: UInt, darkAlpha: Double = 1, lightAlpha: Double = 1) -> Color {
         #if canImport(UIKit)
@@ -61,6 +61,8 @@ enum Theme {
         static let md: CGFloat = 16
         static let lg: CGFloat = 24
         static let xl: CGFloat = 32
+        static let screen: CGFloat = 20
+        static let section: CGFloat = 28
     }
 
     // MARK: Corner radius
@@ -71,9 +73,9 @@ enum Theme {
         /// Rows, inputs.
         static let md: CGFloat = 12
         /// Cards, sheets.
-        static let lg: CGFloat = 16
+        static let lg: CGFloat = 18
         /// Hero surfaces.
-        static let xl: CGFloat = 24
+        static let xl: CGFloat = 22
     }
 
     // MARK: Typography
@@ -81,6 +83,8 @@ enum Theme {
     // Weights are semibold/bold only.
 
     enum Typography {
+        static let score = Font.system(.title, weight: .semibold).monospacedDigit()
+        static let section = Font.system(.subheadline, weight: .semibold)
         static let display = Font.system(.largeTitle, weight: .bold)
         static let title = Font.system(.title2, weight: .bold)
         static let headline = Font.system(.headline, weight: .semibold)
@@ -136,16 +140,16 @@ enum Theme {
     // Named colours that used to be inline hex literals. Brand/team/sport colours live here.
 
     enum Palette {
-        static let highlightYellow = Color(hex: 0xFFCC00)
-        static let positive = Color(hex: 0x3DBE6B)
+        static let highlightYellow = Color(hex: 0xE6B65D)
+        static let positive = Color(hex: 0x54BC8A)
         static let systemGreen = Color(hex: 0x34C759)
-        static let gold = Color(hex: 0xFFD700)
+        static let gold = Color(hex: 0xE6B65D)
         static let orange = Color(hex: 0xFF6B35)
         static let raspberry = Color(hex: 0xE24A6B)
         static let amber = Color(hex: 0xE0A83D)
         static let green = Color(hex: 0x37C871)
         static let graphite = Color(hex: 0x2A2C31)
-        static let nearBlack = Color(hex: 0x080A0F)
+        static let nearBlack = Color(hex: 0x080B12)
         static let midnight = Color(hex: 0x060D1B)
         static let systemRed = Color(hex: 0xFF453A)
         static let sunflower = Color(hex: 0xF5C842)
@@ -165,7 +169,7 @@ enum Theme {
         static let forest = Color(hex: 0x1B3B2A)
         static let fieldGreen = Color(hex: 0x1A9E40)
         static let royal = Color(hex: 0x1A6FE8)
-        static let slate = Color(hex: 0x181C24)
+        static let slate = Color(hex: 0x1D2533)
         static let deepGreen = Color(hex: 0x153B2C)
         static let navy = Color(hex: 0x0D1F3C)
         static let abyss = Color(hex: 0x0A1628)

@@ -26,9 +26,16 @@ struct DiscoverView: View {
     }
 
     private var displayedArticles: [ESPNArticle] {
-        viewModel.articles(for: nil)
+        let articles = viewModel.articles(for: nil)
             .filter { targetLeagues.contains($0.league) && !$0.isHighlight }
             .filter { !articleLibrary.isHidden($0) && !articleLibrary.isMuted($0) }
+        guard selectedSport == .forYou, !prefs.favoriteTeams.isEmpty else { return articles }
+        // Stable partition keeps the provider's editorial order within each group.
+        let personal = articles.filter { article in
+            prefs.favoriteTeams.contains { article.matchesFavoriteTeam($0) }
+        }
+        let personalIDs = Set(personal.map(\.id))
+        return personal + articles.filter { !personalIDs.contains($0.id) }
     }
 
     private var heroArticle: ESPNArticle? {
@@ -141,9 +148,7 @@ struct DiscoverView: View {
 
     @ViewBuilder private var content: some View {
         if viewModel.isLoading && displayedArticles.isEmpty {
-            Spacer()
-            ProgressView().tint(Theme.accent)
-            Spacer()
+            ContentSkeleton(kind: .stories)
         } else {
             articleList
         }
@@ -166,7 +171,7 @@ struct DiscoverView: View {
                 }
 
                 if !teamArticles.isEmpty {
-                    DiscoverSectionHeader(title: "FROM YOUR TEAMS", actionTitle: "See All")
+                    DiscoverSectionHeader(title: "FROM YOUR TEAMS", actionTitle: nil)
                     VStack(spacing: 0) {
                         ForEach(teamArticles) { article in
                             Button { open(article: article) } label: {
@@ -346,10 +351,12 @@ private struct DiscoverSectionHeader: View {
             }
         }
         .padding(.horizontal, 4)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
 private struct HeroArticleCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let article: ESPNArticle
     let isSaved: Bool
     let onToggleSaved: () -> Void
@@ -369,7 +376,7 @@ private struct HeroArticleCard: View {
                     .aspectRatio(16 / 9, contentMode: .fit)
             }
             LinearGradient(
-                colors: [.clear, .black.opacity(0.88)],
+                colors: [.clear, .black.opacity(0.96)],
                 startPoint: .center,
                 endPoint: .bottom
             )
@@ -389,7 +396,7 @@ private struct HeroArticleCard: View {
                 Text(article.headline)
                     .font(Theme.isMac ? .system(size: Theme.Mac.Typography.heading, weight: .bold) : .title3.weight(.bold))
                     .foregroundStyle(.white)
-                    .lineLimit(2)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .multilineTextAlignment(.leading)
 
 
@@ -399,13 +406,16 @@ private struct HeroArticleCard: View {
             }
             .padding(Theme.isMac ? 22 : 16)
         }
-        .clipShape(RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Mac.Radius.hero : Theme.Radius.sm, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Mac.Radius.hero : Theme.Radius.sm, style: .continuous).strokeBorder(Theme.hairline))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Mac.Radius.hero : Theme.Radius.xl, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Mac.Radius.hero : Theme.Radius.xl, style: .continuous).strokeBorder(Theme.hairline))
+        .accessibilityAction(named: Text(isSaved ? "Unsave article" : "Save article")) { onToggleSaved() }
+        .accessibilityAction(named: Text("Hide article")) { onHide() }
         .contextMenu { ArticleContextActions(article: article, isSaved: isSaved, onToggleSaved: onToggleSaved, onHide: onHide, onMute: onMute) }
     }
 }
 
 private struct TeamNewsRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let article: ESPNArticle
     let isSaved: Bool
     let onToggleSaved: () -> Void
@@ -421,7 +431,7 @@ private struct TeamNewsRow: View {
                 Text(article.headline)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(2)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                 Text(article.metadataLine(includeSource: false))
                     .font(.caption)
                     .foregroundStyle(Theme.textSecondary)
@@ -429,12 +439,15 @@ private struct TeamNewsRow: View {
             Spacer()
         }
         .padding(14)
+        .accessibilityAction(named: Text(isSaved ? "Unsave article" : "Save article")) { onToggleSaved() }
+        .accessibilityAction(named: Text("Hide article")) { onHide() }
         .contextMenu { ArticleContextActions(article: article, isSaved: isSaved, onToggleSaved: onToggleSaved, onHide: onHide, onMute: onMute) }
     }
 }
 
 
 private struct StandardArticleCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let article: ESPNArticle
     let isSaved: Bool
     let onToggleSaved: () -> Void
@@ -448,17 +461,11 @@ private struct StandardArticleCard: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Theme.textSecondary)
                 Text(article.headline)
-                    .font(.headline.weight(.bold))
+                    .font(Theme.Typography.headline)
                     .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(2)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3)
                     .multilineTextAlignment(.leading)
-                if !article.description.isEmpty {
-                    Text(article.description)
-                        .font(.subheadline)
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                }
+
             }
             Spacer(minLength: 0)
             ArticleImage(url: article.imageURL)
@@ -466,11 +473,14 @@ private struct StandardArticleCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
         }
         .padding(14)
+        .accessibilityAction(named: Text(isSaved ? "Unsave article" : "Save article")) { onToggleSaved() }
+        .accessibilityAction(named: Text("Hide article")) { onHide() }
         .contextMenu { ArticleContextActions(article: article, isSaved: isSaved, onToggleSaved: onToggleSaved, onHide: onHide, onMute: onMute) }
     }
 }
 
 private struct CompactArticleRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let article: ESPNArticle
     let isSaved: Bool
     let onToggleSaved: () -> Void
@@ -486,7 +496,7 @@ private struct CompactArticleRow: View {
                 Text(article.headline)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(2)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .multilineTextAlignment(.leading)
                 Text(article.metadataLine(includeSource: false))
                     .font(.caption)
@@ -496,6 +506,8 @@ private struct CompactArticleRow: View {
             Spacer(minLength: 0)
         }
         .padding(14)
+        .accessibilityAction(named: Text(isSaved ? "Unsave article" : "Save article")) { onToggleSaved() }
+        .accessibilityAction(named: Text("Hide article")) { onHide() }
         .contextMenu { ArticleContextActions(article: article, isSaved: isSaved, onToggleSaved: onToggleSaved, onHide: onHide, onMute: onMute) }
     }
 }
@@ -511,11 +523,12 @@ private struct ArticleImage: View {
                 Theme.surfaceElevated.overlay {
                     Image(systemName: "newspaper.fill")
                         .font(.title2)
-                        .foregroundStyle(Theme.textSecondary.opacity(0.55))
+                        .foregroundStyle(Theme.textSecondary)
                 }
             }
         }
         .clipped()
+        .accessibilityHidden(true)
     }
 }
 

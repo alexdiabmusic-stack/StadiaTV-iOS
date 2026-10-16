@@ -96,6 +96,11 @@ nonisolated extension BannerNewsArticle {
     func toLegacyArticle(league: League) -> ESPNArticle {
         // Prefer author byline; fall back to publisher name for attribution.
         let displayByline = authorByline ?? publisher ?? sourceName
+        // Preserve article-level league metadata instead of relabelling every
+        // result with the feed requested by the caller.
+        let articleLeague = leagueID.flatMap { id in
+            League.all.first { SportsIdentityResolver.canonicalLeagueID(for: $0) == id }
+        } ?? league
         return ESPNArticle(
             id: id.rawValue,
             headline: headline,
@@ -103,7 +108,7 @@ nonisolated extension BannerNewsArticle {
             published: published,
             url: url,
             imageURL: imageURL,
-            league: league,
+            league: articleLeague,
             byline: displayByline,
             type: articleType,
             isPremium: false,

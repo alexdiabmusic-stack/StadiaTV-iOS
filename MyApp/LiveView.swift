@@ -116,12 +116,7 @@ struct LiveView: View {
     }
 
     private var loadingView: some View {
-        VStack(spacing: 16) {
-            ProgressView().tint(Theme.live)
-            Text("Scanning all sports…")
-                .font(.callout)
-                .foregroundStyle(Theme.textSecondary)
-        }
+        ContentSkeleton(kind: .games)
     }
 
     private var liveList: some View {
@@ -150,7 +145,6 @@ struct LiveView: View {
                     emptyState
                 } else if selectedSport != nil {
                     ForEach(visibleMatches) { match in
-                        NavigationLink(value: match) {
                             LiveMatchCard(
                                 match: match,
                                 onSetAlert: { Task { await setAlert(for: match) } },
@@ -160,7 +154,6 @@ struct LiveView: View {
                                 fantasyContext: liveFantasyContext(for: match),
                                 streamCount: streamStore.count(for: match.id)
                             )
-                        }
                             .buttonStyle(.plain)
                     }
                 } else {
@@ -299,7 +292,6 @@ struct LiveView: View {
             .foregroundStyle(Theme.live)
 
             ForEach(matches) { match in
-                NavigationLink(value: match) {
                     LiveMatchCard(
                         match: match,
                         onSetAlert: { Task { await setAlert(for: match) } },
@@ -308,7 +300,6 @@ struct LiveView: View {
                         showScoreBar: prefs.showLiveScoreBar,
                         streamCount: streamStore.count(for: match.id)
                     )
-                }
                 .buttonStyle(.plain)
             }
         }
@@ -451,6 +442,7 @@ struct LiveMatchCard: View {
     var streamCount: Int = 0
     @EnvironmentObject private var streamStore: StreamAvailabilityStore
     @State private var showingQuickStream = false
+    @State private var playbackContext: MatchPlaybackContext?
 
     private var fantasyLabel: String? {
         guard !fantasyContext.isEmpty else { return nil }
@@ -496,65 +488,52 @@ struct LiveMatchCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.isMac ? 6 : 10) {
-            HStack {
-                PulsingLiveBadge()
-                Text(match.league.shortName)
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(Theme.textSecondary)
-                if let label = intelligenceLabel {
-                    Text("·")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.textSecondary)
-                    Text(label)
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(Theme.starting)
-                }
-                if let fantasyLabel {
-                    Text("·")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.textSecondary)
-                    Text(fantasyLabel)
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(Theme.accent)
-                        .lineLimit(1)
-                }
-                Spacer()
-                if streamCount > 0 {
-                    Button { showingQuickStream = true } label: {
-                        HStack(spacing: 3) {
-                            Image(systemName: "play.tv")
+            NavigationLink(value: match) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(alignment: .top, spacing: 8) {
+                        Text(match.league.shortName)
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.textSecondary)
+                        if let label = intelligenceLabel {
+                            Text(label)
                                 .font(Theme.Typography.overline)
-                            Text("\(streamCount)")
-                                .font(Theme.Typography.overline.monospacedDigit())
+                                .foregroundStyle(Theme.starting)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-                        .foregroundStyle(Theme.accent)
-                        .padding(.horizontal, 6).padding(.vertical, 3)
-                        .background(Theme.accent.opacity(0.12), in: Capsule())
+                        Spacer(minLength: 8)
+                        LiveBadge()
                     }
-                    .buttonStyle(.plain)
+                    eventSummaryRow
+                    Text(BroadcastPresentation.status(match.statusDetail))
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                    if let fantasyLabel {
+                        Text(fantasyLabel)
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(Theme.accessibleAccent)
+                    }
                 }
-                Text(match.statusDetail)
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(Theme.live)
-                    .lineLimit(1)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
 
-            eventSummaryRow
-
-            // Hidden on mac — the row is compacted to scoreboard density there and this
-            // isn't essential (unlike ScheduleRow, which has room and a reason to show it).
-            if !Theme.isMac, !match.broadcasts.isEmpty {
-                HStack(spacing: 4) {
-                    Image(systemName: "tv")
-                        .font(.caption2)
-                    Text(match.broadcasts.prefix(2).joined(separator: " · "))
-                        .font(.caption2.weight(.semibold))
+            Divider().overlay(Theme.hairline)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    broadcastLabel
+                    Spacer(minLength: 8)
+                    watchAction
                 }
-                .foregroundStyle(Theme.textSecondary)
+                VStack(alignment: .leading, spacing: 8) {
+                    broadcastLabel
+                    watchAction
+                }
             }
         }
-        .padding(.horizontal, Theme.isMac ? 18 : 14)
-        .padding(.vertical, Theme.isMac ? 10 : 12)
+        .padding(.horizontal, 18)
+        .padding(.vertical, Theme.isMac ? 10 : 16)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
         .overlay(alignment: .top) {
@@ -566,9 +545,17 @@ struct LiveMatchCard: View {
             }
         }
         .contextMenu {
+            Button("Set alert", systemImage: "bell") { onSetAlert() }
             Button("Add to Calendar", systemImage: "calendar.badge.plus") { onAddToCalendar() }
             Divider()
             Button("Hide", systemImage: "eye.slash", role: .destructive) { onHide() }
+        }
+        .fullScreenCoverCompat(item: $playbackContext) { context in
+            #if os(tvOS)
+            TVMatchDetailView(match: context.match)
+            #else
+            PlayerView(context: context)
+            #endif
         }
         .sheet(isPresented: $showingQuickStream) {
             #if os(tvOS)
@@ -584,13 +571,52 @@ struct LiveMatchCard: View {
         }
     }
 
+    private var broadcastLabel: some View {
+        Text(BroadcastPresentation.networks(match.broadcasts))
+            .font(Theme.Typography.caption)
+            .foregroundStyle(Theme.textSecondary)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder
+    private var watchAction: some View {
+        if streamStore.confirmedCount(for: match.id) > 0 {
+            Button {
+                let sources = streamStore.topRanked(for: match.id, limit: 100).filter(\.isConfirmed)
+                if let source = sources.first(where: { BroadcastPresentation.isHD($0.channel.name) }) ?? sources.first {
+                    PlaybackTapClock.record()
+                    playbackContext = MatchPlaybackContext(match: match, channel: source.channel, rankedSources: sources)
+                }
+            } label: {
+                Label("Watch", systemImage: "play.fill")
+                    .font(Theme.Typography.caption)
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: 44)
+                    .background(Theme.accent.opacity(0.18), in: RoundedRectangle(cornerRadius: Theme.Radius.md))
+            }
+            .foregroundStyle(Theme.accessibleAccent)
+            .buttonStyle(.plain)
+
+        } else if streamCount > 0 {
+            Button("Find streams") { showingQuickStream = true }
+                .font(Theme.Typography.caption)
+                .foregroundStyle(Theme.accessibleAccent)
+                .frame(minHeight: 44)
+                .buttonStyle(.plain)
+        } else {
+            Text("No verified stream")
+                .font(Theme.Typography.caption)
+                .foregroundStyle(Theme.textSecondary)
+        }
+    }
+
     @ViewBuilder
     private var eventSummaryRow: some View {
         switch archetype {
         case .golf:
             VStack(alignment: .leading, spacing: 6) {
                 Text(match.name.isEmpty ? match.league.name : match.name)
-                    .font(.system(size: 18, weight: .bold))
+                    .font(Theme.Typography.headline)
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(2)
                 golfLeaderLine
@@ -636,34 +662,9 @@ struct LiveMatchCard: View {
     }
 
     private var headToHeadScoreRow: some View {
-        HStack(spacing: 0) {
-            HStack(spacing: 8) {
-                TeamLogo(url: match.leadingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.row : 36)
-                Text(match.leadingSide.shortName)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            HStack(spacing: 6) {
-                Text(match.leadingSide.score ?? "-")
-                Text("–").foregroundStyle(Theme.textSecondary)
-                Text(match.trailingSide.score ?? "-")
-            }
-            .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
-            .foregroundStyle(Theme.textPrimary)
-
-            HStack(spacing: 8) {
-                Text(match.trailingSide.shortName)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(1)
-                TeamLogo(url: match.trailingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.row : 36)
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-        }
+        GameScoreRow(match: match, showsScore: true)
     }
+
 }
 
 // MARK: - Compact Soon Card
@@ -706,16 +707,12 @@ private struct CompactSoonCard: View {
 // MARK: - Pulsing Live Badge
 
 struct PulsingLiveBadge: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pulsing = false
-
     var body: some View {
         Circle()
             .fill(Theme.live)
             .frame(width: 8, height: 8)
-            .opacity(pulsing ? 0.3 : 1)
-            .animation(Theme.Motion.respecting(reduceMotion, .easeInOut(duration: 0.9).repeatForever(autoreverses: true)), value: pulsing)
-            .onAppear { if !reduceMotion { pulsing = true } }
+            .modifier(GentlePulse())
+            .accessibilityHidden(true)
     }
 }
 
@@ -761,7 +758,7 @@ enum LiveFilter: String, CaseIterable, Identifiable {
     var activeColor: Color {
         switch self {
         case .forYou: return Theme.accent
-        case .all:    return Theme.live
+        case .all:    return Theme.accent
         case .guide:  return Theme.accent
         }
     }

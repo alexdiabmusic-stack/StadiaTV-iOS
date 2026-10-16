@@ -107,12 +107,12 @@ struct MatchesView: View {
         }
         .onDisappear { viewModel.stopAutoRefresh() }
         .onChange(of: prefs.favoriteTeams) { _, _ in
-            withAnimation(.snappy) { selectedSelection = .all }
+            withAnimation(Theme.Motion.snappy) { selectedSelection = .all }
         }
     }
 
     private var pageSelector: some View {
-        Picker("Following page", selection: $selectedPage.animation(.snappy)) {
+        Picker("Following page", selection: $selectedPage.animation(Theme.Motion.snappy)) {
             ForEach(FollowingPage.allCases) { page in
                 Text(page.rawValue).tag(page)
             }
@@ -299,7 +299,7 @@ struct MatchesView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 entityChip(title: "All", logoURL: nil, isSelected: selectedSelection == .all) {
-                    withAnimation(.snappy) { selectedSelection = .all }
+                    withAnimation(Theme.Motion.snappy) { selectedSelection = .all }
                 }
                 ForEach(prefs.favoriteTeams) { team in
                     let abbr = team.abbreviation.isEmpty
@@ -309,15 +309,19 @@ struct MatchesView: View {
                         title: abbr, logoURL: team.logoURL,
                         isSelected: selectedSelection == .team(team)
                     ) {
-                        withAnimation(.snappy) { selectedSelection = .team(team) }
+                        withAnimation(Theme.Motion.snappy) { selectedSelection = .team(team) }
                     }
+                    .contextMenu {
+                        Button("Manage following", systemImage: "star") { showingTeamEditor = true }
+                    }
+                    .accessibilityAction(named: Text("Manage following")) { showingTeamEditor = true }
                 }
                 ForEach(leagueChips) { league in
                     entityChip(
                         title: league.shortName, logoURL: nil,
                         isSelected: selectedSelection == .league(league)
                     ) {
-                        withAnimation(.snappy) { selectedSelection = .league(league) }
+                        withAnimation(Theme.Motion.snappy) { selectedSelection = .league(league) }
                     }
                 }
                 Button { showingTeamEditor = true } label: {
@@ -360,7 +364,7 @@ struct MatchesView: View {
                     .lineLimit(1)
             }
             .padding(.horizontal, Theme.isMac ? (logoURL == nil ? 16 : 12) : (logoURL == nil ? 12 : 8))
-            .frame(height: Theme.isMac ? Theme.Mac.ControlHeight.sm + 2 : 32)
+            .frame(minHeight: Theme.isMac ? Theme.Mac.ControlHeight.sm + 2 : 44)
             .background(isSelected ? Theme.actionFill : Theme.surface, in: Capsule())
             .overlay(Capsule().strokeBorder(isSelected ? Theme.accent.opacity(0.4) : Theme.hairline))
             .shadow(color: isSelected ? Theme.accent.opacity(0.28) : .clear, radius: 8, y: 3)
@@ -472,28 +476,12 @@ private struct FollowingSportsSummary: View {
                 statItem(icon: "calendar", value: "\(todayCount)", label: "Today",
                          tint: Theme.upcoming, prominent: false)
                 divider
-                statItem(icon: "bell", value: "\(thisWeekCount)", label: "This Week",
+                statItem(icon: "calendar.badge.clock", value: "\(thisWeekCount)", label: "This Week",
                          tint: Theme.starting, prominent: false)
                 Spacer()
             }
 
-            if liveCount == 0, todayCount == 0, let next = nextUpcoming {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.textTertiary)
-                        .padding(.top, 1)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Nothing today")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Theme.textPrimary)
-                        Text(nextLine(next))
-                            .font(.caption)
-                            .foregroundStyle(Theme.textSecondary)
-                            .lineLimit(1)
-                    }
-                }
-            }
+
         }
     }
 
@@ -679,35 +667,7 @@ private struct FollowingUpNextHero: View {
                     }
                 }
             } else {
-                HStack(alignment: .center, spacing: 0) {
-                    VStack(spacing: 10) {
-                        TeamLogo(url: match.away.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.hero : 60)
-                        Text(match.away.displayName)
-                            .font(.system(size: Theme.isMac ? Theme.Mac.Typography.bodyLarge : 13, weight: .bold))
-                            .foregroundStyle(Theme.textPrimary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.8)
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    Text("VS")
-                        .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : Theme.Typography.caption)
-                        .foregroundStyle(Theme.textTertiary)
-                        .tracking(1)
-                        .padding(.horizontal, 4)
-
-                    VStack(spacing: 10) {
-                        TeamLogo(url: match.home.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.hero : 60)
-                        Text(match.home.displayName)
-                            .font(.system(size: Theme.isMac ? Theme.Mac.Typography.bodyLarge : 13, weight: .bold))
-                            .foregroundStyle(Theme.textPrimary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.8)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
+                GameScoreRow(match: match, showsScore: false, logoSize: 64, showsFullNames: true)
             }
 
             VStack(alignment: .leading, spacing: 3) {
@@ -774,9 +734,7 @@ private struct FollowingUpNextHero: View {
                 )
         )
         .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Theme.hairline))
-        .shadow(color: Color.black.opacity(0.14), radius: 22, y: 6)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityLabel)
+        .accessibilityElement(children: .contain)
     }
 
     private var friendlyDate: String {
@@ -784,7 +742,7 @@ private struct FollowingUpNextHero: View {
         let time = match.date.formatted(date: .omitted, time: .shortened)
         if cal.isDateInToday(match.date) { return "Today · \(time)" }
         if cal.isDateInTomorrow(match.date) { return "Tomorrow · \(time)" }
-        let weekday = match.date.formatted(.dateTime.weekday(.wide)).uppercased()
+        let weekday = match.date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())
         return "\(weekday) · \(time)"
     }
 
@@ -792,7 +750,7 @@ private struct FollowingUpNextHero: View {
         let s = max(0, match.date.timeIntervalSinceNow)
         let d = Int(s) / 86400, h = (Int(s) % 86400) / 3600, m = (Int(s) % 3600) / 60
         if d > 1 { return "Starts in \(d) days" }
-        if d == 1 { return "Starts tomorrow" }
+        if d == 1 { return "Starts in 1 day" }
         if h > 0 { return "Starts in \(h)h \(m)m" }
         if m > 0 { return "Starts in \(m) min" }
         return "Starting soon"
@@ -993,14 +951,14 @@ private struct FollowingComingUpSection: View {
     private var sportFilterMenu: some View {
         Menu {
             Button {
-                withAnimation(.snappy) { sportFilter = nil }
+                withAnimation(Theme.Motion.snappy) { sportFilter = nil }
             } label: {
                 if sportFilter == nil { Label("All Sports", systemImage: "checkmark") }
                 else { Text("All Sports") }
             }
             ForEach(availableSports, id: \.self) { sport in
                 Button {
-                    withAnimation(.snappy) { sportFilter = sport }
+                    withAnimation(Theme.Motion.snappy) { sportFilter = sport }
                 } label: {
                     if sportFilter == sport { Label(sport.rawValue, systemImage: "checkmark") }
                     else { Text(sport.rawValue) }
@@ -1531,49 +1489,8 @@ private struct FollowingEmptyStateView: View {
 // MARK: - Skeleton
 
 private struct FollowingSkeletonView: View {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var phase: Double = 0
-
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(spacing: 8) {
-                    ForEach(0..<5, id: \.self) { _ in
-                        Capsule().fill(Theme.surface).frame(width: 56, height: 32)
-                            .opacity(0.4 + 0.6 * phase)
-                    }
-                }
-                .padding(.horizontal, 20).padding(.top, 12)
-
-                HStack(spacing: 20) {
-                    ForEach(0..<3, id: \.self) { _ in
-                        skeletonRect(h: 42).frame(maxWidth: .infinity)
-                            .opacity(0.4 + 0.6 * phase)
-                    }
-                }
-                .padding(.horizontal, 20)
-
-                skeletonRect(h: 200)
-                    .opacity(0.4 + 0.6 * phase)
-                    .padding(.horizontal, 20)
-
-                ForEach(0..<4, id: \.self) { _ in
-                    skeletonRect(h: 50)
-                        .opacity(0.4 + 0.6 * phase)
-                        .padding(.horizontal, 20)
-                }
-            }
-        }
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { phase = 1 }
-        }
-    }
-
-    private func skeletonRect(h: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous)
-            .fill(Theme.surface)
-            .frame(maxWidth: .infinity).frame(height: h)
+        ContentSkeleton(kind: .games)
     }
 }
 

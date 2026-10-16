@@ -9,6 +9,7 @@ struct MoreView: View {
     @EnvironmentObject private var articleLibrary: ArticleLibraryStore
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var epgRepository: EPGRepository
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var showingTeamEditor = false
     @State private var showingResetConfirmation = false
     @State private var showingDeleteConfirmation = false
@@ -20,21 +21,21 @@ struct MoreView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
                         statusCard
-                            .padding(.horizontal, 18)
+                            .padding(.horizontal, Theme.Spacing.screen)
                             .padding(.bottom, 20)
 
                         quickGrid
-                            .padding(.horizontal, 18)
+                            .padding(.horizontal, Theme.Spacing.screen)
                             .padding(.bottom, 28)
 
                         sections
-                            .padding(.horizontal, 18)
+                            .padding(.horizontal, Theme.Spacing.screen)
 
                         versionFooter
                             .padding(.top, 36)
-                            .padding(.bottom, 120)
+                            .padding(.bottom, Theme.Spacing.section)
                     }
-                    .padding(.top, 12)
+                    .padding(.top, 4)
                     .frame(maxWidth: Theme.isPad ? 680 : .infinity)
                     .frame(maxWidth: .infinity, alignment: .center)
                 }
@@ -81,7 +82,7 @@ struct MoreView: View {
 
     private var quickGrid: some View {
         LazyVGrid(
-            columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
+            columns: dynamicTypeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
             spacing: 12
         ) {
             NavigationLink { PlaylistsSettingsView() } label: {
@@ -279,7 +280,7 @@ struct MoreView: View {
             .font(.caption)
             .foregroundStyle(Theme.textTertiary)
             .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.horizontal, 18)
+            .padding(.horizontal, Theme.Spacing.screen)
             .accessibilityHidden(true)
     }
 
@@ -397,65 +398,29 @@ private struct BannerStatusCard: View {
     let epgRefreshState: EPGRefreshState
 
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Theme.surface)
-
-            // Atmospheric glows — very subtle, almost invisible on the dark background
-            GeometryReader { geo in
-                Ellipse()
-                    .fill(Theme.accent.opacity(0.11))
-                    .frame(width: geo.size.width * 0.55, height: geo.size.height * 1.6)
-                    .blur(radius: 38)
-                    .offset(x: -geo.size.width * 0.08, y: -geo.size.height * 0.35)
-
-                Ellipse()
-                    .fill(Theme.live.opacity(0.07))
-                    .frame(width: geo.size.width * 0.44, height: geo.size.height * 1.4)
-                    .blur(radius: 32)
-                    .offset(x: geo.size.width * 0.68, y: -geo.size.height * 0.3)
+        HStack(spacing: 12) {
+            Image(systemName: dotColor == Theme.upcoming ? "checkmark.circle.fill" : "info.circle.fill")
+                .foregroundStyle(dotColor)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(statusLabel)
+                    .font(Theme.Typography.headline)
+                    .foregroundStyle(Theme.textPrimary)
+                Text(summaryLine)
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                Text(guideLine)
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.textSecondary)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .allowsHitTesting(false)
-
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("BANNER TV")
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.6)
-                        .foregroundStyle(Theme.accent)
-
-                    HStack(spacing: 7) {
-                        Circle()
-                            .fill(dotColor)
-                            .frame(width: 7, height: 7)
-                            .accessibilityHidden(true)
-                        Text(statusLabel)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Theme.textPrimary)
-                    }
-
-                    Text(summaryLine)
-                        .font(.caption)
-                        .foregroundStyle(Theme.textSecondary)
-
-                    Text(guideLine)
-                        .font(.caption)
-                        .foregroundStyle(Theme.textSecondary)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Theme.textTertiary)
-            }
-            .padding(18)
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(Theme.textSecondary)
         }
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(Theme.hairline)
-        )
+        .padding(16)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg))
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg).strokeBorder(Theme.hairline))
     }
 
     private var dotColor: Color {
@@ -474,7 +439,7 @@ private struct BannerStatusCard: View {
         case .failed(_): return "Guide update failed"
         case .refreshing: return "Updating guide…"
         case .idle:
-            return playlistCount == 0 ? "No playlists connected" : "Everything looks good"
+            return playlistCount == 0 ? "No playlists connected" : "Ready to watch"
         }
     }
 
@@ -509,7 +474,8 @@ private struct QuickActionCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Image(systemName: icon)
-                .font(.system(size: 20, weight: .semibold))
+                .font(.title3.weight(.semibold))
+                .accessibilityHidden(true)
                 .foregroundStyle(Theme.accent)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.bottom, 10)
@@ -518,15 +484,15 @@ private struct QuickActionCard: View {
                 Text(title)
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(Theme.textSecondary)
-                    .lineLimit(2)
+
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
         .padding(14)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
@@ -536,11 +502,12 @@ private struct QuickActionCard: View {
 // MARK: - Card Press Style
 
 private struct CardPressStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1.0)
             .opacity(configuration.isPressed ? 0.85 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.75), value: configuration.isPressed)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 
@@ -555,6 +522,7 @@ struct SettingsSection<Content: View>: View {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .tracking(0.6)
+                .accessibilityAddTraits(.isHeader)
                 .foregroundStyle(Theme.textSecondary)
                 .padding(.horizontal, 4)
             VStack(spacing: 0) {
@@ -570,17 +538,18 @@ struct SettingsSection<Content: View>: View {
 // MARK: - Settings Nav Row
 
 struct SettingsNavRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let icon: String
     let title: String
     var subtitle: String? = nil
     var pill: SettingsPillContent? = nil
-    var iconColor: Color = Theme.accent
+    var iconColor: Color = Theme.textSecondary
 
     var body: some View {
         HStack(spacing: 12) {
             SettingsIconBox(systemName: icon, color: iconColor)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.body)
                     .foregroundStyle(Theme.textPrimary)
@@ -588,13 +557,17 @@ struct SettingsNavRow: View {
                     Text(subtitle)
                         .font(.caption)
                         .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if dynamicTypeSize.isAccessibilitySize, let pill {
+                    SettingsPill(label: pill.label, semantic: pill.semantic)
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
 
-            Spacer()
+            Spacer(minLength: 4)
 
-            if let pill {
+            if !dynamicTypeSize.isAccessibilitySize, let pill {
                 SettingsPill(label: pill.label, semantic: pill.semantic)
             }
 
@@ -604,6 +577,8 @@ struct SettingsNavRow: View {
         }
         .contentShape(Rectangle())
         .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .accessibilityElement(children: .combine)
         .frame(minHeight: subtitle == nil ? 52 : 64)
     }
 }
@@ -619,7 +594,8 @@ struct SettingsIconBox: View {
             .font(.system(size: 14, weight: .semibold))
             .foregroundStyle(color)
             .frame(width: 34, height: 34)
-            .background(color.opacity(0.13), in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
+            .accessibilityHidden(true)
+            .background(Theme.surfaceElevated, in: RoundedRectangle(cornerRadius: Theme.Radius.sm, style: .continuous))
     }
 }
 

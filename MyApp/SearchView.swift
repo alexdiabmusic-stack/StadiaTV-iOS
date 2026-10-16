@@ -30,16 +30,11 @@ struct SearchView: View {
             || playerIntentWords.contains { normalized.contains($0) }
     }
 
-    /// All channels with hidden ones removed and custom names applied.
+    /// Search original provider names as well as user-assigned names.
     private var searchChannels: [Channel] {
         playlists.allChannels
             .filter { !channelPrefs.isHidden($0.id) }
-            .map { ch in
-                guard let custom = channelPrefs.customName(for: ch.id) else { return ch }
-                return Channel(id: ch.id, name: custom, streamURL: ch.streamURL,
-                               logoURL: ch.logoURL, group: ch.group,
-                               playlistID: ch.playlistID, playlistName: ch.playlistName)
-            }
+
     }
 
     private var results: [UniversalSearchResult] {
@@ -49,6 +44,7 @@ struct SearchView: View {
             teams: viewModel.teams,
             matches: viewModel.matches,
             channels: searchChannels,
+            channelNames: channelPrefs.customNames,
             players: viewModel.players,
             articles: viewModel.articles,
             podcasts: podcastStore.catalog,
@@ -96,7 +92,7 @@ struct SearchView: View {
         add("Upcoming Games", games, limit: 5)
         add("News", news, limit: 5)
         add("Highlights", highlights, limit: 3)
-        add("Channels", channels, limit: 5)
+        add("Channels", channels, limit: channels.count)
         add("Podcasts", podcasts, limit: 4)
         add("Players", players, limit: 4)
         add("Settings", settings, limit: 3)
@@ -510,6 +506,7 @@ private enum SearchIndex {
         teams: [SearchTeamResult],
         matches: [Match],
         channels: [Channel],
+        channelNames: [String: String] = [:],
         players: [SearchPlayerResult],
         articles: [ESPNArticle],
         podcasts: [PodcastCatalog.CatalogFeed],
@@ -522,7 +519,7 @@ private enum SearchIndex {
         results.append(contentsOf: teams.compactMap { result(for: $0, query: query) })
         results.append(contentsOf: leagues.compactMap { result(for: $0, query: query) })
         results.append(contentsOf: matches.compactMap { result(for: $0, query: query) })
-        results.append(contentsOf: channels.compactMap { result(for: $0, query: query) })
+        results.append(contentsOf: channels.compactMap { result(for: $0, customName: channelNames[$0.id], query: query) })
         results.append(contentsOf: players.compactMap { result(for: $0, query: query) })
         results.append(contentsOf: articles.compactMap { result(for: $0, query: query) })
         results.append(contentsOf: podcasts.compactMap { result(for: $0, query: query) })
@@ -598,13 +595,23 @@ private enum SearchIndex {
         )
     }
 
-    private static func result(for channel: Channel, query: SearchQuery) -> UniversalSearchResult? {
-        let fields = [channel.name, channel.group ?? "", channel.playlistName, "channel channels stream live tv watch"]
-        guard let rank = score(query: query, title: channel.name, fields: fields, categoryBoost: 14) else { return nil }
+    private static func result(for channel: Channel, customName: String?, query: SearchQuery) -> UniversalSearchResult? {
+        let title = customName ?? channel.name
+        let names = [title, channel.name, ChannelDisplayName.make(from: channel.name).title]
+        let fields = names + [channel.group ?? "", channel.playlistName, "channel channels stream live tv watch"]
+        let standardRank = score(query: query, title: title, fields: fields, categoryBoost: 14)
+        // Providers vary between names such as "TSN1", "TSN 1", and "TSN-1".
+        // Compact only name aliases so metadata cannot create accidental cross-field matches.
+        let compactQuery = SearchQuery(query.normalized.replacingOccurrences(of: " ", with: ""))
+        let nameRanks = names.compactMap { name in
+            let compactName = name.searchNormalized.replacingOccurrences(of: " ", with: "")
+            return score(query: compactQuery, title: compactName, fields: [compactName], categoryBoost: 14)
+        }
+        guard let rank = ([standardRank].compactMap { $0 } + nameRanks).max() else { return nil }
         return UniversalSearchResult(
             id: "channel-\(channel.id)",
-            title: channel.name,
-            subtitle: "Channel",
+            title: title,
+            subtitle: channel.group.map { "Channel · \($0)" } ?? "Channel",
             systemImage: "play.tv.fill",
             imageURL: channel.logoURL,
             rank: rank,
@@ -725,7 +732,6 @@ private struct SearchQuery {
         tokens = normalized
             .split(separator: " ")
             .map(String.init)
-            .filter { $0.count > 1 }
     }
 
     var isEmpty: Bool {

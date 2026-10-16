@@ -1912,39 +1912,21 @@ struct PodcastArtwork: View {
     let size: CGFloat
     var cornerRadius: CGFloat = 8
 
-    @State private var cachedImage: Image?
-
     var body: some View {
-        ZStack {
-            if let cachedImage {
-                cachedImage
-                    .resizable()
-                    .scaledToFill()
+        CachedImage(url: url) { phase in
+            if let image = phase.image {
+                image.resizable().scaledToFill()
             } else {
                 Theme.surfaceElevated.overlay {
                     Image(systemName: "mic.fill")
-                        .font(.system(size: size * 0.32))
-                        .foregroundStyle(Theme.textSecondary.opacity(0.45))
+                        .font(.title2)
+                        .foregroundStyle(Theme.textSecondary)
                 }
             }
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .task(id: url) {
-            guard let url else {
-                cachedImage = nil
-                return
-            }
-            let request = URLRequest(url: url, cachePolicy: .returnCacheDataElseLoad, timeoutInterval: 30)
-            guard let (data, _) = try? await URLSession.shared.data(for: request) else { return }
-            #if os(iOS)
-            guard let uiImage = UIImage(data: data) else { return }
-            cachedImage = Image(uiImage: uiImage)
-            #elseif os(macOS)
-            guard let nsImage = NSImage(data: data) else { return }
-            cachedImage = Image(nsImage: nsImage)
-            #endif
-        }
+        .accessibilityHidden(true)
     }
 }
 
@@ -1979,6 +1961,7 @@ struct PodcastSectionHeader: View {
 struct PodcastCardTile: View {
     let podcast: Podcast
     let onTap: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var store: PodcastStore
 
     private var artworkURL: URL? {
@@ -1996,17 +1979,27 @@ struct PodcastCardTile: View {
                 Text(podcast.title)
                     .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : .caption.weight(.semibold))
                     .foregroundStyle(Theme.textPrimary)
-                    .lineLimit(2)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .multilineTextAlignment(.leading)
                 if !podcast.publisher.isEmpty {
                     Text(podcast.publisher)
                         .font(.caption2)
                         .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                 }
             }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(podcast.title)
+        .accessibilityHint("Opens the show and its episodes")
+        .contextMenu {
+            Button(store.isSubscribed(podcast) ? "Unfollow show" : "Follow show", systemImage: "star") {
+                store.toggleSubscription(podcast)
+            }
+        }
+        .accessibilityAction(named: Text(store.isSubscribed(podcast) ? "Unfollow show" : "Follow show")) {
+            store.toggleSubscription(podcast)
+        }
         .task(id: podcast.id) { await store.fetchArtwork(for: podcast.feedURL) }
     }
 }

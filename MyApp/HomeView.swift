@@ -233,6 +233,7 @@ struct HomeView: View {
         ToolbarItem(placement: .primaryAction) {
             NavigationLink(destination: SearchView()) {
                 Image(systemName: "magnifyingglass")
+                    .accessibilityLabel("Search")
                     .font(.system(size: Theme.isMac ? Theme.Mac.Header.searchIconSize : 16))
                     .foregroundStyle(Theme.textSecondary)
                     .frame(width: Theme.isMac ? Theme.Mac.Header.searchSize : nil,
@@ -247,7 +248,9 @@ struct HomeView: View {
 
     @ViewBuilder
     private var mainContent: some View {
-        if let msg = viewModel.errorMessage, viewModel.liveNow.isEmpty && viewModel.upcoming.isEmpty {
+        if viewModel.isLoading && viewModel.liveNow.isEmpty && viewModel.upcoming.isEmpty && viewModel.featuredPicks.isEmpty {
+            ContentSkeleton(kind: .games)
+        } else if let msg = viewModel.errorMessage, viewModel.liveNow.isEmpty && viewModel.upcoming.isEmpty {
             errorView(msg)
         } else {
             scrollContent
@@ -323,7 +326,7 @@ struct HomeView: View {
 
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 104)
+            .padding(.bottom, Theme.Spacing.section)
             .macContentWidth()
         }
     }
@@ -342,9 +345,9 @@ struct HomeView: View {
     private var greetingSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(greetingText)
-                .font(.system(size: 28, weight: .bold))
+                .font(.system(.largeTitle, weight: .semibold))
                 .foregroundStyle(Theme.textPrimary)
-            Text("Here's what's happening")
+            Text("Your sports, all in one place.")
                 .font(.subheadline)
                 .foregroundStyle(Theme.textSecondary)
         }
@@ -367,12 +370,15 @@ struct HomeView: View {
                 guard let end = p.endDate else { return true }
                 return end > ctx.date
             }
-            if let pick {
+            if let prime = viewModel.primeMatch,
+               prime.state == .live || Calendar.current.isDateInToday(prime.date) {
+                PrimeHeroCard(match: prime)
+            } else if let pick {
                 let heroMatch = viewModel.featuredMatchesByPickID[pick.id]
                 FeaturedHero(
                     pick: pick,
                     match: heroMatch,
-                    hasStreams: heroMatch.map { streamStore.count(for: $0.id) > 0 } ?? false,
+                    hasStreams: heroMatch.map { streamStore.confirmedCount(for: $0.id) > 0 } ?? false,
                     onWatch: { quickStreamMatch = $0 },
                     onSetAlert: { match in Task { await setAlert(for: match) } }
                 )
@@ -841,7 +847,7 @@ private struct SportsDaySingleGameCard: View {
         case .live:
             HStack(spacing: 5) {
                 PulsingLiveBadge()
-                Text("LIVE • \(match.statusDetail)")
+                Text("LIVE")
             }
             .font(.caption.weight(.bold))
             .foregroundStyle(Theme.live)
@@ -869,6 +875,11 @@ private struct SportsDaySingleGameCard: View {
     private func teamColumn(_ side: TeamSide) -> some View {
         VStack(spacing: 4) {
             TeamLogo(url: side.logoURL, size: 44)
+            if match.state == .final, !hideScore, side.isWinner {
+                Label("Winner", systemImage: "checkmark")
+                    .font(Theme.Typography.overline)
+                    .foregroundStyle(Theme.upcoming)
+            }
             Text(side.abbreviation.isEmpty ? side.shortName : side.abbreviation)
                 .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(Theme.textPrimary)
@@ -907,11 +918,7 @@ private struct SportsDaySingleGameCard: View {
                     Text(scoreText)
                         .font(.system(size: 22, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(Theme.textPrimary)
-                    if let favoriteSide {
-                        Text(favoriteSide.isWinner ? "W" : "L")
-                            .font(.caption2.weight(.bold))
-                            .foregroundStyle(favoriteSide.isWinner ? Theme.Palette.positive : Theme.live)
-                    }
+
                 }
             }
         }
@@ -945,7 +952,7 @@ private struct SportsDaySingleGameCard: View {
                 .buttonStyle(.plain)
             case .final:
                 NavigationLink(value: match) {
-                    actionLabel("Game Center", icon: "chart.bar.fill", primary: true)
+                    actionLabel("Game Center", icon: "chart.bar.fill", primary: false)
                 }
                 .buttonStyle(.plain)
             }
@@ -1076,7 +1083,7 @@ private struct HomeFilterBar: View {
     }
 
     private func filterChip(_ filter: HomeFilter) -> some View {
-        Button { withAnimation(.snappy) { selected = filter } } label: {
+        Button { withAnimation(Theme.Motion.snappy) { selected = filter } } label: {
             Label(filter.label, systemImage: filter.icon)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(selected == filter ? .white : Theme.textSecondary)
@@ -1128,113 +1135,54 @@ private struct TeamMatchupHero: View {
     private var trailingSide: TeamSide { displayMatch.trailingSide }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Theme.isMac ? Theme.Mac.Radius.hero : Theme.Radius.xl, style: .continuous)
-        GeometryReader { proxy in
-            ZStack {
-                // Background image
-                Image("FeaturedHeroBackground")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: proxy.size.width, height: Self.cardHeight)
-                    .accessibilityHidden(true)
-
-                // Unified gradient: subtle top dark → very dark bottom
-                LinearGradient(
-                    stops: [
-                        .init(color: .black.opacity(0.40), location: 0),
-                        .init(color: .black.opacity(0.50), location: 0.42),
-                        .init(color: .black.opacity(0.88), location: 0.68),
-                        .init(color: .black.opacity(0.96), location: 1)
-                    ],
-                    startPoint: .top, endPoint: .bottom
-                )
-                .frame(width: proxy.size.width, height: Self.cardHeight)
-
-                if isLive {
-                    LinearGradient(
-                        colors: [Theme.live.opacity(0.28), .clear],
-                        startPoint: .leading, endPoint: .trailing
-                    )
-                    .frame(width: proxy.size.width, height: Self.cardHeight)
-                }
-
-                // Content
-                VStack(spacing: 0) {
-                    // Featured / Live badge
-                    HStack {
-                        heroBadge
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-
-                    Spacer()
-
-                    // Team logos + VS
-                    HStack(spacing: 0) {
-                        Spacer()
-                        VStack(spacing: 4) {
-                            TeamLogo(url: leadingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.hero : 48)
-                            Text(leadingSide.shortName)
-                                .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : Theme.Typography.caption)
-                                .foregroundStyle(.white.opacity(0.80))
-                                .lineLimit(1)
-                        }
-                        Spacer()
-                        Text("VS")
-                            .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : Theme.Typography.overline)
-                            .foregroundStyle(.white.opacity(0.50))
-                            .frame(width: 28)
-                        Spacer()
-                        VStack(spacing: 4) {
-                            TeamLogo(url: trailingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.hero : 48)
-                            Text(trailingSide.shortName)
-                                .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : Theme.Typography.caption)
-                                .foregroundStyle(.white.opacity(0.80))
-                                .lineLimit(1)
-                        }
-                        Spacer()
-                    }
-                    .padding(.horizontal, 48)
-
-                    // Match title
-                    Text(pick.title)
-                        .font(.system(size: Theme.isMac ? 22 : 21, weight: .bold))
-                        .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(3)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 10)
-
-                    // Date · Time · Venue
-                    if let date = eventDate {
-                        Text(metadataLine(date: date, venue: match?.venue))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.60))
-                            .padding(.top, 4)
-                    }
-
-                    // Bottom tray: countdown + actions
-                    HStack(alignment: .center, spacing: 12) {
-                        countdownView
-                        Spacer()
-                        buttonsView
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 16)
-                }
-                .frame(width: proxy.size.width, height: Self.cardHeight)
+        VStack(spacing: 18) {
+            HStack {
+                Text("TOP MATCH")
+                    .font(Theme.Typography.overline)
+                    .foregroundStyle(Theme.starting)
+                Spacer()
+                Text(displayMatch.league.shortName)
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                if isLive { LiveBadge() }
             }
-            .frame(width: proxy.size.width, height: Self.cardHeight)
-            .clipShape(shape)
-            .overlay(shape.strokeBorder(
-                isLive ? Theme.live.opacity(0.5) : .white.opacity(0.1),
-                lineWidth: isLive ? 1.5 : 1
-            ))
+
+            GameScoreRow(match: displayMatch, showsScore: isLive, logoSize: 64)
+
+            if let date = eventDate {
+                VStack(spacing: 4) {
+                    Text(date, format: .dateTime.weekday(.wide).month(.wide).day())
+                        .font(Theme.Typography.headline)
+                    Text(date, format: .dateTime.hour().minute())
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    countdownView
+                    Spacer(minLength: 8)
+                    buttonsView
+                }
+                VStack(spacing: 12) {
+                    countdownView
+                    buttonsView
+                }
+            }
         }
-        .frame(height: Self.cardHeight)
-        .frame(maxWidth: .infinity)
+        .padding(18)
+        .background {
+            RoundedRectangle(cornerRadius: Theme.Radius.xl)
+                .fill(Theme.surface.gradient)
+                .overlay {
+                    RoundedRectangle(cornerRadius: Theme.Radius.xl)
+                        .fill(Theme.accent.opacity(0.04))
+                }
+        }
+        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.xl).strokeBorder(Theme.hairline))
     }
 
     @ViewBuilder
@@ -1636,22 +1584,11 @@ private struct PrimeHeroCard: View {
                             .foregroundStyle(Theme.textSecondary)
                     }
 
-                    HStack(spacing: 12) {
-                        teamColumn(match.leadingSide)
-                        VStack(spacing: 4) {
-                            Text(match.state == .pre
-                                 ? "VS"
-                                 : "\(match.leadingSide.score ?? "-") – \(match.trailingSide.score ?? "-")")
-                                .font(.system(size: 24, weight: .bold, design: .rounded).monospacedDigit())
-                                .foregroundStyle(Theme.textPrimary)
-                            Text(primeHeroStatusText(for: match))
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(match.state == .live ? Theme.live : Theme.textSecondary)
-                                .lineLimit(1)
-                        }
-                        .frame(minWidth: 80)
-                        teamColumn(match.trailingSide)
-                    }
+                    GameScoreRow(match: match, showsScore: match.state != .pre, logoSize: 56)
+                    Text(primeHeroStatusText(for: match))
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Image(systemName: "chevron.right")
@@ -1748,11 +1685,11 @@ private struct LiveNowCommandCenter: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         sportChip(title: "All", icon: "sportscourt", selected: selectedSport == nil) {
-                            withAnimation(.snappy) { selectedSport = nil }
+                            withAnimation(Theme.Motion.snappy) { selectedSport = nil }
                         }
                         ForEach(activeSports) { sport in
                             sportChip(title: sport.rawValue, icon: sport.systemImage, selected: selectedSport == sport) {
-                                withAnimation(.snappy) { selectedSport = selectedSport == sport ? nil : sport }
+                                withAnimation(Theme.Motion.snappy) { selectedSport = selectedSport == sport ? nil : sport }
                             }
                         }
                     }
@@ -1772,7 +1709,6 @@ private struct LiveNowCommandCenter: View {
                     .overlay(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous).strokeBorder(Theme.hairline))
             } else {
                 ForEach(displayed) { match in
-                    NavigationLink(value: match) {
                         LiveMatchCard(
                             match: match,
                             onSetAlert: { onSetAlert(match) },
@@ -1780,7 +1716,6 @@ private struct LiveNowCommandCenter: View {
                             onHide: { hiddenMatchIDs.insert(match.id) },
                             streamCount: streamStore.count(for: match.id)
                         )
-                    }
                     .buttonStyle(.plain)
                 }
             }
@@ -1827,16 +1762,7 @@ private struct LiveNowCommandCenter: View {
     }
 
     private func sportChip(title: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: icon)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(selected ? .white : Theme.textSecondary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(selected ? Theme.live : Theme.surface, in: Capsule())
-                .overlay(Capsule().strokeBorder(selected ? Theme.live : Theme.hairline))
-        }
-        .buttonStyle(.plain)
+        Chip(title: title, systemImage: icon, isSelected: selected, action: action)
     }
 }
 
@@ -1934,6 +1860,7 @@ private struct SoonTimelineCard: View {
 
 private struct ScheduleSection: View {
     let upcoming: [Match]
+    @State private var showingTeamEditor = false
     @Binding var selectedDay: ScheduleDay
 
     private let calendar = Calendar.current
@@ -2021,7 +1948,7 @@ private struct ScheduleSection: View {
             HStack(spacing: 0) {
                 ForEach(ScheduleDay.allCases) { day in
                     let isSelected = selectedDay == day
-                    Button { withAnimation(.snappy) { selectedDay = day } } label: {
+                    Button { withAnimation(Theme.Motion.snappy) { selectedDay = day } } label: {
                         Text(day.rawValue)
                             .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .semibold) : .subheadline.weight(.semibold))
                             .foregroundStyle(isSelected ? Theme.accent : Theme.textSecondary)
@@ -2043,19 +1970,36 @@ private struct ScheduleSection: View {
                         .fill(Theme.accent.opacity(0.15))
                         .frame(width: w, height: proxy.size.height)
                         .offset(x: w * CGFloat(idx))
-                        .animation(.snappy, value: selectedDay)
+                        .animation(Theme.Motion.snappy, value: selectedDay)
+                        .allowsHitTesting(false)
                 }
             )
 
             // Matches — grouped by date for Tomorrow/Weekend
-            if displayedMatches.isEmpty {
-                HStack(spacing: 12) {
-                    Image(systemName: "calendar.badge.checkmark")
-                        .foregroundStyle(Theme.textSecondary)
-                    Text(emptyText)
-                        .font(.callout)
-                        .foregroundStyle(Theme.textSecondary)
-                    Spacer()
+            if displayedMatches.isEmpty, let next = upcoming.filter({ $0.date > .now }).min(by: { $0.date < $1.date }) {
+                NavigationLink(value: next) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Next followed-team game").font(Theme.Typography.caption).foregroundStyle(Theme.textSecondary)
+                        Text(next.date, format: .dateTime.weekday(.wide).month(.abbreviated).day())
+                            .font(Theme.Typography.caption)
+                        ScheduleRow(match: next)
+                    }
+                }
+                .buttonStyle(.plain)
+            } else if displayedMatches.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "calendar.badge.checkmark")
+                            .foregroundStyle(Theme.textSecondary)
+                        Text(emptyText)
+                            .font(.callout)
+                            .foregroundStyle(Theme.textSecondary)
+                        Spacer()
+                    }
+                    Button("Follow a team", systemImage: "star.badge.plus") { showingTeamEditor = true }
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(Theme.accessibleAccent)
+                        .frame(minHeight: 44)
                 }
                 .padding(16)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
@@ -2079,6 +2023,7 @@ private struct ScheduleSection: View {
                 }
             }
         }
+        .sheet(isPresented: $showingTeamEditor) { TeamEditorView() }
     }
 
     private var emptyText: String {
@@ -2220,6 +2165,8 @@ extension WatchStore {
 }
 
 struct ContinueWatchingSection: View {
+    @EnvironmentObject private var watchStore: WatchStore
+    @State private var detailChannel: Channel?
     let items: [ContinueWatchingItem]
     let onPlay: (Channel) -> Void
 
@@ -2231,7 +2178,8 @@ struct ContinueWatchingSection: View {
                     .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : .footnote.weight(.semibold))
                     .tracking(Theme.isMac ? 0.4 : 0)
             }
-            .foregroundStyle(Theme.accent)
+            .foregroundStyle(Theme.textSecondary)
+            .accessibilityAddTraits(.isHeader)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
@@ -2240,15 +2188,33 @@ struct ContinueWatchingSection: View {
                             ContinueWatchingCard(item: item)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Watch \(ChannelDisplayName.make(from: item.channel.name).title)")
+                        .accessibilityHint("Resumes this channel")
+                        .contextMenu {
+                            Button(watchStore.isFavorite(item.channel) ? "Remove from Favourites" : "Add to Favourites",
+                                   systemImage: "heart") { watchStore.toggleFavorite(item.channel) }
+                            Button("Channel details", systemImage: "info.circle") { detailChannel = item.channel }
+                            Button("Remove from Continue Watching", systemImage: "xmark.circle", role: .destructive) {
+                                watchStore.removeFromHistory(item.entry)
+                            }
+                        }
+                        .accessibilityAction(named: Text("Toggle favourite")) { watchStore.toggleFavorite(item.channel) }
+                        .accessibilityAction(named: Text("Channel details")) { detailChannel = item.channel }
+                        .accessibilityAction(named: Text("Remove from Continue Watching")) { watchStore.removeFromHistory(item.entry) }
                     }
                 }
             }
+        }
+        .sheet(item: $detailChannel) { channel in
+            ChannelInformationSheet(channel: channel)
         }
     }
 }
 
 private struct ContinueWatchingCard: View {
     let item: ContinueWatchingItem
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .caption) private var tileWidth: CGFloat = 150
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -2258,13 +2224,14 @@ private struct ContinueWatchingCard: View {
                     if case .success(let image) = phase {
                         image.resizable().scaledToFit().padding(10)
                     } else {
-                        Image(systemName: "play.tv.fill")
-                            .font(.title2)
-                            .foregroundStyle(Theme.accent)
+                        Text(ChannelDisplayName.make(from: item.channel.name).title.split(separator: " ").prefix(2).compactMap(\.first).map(String.init).joined())
+                            .font(.title2.weight(.semibold))
+                            .foregroundStyle(Theme.textSecondary)
                     }
                 }
             }
-            .frame(width: 150, height: 84)
+            .frame(width: tileWidth, height: tileWidth * 9 / 16)
+            .accessibilityHidden(true)
             .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md, style: .continuous))
             .overlay(alignment: .bottomTrailing) {
                 Image(systemName: "play.circle.fill")
@@ -2273,16 +2240,16 @@ private struct ContinueWatchingCard: View {
                     .padding(6)
             }
 
-            Text(item.channel.name)
+            Text(ChannelDisplayName.make(from: item.channel.name).title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Theme.textPrimary)
-                .lineLimit(1)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
             Text(item.entry.lastWatched.formatted(.relative(presentation: .named)))
                 .font(.caption2)
                 .foregroundStyle(Theme.textSecondary)
-                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(width: 150)
+        .frame(width: tileWidth)
     }
 }
 

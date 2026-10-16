@@ -179,7 +179,7 @@ struct LiveBrowserView: View {
                             )
                         } label: {
                             BrowserRow(
-                                title: groupPrefs.customName(for: group.id) ?? group.title,
+                                title: groupPrefs.customName(for: group.id) ?? BroadcastPresentation.category(group.title),
                                 systemImage: "rectangle.stack.fill",
                                 count: group.count,
                                 isHidden: groupPrefs.isHidden(group.id)
@@ -248,12 +248,13 @@ struct BrowserRow: View {
             Text(title)
                 .font(.body.weight(.medium))
                 .foregroundStyle(isHidden ? Theme.textSecondary : Theme.textPrimary)
-                .lineLimit(1)
+                .lineLimit(2)
             Spacer()
-            Text("\(count)")
+            Text(count, format: .number)
                 .font(.subheadline.monospacedDigit())
                 .foregroundStyle(Theme.textSecondary)
         }
+        .frame(minHeight: 44)
         .padding(.vertical, Theme.Spacing.xxs)
     }
 }

@@ -243,6 +243,9 @@ struct UserPreferences: Codable, Equatable {
     var guideTimeScaleMinutes: Int = 60
     var playerBarActions: [String] = PlayerBarAction.defaultOrder.map(\.rawValue)
     var playerBufferProfile: PlayerBufferProfile = .balanced
+    /// Live channels play through the stream engine (reserve, background reconnects, splicing).
+    /// Off hands provider URLs straight to AVPlayer, for troubleshooting a provider.
+    var playerStreamEngineEnabled = true
     /// When false (default), Auto prefers 1080p/720p mirrors, which start faster than 4K.
     var preferUHDStreams = false
 
@@ -281,7 +284,7 @@ struct UserPreferences: Codable, Equatable {
         case playerMaximumStreams, playerDefaultCategory
         case playerDoubleTapSeeks, commercialBreakMode, preferredAudioLanguage, preferredSubtitleLanguage
         case playerPanelTimeoutSeconds, guideTimeScaleMinutes, playerBarActions
-        case playerBufferProfile, preferUHDStreams
+        case playerBufferProfile, playerStreamEngineEnabled, preferUHDStreams
         case selectedCatalogLeagueIDs, selectedCatalogSportIDs
     }
 
@@ -326,6 +329,7 @@ struct UserPreferences: Codable, Equatable {
         playerBarActions = try container.decodeIfPresent([String].self, forKey: .playerBarActions)
             ?? PlayerBarAction.defaultOrder.map(\.rawValue)
         playerBufferProfile = (try? container.decodeIfPresent(PlayerBufferProfile.self, forKey: .playerBufferProfile)) ?? .balanced
+        playerStreamEngineEnabled = try container.decodeIfPresent(Bool.self, forKey: .playerStreamEngineEnabled) ?? true
         preferUHDStreams = try container.decodeIfPresent(Bool.self, forKey: .preferUHDStreams) ?? false
         selectedCatalogLeagueIDs = try container.decodeIfPresent(Set<String>.self, forKey: .selectedCatalogLeagueIDs) ?? []
         selectedCatalogSportIDs  = try container.decodeIfPresent(Set<String>.self, forKey: .selectedCatalogSportIDs) ?? []
@@ -366,6 +370,7 @@ final class PreferencesStore: ObservableObject {
         }
         CloudSyncService.shared.setEnabled(prefs.cloudSyncEnabled)
         StreamRankingSettings.preferUHD = prefs.preferUHDStreams
+        StreamEngineSettings.isEnabled = prefs.playerStreamEngineEnabled
         NotificationCenter.default.addObserver(
             forName: .bannertvCloudSyncDidChange,
             object: nil,
@@ -394,6 +399,7 @@ final class PreferencesStore: ObservableObject {
         prefs = cloud
         NotificationCenter.default.post(name: .bannerPreferencesChanged, object: nil)
         StreamRankingSettings.preferUHD = prefs.preferUHDStreams
+        StreamEngineSettings.isEnabled = prefs.playerStreamEngineEnabled
         if let data = try? JSONEncoder().encode(prefs) {
             UserDefaults.standard.set(data, forKey: defaultsKey)
         }
@@ -425,6 +431,7 @@ final class PreferencesStore: ObservableObject {
         prefs.hasCompletedOnboarding = true
         prefs.cloudSyncEnabled = true
         StreamRankingSettings.preferUHD = prefs.preferUHDStreams
+        StreamEngineSettings.isEnabled = prefs.playerStreamEngineEnabled
         persist()
         CloudSyncService.shared.setEnabled(true)
         return true
@@ -621,6 +628,13 @@ final class PreferencesStore: ObservableObject {
 
     var playerBufferProfile: PlayerBufferProfile { prefs.playerBufferProfile }
     func setPlayerBufferProfile(_ v: PlayerBufferProfile) { prefs.playerBufferProfile = v; persist() }
+
+    var playerStreamEngineEnabled: Bool { prefs.playerStreamEngineEnabled }
+    func setPlayerStreamEngineEnabled(_ v: Bool) {
+        prefs.playerStreamEngineEnabled = v
+        StreamEngineSettings.isEnabled = v
+        persist()
+    }
 
     var preferUHDStreams: Bool { prefs.preferUHDStreams }
     func setPreferUHDStreams(_ v: Bool) {

@@ -32,11 +32,26 @@ nonisolated enum PlayerBufferProfile: String, CaseIterable, Identifiable, Codabl
 
     var description: String {
         switch self {
-        case .fast: return "Starts quickest, small buffer"
-        case .balanced: return "Fast start, system buffer (default)"
-        case .stable: return "Waits to buffer, fewest stalls"
+        case .fast: return "Smallest reserve, closest to live"
+        case .balanced: return "About 20 s reserve, rides out server pauses (default)"
+        case .stable: return "Up to a minute of reserve; slows playback slightly on weak lines instead of freezing"
         }
     }
+
+    /// The stream engine's reserve profile for this setting.
+    var engineProfile: StreamEngineConfiguration.Profile {
+        switch self {
+        case .fast: return .fast
+        case .balanced: return .balanced
+        case .stable: return .maximum
+        }
+    }
+}
+
+/// Mirrors `UserPreferences.playerStreamEngineEnabled` for the playback controllers, which have no
+/// preferences store of their own.
+enum StreamEngineSettings {
+    static var isEnabled = true
 }
 
 // MARK: - Item factory
@@ -84,6 +99,17 @@ nonisolated enum PlaybackItemFactory {
     static func apply(_ profile: PlayerBufferProfile, to player: AVPlayer) {
         player.automaticallyWaitsToMinimizeStalling = profile.waitsToMinimizeStalling
         player.currentItem?.preferredForwardBufferDuration = profile.forwardBufferDuration
+    }
+
+    /// An item for the stream engine's local playlist. The engine owns buffering and recovery, so
+    /// AVPlayer takes whatever the engine has published, and plays the engine's pace with pitch
+    /// correction.
+    static func makeEngineItem(url: URL) -> AVPlayerItem {
+        let item = AVPlayerItem(asset: AVURLAsset(url: url))
+        item.preferredForwardBufferDuration = 0
+        item.audioTimePitchAlgorithm = .timeDomain
+        item.automaticallyPreservesTimeOffsetFromLive = false
+        return item
     }
 
     /// URLs to try, in order, for a stream. AVPlayer can't play raw MPEG-TS, so an

@@ -1534,6 +1534,21 @@ struct PlayerPlaybackSettingsView: View {
                 } label: {
                     SettingsDisclosureRow(title: "Buffer", value: prefs.playerBufferProfile.rawValue)
                 }
+                Text(prefs.playerBufferProfile.description + ". Applies from the next channel.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
+                Divider().overlay(Theme.hairline)
+                SettingsToggleRow(
+                    title: "Stream Engine",
+                    isOn: Binding(get: { prefs.playerStreamEngineEnabled }, set: { prefs.setPlayerStreamEngineEnabled($0) })
+                )
+                Text("Holds the provider connection itself and keeps a reserve of programme ahead of the picture, so server pauses, dropped connections and stream restarts are bridged without freezing or reloading. Turn off only to troubleshoot a provider.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
                 Divider().overlay(Theme.hairline)
                 SettingsToggleRow(
                     title: "Prefer 4K Streams",

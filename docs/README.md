@@ -6,6 +6,7 @@
 | `benchmarks/` | Measurements of the guide and the stream linker on real exports. |
 | `archive/` | Reviews of earlier states of the code. Kept for history; not kept up to date. |
 | `../MatchLinker/` | The stream linker's harness, prompts and Python reference. `StreamLinker.swift` and its tests are symlinks to the copies the app builds. |
+| `../Documentation/StreamEngine.md` | How live channels play through the stream engine: reserve, background reconnects and splicing, the recovery rules and profiles, its tests, and what hasn't been verified on device. |
 
 `Public-ESPN-API-main/` and `odds-api-main/` at the repository root are snapshots of third-party API documentation. Nothing builds them and nothing in the app reads them.
 

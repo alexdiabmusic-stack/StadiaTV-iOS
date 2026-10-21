@@ -12,14 +12,27 @@ import UIKit
 /// layout re-attaches the same AVPlayer instead of re-buffering from zero. Changing
 /// channel or source swaps the current item on that same player.
 ///
+/// Live channels play through the stream engine (`StreamEngineSession`): it holds the provider
+/// connection, keeps a reserve of programme ahead of the picture, reconnects and splices in the
+/// background, and serves AVPlayer a steady local HLS stream. The engine's referee owns network
+/// recovery; this controller only rebuilds the player item when AVPlayer itself gets stuck, and
+/// applies the engine's playback pace. Streams the engine doesn't carry (on-demand, catch-up,
+/// adaptive or encrypted HLS) play directly, as does everything when the engine is turned off.
+///
 /// Responsibilities:
 /// - start-up tuning (buffer profile, first eligible variant, play immediately when ready)
 /// - start-up watchdog and fallback URLs (e.g. an Xtream `.ts` URL tried as `.m3u8` first)
-/// - stall recovery: reconnect with backoff, then report failure so Auto can fail over
+/// - direct playback stall recovery: reconnect with backoff, then report failure so Auto can fail over
 /// - detecting video streams that play with no picture (only when the manifest advertises video)
 /// - audio-session interruptions, headphone unplug, foreground return and live-edge tracking
 @MainActor
 final class PlaybackController: ObservableObject {
+    /// Where this controller plays: multiview tiles keep a small reserve so several fit in memory.
+    enum Role {
+        case primary
+        case multiviewTile
+    }
+
     enum State: Equatable {
         case idle
         case loading
@@ -63,8 +76,11 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var qualityCap: PlayerQualityCap = .auto
     /// DEBUG-only start-up timing line for the on-screen overlay.
     @Published private(set) var metricsSummary: String?
+    /// The stream engine's live telemetry; nil while AVPlayer plays the provider URL directly.
+    @Published private(set) var engineStatus: StreamEngineStatus?
 
     let player = AVPlayer()
+    let role: Role
     private(set) var channel: Channel?
     private(set) var bufferProfile: PlayerBufferProfile
     /// Set by the `audioOnly` argument to the most recent `load(_:audioOnly:)` call. Drives
@@ -120,9 +136,23 @@ final class PlaybackController: ObservableObject {
     private var monitorTask: Task<Void, Never>?
     private var bufferingTask: Task<Void, Never>?
 
-    init(tapDate: Date? = nil, bufferProfile: PlayerBufferProfile = .balanced) {
+    // Stream engine.
+    private var engineSession: StreamEngineSession?
+    /// The current item plays the engine's local stream.
+    private var usesEngine = false
+    private var engineConfiguration = StreamEngineConfiguration.profile(.balanced)
+    /// Pitch-corrected rate the engine asked for.
+    private var engineRate: Double = 1.0
+    /// Times AVPlayer's item was rebuilt on the same engine session, for rate limiting.
+    private var engineItemRebuilds: [Date] = []
+    private var externalPlaybackObservation: NSKeyValueObservation?
+    private static let maxEngineItemRebuilds = 3
+    private static let engineItemRebuildWindow: TimeInterval = 120
+
+    init(tapDate: Date? = nil, bufferProfile: PlayerBufferProfile = .balanced, role: Role = .primary) {
         self.pendingTapDate = tapDate
         self.bufferProfile = bufferProfile
+        self.role = role
         #if !os(visionOS)
         player.allowsExternalPlayback = true
         #endif
@@ -198,6 +228,10 @@ final class PlaybackController: ObservableObject {
         cancelTasks()
         currentItem?.cancelPendingSeeks()
         detachItemObservers()
+        stopEngine()
+        // The engine's first segment arrives asynchronously; the previous channel must not keep playing meanwhile.
+        player.replaceCurrentItem(with: nil)
+        currentItem = nil
         self.channel = channel
         urlCandidates = PlaybackItemFactory.playbackURLCandidates(for: channel.streamURL)
         urlIndex = 0
@@ -222,7 +256,9 @@ final class PlaybackController: ObservableObject {
         if audioOnly { AudioSessionManager.activateForAudioOnly() } else { AudioSessionManager.activateForVideo() }
         NotificationCenter.default.post(name: .bannerVideoPlaybackWillStart, object: nil)
         setHoldsPlaybackPriority(true)
-        startCurrentURL()
+        if !startEngine(for: channel) {
+            startCurrentURL()
+        }
     }
 
     func play() {
@@ -250,6 +286,7 @@ final class PlaybackController: ObservableObject {
         generation += 1
         cancelTasks()
         detachItemObservers()
+        stopEngine()
         player.pause()
         player.replaceCurrentItem(with: nil)
         currentItem = nil
@@ -275,10 +312,12 @@ final class PlaybackController: ObservableObject {
         currentItem?.preferredMaximumResolution = cap.maximumResolution
     }
 
-    /// Applies a buffer profile to the live player and item immediately.
+    /// Applies a buffer profile to the live player and item immediately. The stream engine's
+    /// reserve profile takes effect from the next channel load.
     func setBufferProfile(_ profile: PlayerBufferProfile) {
         bufferProfile = profile
         PlaybackItemFactory.apply(profile, to: player)
+        if usesEngine { player.automaticallyWaitsToMinimizeStalling = false }
     }
 
     func setPreferredPeakBitRate(_ bitRate: Double) {
@@ -288,6 +327,13 @@ final class PlaybackController: ObservableObject {
 
     /// Jumps to the live point of a live stream.
     func seekToLiveEdge() {
+        if usesEngine, let session = engineSession {
+            // Hand the whole reserve to the player and rejoin near its newest programme.
+            session.jumpToLive()
+            isBehindLiveEdge = false
+            if currentItem != nil { startEngineItem(url: session.playlistURL) }
+            return
+        }
         guard let item = currentItem, item.duration.isIndefinite,
               let range = item.seekableTimeRanges.last?.timeRangeValue,
               let target = Self.liveSeekTarget(
@@ -343,7 +389,12 @@ final class PlaybackController: ObservableObject {
 
     /// The stream (or a fallback URL) couldn't start.
     private func startupFailed(_ reason: String) {
-        if reconnectAttempt > 0 {
+        if usesEngine {
+            // A rebuilt item that's slow to start is the engine's to handle (it may be riding out
+            // an outage). Before the first picture, AVPlayer couldn't play the engine's stream at
+            // all (an unsupported codec, say): try the provider URL.
+            if !firstFrameRendered { fallbackToDirect(reason: reason) }
+        } else if reconnectAttempt > 0 {
             reconnect(reason: reason)
         } else if urlIndex + 1 < urlCandidates.count {
             urlIndex += 1
@@ -389,6 +440,7 @@ final class PlaybackController: ObservableObject {
         generation += 1
         cancelTasks()
         detachItemObservers()
+        stopEngine()
         player.pause()
         player.replaceCurrentItem(with: nil)
         currentItem = nil
@@ -419,7 +471,10 @@ final class PlaybackController: ObservableObject {
 
     private func resumePlayback() {
         guard currentItem != nil else { return }
-        if !bufferProfile.waitsToMinimizeStalling, currentItem?.status == .readyToPlay {
+        if usesEngine {
+            // The engine decides how much to buffer; AVPlayer plays whatever it has been given.
+            player.playImmediately(atRate: effectiveEngineRate)
+        } else if !bufferProfile.waitsToMinimizeStalling, currentItem?.status == .readyToPlay {
             player.playImmediately(atRate: 1)
         } else {
             player.play()
@@ -472,7 +527,12 @@ final class PlaybackController: ObservableObject {
                 // A picture-less stream is only broken if its manifest advertises video;
                 // genuine audio-only channels (radio) are left alone and count as started.
                 if secondsPlayingWithoutPicture >= 3, advertisesVideo == nil {
-                    let result = await Self.manifestAdvertisesVideo(item)
+                    let result: Bool
+                    if self.usesEngine {
+                        result = self.engineCarriesVideo
+                    } else {
+                        result = await Self.manifestAdvertisesVideo(item)
+                    }
                     guard !Task.isCancelled, self.generation == generation else { return }
                     advertisesVideo = result
                     if !result { self.markFirstFrame() }
@@ -494,7 +554,11 @@ final class PlaybackController: ObservableObject {
                     }
                 }
 
-                self.updateLiveEdgeDistance(for: item)
+                if self.usesEngine {
+                    self.reportEnginePlayback()
+                } else {
+                    self.updateLiveEdgeDistance(for: item)
+                }
             }
         }
     }
@@ -525,6 +589,11 @@ final class PlaybackController: ObservableObject {
         timeControlObservation = player.observe(\.timeControlStatus, options: [.new]) { @Sendable [weak self] _, _ in
             Task { @MainActor [weak self] in self?.timeControlStatusChanged() }
         }
+        #if !os(visionOS)
+        externalPlaybackObservation = player.observe(\.isExternalPlaybackActive, options: [.new]) { @Sendable [weak self] _, _ in
+            Task { @MainActor [weak self] in self?.externalPlaybackChanged() }
+        }
+        #endif
     }
 
     private func timeControlStatusChanged() {
@@ -544,7 +613,9 @@ final class PlaybackController: ObservableObject {
             guard !isUserPaused else { return }
             if itemHasPlayed {
                 state = .buffering
-                startStallTimer()
+                // With the engine, a stall means the reserve ran dry; rebuilding the item would
+                // only throw away what's buffered. The engine's referee owns that recovery.
+                if !usesEngine { startStallTimer() }
             }
             setBuffering(true)
         case .paused:
@@ -553,6 +624,7 @@ final class PlaybackController: ObservableObject {
         @unknown default:
             break
         }
+        reportEnginePlayback()
     }
 
     private func startStallTimer() {
@@ -680,7 +752,7 @@ final class PlaybackController: ObservableObject {
         case .failed:
             let reason = Self.safeErrorMessage(item.error)
             if itemHasPlayed {
-                reconnect(reason: reason)
+                if usesEngine { rebuildEngineItem(reason: "player item failed") } else { reconnect(reason: reason) }
             } else {
                 startupFailed(reason)
             }
@@ -708,7 +780,11 @@ final class PlaybackController: ObservableObject {
 
     private func itemFailedMidStream(_ message: String?) {
         guard currentItem != nil else { return }
-        reconnect(reason: message ?? "failed to play to end")
+        if usesEngine {
+            rebuildEngineItem(reason: message ?? "failed to play to end")
+        } else {
+            reconnect(reason: message ?? "failed to play to end")
+        }
     }
 
     private func itemStalled() {
@@ -717,7 +793,11 @@ final class PlaybackController: ObservableObject {
         guard itemHasPlayed, !isUserPaused else { return }
         state = .buffering
         setBuffering(true)
-        startStallTimer()
+        if usesEngine {
+            reportEnginePlayback()
+        } else {
+            startStallTimer()
+        }
     }
 
     private func observeSystemEvents() {
@@ -783,6 +863,200 @@ final class PlaybackController: ObservableObject {
             seekToLiveEdge()
         }
         resumePlayback()
+    }
+
+    // MARK: - Stream engine
+
+    /// Distinguishes the current session's events from those of a session already stopped.
+    private var engineToken: UUID?
+
+    /// Hands a live channel to the stream engine. Returns false when the channel should play directly.
+    private func startEngine(for channel: Channel) -> Bool {
+        guard StreamEngineSettings.isEnabled, !isExternalVideoPlaybackActive,
+              let routes = StreamEnginePlanner.routes(for: channel.streamURL) else { return false }
+        let profile = StreamEngineConfiguration.profile(bufferProfile.engineProfile)
+        engineConfiguration = role == .multiviewTile ? profile.forMultiviewTile() : profile
+        // Only a known one-stream account makes a quick drop look like another device taking over.
+        let singleConnection = XtreamAccountStatusStore.shared.statusByPlaylistID[channel.playlistID]?.maxConnections == 1
+        let token = UUID()
+        let session: StreamEngineSession
+        do {
+            session = try StreamEngine.shared.makeSession(
+                routes: routes, headers: channel.httpHeaders ?? [:], configuration: engineConfiguration,
+                isSingleConnectionAccount: singleConnection) { @Sendable [weak self] event in
+                    // The main queue keeps the session's events in order.
+                    DispatchQueue.main.async { [weak self] in
+                        MainActor.assumeIsolated { self?.handleEngineEvent(event, token: token) }
+                    }
+                }
+        } catch {
+            PlaybackMetrics.logger.error("Stream engine unavailable: \(String(describing: error), privacy: .public)")
+            return false
+        }
+        engineToken = token
+        engineSession = session
+        usesEngine = true
+        engineRate = 1.0
+        engineItemRebuilds.removeAll()
+        player.automaticallyWaitsToMinimizeStalling = false
+        state = isUserPaused ? .paused : .connecting
+        PlaybackMetrics.logger.info("Stream engine: \(routes.map(\.label).joined(separator: " → "), privacy: .public), \(self.engineConfiguration.profile.rawValue, privacy: .public) reserve")
+        session.start()
+
+        // The engine reports failure itself; this only guards against it never answering.
+        watchdogTask?.cancel()
+        let startGeneration = generation
+        watchdogTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(30))
+            guard let self, !Task.isCancelled, self.generation == startGeneration,
+                  self.usesEngine, self.currentItem == nil else { return }
+            self.fallbackToDirect(reason: "the stream engine didn't start in time")
+        }
+        return true
+    }
+
+    private func stopEngine() {
+        engineSession?.stop()
+        engineSession = nil
+        engineToken = nil
+        usesEngine = false
+        engineStatus = nil
+        engineRate = 1.0
+        engineItemRebuilds.removeAll()
+        player.defaultRate = 1.0
+    }
+
+    private func handleEngineEvent(_ event: StreamEngineSession.Event, token: UUID) {
+        guard token == engineToken, usesEngine, let session = engineSession else { return }
+        switch event {
+        case .ready(let url):
+            guard currentItem == nil else { return }
+            startEngineItem(url: url)
+        case .endpointChanged(let url):
+            guard currentItem != nil else { return }
+            rebuildEngineItem(url: url, reason: "local server moved")
+        case .status(let status):
+            engineStatus = status
+            // The profile's reserve is deliberate distance from live; only drift well past it counts.
+            let behind = status.buffered > engineConfiguration.highBuffer + Self.behindLiveThreshold
+            if behind != isBehindLiveEdge { isBehindLiveEdge = behind }
+        case .pace(let rate):
+            applyEngineRate(rate)
+        case .decoderResetRequested:
+            rebuildEngineItem(url: session.playlistURL, reason: "player stalled with programme available")
+        case .failed(let failure):
+            PlaybackMetrics.logger.info("Stream engine stopped: \(failure.message, privacy: .public)")
+            if failure.allowsDirectPlayback, !firstFrameRendered {
+                fallbackToDirect(reason: failure.message)
+            } else {
+                fail(failure.message)
+            }
+        }
+    }
+
+    /// Plays the engine's local stream on a fresh item.
+    private func startEngineItem(url: URL) {
+        isWaitingToReconnect = false
+        generation += 1
+        let generation = generation
+        detachItemObservers()
+        watchdogTask?.cancel()
+        monitorTask?.cancel()
+        stallTask?.cancel()
+        itemHasPlayed = false
+        didNotifyItemReady = false
+
+        let item = PlaybackItemFactory.makeEngineItem(url: url)
+        item.preferredPeakBitRate = peakBitRate
+        item.preferredMaximumResolution = qualityCap.maximumResolution
+        attachObservers(to: item)
+        currentItem = item
+        if !firstFrameRendered { state = isUserPaused ? .paused : .connecting }
+        metrics?.record(.itemCreated)
+        publishMetrics()
+
+        player.automaticallyWaitsToMinimizeStalling = false
+        player.replaceCurrentItem(with: item)
+        if !isUserPaused { player.playImmediately(atRate: effectiveEngineRate) }
+
+        startWatchdog(generation: generation)
+        startMonitor(item: item, generation: generation)
+    }
+
+    /// AVPlayer got stuck or failed while the engine still has programme: replace only the
+    /// player item. The connection, reserve and timeline carry on, and the new item rejoins at
+    /// the same picture (the playlist's EXT-X-START points at it).
+    private func rebuildEngineItem(url: URL? = nil, reason: String) {
+        guard let session = engineSession else { return }
+        let now = Date()
+        engineItemRebuilds.removeAll { now.timeIntervalSince($0) > Self.engineItemRebuildWindow }
+        guard engineItemRebuilds.count < Self.maxEngineItemRebuilds else {
+            fail(StreamEngineFailure.sourceUnavailable.message)
+            return
+        }
+        engineItemRebuilds.append(now)
+        PlaybackMetrics.logger.info("Rebuilding the player item (\(reason, privacy: .public))")
+        session.noteDecoderReset()
+        startEngineItem(url: url ?? session.playlistURL)
+    }
+
+    /// The engine can't carry this stream; let AVPlayer fetch the provider URL itself.
+    private func fallbackToDirect(reason: String) {
+        PlaybackMetrics.logger.info("Playing the provider URL directly (\(reason, privacy: .public))")
+        generation += 1
+        detachItemObservers()
+        stopEngine()
+        PlaybackItemFactory.apply(bufferProfile, to: player)
+        urlIndex = 0
+        reconnectAttempt = 0
+        startCurrentURL()
+    }
+
+    /// Tells the engine where AVPlayer is, so it publishes just ahead of the picture and knows
+    /// when the viewer is actually waiting.
+    private func reportEnginePlayback() {
+        guard usesEngine, let session = engineSession, let item = currentItem else { return }
+        let programmeTime = item.currentDate().map { $0.timeIntervalSince(session.programmeEpoch) }
+        let status = player.timeControlStatus
+        // Once the channel has shown a picture, any wait is the viewer waiting (a rebuilt item included).
+        let waiting = (itemHasPlayed || firstFrameRendered) && !isUserPaused && status == .waitingToPlayAtSpecifiedRate
+        session.reportPlayback(programmeTime: programmeTime, isWaiting: waiting,
+                               isPlaying: status == .playing, rate: Double(player.rate))
+    }
+
+    private func applyEngineRate(_ rate: Double) {
+        engineRate = rate
+        let effective = effectiveEngineRate
+        player.defaultRate = effective
+        if player.rate > 0 { player.rate = effective }
+    }
+
+    /// The engine's pace, limited to what the current item supports.
+    private var effectiveEngineRate: Float {
+        guard let item = currentItem else { return Float(engineRate) }
+        if engineRate < 1, !item.canPlaySlowForward { return 1 }
+        if engineRate > 1, !item.canPlayFastForward { return 1 }
+        return Float(engineRate)
+    }
+
+    private var engineCarriesVideo: Bool {
+        guard let codecs = engineStatus?.codecs else { return false }
+        return ["H.264", "HEVC", "MPEG-2", "MPEG-1"].contains { codecs.contains($0) }
+    }
+
+    private var isExternalVideoPlaybackActive: Bool {
+        #if os(visionOS)
+        return false
+        #else
+        return player.isExternalPlaybackActive
+        #endif
+    }
+
+    /// AirPlay video hands the stream URL to the receiver, which can't reach this device's
+    /// loopback server; the receiver gets the provider URL instead.
+    private func externalPlaybackChanged() {
+        guard usesEngine, isExternalVideoPlaybackActive else { return }
+        fallbackToDirect(reason: "AirPlay video")
     }
 
     // MARK: - Helpers

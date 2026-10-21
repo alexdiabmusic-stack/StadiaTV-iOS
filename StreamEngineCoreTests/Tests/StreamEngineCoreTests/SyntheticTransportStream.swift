@@ -21,6 +21,8 @@ struct SyntheticTransportStream {
     var gop = 50
     var frameTicks: Int64 = 3_600
     var audioTicks: Int64 = 1_920
+    /// AAC frames per audio PES; IPTV muxers commonly pack eight (a fifth of a second).
+    var audioFramesPerPES = 1
     /// PTS of frame 0 (the encoder's clock, not the engine's).
     var startPTS: Int64 = 900_000
     /// The encoder's identity. It changes every picture's payload, so fingerprints differ between encoders.
@@ -52,7 +54,7 @@ struct SyntheticTransportStream {
             if includeVideo { output += videoPES(frame: index, pts: framePTS) }
             while includeAudio, MPEGTS.signedDelta(nextAudioPTS, framePTS + frameTicks) < 0 {
                 output += audioPES(pts: nextAudioPTS)
-                nextAudioPTS = MPEGTS.wrap(nextAudioPTS + audioTicks)
+                nextAudioPTS = MPEGTS.wrap(nextAudioPTS + audioTicks * Int64(audioFramesPerPES))
             }
         }
         resumeFrame = firstFrame + frames
@@ -147,9 +149,14 @@ struct SyntheticTransportStream {
     }
 
     mutating func audioPES(pts: Int64) -> [UInt8] {
-        let header = Self.pesHeader(streamID: 0xC0, pts: pts, dts: nil)
-        let frame = Self.adtsFrame(filler: UInt8(truncatingIfNeeded: pts / audioTicks) | 0x01)
-        return packetize(pid: audioPID, pes: header + frame, pcr: includeVideo ? nil : pts - 9_000, randomAccess: false)
+        var pes = Self.pesHeader(streamID: 0xC0, pts: pts, dts: nil)
+        for frame in 0..<Int64(audioFramesPerPES) {
+            pes += Self.adtsFrame(filler: UInt8(truncatingIfNeeded: pts / audioTicks + frame) | 0x01)
+        }
+        // Audio PES announce their length, the way muxers write them; video leaves it open.
+        pes[4] = UInt8((pes.count - 6) >> 8)
+        pes[5] = UInt8((pes.count - 6) & 0xFF)
+        return packetize(pid: audioPID, pes: pes, pcr: includeVideo ? nil : pts - 9_000, randomAccess: false)
     }
 
     /// One ADTS AAC-LC frame of 1024 samples, stereo, at sampling-frequency index `rateIndex` (3 is 48 kHz).
@@ -278,6 +285,7 @@ func pesUnits(in bytes: [UInt8], pid: UInt16) -> [PESUnit] {
 }
 
 /// Runs bytes through aligner → splicer → segmenter the way a session does, one connection per call.
+/// `units` only keeps what reached the output: a GOP replaced by a resumed reconnect is removed.
 struct PipelineHarness {
     var aligner = TSPacketAligner()
     let splicer = TSTimelineSplicer()
@@ -288,31 +296,76 @@ struct PipelineHarness {
     /// Index into `units` where each connection's output begins.
     var connectionStarts: [Int] = []
     var wall: Double = 0
+    /// Hold the GOP a drop cuts short, as the session does for continuous MPEG-TS connections.
+    var holdsTail = true
+    /// Connections hand over whole HLS segments, as HLS ingest does: the PES packets one leaves
+    /// open are whole, and there is no GOP to hold.
+    var segmentedIngest = false
+    /// Where the held GOP starts in `units`.
+    private var heldTailStart: Int?
 
     mutating func connection(_ bytes: [UInt8], chunk: Int = 1_000, outageBefore: Double = 0) {
         if !connectionStarts.isEmpty {
-            // What the session does when a connection ends: drop torn PES, cut the open segment.
-            splicer.endConnection()
-            if let segment = segmenter.flush() { segments.append(segment) }
+            // What the session does when a connection ends: finish whole PES, drop torn ones,
+            // hold or cut the open segment.
+            take(splicer.endConnection(atUnitBoundary: segmentedIngest, wallTime: wall))
             aligner.reset()
+            holdTail()
         }
         connectionStarts.append(units.count)
         wall += outageBefore
         splicer.beginConnection()
+        feed(bytes, chunk: chunk)
+    }
+
+    /// More bytes on the current connection.
+    mutating func feed(_ bytes: [UInt8], chunk: Int = 1_000) {
         var offset = 0
         while offset < bytes.count {
             let end = min(offset + chunk, bytes.count)
-            let produced = splicer.process(aligner.push(bytes[offset..<end]), wallTime: wall)
-            units += produced
-            segments += segmenter.append(produced)
-            events += splicer.drainEvents()
+            take(splicer.process(aligner.push(bytes[offset..<end]), wallTime: wall))
             offset = end
             wall += 0.01
         }
     }
 
+    /// An HLS discontinuity before the next segment, announced the way HLS ingest does.
+    mutating func sourceDiscontinuity() {
+        take(splicer.beginSourceDiscontinuity(wallTime: wall))
+    }
+
+    private mutating func take(_ produced: [NormalizedUnit]) {
+        let newEvents = splicer.drainEvents()
+        for case .splice(let report) in newEvents where report.kind != .start {
+            if report.kind == .resumed, let start = heldTailStart {
+                segmenter.discardOpenSegment()
+                units.removeSubrange(start...)
+            } else if heldTailStart != nil, let segment = segmenter.flush() {
+                segments.append(segment)
+            }
+            heldTailStart = nil
+        }
+        events += newEvents
+        units += produced
+        segments += segmenter.append(produced)
+    }
+
+    private mutating func holdTail() {
+        if holdsTail, !segmentedIngest, let keyframe = splicer.resumeKeyframeTime {
+            let split = segmenter.holdTail(fromKeyframeAt: keyframe)
+            if split.held {
+                if let closed = split.closed { segments.append(closed) }
+                heldTailStart = heldTailStart ?? units.lastIndex { $0.kind == .video && $0.isKeyframe && $0.dts == keyframe }
+                return
+            }
+        }
+        splicer.discardResumePoint()
+        if let segment = segmenter.flush() { segments.append(segment) }
+        heldTailStart = nil
+    }
+
     mutating func finish() {
-        splicer.endConnection()
+        take(splicer.endConnection(atUnitBoundary: segmentedIngest, wallTime: wall))
         if let segment = segmenter.flush() { segments.append(segment) }
     }
 

@@ -33,6 +33,10 @@ nonisolated struct StreamHealthMonitor {
     private(set) var bitrate: Double?
     /// Bits per programme second: the stream's own bitrate.
     private(set) var streamBitrate: Double?
+    /// The usual pause between deliveries. Streams a panel restreams from HLS arrive a segment at a
+    /// time, every few seconds, and that silence is healthy; learned across reconnects.
+    private(set) var deliveryCadence: Double = 0
+    private var deliveryGaps: [Double] = []
 
     private var sampleStart: Double?
     private var sampleProgramme: Double = 0
@@ -52,6 +56,15 @@ nonisolated struct StreamHealthMonitor {
     }
 
     mutating func received(bytes: Int, at now: Double) {
+        // Gaps in the first seconds belong to the connect and the provider's burst, not its rhythm.
+        if let last = lastByteAt, let connectedAt, now - connectedAt > 2, now - last >= 0.3 {
+            deliveryGaps.append(now - last)
+            if deliveryGaps.count > 12 { deliveryGaps.removeFirst() }
+            // The second-largest recent gap: short gaps while a burst arrives don't hide the rhythm,
+            // and a single stall doesn't become it.
+            let sorted = deliveryGaps.sorted(by: >)
+            deliveryCadence = sorted.count >= 3 ? sorted[1] : sorted[0]
+        }
         lastByteAt = now
         sampleBytes += bytes
         totalBytes += bytes
@@ -88,12 +101,16 @@ nonisolated struct StreamHealthMonitor {
             return
         }
         let elapsed = now - start
-        guard elapsed >= 1 else { return }
+        // A window spans at least two of the stream's usual pauses: a source that arrives a segment
+        // every five seconds would otherwise read as dead, then as five times real time.
+        guard elapsed >= max(1, 2 * deliveryCadence) else { return }
         let ratio = sampleProgramme / elapsed
         let bits = Double(sampleBytes * 8) / elapsed
-        fastRatio = fastRatio.map { $0 + 0.35 * (ratio - $0) } ?? ratio
-        slowRatio = slowRatio.map { $0 + 0.08 * (ratio - $0) } ?? ratio
-        bitrate = bitrate.map { $0 + 0.3 * (bits - $0) } ?? bits
+        // Smoothing per second of wall time, whatever the window length.
+        func weight(_ perSecond: Double) -> Double { 1 - pow(1 - perSecond, elapsed) }
+        fastRatio = fastRatio.map { $0 + weight(0.35) * (ratio - $0) } ?? ratio
+        slowRatio = slowRatio.map { $0 + weight(0.08) * (ratio - $0) } ?? ratio
+        bitrate = bitrate.map { $0 + weight(0.3) * (bits - $0) } ?? bits
         sampleStart = now
         sampleProgramme = 0
         sampleBytes = 0

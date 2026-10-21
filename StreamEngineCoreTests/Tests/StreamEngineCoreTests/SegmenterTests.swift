@@ -44,15 +44,28 @@ struct SegmenterTests {
     @Test("A long-GOP source is cut at the maximum length, and still at its keyframes")
     func longGOP() {
         var stream = SyntheticTransportStream()
-        stream.gop = 250
+        stream.gop = 300
+        var harness = PipelineHarness()
+        harness.connection(stream.bytes(seconds: 16))
+        harness.finish()
+
+        #expect(harness.segments.map { ($0.duration * 100).rounded() } == [432, 432, 336, 396])
+        #expect(harness.segments.map(\.startsWithKeyframe) == [true, false, false, true])
+        // EXTINF rounded to the nearest second may not exceed the target duration.
+        let ceiling = Double(HLSSegmenter.Configuration().playlistTargetDuration)
+        #expect(harness.segments.allSatisfy { $0.duration.rounded() <= ceiling })
+    }
+
+    @Test("A keyframe every 4 s, common on IPTV encoders, still cuts at every keyframe")
+    func fourSecondGOP() {
+        var stream = SyntheticTransportStream()
+        stream.gop = 100
         var harness = PipelineHarness()
         harness.connection(stream.bytes(seconds: 12))
         harness.finish()
 
-        #expect(harness.segments.map { ($0.duration * 100).rounded() } == [352, 352, 296, 196])
-        #expect(harness.segments.map(\.startsWithKeyframe) == [true, false, false, true])
-        let ceiling = Double(HLSSegmenter.Configuration().playlistTargetDuration)
-        #expect(harness.segments.allSatisfy { $0.duration <= ceiling })
+        #expect(harness.segments.map { ($0.duration * 100).rounded() } == [400, 400, 396])
+        #expect(harness.segments.allSatisfy { $0.startsWithKeyframe })
     }
 
     @Test("Short GOPs give short startup segments, then the target length")

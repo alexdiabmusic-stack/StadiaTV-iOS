@@ -61,7 +61,9 @@ nonisolated final class TSTimelineSplicer {
 
     struct SpliceReport: Equatable, Sendable {
         enum Kind: String, Equatable, Sendable {
-            case start, seamless, overlapRemoved, gapClosed, timebaseReset, timelineJump, reconfigured
+            /// `resumed`: the reconnect re-sent the last keyframe delivered and took over from it,
+            /// replacing the partial GOP after it; nothing is skipped.
+            case start, seamless, resumed, overlapRemoved, gapClosed, timebaseReset, timelineJump, reconfigured
         }
         var kind: Kind
         /// Seconds of already-delivered content the new connection re-sent and that was skipped.
@@ -84,6 +86,8 @@ nonisolated final class TSTimelineSplicer {
         var timelineJumps = 0
         var reconfigurations = 0
         var droppedUnits = 0
+        /// Audio PES cut at a frame at a splice, rather than dropped whole.
+        var trimmedAudioUnits = 0
         var corruptUnits = 0
         var scrambledPackets = 0
         var erroredPackets = 0
@@ -116,6 +120,34 @@ nonisolated final class TSTimelineSplicer {
     private struct KeyframeRecord: Equatable {
         let dts: Int64
         let fingerprint: UInt64
+    }
+
+    /// Everything about the output that carries across connections.
+    private struct OutputState {
+        var offset: Int64
+        var lastOutTiming: Int64?
+        var maxOutVideoPTS: Int64?
+        var lastOutAudioPTS: [UInt16: Int64]
+        var audioSteps: [UInt16: [Int64]]
+        var lastOutAudioEnd: [UInt16: Int64]
+        var audioEpoch: [UInt16: Int]
+        var spliceEpoch: Int
+        var audioSpliceGuard: Set<UInt16>
+        var lastEmittedRawTiming: Int64?
+        var lastEmittedWallTime: Double?
+        var continuity: [UInt16: ContinuityState]
+        var pendingDiscontinuity: Bool
+        var deliveredKeyframes: [KeyframeRecord]
+    }
+
+    /// The output as it stood just before the latest keyframe was delivered. A reconnect that
+    /// re-sends that keyframe can take over from it, replacing the GOP the drop cut short.
+    private struct ResumePoint {
+        let rawDTS: Int64
+        let fingerprint: UInt64
+        let outputDTS: Int64
+        let programVersion: UInt8
+        let state: OutputState
     }
 
     let configuration: Configuration
@@ -171,6 +203,7 @@ nonisolated final class TSTimelineSplicer {
     /// behind the old one, and must not have its fresh programme thrown away as a duplicate.
     private var deliveredKeyframes: [KeyframeRecord] = []
     private let deliveredKeyframeLimit = 512
+    private var resumePoint: ResumePoint?
 
     init(configuration: Configuration = Configuration()) {
         self.configuration = configuration
@@ -184,6 +217,15 @@ nonisolated final class TSTimelineSplicer {
 
     /// The end of the last unit delivered, on the output timeline.
     var outputEnd: Int64? { lastOutTiming.map { MPEGTS.wrap($0 + frameDuration) } }
+
+    /// Output decode time of the keyframe a reconnect may resume from. Everything delivered from
+    /// it on must stay replaceable (unpublished) for the resume to be used.
+    var resumeKeyframeTime: Int64? { resumePoint?.outputDTS }
+
+    /// What was delivered after the resume keyframe has been committed: splice after it instead.
+    func discardResumePoint() {
+        resumePoint = nil
+    }
 
     func drainEvents() -> [Event] {
         defer { events.removeAll() }
@@ -199,20 +241,40 @@ nonisolated final class TSTimelineSplicer {
         gateReason = hasOutput ? .reconnect : .firstConnection
     }
 
-    /// Discards PES packets the connection didn't finish.
-    func endConnection() {
-        for (pid, packets) in pending where !packets.isEmpty { markDropped(sourcePID: pid) }
+    /// Ends the connection's input. A PES packet still open is finished when it's whole — every
+    /// byte its header announces has arrived, or the input stopped where PES packets end (after a
+    /// complete HLS segment) — and dropped when the connection cut it short.
+    func endConnection(atUnitBoundary: Bool = false, wallTime: Double) -> [NormalizedUnit] {
+        var output: [NormalizedUnit] = []
+        // The timing stream first: it gates the followers that arrived alongside it.
+        let timingPID = sourceProgram.flatMap { timingStream(of: $0)?.pid }
+        let pids = pending.keys.sorted { lhs, rhs in
+            if (lhs == timingPID) != (rhs == timingPID) { return lhs == timingPID }
+            return lhs < rhs
+        }
+        for pid in pids {
+            guard let packets = pending[pid], !packets.isEmpty else { continue }
+            let unit = PESUnit(sourcePID: pid, packets: packets)
+            if let program = sourceProgram, let stream = program.stream(pid: pid), unit.isCompleteByLength ?? atUnitBoundary {
+                complete(unit, stream: stream, program: program, wallTime: wallTime, into: &output)
+            } else {
+                markDropped(sourcePID: pid)
+            }
+        }
         pending.removeAll()
+        return output
     }
 
     /// The source declared a timeline break (an HLS discontinuity): splice at the next
     /// picture without trying to match content against what was already delivered.
-    func beginSourceDiscontinuity() {
-        endConnection()
+    /// Returns what the segment before the break left open, finished.
+    func beginSourceDiscontinuity(wallTime: Double) -> [NormalizedUnit] {
+        let finished = endConnection(atUnitBoundary: true, wallTime: wallTime)
         if sourceProgram != nil, mode != .awaitingProgram {
             mode = .awaitingKeyframe
         }
         if hasOutput { gateReason = .sourceDiscontinuity }
+        return finished
     }
 
     private func resetConnectionState() {
@@ -423,7 +485,9 @@ nonisolated final class TSTimelineSplicer {
             releaseHeldFollowers(into: &output)
         case .deduplicating(let until, let since, let firstDropped):
             let delta = MPEGTS.signedDelta(rawDTS, until)
-            if delta > 0, isKeyframe {
+            if isKeyframe, resume(at: picture, droppedSince: firstDropped) {
+                releaseHeldFollowers(into: &output)
+            } else if delta > 0, isKeyframe {
                 let skipped = firstDropped.map { MPEGTS.seconds(MPEGTS.signedDelta(until, $0)) } ?? 0
                 openAfterDeduplication(picture, skipped: max(0, skipped))
                 releaseHeldFollowers(into: &output)
@@ -463,6 +527,10 @@ nonisolated final class TSTimelineSplicer {
             }
             if !isKeyframe { dropLeadingPicturesBefore = nil }
         }
+        if let fingerprint, case .video = stream.kind {
+            resumePoint = ResumePoint(rawDTS: rawDTS, fingerprint: fingerprint, outputDTS: MPEGTS.wrap(rawDTS + offset),
+                                      programVersion: programVersion, state: outputState())
+        }
         if let fingerprint {
             deliveredKeyframes.append(KeyframeRecord(dts: rawDTS, fingerprint: fingerprint))
             if deliveredKeyframes.count > deliveredKeyframeLimit { deliveredKeyframes.removeFirst(deliveredKeyframes.count / 4) }
@@ -494,13 +562,14 @@ nonisolated final class TSTimelineSplicer {
             return
         }
         let kind = kindOf(stream)
-        guard let rawPTS = header.pts else {
+        guard var rawPTS = header.pts else {
             emit(&unit, header: header, stream: stream, kind: kind, rawPTS: nil, rawDTS: nil, isKeyframe: false,
                  isTiming: false, wallTime: nil, into: &output)
             return
         }
+        var header = header
         if kind == .audio {
-            let outPTS = MPEGTS.wrap(rawPTS + offset)
+            var outPTS = MPEGTS.wrap(rawPTS + offset)
             let outputPID = pidMap[stream.pid] ?? stream.pid
             if let last = lastOutAudioPTS[outputPID] {
                 // Never replay audio already delivered. Audio from just before the splice picture
@@ -509,8 +578,18 @@ nonisolated final class TSTimelineSplicer {
                 // Right after a splice the new audio must also clear the whole of the previous PES.
                 let end = audioSpliceGuard.contains(outputPID) ? lastOutAudioEnd[outputPID] : nil
                 if MPEGTS.signedDelta(outPTS, last) <= 0 || end.map({ MPEGTS.signedDelta(outPTS, $0) < -480 }) == true {
-                    markDropped(sourcePID: unit.sourcePID)
-                    return
+                    // Re-sent audio usually straddles the splice: keep the AAC frames after what was played.
+                    guard let end, case .audio(.aac) = stream.kind,
+                          let trimmed = unit.droppingADTSFrames(startingWithin: MPEGTS.signedDelta(end, outPTS) - 480, header: header)
+                    else {
+                        markDropped(sourcePID: unit.sourcePID)
+                        return
+                    }
+                    unit = trimmed.unit
+                    header = trimmed.header
+                    rawPTS = MPEGTS.wrap(rawPTS + trimmed.droppedTicks)
+                    outPTS = MPEGTS.wrap(rawPTS + offset)
+                    statistics.trimmedAudioUnits += 1
                 }
             } else if let gate = gatePTS, MPEGTS.signedDelta(rawPTS, gate) < -frameDuration {
                 // At the very start, audio and picture begin together.
@@ -547,6 +626,7 @@ nonisolated final class TSTimelineSplicer {
         var missing: Double = 0
         switch gateReason {
         case .reconnect:
+            if resume(at: picture, droppedSince: nil) { return true }
             if let previous = lastEmittedRawTiming {
                 let delta = MPEGTS.signedDelta(picture.dts, previous)
                 let outage = max(0, wallTime - (lastEmittedWallTime ?? wallTime))
@@ -599,6 +679,8 @@ nonisolated final class TSTimelineSplicer {
     }
 
     private func finishGate(_ picture: SplicePicture, report: SpliceReport) {
+        // What the previous connection delivered after its last keyframe is now committed.
+        resumePoint = nil
         mode = .flowing
         gatePTS = picture.pts
         dropLeadingPicturesBefore = picture.pts
@@ -617,6 +699,54 @@ nonisolated final class TSTimelineSplicer {
         default: break
         }
         events.append(.splice(report))
+    }
+
+    /// Takes over from the resume point when `picture` is its keyframe re-sent: the output goes back
+    /// to how it stood before that keyframe, so the new connection delivers that GOP again, complete.
+    private func resume(at picture: SplicePicture, droppedSince firstDropped: Int64?) -> Bool {
+        guard let point = resumePoint, point.rawDTS == picture.dts, point.fingerprint == picture.fingerprint,
+              point.programVersion == programVersion else { return false }
+        let replaced = lastEmittedRawTiming.map { MPEGTS.seconds(MPEGTS.signedDelta($0, point.rawDTS)) + MPEGTS.seconds(frameDuration) } ?? 0
+        let skipped = firstDropped.map { MPEGTS.seconds(MPEGTS.signedDelta(point.rawDTS, $0)) } ?? 0
+        restore(point.state)
+        resumePoint = nil
+        mode = .flowing
+        gatePTS = picture.pts
+        // Its leading pictures reference the GOP before it, which the decoder already has.
+        dropLeadingPicturesBefore = nil
+        lastEmittedRawTimingInConnection = nil
+        for key in continuity.keys { continuity[key]?.needsAnchor = true }
+        spliceEpoch += 1
+        audioSpliceGuard = Set(lastOutAudioPTS.keys)
+        statistics.splices += 1
+        statistics.overlapsRemoved += 1
+        events.append(.splice(SpliceReport(kind: .resumed, skippedSeconds: max(0, skipped) + max(0, replaced), missingSeconds: 0)))
+        return true
+    }
+
+    private func outputState() -> OutputState {
+        OutputState(offset: offset, lastOutTiming: lastOutTiming, maxOutVideoPTS: maxOutVideoPTS, lastOutAudioPTS: lastOutAudioPTS,
+                    audioSteps: audioSteps, lastOutAudioEnd: lastOutAudioEnd, audioEpoch: audioEpoch, spliceEpoch: spliceEpoch,
+                    audioSpliceGuard: audioSpliceGuard, lastEmittedRawTiming: lastEmittedRawTiming,
+                    lastEmittedWallTime: lastEmittedWallTime, continuity: continuity, pendingDiscontinuity: pendingDiscontinuity,
+                    deliveredKeyframes: deliveredKeyframes)
+    }
+
+    private func restore(_ state: OutputState) {
+        offset = state.offset
+        lastOutTiming = state.lastOutTiming
+        maxOutVideoPTS = state.maxOutVideoPTS
+        lastOutAudioPTS = state.lastOutAudioPTS
+        audioSteps = state.audioSteps
+        lastOutAudioEnd = state.lastOutAudioEnd
+        audioEpoch = state.audioEpoch
+        spliceEpoch = state.spliceEpoch
+        audioSpliceGuard = state.audioSpliceGuard
+        lastEmittedRawTiming = state.lastEmittedRawTiming
+        lastEmittedWallTime = state.lastEmittedWallTime
+        continuity = state.continuity
+        pendingDiscontinuity = state.pendingDiscontinuity
+        deliveredKeyframes = state.deliveredKeyframes
     }
 
     // MARK: - Output

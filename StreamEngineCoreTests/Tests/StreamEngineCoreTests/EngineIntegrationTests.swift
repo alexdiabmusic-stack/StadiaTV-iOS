@@ -135,14 +135,16 @@ struct EnginePlumbingTests {
 /// The whole engine, in real time, against providers that misbehave the way IPTV panels do.
 @Suite("Engine end to end", .timeLimit(.minutes(1)))
 struct EngineEndToEndTests {
-    @Test("A provider cut mid-packet is bridged from the reserve: no freeze, no repeated picture, one timeline")
+    @Test("A provider cut mid-packet is bridged from the reserve: no freeze, nothing missed or repeated")
     func transportStreamCut() async throws {
-        // The panel holds 12 s of programme, bursts the last 8 s on connect, and drops the first
-        // connection 4 s in, in the middle of a packet.
-        let channel = try FakeTransportChannel(seconds: 48, lead: 12, burst: 8, cuts: [0: 4])
+        // The panel holds 16 s of programme, bursts the last 12 s on connect, and drops the first
+        // connection 3 s in, in the middle of a packet. The reconnect's burst re-sends the GOP the
+        // drop cut short, so the engine takes over from its keyframe and nothing is skipped. The
+        // player plays long enough to receive that GOP.
+        let channel = try FakeTransportChannel(seconds: 60, lead: 16, burst: 12, cuts: [0: 3])
         defer { channel.stop() }
         let url = try #require(URL(string: "http://127.0.0.1:\(channel.port)/play/1234.ts"))
-        let run = try await play(routes: [.init(url: url, label: "MPEG-TS")], profile: .fast, seconds: 10)
+        let run = try await play(routes: [.init(url: url, label: "MPEG-TS")], profile: .fast, seconds: 14)
 
         #expect(run.failure == nil)
         #expect(channel.connectionCount >= 2)
@@ -152,7 +154,7 @@ struct EngineEndToEndTests {
         let status = try #require(run.status)
         #expect(status.reconnects >= 1)
         #expect(status.overlapsRemoved >= 1)
-        expectOneTimeline(run.player)
+        expectOneTimeline(run.player, maximumMissing: 0)
     }
 
     @Test("An Xtream channel without .ts output falls back to HLS and rides out an HLS outage")
@@ -162,7 +164,9 @@ struct EngineEndToEndTests {
         defer { channel.stop() }
         let url = try #require(URL(string: "http://127.0.0.1:\(channel.port)/live/user/pass/77.ts"))
         let routes = try #require(StreamEnginePlanner.routes(for: url))
-        let run = try await play(routes: routes, profile: .balanced, seconds: 11)
+        // The player plays on until it has received the programme where ingest resumed, which the
+        // reserve held some 16 s ahead of the picture.
+        let run = try await play(routes: routes, profile: .balanced, seconds: 22)
 
         #expect(run.failure == nil)
         #expect(channel.transportRequests >= 1)
@@ -171,12 +175,19 @@ struct EngineEndToEndTests {
         let status = try #require(run.status)
         #expect(status.route == "HLS")
         #expect(status.reconnects >= 1)
-        expectOneTimeline(run.player)
+        // HLS ingest resumes after the last segment delivered, and segments arrive whole: nothing is lost.
+        let before = try #require(channel.segmentRequests.last { $0.time < 4 }?.sequence)
+        let resumed = try #require(channel.segmentRequests.first { $0.time >= 9 }?.sequence)
+        #expect(resumed == before + 1)
+        let frames = pesUnits(in: run.player.downloaded.flatMap { [UInt8]($0.data) }, pid: 0x100)
+            .compactMap { SyntheticTransportStream.picture(in: $0)?.frame }
+        #expect((frames.last ?? 0) >= (resumed + 1) * 50)
+        expectOneTimeline(run.player, maximumMissing: 0)
     }
 
     /// The pictures the player received form one timeline: decode times one frame apart, no
-    /// picture twice, and nothing missing beyond what a splice must skip to reach a keyframe.
-    private func expectOneTimeline(_ player: VirtualPlayer, sourceLocation: SourceLocation = #_sourceLocation) {
+    /// picture twice, and at most `maximumMissing` source pictures skipped.
+    private func expectOneTimeline(_ player: VirtualPlayer, maximumMissing: Int, sourceLocation: SourceLocation = #_sourceLocation) {
         let bytes = player.downloaded.flatMap { [UInt8]($0.data) }
         let pictures = pesUnits(in: bytes, pid: 0x100)
         let frames = pictures.compactMap { SyntheticTransportStream.picture(in: $0)?.frame }
@@ -187,7 +198,8 @@ struct EngineEndToEndTests {
         let steps = Set(zip(times.dropFirst(), times).map { MPEGTS.signedDelta($0, $1) })
         #expect(steps == [3_600], sourceLocation: sourceLocation)
         if let first = frames.first, let last = frames.last {
-            #expect(last - first + 1 - frames.count <= 50, sourceLocation: sourceLocation)
+            #expect(last - first + 1 - frames.count <= maximumMissing, "\(last - first + 1 - frames.count) pictures missing",
+                    sourceLocation: sourceLocation)
         }
     }
 
@@ -216,13 +228,14 @@ struct EngineEndToEndTests {
         let playlistURL = try #require(recorder.ready)
         let startup = elapsed()
         var player = VirtualPlayer(epoch: session.programmeEpoch)
-        var lastReload = -1.0
+        var nextReload = 0.0
         let end = elapsed() + seconds
         while elapsed() < end, recorder.failure == nil {
-            if elapsed() - lastReload >= 1 {
-                lastReload = elapsed()
+            if elapsed() >= nextReload {
+                // Like AVPlayer: a target duration after a playlist that changed, half of one otherwise.
                 let playlist = await fetch(playlistURL)
-                if playlist.status == 200 { player.read(String(decoding: playlist.body, as: UTF8.self)) }
+                let changed = playlist.status == 200 && player.read(String(decoding: playlist.body, as: UTF8.self))
+                nextReload = elapsed() + (changed ? player.targetDuration : player.targetDuration / 2)
                 while let next = player.nextSequence {
                     let segment = await fetch(playlistURL.deletingLastPathComponent().appendingPathComponent("s\(next).ts"))
                     guard segment.status == 200 else { break }
@@ -249,6 +262,7 @@ struct VirtualPlayer {
     }
 
     let epoch: Date
+    private(set) var targetDuration: Double = 4
     private(set) var entries: [Int: Entry] = [:]
     private(set) var downloaded: [(sequence: Int, data: Data)] = []
     private(set) var position: Double?
@@ -261,13 +275,18 @@ struct VirtualPlayer {
         self.epoch = epoch
     }
 
-    mutating func read(_ playlist: String) {
+    /// Reads the local playlist; true when it lists a segment it didn't before.
+    @discardableResult
+    mutating func read(_ playlist: String) -> Bool {
+        let previousLast = entries.keys.max()
         var date: Date?
         var duration = 0.0
         var startOffset = 0.0
         var window: [Int] = []
         for line in playlist.split(separator: "\n").map(String.init) {
-            if line.hasPrefix("#EXT-X-START:TIME-OFFSET=") {
+            if line.hasPrefix("#EXT-X-TARGETDURATION:") {
+                targetDuration = Double(line.dropFirst("#EXT-X-TARGETDURATION:".count)) ?? targetDuration
+            } else if line.hasPrefix("#EXT-X-START:TIME-OFFSET=") {
                 startOffset = Double(line.dropFirst("#EXT-X-START:TIME-OFFSET=".count).split(separator: ",")[0]) ?? 0
             } else if line.hasPrefix("#EXT-X-PROGRAM-DATE-TIME:") {
                 date = Self.date(String(line.dropFirst("#EXT-X-PROGRAM-DATE-TIME:".count)))
@@ -284,6 +303,7 @@ struct VirtualPlayer {
             let target = firstStart + startOffset
             joinSequence = window.last { (entries[$0]?.start ?? .infinity) <= target + 0.001 } ?? first
         }
+        return entries.keys.max() != previousLast
     }
 
     /// The next segment to fetch, once the playlist lists it.
@@ -560,6 +580,7 @@ final class FakeHLSChannel: @unchecked Sendable {
         let origin = ProcessInfo.processInfo.systemUptime
         private let lock = NSLock()
         private var transportCount = 0
+        private var segmentLog: [(time: Double, sequence: Int)] = []
 
         init(segments: [Data], lead: Double, outage: Range<Double>?) {
             self.segments = segments
@@ -571,6 +592,12 @@ final class FakeHLSChannel: @unchecked Sendable {
             lock.lock()
             defer { lock.unlock() }
             return transportCount
+        }
+
+        var segmentRequests: [(time: Double, sequence: Int)] {
+            lock.lock()
+            defer { lock.unlock() }
+            return segmentLog
         }
 
         func respond(to request: LoopbackHTTPServer.Request) -> LoopbackHTTPServer.Response {
@@ -591,6 +618,9 @@ final class FakeHLSChannel: @unchecked Sendable {
                 return .init(status: 200, contentType: "application/vnd.apple.mpegurl", body: Data((lines.joined(separator: "\n") + "\n").utf8))
             }
             if name.hasPrefix("seg"), name.hasSuffix(".ts"), let sequence = Int(name.dropFirst(3).dropLast(3)), sequence < available {
+                lock.lock()
+                segmentLog.append((now, sequence))
+                lock.unlock()
                 return .init(status: 200, contentType: "video/mp2t", body: segments[sequence])
             }
             return .notFound()
@@ -611,6 +641,8 @@ final class FakeHLSChannel: @unchecked Sendable {
     }
 
     var transportRequests: Int { state.transportRequests }
+    /// Segments served, with the channel time each was requested at.
+    var segmentRequests: [(time: Double, sequence: Int)] { state.segmentRequests }
 
     func stop() { server.stop() }
 }

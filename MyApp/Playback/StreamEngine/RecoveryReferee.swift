@@ -258,7 +258,10 @@ nonisolated struct RecoveryReferee {
                 return [finish(.startupFailed)]
             }
         }
-        if let next = nextRoute(after: route), routeFailures[route] >= 2, routeFailures[next] <= routeFailures[route] {
+        // A route that has played gets more patience before the backup is tried: a reconnect to it
+        // comes with the provider's burst, while the backup (often HLS) can run behind it.
+        let patience = streamedRoutes.contains(route) ? 3 : 2
+        if let next = nextRoute(after: route), routeFailures[route] >= patience, routeFailures[next] <= routeFailures[route] {
             return switchRoute(to: next, at: now, drought: drought, reason: "route failing repeatedly")
         }
         let delay = retryDelay(at: now, drought: drought)

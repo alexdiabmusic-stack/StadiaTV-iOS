@@ -27,8 +27,10 @@ nonisolated struct HLSSegmenter {
         /// Shorter first segments so the first picture appears sooner.
         var startupTargetDuration: Double = 1.0
         var startupSegmentCount = 2
-        /// Cut here even without a keyframe (long-GOP sources), keeping EXTINF under the target duration.
-        var maximumDuration: Double = 3.5
+        /// Cut here even without a keyframe (long-GOP sources). IPTV encoders commonly send a keyframe
+        /// every 4 s, which must still cut at keyframes; a cut a frame past this still rounds to the
+        /// target duration, as EXTINF must.
+        var maximumDuration: Double = 4.3
         /// EXT-X-TARGETDURATION; no segment may round above it.
         var playlistTargetDuration = 4
     }
@@ -44,7 +46,18 @@ nonisolated struct HLSSegmenter {
     private var programmeTime: Double = 0
     private var patContinuity: UInt8 = 0x0F
     private var pmtContinuity: UInt8 = 0x0F
+    /// PSI continuity counters before the open segment's tables, restored if it's discarded.
+    private var tablesContinuity: (pat: UInt8, pmt: UInt8) = (0x0F, 0x0F)
     private var lastSegmentSize = 0
+
+    /// Where the latest video keyframe starts in the open segment.
+    private struct KeyframeMark {
+        let time: Int64
+        let offset: Int
+        let program: TSProgram
+        let programVersion: UInt8
+    }
+    private var keyframeMark: KeyframeMark?
 
     init(configuration: Configuration = Configuration()) {
         self.configuration = configuration
@@ -80,6 +93,9 @@ nonisolated struct HLSSegmenter {
                 if unit.duration > 0 { lastDuration = unit.duration }
             }
             if bytes.isEmpty { writeProgramTables(unit.program, version: unit.programVersion) }
+            if unit.isTiming, unit.isKeyframe, unit.kind == .video, let time = unit.time {
+                keyframeMark = KeyframeMark(time: time, offset: bytes.count, program: unit.program, programVersion: unit.programVersion)
+            }
             for packet in unit.packets { bytes.append(contentsOf: packet.bytes) }
         }
         return finished
@@ -90,6 +106,36 @@ nonisolated struct HLSSegmenter {
     mutating func flush() -> MediaSegment? {
         guard let lastTime else { return nil }
         return close(at: MPEGTS.wrap(lastTime + lastDuration))
+    }
+
+    /// Cuts the open segment at the keyframe decoded at `time`: what came before it is returned as a
+    /// finished segment, and the open segment then starts at that keyframe, so it can be discarded
+    /// whole if a reconnect re-sends that GOP. `held` is false when that keyframe isn't in the open segment.
+    mutating func holdTail(fromKeyframeAt time: Int64) -> (held: Bool, closed: MediaSegment?) {
+        guard let mark = keyframeMark, mark.time == time, startTime != nil else { return (false, nil) }
+        guard let start = startTime, MPEGTS.signedDelta(time, start) > 0 else { return (true, nil) }
+        let tail = Array(bytes[mark.offset...])
+        let tailEnd = (lastTime, lastDuration)
+        bytes.removeSubrange(mark.offset...)
+        let closed = close(at: time)
+        writeProgramTables(mark.program, version: mark.programVersion)
+        keyframeMark = KeyframeMark(time: time, offset: bytes.count, program: mark.program, programVersion: mark.programVersion)
+        bytes += tail
+        startTime = time
+        startsWithKeyframe = true
+        (lastTime, lastDuration) = tailEnd
+        return (true, closed)
+    }
+
+    /// Drops the open segment: a reconnect re-sent everything in it.
+    mutating func discardOpenSegment() {
+        if !bytes.isEmpty { (patContinuity, pmtContinuity) = tablesContinuity }
+        bytes = []
+        startTime = nil
+        lastTime = nil
+        startsWithKeyframe = false
+        isDiscontinuity = false
+        keyframeMark = nil
     }
 
     private mutating func beginTiming(at time: Int64, unit: NormalizedUnit) {
@@ -119,10 +165,12 @@ nonisolated struct HLSSegmenter {
         lastTime = nil
         startsWithKeyframe = false
         isDiscontinuity = false
+        keyframeMark = nil
         return segment
     }
 
     private mutating func writeProgramTables(_ program: TSProgram, version: UInt8) {
+        tablesContinuity = (patContinuity, pmtContinuity)
         for packet in PSITables.packetize(section: PSITables.makePAT(for: program, version: version),
                                           pid: MPEGTS.patPID, continuityCounter: &patContinuity) {
             bytes.append(contentsOf: packet.bytes)

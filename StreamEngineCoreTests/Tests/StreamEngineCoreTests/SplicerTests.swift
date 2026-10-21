@@ -38,10 +38,68 @@ struct SplicerTests {
         #expect(harness.splicer.statistics.splices == 0)
     }
 
-    @Test("A reconnect re-sending delivered programme joins after it without repeating a picture")
+    @Test("A reconnect that re-sends the last keyframe takes over from it: nothing skipped, nothing repeated")
+    func resumedAtLastKeyframe() throws {
+        var stream = SyntheticTransportStream()
+        var harness = PipelineHarness()
+        harness.connection(stream.bytes(seconds: 6))
+        // The provider's burst re-sends the last two seconds, from the last keyframe delivered.
+        harness.connection(stream.bytes(seconds: 6, firstFrame: 100))
+        harness.finish()
+
+        #expect(harness.deliveredFrames == Array(0..<249))
+        #expect(Set(harness.videoSteps) == [3_600])
+        #expect(harness.spliceReports.map(\.kind) == [.start, .resumed])
+        let splice = try #require(harness.spliceReports.last)
+        #expect(splice.missingSeconds == 0)
+        #expect(abs(splice.skippedSeconds - 1.96) < 0.001)
+        #expect(!harness.units.contains { $0.startsDiscontinuity })
+        expectContinuousAudio(harness)
+        // The GOP the drop cut short never reached a segment twice.
+        let total = harness.segments.reduce(0) { $0 + $1.duration }
+        #expect(abs(total - 249 * 0.04) < 0.001)
+        for (previous, next) in zip(harness.segments, harness.segments.dropFirst()) {
+            #expect(abs(previous.programmeEnd - next.programmeStart) < 0.000_001)
+        }
+        #expect(harness.segments.allSatisfy { $0.startsWithKeyframe })
+    }
+
+    @Test("A burst starting before the last keyframe is skipped up to it, then taken over from it")
+    func resumedAfterSkippingResentProgramme() throws {
+        var stream = SyntheticTransportStream()
+        var harness = PipelineHarness()
+        harness.connection(stream.bytes(seconds: 6))
+        harness.connection(stream.bytes(seconds: 6, firstFrame: 10))
+        harness.finish()
+
+        #expect(harness.deliveredFrames == Array(0..<159))
+        #expect(harness.spliceReports.map(\.kind) == [.start, .resumed])
+        let splice = try #require(harness.spliceReports.last)
+        // Frames 50–99 were re-sent and skipped, 100–148 re-sent and replaced.
+        #expect(abs(splice.skippedSeconds - (2.0 + 1.96)) < 0.001)
+        expectContinuousAudio(harness)
+    }
+
+    @Test("An open-GOP stream resumed at its last keyframe needs no discontinuity")
+    func resumedOpenGOP() {
+        var stream = SyntheticTransportStream()
+        stream.openGOP = true
+        var harness = PipelineHarness()
+        harness.connection(stream.bytes(seconds: 6))
+        harness.connection(stream.bytes(seconds: 6, firstFrame: 100))
+        harness.finish()
+
+        #expect(harness.deliveredFrames == Array(0..<249))
+        #expect(harness.spliceReports.map(\.kind) == [.start, .resumed])
+        #expect(!harness.units.contains { $0.startsDiscontinuity })
+        #expect(!harness.segments.contains { $0.isDiscontinuity })
+    }
+
+    @Test("Without a held GOP, re-sent programme is skipped up to the next keyframe")
     func overlapRemoved() throws {
         var stream = SyntheticTransportStream()
         var harness = PipelineHarness()
+        harness.holdsTail = false
         harness.connection(stream.bytes(seconds: 6))
         // The provider's burst re-sends the last two seconds the reserve already holds.
         harness.connection(stream.bytes(seconds: 6, firstFrame: 100))
@@ -131,7 +189,7 @@ struct SplicerTests {
         harness.connection(restarted.bytes(seconds: 6, firstFrame: 200), outageBefore: 3)
         harness.finish()
 
-        #expect(harness.spliceReports.map(\.kind) == [.start, .overlapRemoved, .timebaseReset, .gapClosed])
+        #expect(harness.spliceReports.map(\.kind) == [.start, .resumed, .timebaseReset, .gapClosed])
         let packets = harness.units.flatMap(\.packets)
         #expect(Set(packets.map(\.pid)) == [0x100, 0x101])
         var last: [UInt16: UInt8] = [:]
@@ -262,6 +320,96 @@ struct SplicerTests {
         #expect(harness.segments.allSatisfy { $0.startsWithKeyframe && $0.duration > 0.7 && $0.duration < 2.1 })
         let total = harness.segments.reduce(0) { $0 + $1.duration }
         #expect(abs(total - Double(harness.units.count) * 1_920 / 90_000) < 0.001)
+    }
+
+    @Test("A drop keeps the audio the connection delivered whole; only the open picture is lost")
+    func wholeAudioAtDrop() throws {
+        var stream = SyntheticTransportStream()
+        let bytes = stream.bytes(seconds: 2)
+        var harness = PipelineHarness()
+        harness.holdsTail = false
+        harness.connection(bytes)
+        harness.connection(stream.bytes(seconds: 2, firstFrame: 50))
+        harness.finish()
+
+        let firstConnection = harness.units[..<harness.connectionStarts[1]]
+        // Audio PES announce their length, so the last one sent, whole, is delivered.
+        let offset = MPEGTS.signedDelta(try #require(harness.videoUnits.first?.pts), stream.pts(frame: 0))
+        let lastSent = try #require(pesUnits(in: bytes, pid: stream.audioPID).last?.parseHeader()?.pts)
+        let lastDelivered = try #require(firstConnection.last { $0.kind == .audio }?.pts)
+        #expect(MPEGTS.signedDelta(lastDelivered, lastSent) == offset)
+        // A video PES doesn't say where it ends: the last picture could have been cut short.
+        #expect(firstConnection.filter { $0.kind == .video }.count == 49)
+        #expect(harness.spliceReports.map(\.kind) == [.start, .gapClosed])
+        expectContinuousAudio(harness)
+    }
+
+    @Test("Re-sent audio straddling a splice is cut at an AAC frame, not dropped whole")
+    func straddlingAudioTrimmed() throws {
+        var stream = SyntheticTransportStream()
+        stream.audioFramesPerPES = 8
+        let start = stream.bytes(seconds: 4)
+        let resent = stream.bytes(seconds: 8, firstFrame: 100)
+        var harness = PipelineHarness()
+        harness.holdsTail = false
+        // The drop tears frame 130; the reconnect re-sends from frame 100, so the splice skips to
+        // frame 150 and the audio re-sent around it overlaps what was already played.
+        let pictures = transportPackets(resent).indices.filter {
+            let packet = transportPackets(resent)[$0]
+            return packet.pid == stream.videoPID && packet.payloadUnitStart
+        }
+        harness.connection(start + resent[..<((pictures[30] + 2) * 188 + 50)])
+        harness.connection(resent)
+        harness.finish()
+
+        #expect(harness.spliceReports.map(\.kind) == [.start, .overlapRemoved])
+        #expect(harness.splicer.statistics.trimmedAudioUnits == 1)
+        let spans = try harness.audioUnits.map { unit -> (start: Int64, end: Int64) in
+            let pes = PESUnit(sourcePID: stream.audioPID, packets: unit.packets)
+            let header = try #require(pes.parseHeader())
+            let start = try #require(unit.pts)
+            return (start, start + (pes.adtsDuration(dataOffset: header.dataOffset) ?? 0))
+        }
+        // Each PES picks up where the previous one ended, give or take the 480-tick tolerance.
+        let gaps = zip(spans.dropFirst(), spans).map { MPEGTS.signedDelta($0.start, $1.end) }
+        #expect(gaps.allSatisfy { $0 >= -480 && $0 < 1_920 }, "audio gaps \(Set(gaps).sorted())")
+    }
+
+    @Test("HLS segments join seamlessly across a reconnect, the last picture of the last one included")
+    func wholeSegmentsAcrossReconnect() {
+        var stream = SyntheticTransportStream()
+        var harness = PipelineHarness()
+        harness.segmentedIngest = true
+        // Two-second segments; the reconnect resumes right after the last one delivered.
+        harness.connection(stream.bytes(seconds: 2) + stream.bytes(seconds: 2, firstFrame: 50))
+        harness.connection(stream.bytes(seconds: 2, firstFrame: 100))
+        harness.finish()
+
+        #expect(harness.deliveredFrames == Array(0..<150))
+        #expect(harness.spliceReports.map(\.kind) == [.start, .seamless])
+        #expect(harness.spliceReports.last?.missingSeconds == 0)
+        #expect(Set(harness.videoSteps) == [3_600])
+        // Every audio frame in place across the splice: none lost, none overlapping.
+        #expect(Set(harness.audioSteps) == [1_920])
+    }
+
+    @Test("An HLS discontinuity keeps the last picture of the segment before it")
+    func pictureBeforeDiscontinuity() {
+        var first = SyntheticTransportStream()
+        var second = SyntheticTransportStream(startPTS: 5_000_000, content: 1)
+        var harness = PipelineHarness()
+        harness.segmentedIngest = true
+        harness.connection(first.bytes(seconds: 2))
+        harness.sourceDiscontinuity()
+        harness.feed(second.bytes(seconds: 2))
+        harness.finish()
+
+        let pictures = harness.deliveredPictures
+        #expect(pictures.map(\.frame) == Array(0..<50) + Array(0..<50))
+        #expect(pictures.map(\.content) == Array(repeating: 0, count: 50) + Array(repeating: 1, count: 50))
+        #expect(harness.spliceReports.map(\.kind) == [.start, .timebaseReset])
+        #expect(Set(harness.videoSteps) == [3_600])
+        expectContinuousAudio(harness)
     }
 
     @Test("A connection that dies mid-picture never leaks the torn picture into the next one")

@@ -40,7 +40,9 @@ nonisolated struct StreamEngineConfiguration: Equatable, Sendable {
 
     // Detection and recovery.
     /// A silent connection is replaced after somewhere between these, depending on how much reserve is left.
-    var stallTimeoutMinimum: Double = 4
+    /// Panels that restream an HLS source pause about five seconds between deliveries as a matter of
+    /// course, before their rhythm has been learned; the minimum leaves room for that.
+    var stallTimeoutMinimum: Double = 6
     var stallTimeoutMaximum: Double = 12
     /// Keep this much buffer in hand when deciding how long to wait out a silent connection.
     var stallSafetyMargin: Double = 6

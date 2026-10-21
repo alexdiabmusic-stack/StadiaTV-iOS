@@ -202,6 +202,18 @@ nonisolated struct PESUnit {
 
     var byteCount: Int { packets.count * MPEGTS.packetSize }
 
+    /// Whether every byte the PES header announces has arrived; nil when the header leaves the
+    /// length open, as video PES usually do, so only the next unit's start shows where it ends.
+    var isCompleteByLength: Bool? {
+        let positions = payloadPositions(limit: 6)
+        guard positions.count == 6 else { return false }
+        func byte(_ index: Int) -> UInt8 { packets[positions[index].packet].bytes[positions[index].offset] }
+        guard byte(0) == 0x00, byte(1) == 0x00, byte(2) == 0x01 else { return false }
+        let declared = Int(byte(4)) << 8 | Int(byte(5))
+        guard declared > 0 else { return nil }
+        return packets.reduce(0) { $0 + $1.payload.count } >= 6 + declared
+    }
+
     /// Playing time of an ADTS AAC PES, in 90 kHz ticks, counted from its frame headers.
     /// A PES often carries several AAC frames, so its start time alone doesn't say where it ends.
     func adtsDuration(dataOffset: Int) -> Int64? {
@@ -225,6 +237,68 @@ nonisolated struct PESUnit {
         }
         guard let sampleRate, samples > 0 else { return nil }
         return Int64(samples) * MPEGTS.clockRate / Int64(sampleRate)
+    }
+
+    /// This ADTS AAC PES without the frames that begin in its first `ticks`, its timestamps moved
+    /// past them. A PES often holds a fifth of a second of audio or more: when a splice has already
+    /// played the start of one, cutting at a frame keeps the rest instead of leaving a hole. Nil when
+    /// the payload isn't ADTS, a packet carries a PCR, or no frame would be left.
+    func droppingADTSFrames(startingWithin ticks: Int64, header: Header) -> (unit: PESUnit, header: Header, droppedTicks: Int64)? {
+        guard ticks > 0, let pts = header.pts, let last = packets.last, !packets.contains(where: { $0.pcrBase != nil }) else {
+            return nil
+        }
+        var pes: [UInt8] = []
+        for packet in packets { pes += packet.payload }
+        let rates = [96_000, 88_200, 64_000, 48_000, 44_100, 32_000, 24_000, 22_050, 16_000, 12_000, 11_025, 8_000, 7_350]
+        func frame(at index: Int) -> (length: Int, samples: Int, rate: Int)? {
+            guard index + 7 <= pes.count, pes[index] == 0xFF, pes[index + 1] & 0xF0 == 0xF0 else { return nil }
+            let rateIndex = Int((pes[index + 2] >> 2) & 0x0F)
+            let length = (Int(pes[index + 3] & 0x03) << 11) | (Int(pes[index + 4]) << 3) | Int(pes[index + 5] >> 5)
+            guard rateIndex < rates.count, length >= 7, index + length <= pes.count else { return nil }
+            return (length, (Int(pes[index + 6] & 0x03) + 1) * 1024, rates[rateIndex])
+        }
+        var index = header.dataOffset
+        var samples = 0
+        var dropped: Int64 = 0
+        while dropped < ticks, let next = frame(at: index) {
+            index += next.length
+            samples += next.samples
+            dropped = Int64(samples) * MPEGTS.clockRate / Int64(next.rate)
+        }
+        guard dropped > 0, frame(at: index) != nil else { return nil }
+
+        var trimmed = Array(pes[..<header.dataOffset]) + pes[index...]
+        let declared = Int(trimmed[4]) << 8 | Int(trimmed[5])
+        if declared > 0 {
+            let length = declared - (index - header.dataOffset)
+            guard length > 0 else { return nil }
+            trimmed[4] = UInt8(length >> 8)
+            trimmed[5] = UInt8(length & 0xFF)
+        }
+        // Repacketized on the same PID; the counters count back from the original last packet, so
+        // the next PES still follows on.
+        let count = (trimmed.count + 183) / 184
+        var rebuilt: [TSPacket] = []
+        rebuilt.reserveCapacity(count)
+        for number in 0..<count {
+            let chunk = trimmed[(number * 184)..<min((number + 1) * 184, trimmed.count)]
+            let counter = (last.continuityCounter &- UInt8((count - 1 - number) & 0x0F)) & 0x0F
+            var bytes: [UInt8] = [0x47, (last.bytes[1] & 0x1F) | (number == 0 ? 0x40 : 0), last.bytes[2], 0x10 | counter]
+            if chunk.count < 184 {
+                // Adaptation-field stuffing fills the last packet.
+                let stuffing = 183 - chunk.count
+                bytes[3] |= 0x20
+                bytes.append(UInt8(stuffing))
+                if stuffing > 0 { bytes += [0x00] + [UInt8](repeating: 0xFF, count: stuffing - 1) }
+            }
+            bytes += chunk
+            rebuilt.append(TSPacket(bytes: bytes))
+        }
+        var unit = PESUnit(sourcePID: sourcePID, packets: rebuilt)
+        guard let parsed = unit.parseHeader() else { return nil }
+        unit.rewriteTimestamps(parsed, pts: MPEGTS.wrap(pts + dropped), dts: header.dts.map { MPEGTS.wrap($0 + dropped) })
+        guard let shifted = unit.parseHeader() else { return nil }
+        return (unit, shifted, dropped)
     }
 
     /// FNV-1a over the first elementary-stream bytes: identifies the same coded picture when a

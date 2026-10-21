@@ -92,6 +92,9 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
     private var connectionCadence: Double = 0
     private var connectionsOpened = 0
     private var lastOutputEnd: Int64?
+    /// Since when the GOP a drop cut short is held out of the reserve, waiting to see whether the
+    /// reconnect re-sends it whole.
+    private var tailHeldSince: Double?
 
     // Playback feedback from the player.
     private var playhead: Double?
@@ -100,6 +103,8 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
     private var playerWaiting = false
     private var playerPlaying = false
     private var firstPublishedAt: Double?
+    /// When the first segment reached the reserve.
+    private var firstSegmentAt: Double?
     private var firstPublishedStart: Double?
     private var holdForRebuffer = false
     private var joinTarget: Double?
@@ -221,6 +226,11 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
 
     private func now() -> Double { ProcessInfo.processInfo.systemUptime - clockOrigin }
 
+    /// Longest a cut-short GOP waits for the reconnect to re-send it.
+    private static let tailHoldLimit: Double = 6
+    /// Longest the first playlist waits for a few seconds of programme.
+    private static let startupWaitLimit: Double = 3
+
     private func perform(_ actions: [RecoveryReferee.Action]) {
         for action in actions {
             switch action {
@@ -267,9 +277,39 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
     }
 
     private func finishConnectionPipeline() {
-        splicer.endConnection()
+        // HLS ingest hands over whole segments, so the PES packets one leaves open are whole.
+        let finished = splicer.endConnection(atUnitBoundary: hlsRoutes[connectionRoute] != nil, wallTime: now())
+        if !finished.isEmpty { commit(finished, at: now()) }
         aligner.reset()
         health.connectionClosed()
+        holdTail()
+    }
+
+    /// After a drop, what arrived up to the last keyframe goes into the reserve at once; the rest of
+    /// that GOP is held back. Providers re-send the last seconds on reconnect: when the new connection
+    /// re-sends that keyframe, it delivers the GOP again, complete, and the splice loses nothing.
+    /// Only while the reserve can cover the wait; HLS ingest resumes after its last segment instead.
+    private func holdTail() {
+        let isTransportStream = hlsRoutes[connectionRoute] == nil
+        if isTransportStream, let keyframe = splicer.resumeKeyframeTime {
+            // Cutting at the keyframe is harmless either way: what came before it is playable now.
+            let split = segmenter.holdTail(fromKeyframeAt: keyframe)
+            if let closed = split.closed {
+                reserve.append(closed)
+                publishIfNeeded()
+            }
+            if split.held, reserveAhead(now()) >= tailHoldMinimum {
+                tailHeldSince = tailHeldSince ?? now()
+                return
+            }
+        }
+        releaseTail()
+    }
+
+    /// Commits whatever the segmenter holds, so it can be played; no resume after this.
+    private func releaseTail() {
+        tailHeldSince = nil
+        splicer.discardResumePoint()
         if let segment = segmenter.flush() {
             reserve.append(segment)
             publishIfNeeded()
@@ -289,7 +329,8 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
         case .segmentDelivered(let sequence):
             hlsDelivered[connectionRoute] = sequence
         case .sourceDiscontinuity:
-            splicer.beginSourceDiscontinuity()
+            let finished = splicer.beginSourceDiscontinuity(wallTime: time)
+            if !finished.isEmpty { commit(finished, at: time) }
             journal.record(.splice, "Provider announced a discontinuity", buffered: bufferedAhead(time))
         case .playlist(let text, let url):
             // This route serves HLS: switch it to playlist ingest without counting a failure.
@@ -312,7 +353,11 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
     private func ingest(_ data: Data, at time: Double) {
         let packets = aligner.push(data)
         guard !packets.isEmpty else { return }
-        let units = splicer.process(packets, wallTime: time)
+        commit(splicer.process(packets, wallTime: time), at: time)
+    }
+
+    /// Takes what the splicer produced through the segmenter into the reserve.
+    private func commit(_ units: [NormalizedUnit], at time: Double) {
         handleSplicerEvents(at: time)
         let finished = segmenter.append(units)
         if let end = splicer.outputEnd {
@@ -344,6 +389,22 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
                 journal.record(.splice, "Program: \(program.codecSummary)", buffered: bufferedAhead(time))
             case .splice(let report):
                 guard report.kind != .start else { continue }
+                if report.kind == .resumed {
+                    // The held GOP is being delivered again, complete.
+                    segmenter.discardOpenSegment()
+                    tailHeldSince = nil
+                    journal.record(.splice, String(format: "Rejoined at the last keyframe, nothing missed (%.1f s re-sent)", report.skippedSeconds),
+                                   buffered: bufferedAhead(time))
+                    continue
+                }
+                if tailHeldSince != nil {
+                    // Not re-sent: what was held plays before the new connection's programme.
+                    tailHeldSince = nil
+                    if let segment = segmenter.flush() {
+                        reserve.append(segment)
+                        publishIfNeeded()
+                    }
+                }
                 var message = "Spliced (\(report.kind.rawValue))"
                 if report.skippedSeconds > 0 { message += String(format: ", skipped %.1f s already played", report.skippedSeconds) }
                 if report.missingSeconds > 0.05 { message += String(format: ", %.1f s of programme missing", report.missingSeconds) }
@@ -359,6 +420,24 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
 
     /// Programme time at the end of everything ingested.
     private var ingestEdge: Double { (reserve.ingestEnd ?? 0) + segmenter.openDuration }
+
+    /// Programme in the reserve ahead of the picture, not counting the segment still being cut.
+    private func reserveAhead(_ time: Double) -> Double {
+        guard let end = reserve.ingestEnd else { return 0 }
+        guard let head = estimatedPlayhead(time) else { return end - (reserve.published.first?.programmeStart ?? end) }
+        return max(0, end - head)
+    }
+
+    /// A GOP is only held while the player has this much else ahead of it: enough to keep playing
+    /// through AVPlayer's playlist reload delay (a target duration) if the hold ends late.
+    private var tailHoldMinimum: Double { Double(configuration.segmenter.playlistTargetDuration) + 1.5 }
+
+    /// Silence that is normal on the current connection: an HLS playlist's target duration between
+    /// segments, or the rhythm a continuous stream has been seen to deliver in.
+    private var normalSilence: Double {
+        max(connectionCadence > 0 ? 2 * connectionCadence + 2 : 0,
+            health.deliveryCadence > 0 ? 1.5 * health.deliveryCadence + 1 : 0)
+    }
 
     /// AVPlayer's position, extrapolated between reports.
     private func estimatedPlayhead(_ time: Double) -> Double? {
@@ -398,7 +477,13 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
         var changed = false
         if reserve.publishedCount == 0 {
             guard let first = reserve.segments.first else { return }
-            // Fast start: the first segment goes out immediately, then up to the lead.
+            // AVPlayer reloads a live playlist only a target duration after loading it, so the first
+            // playlist must carry enough to play until then: wait for that (the provider's burst
+            // usually brings it at once), but not for long when the provider sends in real time.
+            let firstSegmentAt = self.firstSegmentAt ?? time
+            self.firstSegmentAt = firstSegmentAt
+            let startupLead = min(configuration.lead, Double(configuration.segmenter.playlistTargetDuration) + 1)
+            guard reserve.reserveSeconds >= startupLead || time - firstSegmentAt >= Self.startupWaitLimit else { return }
             reserve.publishNext()
             reserve.publish(before: first.programmeStart + configuration.lead)
             firstPublishedAt = time
@@ -455,13 +540,17 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
         }
 
         perform(referee.tick(.init(now: time, buffered: buffered, isStarved: starved, health: health,
-                                   silenceFloor: connectionCadence > 0 ? 2 * connectionCadence + 2 : 0)))
+                                   silenceFloor: normalSilence)))
         guard !stopped else { return }
+        if let since = tailHeldSince, time - since >= Self.tailHoldLimit || reserveAhead(time) < tailHoldMinimum - 1 {
+            journal.record(.splice, "Reconnect slow: releasing the held GOP", buffered: buffered)
+            releaseTail()
+        }
         publishIfNeeded()
         reserve.evict(playhead: estimatedPlayhead(time))
 
         if time - lastPaceUpdate >= 1 {
-            let isOutage = connection == nil || (health.programmeDrought(at: time) ?? 0) > 3
+            let isOutage = connection == nil || (health.programmeDrought(at: time) ?? 0) > max(3, normalSilence)
             if let rate = pace.update(buffered: buffered, deliveryRatio: health.slowRatio, isOutage: isOutage,
                                       isStarved: starved, configuration: configuration, elapsed: time - lastPaceUpdate) {
                 emitEvent(.pace(rate))

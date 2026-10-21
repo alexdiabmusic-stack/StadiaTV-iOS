@@ -99,6 +99,23 @@ struct RefereeTests {
         #expect(delays == [15, 30, 60, 60])
     }
 
+    @Test("A route that has played gets three failures before the backup is tried")
+    func patienceForAPlayingRoute() {
+        var referee = playingReferee(routes: 2)
+        var now = 50.0
+        var routes: [Int] = []
+        for _ in 0..<3 {
+            let actions = referee.connectionEnded(.stalled, at: now, openedAt: now - 5, deliveredProgramme: true, drought: 1)
+            if let delay = retryDelay(referee, after: actions, at: now), delay > 0 {
+                now += delay
+                _ = referee.tick(observation(now, health: health(lastDelivery: now)))
+            }
+            routes.append(referee.currentRoute)
+            now += 1
+        }
+        #expect(routes == [0, 0, 1])
+    }
+
     @Test("Two routes failing instantly never add up to more than 15 connections a minute")
     func noReconnectStorm() {
         var referee = playingReferee(routes: 2)
@@ -153,7 +170,7 @@ struct RefereeTests {
     }
 
     @Test("A silent connection is replaced sooner when the reserve is low", arguments: [
-        (20.0, 0.0, 12.0), (14.0, 0.0, 8.0), (5.0, 0.0, 4.0), (20.0, 14.0, 14.0)
+        (20.0, 0.0, 12.0), (14.0, 0.0, 8.0), (5.0, 0.0, 6.0), (20.0, 14.0, 14.0)
     ])
     func stallTimeout(buffered: Double, silenceFloor: Double, expected: Double) {
         var referee = playingReferee()
@@ -471,6 +488,59 @@ struct PaceAndHealthTests {
         #expect(health.condition(at: now, buffered: 10, configuration: balanced) == .marginal)
     }
 
+    @Test("A stream restreamed from HLS arrives every few seconds, and that rhythm is learned")
+    func deliveryCadence() {
+        var bursty = StreamHealthMonitor()
+        bursty.connectionOpened(at: 0)
+        // The provider's burst on connect, then a segment's worth every 4.7 s.
+        bursty.received(bytes: 4_000_000, at: 0.5)
+        var now = 0.5
+        for _ in 0..<10 {
+            now += 4.7
+            bursty.received(bytes: 3_000_000, at: now)
+        }
+        #expect(abs(bursty.deliveryCadence - 4.7) < 0.01)
+        // One long stall doesn't become the rhythm.
+        now += 12
+        bursty.received(bytes: 3_000_000, at: now)
+        #expect(abs(bursty.deliveryCadence - 4.7) < 0.01)
+
+        var steady = StreamHealthMonitor()
+        steady.connectionOpened(at: 0)
+        for second in 1...20 { steady.received(bytes: 500_000, at: Double(second)) }
+        #expect(abs(steady.deliveryCadence - 1) < 0.01)
+    }
+
+    @Test("A source delivering a segment every few seconds reads as real time, not as a slow line")
+    func burstyDeliveryRatio() {
+        var health = StreamHealthMonitor()
+        var pace = PlaybackPaceController()
+        health.connectionOpened(at: 0)
+        health.received(bytes: 2_000_000, at: 0.5)
+        health.ingested(programmeSeconds: 7, at: 0.5)
+        var lowest = Double.infinity
+        var highest = 0.0
+        var enteredSlowLine = false
+        for tick in 1...1_200 {
+            let now = 0.5 + Double(tick) * 0.25
+            // 4.75 s of programme every 4.75 s.
+            if tick.isMultiple(of: 19) {
+                health.received(bytes: 2_000_000, at: now)
+                health.ingested(programmeSeconds: 4.75, at: now)
+            }
+            health.sample(at: now)
+            // After the connect burst has worn off.
+            guard now > 120, let ratio = health.slowRatio else { continue }
+            lowest = min(lowest, ratio)
+            highest = max(highest, ratio)
+            _ = pace.update(buffered: 10, deliveryRatio: ratio, isOutage: false, isStarved: false, configuration: balanced, elapsed: 0.25)
+            enteredSlowLine = enteredSlowLine || pace.slowLineActive
+        }
+        #expect(abs(health.deliveryCadence - 4.75) < 0.01)
+        #expect(lowest > 0.95 && highest < 1.05, "ratio \(lowest)…\(highest)")
+        #expect(!enteredSlowLine)
+    }
+
     @Test("Silence reads as a pause first, then as a stall that depends on the reserve")
     func silence() {
         var health = StreamHealthMonitor()
@@ -481,12 +551,13 @@ struct PaceAndHealthTests {
         #expect(health.condition(at: 2, buffered: 20, configuration: balanced) == .healthy)
         #expect(health.condition(at: 4, buffered: 20, configuration: balanced) == .deliveryPause)
         #expect(health.condition(at: 13, buffered: 20, configuration: balanced) == .stalled)
-        #expect(health.condition(at: 5, buffered: 5, configuration: balanced) == .stalled)
+        #expect(health.condition(at: 6, buffered: 5, configuration: balanced) == .deliveryPause)
+        #expect(health.condition(at: 7, buffered: 5, configuration: balanced) == .stalled)
         #expect(health.silence(at: 4) == 3)
         health.connectionClosed()
         #expect(health.silence(at: 4) == nil)
         #expect(health.programmeDrought(at: 4) == 3)
-        #expect(StreamHealthMonitor.stallTimeout(buffered: 0, configuration: balanced) == 4)
+        #expect(StreamHealthMonitor.stallTimeout(buffered: 0, configuration: balanced) == 6)
         #expect(StreamHealthMonitor.stallTimeout(buffered: 14, configuration: balanced) == 8)
         #expect(StreamHealthMonitor.stallTimeout(buffered: 60, configuration: balanced) == 12)
     }
@@ -510,7 +581,8 @@ struct PaceAndHealthTests {
             #expect(profile.lead < profile.targetBuffer)
             #expect(profile.buildRate < profile.trickleRate && profile.trickleRate < 1 && profile.shedRate > 1)
             #expect(profile.slowLineFloor <= profile.buildRate)
-            #expect(Double(profile.segmenter.playlistTargetDuration) >= profile.segmenter.maximumDuration)
+            // A forced cut, even a frame late, rounds to no more than the target duration.
+            #expect((profile.segmenter.maximumDuration + 0.1).rounded() <= Double(profile.segmenter.playlistTargetDuration))
         }
         let tile = maximum.forMultiviewTile()
         #expect(tile.profile == .fast)

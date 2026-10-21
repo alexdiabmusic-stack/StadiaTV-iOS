@@ -2,8 +2,9 @@ import Foundation
 @testable import StreamEngineCore
 
 /// Builds small, deterministic MPEG transport streams for the engine's tests: H.264 or HEVC video
-/// (parameter sets and IDR, open-GOP intra or predicted pictures) at 25 fps and ADTS AAC audio,
-/// with PAT/PMT, PCR and per-PID continuity counters, the way an IPTV encoder emits them.
+/// (parameter sets and IDR, open-GOP intra or predicted pictures) at 25 fps, ADTS AAC audio and
+/// optionally E-AC-3 5.1 tracks, with PAT/PMT, PCR and per-PID continuity counters, the way an
+/// IPTV encoder emits them.
 ///
 /// Every picture carries its frame number and its encoder's identity in its payload, so a test
 /// can tell exactly which pictures reached the output, and in what order.
@@ -29,12 +30,24 @@ struct SyntheticTransportStream {
     var content: UInt8 = 0
     /// Keyframes after the first are non-IDR intra pictures (H.264 I slices, HEVC CRA).
     var openGOP = false
+    /// NAL units (without start codes) sent before each keyframe's slice instead of placeholder
+    /// parameter sets: a real VPS/SPS/PPS (and SEI) lets the stream be repackaged as fragmented MP4.
+    var parameterSets: [[UInt8]]?
+    /// The AAC track's ISO 639-2 language, announced in the PMT.
+    var audioLanguage: String?
+    /// Further audio tracks: E-AC-3 5.1 at 48 kHz, one 1536-sample access unit per PES, with their languages.
+    var surroundTracks: [(pid: UInt16, language: String)] = []
+    /// Audio blocks per E-AC-3 syncframe (1, 2, 3 or 6): an access unit takes 6 / blocks syncframes.
+    var surroundBlocks = 6
+    /// Each access unit also carries a dependent substream, the way 7.1 is sent.
+    var surroundDependent = false
 
     private var continuity: [UInt16: UInt8] = [:]
     /// Where the previous call stopped, so a call that carries on from it continues the audio
     /// without repeating any (relative to the frame clock, so a clock jump moves audio too).
     private var resumeFrame: Int?
     private var resumeAudioOffset: Int64 = 0
+    private var resumeSurroundOffset: Int64 = 0
 
     init(startPTS: Int64 = 900_000, content: UInt8 = 0) {
         self.startPTS = startPTS
@@ -48,6 +61,8 @@ struct SyntheticTransportStream {
         var output: [UInt8] = []
         let audioOffset = resumeFrame == firstFrame ? resumeAudioOffset : -frameTicks
         var nextAudioPTS = MPEGTS.wrap(pts(frame: firstFrame) + audioOffset)
+        let surroundOffset = resumeFrame == firstFrame ? resumeSurroundOffset : -frameTicks
+        var nextSurroundPTS = MPEGTS.wrap(pts(frame: firstFrame) + surroundOffset)
         for index in firstFrame..<(firstFrame + frames) {
             if (index - firstFrame) % 10 == 0 { output += programTables() }
             let framePTS = pts(frame: index)
@@ -56,13 +71,21 @@ struct SyntheticTransportStream {
                 output += audioPES(pts: nextAudioPTS)
                 nextAudioPTS = MPEGTS.wrap(nextAudioPTS + audioTicks * Int64(audioFramesPerPES))
             }
+            while !surroundTracks.isEmpty, MPEGTS.signedDelta(nextSurroundPTS, framePTS + frameTicks) < 0 {
+                for track in surroundTracks { output += surroundPES(pid: track.pid, pts: nextSurroundPTS) }
+                nextSurroundPTS = MPEGTS.wrap(nextSurroundPTS + Self.eac3Ticks)
+            }
         }
         resumeFrame = firstFrame + frames
         resumeAudioOffset = MPEGTS.signedDelta(nextAudioPTS, pts(frame: firstFrame + frames))
+        resumeSurroundOffset = MPEGTS.signedDelta(nextSurroundPTS, pts(frame: firstFrame + frames))
         return output
     }
 
     func pts(frame: Int) -> Int64 { MPEGTS.wrap(startPTS + Int64(frame) * frameTicks) }
+
+    /// Starts every PID's continuity counter afresh, as a new segmenter or muxer would.
+    mutating func resetContinuity() { continuity.removeAll() }
 
     func kind(of frame: Int) -> PictureKind {
         guard frame % gop == 0 else { return .predicted }
@@ -78,7 +101,12 @@ struct SyntheticTransportStream {
                                             kind: TSProgram.kind(streamType: videoStreamType, descriptors: []), descriptors: []))
         }
         if includeAudio {
-            streams.append(TSProgram.Stream(pid: audioPID, streamType: 0x0F, kind: .audio(.aac), descriptors: []))
+            streams.append(TSProgram.Stream(pid: audioPID, streamType: 0x0F, kind: .audio(.aac),
+                                            descriptors: audioLanguage.map(Self.languageDescriptor) ?? []))
+        }
+        for track in surroundTracks {
+            streams.append(TSProgram.Stream(pid: track.pid, streamType: 0x87, kind: .audio(.eac3),
+                                            descriptors: Self.languageDescriptor(track.language)))
         }
         return TSProgram(programNumber: 1, pmtPID: pmtPID, pcrPID: includeVideo ? videoPID : audioPID,
                          programDescriptors: [], streams: streams)
@@ -116,7 +144,9 @@ struct SyntheticTransportStream {
         var es: [UInt8]
         if videoStreamType == 0x24 {
             es = [0, 0, 0, 1, 0x46, 0x01, 0x50]
-            if kind != .predicted {
+            if kind != .predicted, let parameterSets {
+                for unit in parameterSets { es += [0, 0, 0, 1] + unit }
+            } else if kind != .predicted {
                 es += [0, 0, 0, 1, 0x40, 0x01, 0x0C, 0x01, 0xFF, 0xFF, 0x01, 0x60]
                 es += [0, 0, 0, 1, 0x42, 0x01, 0x01, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90]
                 es += [0, 0, 0, 1, 0x44, 0x01, 0xC1, 0x72, 0xB4, 0x62, 0x40]
@@ -128,7 +158,9 @@ struct SyntheticTransportStream {
             }
         } else {
             es = [0, 0, 0, 1, 0x09, 0xF0]
-            if kind != .predicted {
+            if kind != .predicted, let parameterSets {
+                for unit in parameterSets { es += [0, 0, 0, 1] + unit }
+            } else if kind != .predicted {
                 es += [0, 0, 0, 1, 0x67, 0x64, 0x00, 0x1F, 0xAC, 0xD9, 0x40, 0x50, 0x05, 0xBB, 0x01, 0x10]
                 es += [0, 0, 0, 1, 0x68, 0xEB, 0xE3, 0xCB, 0x22, 0xC0]
             }
@@ -157,6 +189,35 @@ struct SyntheticTransportStream {
         pes[4] = UInt8((pes.count - 6) >> 8)
         pes[5] = UInt8((pes.count - 6) & 0xFF)
         return packetize(pid: audioPID, pes: pes, pcr: includeVideo ? nil : pts - 9_000, randomAccess: false)
+    }
+
+    mutating func surroundPES(pid: UInt16, pts: Int64) -> [UInt8] {
+        var pes = Self.pesHeader(streamID: 0xBD, pts: pts, dts: nil)
+        let filler = UInt8(truncatingIfNeeded: pts / Self.eac3Ticks) | 0x01
+        for _ in 0..<(6 / surroundBlocks) { pes += Self.eac3Frame(blocks: surroundBlocks, filler: filler) }
+        if surroundDependent { pes += Self.eac3Frame(dependent: true, filler: filler) }
+        pes[4] = UInt8((pes.count - 6) >> 8)
+        pes[5] = UInt8((pes.count - 6) & 0xFF)
+        return packetize(pid: pid, pes: pes, pcr: nil, randomAccess: false)
+    }
+
+    /// 1536 samples at 48 kHz.
+    static let eac3Ticks: Int64 = 2_880
+
+    /// One E-AC-3 syncframe: independent substream 0 of `blocks` audio blocks (256 samples each),
+    /// 5.1 at 48 kHz, 384 kb/s.
+    static func eac3Frame(blocks: Int = 6, substream: UInt8 = 0, dependent: Bool = false, filler: UInt8 = 0x11) -> [UInt8] {
+        let blockCode: UInt8 = [1: 0, 2: 1, 3: 2, 6: 3][blocks] ?? 3
+        let words = 128 * blocks
+        // strmtyp, substreamid, frmsiz; fscod 0 (48 kHz), numblkscod, acmod 7, lfeon 1; bsid 16.
+        let header: [UInt8] = [0x0B, 0x77, (dependent ? 0x40 : 0x00) | substream << 3 | UInt8((words - 1) >> 8),
+                               UInt8((words - 1) & 0xFF), blockCode << 4 | 0x0F, 0x80]
+        return header + [UInt8](repeating: filler, count: words * 2 - header.count)
+    }
+
+    /// ISO 639 language descriptor: the code and audio type 0 (undefined).
+    static func languageDescriptor(_ code: String) -> [UInt8] {
+        [0x0A, 4] + Array(code.utf8.prefix(3)) + [0]
     }
 
     /// One ADTS AAC-LC frame of 1024 samples, stereo, at sampling-frequency index `rateIndex` (3 is 48 kHz).
@@ -304,7 +365,8 @@ struct PipelineHarness {
     /// Where the held GOP starts in `units`.
     private var heldTailStart: Int?
 
-    mutating func connection(_ bytes: [UInt8], chunk: Int = 1_000, outageBefore: Double = 0) {
+    /// `otherRoute`: the connection is another output of the same channel.
+    mutating func connection(_ bytes: [UInt8], chunk: Int = 1_000, outageBefore: Double = 0, otherRoute: Bool = false) {
         if !connectionStarts.isEmpty {
             // What the session does when a connection ends: finish whole PES, drop torn ones,
             // hold or cut the open segment.
@@ -314,7 +376,7 @@ struct PipelineHarness {
         }
         connectionStarts.append(units.count)
         wall += outageBefore
-        splicer.beginConnection()
+        splicer.beginConnection(otherRoute: otherRoute)
         feed(bytes, chunk: chunk)
     }
 

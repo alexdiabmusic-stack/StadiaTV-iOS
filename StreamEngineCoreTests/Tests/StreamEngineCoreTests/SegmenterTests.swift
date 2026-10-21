@@ -179,6 +179,63 @@ struct SegmenterTests {
         """)
     }
 
+    @Test("fMP4 playlists name the initialization section after every discontinuity and claim independent segments only when true")
+    func fragmentedPlaylistWriter() {
+        let epoch = Date(timeIntervalSince1970: 1_700_000_000 - 10)
+        var entries: [HLSPlaylistWriter.FragmentEntry] = [
+            .init(uri: "v5.m4s", map: "v1.mp4", duration: 2, programmeStart: 10, isDiscontinuity: false),
+            .init(uri: "v6.m4s", map: "v1.mp4", duration: 2, programmeStart: 12, isDiscontinuity: false),
+            .init(uri: "v7.m4s", map: "v2.mp4", duration: 2, programmeStart: 14, isDiscontinuity: true)
+        ]
+        func render() -> String {
+            HLSPlaylistWriter.fragmentedMediaPlaylist(entries: entries, mediaSequence: 5, targetDuration: 4,
+                                                      discontinuitySequence: 1, epoch: epoch, startOffset: 2)
+        }
+        #expect(render() == """
+        #EXTM3U
+        #EXT-X-VERSION:7
+        #EXT-X-TARGETDURATION:4
+        #EXT-X-MEDIA-SEQUENCE:5
+        #EXT-X-DISCONTINUITY-SEQUENCE:1
+        #EXT-X-INDEPENDENT-SEGMENTS
+        #EXT-X-START:TIME-OFFSET=2.000,PRECISE=NO
+        #EXT-X-MAP:URI="v1.mp4"
+        #EXT-X-PROGRAM-DATE-TIME:2023-11-14T22:13:20.000Z
+        #EXTINF:2.000,
+        v5.m4s
+        #EXT-X-PROGRAM-DATE-TIME:2023-11-14T22:13:22.000Z
+        #EXTINF:2.000,
+        v6.m4s
+        #EXT-X-DISCONTINUITY
+        #EXT-X-MAP:URI="v2.mp4"
+        #EXT-X-PROGRAM-DATE-TIME:2023-11-14T22:13:24.000Z
+        #EXTINF:2.000,
+        v7.m4s
+
+        """)
+        // A player may reset its demuxer at a discontinuity, so an unchanged section is named again.
+        entries[2].map = "v1.mp4"
+        #expect(render().components(separatedBy: "#EXT-X-MAP:URI=\"v1.mp4\"").count == 3)
+        // A long GOP cut short leaves a segment that doesn't start with a keyframe.
+        entries[1].isIndependent = false
+        #expect(!render().contains("#EXT-X-INDEPENDENT-SEGMENTS"))
+
+        let multivariant = HLSPlaylistWriter.multivariantPlaylist(
+            videoURI: "video.m3u8", bandwidth: 18_000_000, averageBandwidth: 15_000_000, codecs: ["hvc1.2.4.L153.B0", "ec-3"],
+            width: 3840, height: 2160, frameRate: 50, videoRange: "PQ",
+            audio: [.init(uri: "audio0.m3u8", name: "English", language: "en", channels: 6, isDefault: true),
+                    .init(uri: "audio1.m3u8", name: "French", language: "fr", channels: 2, isDefault: false)])
+        #expect(multivariant == """
+        #EXTM3U
+        #EXT-X-VERSION:7
+        #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="English",LANGUAGE="en",DEFAULT=YES,AUTOSELECT=YES,CHANNELS="6",URI="audio0.m3u8"
+        #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="French",LANGUAGE="fr",DEFAULT=NO,AUTOSELECT=YES,CHANNELS="2",URI="audio1.m3u8"
+        #EXT-X-STREAM-INF:BANDWIDTH=18000000,AVERAGE-BANDWIDTH=15000000,CODECS="hvc1.2.4.L153.B0,ec-3",RESOLUTION=3840x2160,FRAME-RATE=50.000,VIDEO-RANGE=PQ,AUDIO="audio"
+        video.m3u8
+
+        """)
+    }
+
     @Test("Programme dates are ISO 8601 in UTC with milliseconds", arguments: [
         (0.0, "1970-01-01T00:00:00.000Z"),
         (951_782_400.5, "2000-02-29T00:00:00.500Z"),

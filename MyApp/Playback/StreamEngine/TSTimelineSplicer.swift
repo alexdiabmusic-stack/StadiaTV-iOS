@@ -54,6 +54,10 @@ nonisolated final class TSTimelineSplicer {
         /// programme; closing them avoids holding a frozen picture for the gap's length.
         var jumpBackward: Int64 = MPEGTS.clockRate
         var jumpForward: Int64 = 2 * MPEGTS.clockRate
+        /// Shorter forward steps, from this long (and six frames) up, are programme the provider
+        /// dropped mid-connection: the pictures after it follow straight on, without waiting for a
+        /// keyframe, so the picture doesn't hold for the gap's length.
+        var gapClosing: Int64 = MPEGTS.clockRate / 4
         /// Audio further than this from the video clock is garbage.
         var audioSanityWindow: Int64 = 10 * MPEGTS.clockRate
         var maximumUnitPackets = 24_000
@@ -76,6 +80,8 @@ nonisolated final class TSTimelineSplicer {
         case program(TSProgram)
         case splice(SpliceReport)
         case unsupportedProgram(String)
+        /// The provider dropped this much programme mid-connection; the timeline was closed up.
+        case sourceGapClosed(seconds: Double)
     }
 
     struct Statistics: Equatable, Sendable {
@@ -84,11 +90,17 @@ nonisolated final class TSTimelineSplicer {
         var gapsClosed = 0
         var timebaseResets = 0
         var timelineJumps = 0
+        /// Gaps in a connection's programme closed up, and the programme they were missing.
+        var sourceGaps = 0
+        var sourceGapSeconds: Double = 0
         var reconfigurations = 0
         var droppedUnits = 0
         /// Audio PES cut at a frame at a splice, rather than dropped whole.
         var trimmedAudioUnits = 0
         var corruptUnits = 0
+        /// PES packets that lost transport packets part-way (a gap in the continuity counter), dropped
+        /// rather than handed to the decoder with a hole in them.
+        var tornUnits = 0
         var scrambledPackets = 0
         var erroredPackets = 0
     }
@@ -175,6 +187,20 @@ nonisolated final class TSTimelineSplicer {
     private var gatePTS: Int64?
     private var dropLeadingPicturesBefore: Int64?
     private var timingDeltas: [Int64] = []
+    /// Ordinary picture steps since the connection started, the last splice or the last closed
+    /// gap. Gaps close only after a few, so a stream that lowers its picture rate isn't squeezed.
+    private var steadySteps = 0
+    /// Where the last closed gap was, on the source clock, and the offset before it: audio stamped
+    /// before it (muxers send audio behind the pictures) still plays before the gap.
+    private var gapBoundary: (rawPTS: Int64, offset: Int64)?
+    /// Audio PIDs whose first unit after the gap must clear the whole of the PES before it.
+    private var gapAudioGuard: Set<UInt16> = []
+    /// The last continuity counter on each source PID's payload packets, in this connection.
+    private var sourceContinuity: [UInt16: UInt8] = [:]
+    /// PIDs whose PES in progress lost packets.
+    private var tornPIDs: Set<UInt16> = []
+    /// This connection is another route of the same channel, on the same clock.
+    private var sameProgramme = false
     /// Audio/metadata that arrived while a reconnect waited for its splice picture; released
     /// once the splice offset is known so it can fill the audio hole at the join.
     private var heldFollowers: [(unit: PESUnit, header: PESUnit.Header, stream: TSProgram.Stream)] = []
@@ -234,11 +260,14 @@ nonisolated final class TSTimelineSplicer {
 
     // MARK: - Connection lifecycle
 
-    /// The next packets come from a new connection.
-    func beginConnection() {
+    /// The next packets come from a new connection. `otherRoute`: another output of the same channel
+    /// (a panel's HLS output after its MPEG-TS output), on the same clock, so programme behind what was
+    /// delivered is re-sent even when its first keyframe is one the previous route never delivered.
+    func beginConnection(otherRoute: Bool = false) {
         if let sourceProgram { previousSourceProgram = sourceProgram }
         resetConnectionState()
         gateReason = hasOutput ? .reconnect : .firstConnection
+        sameProgramme = otherRoute
     }
 
     /// Ends the connection's input. A PES packet still open is finished when it's whole — every
@@ -255,13 +284,18 @@ nonisolated final class TSTimelineSplicer {
         for pid in pids {
             guard let packets = pending[pid], !packets.isEmpty else { continue }
             let unit = PESUnit(sourcePID: pid, packets: packets)
-            if let program = sourceProgram, let stream = program.stream(pid: pid), unit.isCompleteByLength ?? atUnitBoundary {
+            if tornPIDs.contains(pid), unit.isCompleteByLength != true {
+                statistics.tornUnits += 1
+                markDropped(sourcePID: pid)
+            } else if let program = sourceProgram, let stream = program.stream(pid: pid), unit.isCompleteByLength ?? atUnitBoundary {
                 complete(unit, stream: stream, program: program, wallTime: wallTime, into: &output)
             } else {
                 markDropped(sourcePID: pid)
             }
         }
         pending.removeAll()
+        tornPIDs.removeAll()
+        sourceContinuity.removeAll()
         return output
     }
 
@@ -290,7 +324,17 @@ nonisolated final class TSTimelineSplicer {
         gatePTS = nil
         dropLeadingPicturesBefore = nil
         timingDeltas.removeAll()
+        steadySteps = 0
+        gapBoundary = nil
+        gapAudioGuard.removeAll()
+        sourceContinuity.removeAll()
+        tornPIDs.removeAll()
         heldFollowers.removeAll()
+    }
+
+    /// An HLS segment ended: the next one may restart its continuity counters, which isn't loss.
+    func segmentEnded() {
+        sourceContinuity.removeAll()
     }
 
     // MARK: - Packet processing
@@ -322,12 +366,31 @@ nonisolated final class TSTimelineSplicer {
                     statistics.scrambledPackets += 1
                     continue
                 }
+                if packet.hasPayload {
+                    let counter = packet.continuityCounter
+                    if let last = sourceContinuity[pid] {
+                        // A repeated counter is a duplicate packet; a skipped one means packets were lost
+                        // (a provider dropping chunks of a stream it can't keep up with).
+                        if counter == last { continue }
+                        if counter != (last &+ 1) & 0x0F, !packet.discontinuityIndicator { tornPIDs.insert(pid) }
+                    }
+                    sourceContinuity[pid] = counter
+                }
                 if packet.payloadUnitStart {
                     if let previous = pending[pid], !previous.isEmpty {
-                        complete(PESUnit(sourcePID: pid, packets: previous), stream: stream, program: program,
-                                 wallTime: wallTime, into: &output)
+                        let unit = PESUnit(sourcePID: pid, packets: previous)
+                        // Packets went missing since it started, perhaps its own tail: decoding it would show
+                        // garbage, unless it announces a length that all arrived (the loss came after it).
+                        if tornPIDs.contains(pid), unit.isCompleteByLength != true {
+                            statistics.tornUnits += 1
+                            markDropped(sourcePID: pid)
+                        } else {
+                            complete(unit, stream: stream, program: program, wallTime: wallTime, into: &output)
+                        }
                     }
+                    tornPIDs.remove(pid)
                     pending[pid] = [packet]
+                    if mode == .flowing, timingStream(of: program)?.pid == pid { anticipateSourceGap(packet) }
                 } else if pending[pid] != nil {
                     pending[pid]?.append(packet)
                     if (pending[pid]?.count ?? 0) > configuration.maximumUnitPackets {
@@ -338,7 +401,7 @@ nonisolated final class TSTimelineSplicer {
             } else if pid == program.pcrPID, mode == .flowing, let outputPID = pidMap[pid], let outputProgram {
                 // PCR carried on its own PID.
                 var packet = packet
-                normalizePCR(&packet)
+                normalizePCR(&packet, offset: offset)
                 var single = [packet]
                 remap(&single, to: outputPID)
                 output.append(NormalizedUnit(kind: .metadata, packets: single, pts: nil, dts: nil, isKeyframe: false,
@@ -469,6 +532,7 @@ nonisolated final class TSTimelineSplicer {
             if delta > 0, delta < MPEGTS.clockRate / 4 {
                 timingDeltas.append(delta)
                 if timingDeltas.count > 31 { timingDeltas.removeFirst() }
+                steadySteps += 1
             }
         }
         lastSeenRawTiming = rawDTS
@@ -515,6 +579,8 @@ nonisolated final class TSTimelineSplicer {
                         markDropped(sourcePID: unit.sourcePID)
                         return
                     }
+                } else if isSourceGap(delta) {
+                    closeSourceGap(pts: picture.pts, dts: picture.dts, delta: delta)
                 }
             }
         }
@@ -568,15 +634,21 @@ nonisolated final class TSTimelineSplicer {
             return
         }
         var header = header
+        // Audio stamped before a closed gap keeps the offset it had there: it plays before the gap.
+        let beforeGap = gapBoundary.flatMap { MPEGTS.signedDelta(rawPTS, $0.rawPTS) < 0 ? $0.offset : nil }
+        let shift = beforeGap ?? offset
+        let afterGap = gapBoundary != nil && beforeGap == nil
         if kind == .audio {
-            var outPTS = MPEGTS.wrap(rawPTS + offset)
+            var outPTS = MPEGTS.wrap(rawPTS + shift)
             let outputPID = pidMap[stream.pid] ?? stream.pid
             if let last = lastOutAudioPTS[outputPID] {
                 // Never replay audio already delivered. Audio from just before the splice picture
                 // is welcome: muxers interleave audio behind video, so the old connection's audio
                 // stops short of its last picture and this fills the hole instead of leaving silence.
-                // Right after a splice the new audio must also clear the whole of the previous PES.
-                let end = audioSpliceGuard.contains(outputPID) ? lastOutAudioEnd[outputPID] : nil
+                // Right after a splice or a closed gap the new audio must also clear the whole of
+                // the previous PES.
+                let guarded = audioSpliceGuard.contains(outputPID) || (afterGap && gapAudioGuard.contains(outputPID))
+                let end = guarded ? lastOutAudioEnd[outputPID] : nil
                 if MPEGTS.signedDelta(outPTS, last) <= 0 || end.map({ MPEGTS.signedDelta(outPTS, $0) < -480 }) == true {
                     // Re-sent audio usually straddles the splice: keep the AAC frames after what was played.
                     guard let end, case .audio(.aac) = stream.kind,
@@ -588,7 +660,7 @@ nonisolated final class TSTimelineSplicer {
                     unit = trimmed.unit
                     header = trimmed.header
                     rawPTS = MPEGTS.wrap(rawPTS + trimmed.droppedTicks)
-                    outPTS = MPEGTS.wrap(rawPTS + offset)
+                    outPTS = MPEGTS.wrap(rawPTS + shift)
                     statistics.trimmedAudioUnits += 1
                 }
             } else if let gate = gatePTS, MPEGTS.signedDelta(rawPTS, gate) < -frameDuration {
@@ -600,9 +672,10 @@ nonisolated final class TSTimelineSplicer {
                 markDropped(sourcePID: unit.sourcePID)
                 return
             }
+            if afterGap { gapAudioGuard.remove(outputPID) }
         }
         emit(&unit, header: header, stream: stream, kind: kind, rawPTS: rawPTS, rawDTS: header.dts, isKeyframe: false,
-             isTiming: false, wallTime: nil, into: &output)
+             isTiming: false, wallTime: nil, offset: shift, into: &output)
     }
 
     private func kindOf(_ stream: TSProgram.Stream) -> NormalizedUnit.Kind {
@@ -632,7 +705,7 @@ nonisolated final class TSTimelineSplicer {
                 let outage = max(0, wallTime - (lastEmittedWallTime ?? wallTime))
                 let forwardLimit = MPEGTS.ticks(outage) + configuration.forwardSlack
                 let resent = picture.fingerprint.map { deliveredKeyframes.contains(KeyframeRecord(dts: picture.dts, fingerprint: $0)) } ?? false
-                if delta <= 0, delta >= -configuration.overlapLimit, resent {
+                if delta <= 0, delta >= -configuration.overlapLimit, resent || sameProgramme {
                     mode = .deduplicating(until: previous, since: wallTime, firstDropped: picture.dts)
                     return false
                 }
@@ -678,6 +751,44 @@ nonisolated final class TSTimelineSplicer {
         return MPEGTS.signedDelta(fromPTS, fromDTS) > 0 ? fromPTS : fromDTS
     }
 
+    /// A forward step in one connection's timeline that is programme the provider dropped.
+    private func isSourceGap(_ delta: Int64) -> Bool {
+        delta <= configuration.jumpForward && delta > max(configuration.gapClosing, 6 * frameDuration) && steadySteps >= 8
+    }
+
+    /// A picture's timestamps come in its first packet, but the picture is only handled once it's
+    /// complete, after the audio sent alongside it: a gap before it is closed as soon as it's seen,
+    /// so that audio lands after the gap too.
+    private func anticipateSourceGap(_ first: TSPacket) {
+        guard let last = lastEmittedRawTimingInConnection,
+              let header = PESUnit(sourcePID: first.pid, packets: [first]).parseHeader(),
+              let pts = header.pts ?? header.dts else { return }
+        let dts = header.dts ?? pts
+        let delta = MPEGTS.signedDelta(dts, last)
+        if isSourceGap(delta) { closeSourceGap(pts: pts, dts: dts, delta: delta) }
+    }
+
+    /// The provider dropped programme mid-connection (a restream that couldn't keep up): the picture
+    /// after the gap follows straight on from the last one delivered, as at a reconnect that closes a
+    /// gap, but without waiting for a keyframe or telling AVPlayer anything. It's the same stream, so
+    /// the decoder carries on; holding the last picture for the gap's length would show as a freeze.
+    private func closeSourceGap(pts: Int64, dts: Int64, delta: Int64) {
+        guard let lastOut = lastOutTiming else { return }
+        let previous = offset
+        offset = continuityOffset(pts: pts, dts: dts, lastOut: lastOut)
+        // Audio stamped up to the middle of the gap belongs before it.
+        let before = maxOutVideoPTS.map { MPEGTS.wrap($0 - previous) } ?? MPEGTS.wrap(pts - delta)
+        gapBoundary = (MPEGTS.wrap(before + MPEGTS.signedDelta(pts, before) / 2), previous)
+        gapAudioGuard = Set(lastOutAudioPTS.keys)
+        // Pictures decoded after this one but shown before it would show before what was already shown.
+        if let shown = maxOutVideoPTS { dropLeadingPicturesBefore = MPEGTS.wrap(shown - offset + 1) }
+        steadySteps = 0
+        let closed = MPEGTS.seconds(MPEGTS.signedDelta(previous, offset))
+        statistics.sourceGaps += 1
+        statistics.sourceGapSeconds += closed
+        events.append(.sourceGapClosed(seconds: closed))
+    }
+
     private func finishGate(_ picture: SplicePicture, report: SpliceReport) {
         // What the previous connection delivered after its last keyframe is now committed.
         resumePoint = nil
@@ -691,6 +802,9 @@ nonisolated final class TSTimelineSplicer {
         for key in continuity.keys { continuity[key]?.needsAnchor = true }
         spliceEpoch += 1
         audioSpliceGuard = Set(lastOutAudioPTS.keys)
+        steadySteps = 0
+        gapBoundary = nil
+        gapAudioGuard.removeAll()
         statistics.splices += report.kind == .start ? 0 : 1
         switch report.kind {
         case .overlapRemoved: statistics.overlapsRemoved += 1
@@ -718,6 +832,9 @@ nonisolated final class TSTimelineSplicer {
         for key in continuity.keys { continuity[key]?.needsAnchor = true }
         spliceEpoch += 1
         audioSpliceGuard = Set(lastOutAudioPTS.keys)
+        steadySteps = 0
+        gapBoundary = nil
+        gapAudioGuard.removeAll()
         statistics.splices += 1
         statistics.overlapsRemoved += 1
         events.append(.splice(SpliceReport(kind: .resumed, skippedSeconds: max(0, skipped) + max(0, replaced), missingSeconds: 0)))
@@ -751,13 +868,15 @@ nonisolated final class TSTimelineSplicer {
 
     // MARK: - Output
 
+    /// `offset` is the splice offset, unless a follower from before a closed gap keeps the earlier one.
     private func emit(_ unit: inout PESUnit, header: PESUnit.Header, stream: TSProgram.Stream, kind: NormalizedUnit.Kind,
                       rawPTS: Int64?, rawDTS: Int64?, isKeyframe: Bool, isTiming: Bool, wallTime: Double?,
-                      into output: inout [NormalizedUnit]) {
-        let outPTS = rawPTS.map { MPEGTS.wrap($0 + offset) }
-        let outDTS = header.dts.map { MPEGTS.wrap($0 + offset) }
+                      offset shift: Int64? = nil, into output: inout [NormalizedUnit]) {
+        let applied = shift ?? offset
+        let outPTS = rawPTS.map { MPEGTS.wrap($0 + applied) }
+        let outDTS = header.dts.map { MPEGTS.wrap($0 + applied) }
         unit.rewriteTimestamps(header, pts: outPTS, dts: outDTS)
-        for index in unit.packets.indices { normalizePCR(&unit.packets[index]) }
+        for index in unit.packets.indices { normalizePCR(&unit.packets[index], offset: applied) }
         let outputPID = pidMap[stream.pid] ?? stream.pid
         remap(&unit.packets, to: outputPID)
 
@@ -803,7 +922,7 @@ nonisolated final class TSTimelineSplicer {
                                      program: outputProgram, programVersion: programVersion))
     }
 
-    private func normalizePCR(_ packet: inout TSPacket) {
+    private func normalizePCR(_ packet: inout TSPacket, offset: Int64) {
         guard let base = packet.pcrBase else { return }
         packet.setPCRBase(base + offset)
     }

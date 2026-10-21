@@ -383,6 +383,54 @@ struct RefereeTests {
         #expect(retry == [.connect(route: 0)])
     }
 
+    @Test("A route that keeps dropping programme gives way to the other route, and isn't switched back to for it")
+    func droppedProgramme() {
+        func lossy(_ now: Double, gaps: Int, seconds: Double) -> RecoveryReferee.Observation {
+            var lossy = observation(now, health: health(lastDelivery: now))
+            lossy.droppedGaps = gaps
+            lossy.droppedProgramme = seconds
+            return lossy
+        }
+        var referee = playingReferee(routes: 2)
+        // One short gap within the window: still worth staying on.
+        #expect(referee.tick(lossy(20, gaps: 1, seconds: 0.8)).isEmpty)
+        // A second: the panel's MPEG-TS output can't keep up, so its HLS output is tried at once.
+        #expect(referee.tick(lossy(21, gaps: 2, seconds: 1.2)) == [.disconnect, .connect(route: 1)])
+        #expect(referee.routeSwitches == 1)
+        referee.programmeArrived(at: 22)
+        // The HLS output drops programme too: the first route already did, so the engine stays.
+        #expect(referee.tick(lossy(40, gaps: 1, seconds: 2.5)).isEmpty)
+        #expect(referee.currentRoute == 1)
+        #expect(referee.drainDecisions().contains { $0 == "Provider dropped 2.5 s of programme in 1 gap within 30 s on this route" })
+
+        // With one route there is nowhere to go: its gaps are closed up and playback carries on.
+        var single = playingReferee(routes: 1)
+        #expect(single.tick(lossy(20, gaps: 6, seconds: 4)).isEmpty)
+        #expect(single.currentRoute == 0)
+    }
+
+    @Test("Before anything plays the session can move to a route that carries the stream better; after, it can't")
+    func preferredRoute() {
+        var referee = RecoveryReferee(configuration: balanced, routeCount: 2, isSingleConnectionAccount: false)
+        _ = referee.start(at: 0)
+        #expect(referee.prefer(route: 1, at: 0.5, reason: "HEVC plays from the panel's HLS output") == [.disconnect, .connect(route: 1)])
+        #expect(referee.currentRoute == 1)
+        #expect(referee.routeSwitches == 1)
+        #expect(referee.prefer(route: 1, at: 0.6, reason: "again").isEmpty)
+
+        // A route that never played and refused is dead: it isn't preferred again.
+        var refused = RecoveryReferee(configuration: balanced, routeCount: 2, isSingleConnectionAccount: false)
+        _ = refused.start(at: 0)
+        _ = refused.prefer(route: 1, at: 0.5, reason: "HEVC")
+        #expect(refused.connectionEnded(.accountRejected(403), at: 1, openedAt: 0.5, deliveredProgramme: false, drought: nil)
+                == [.connect(route: 0)])
+        #expect(refused.prefer(route: 1, at: 1.5, reason: "HEVC").isEmpty)
+
+        // Once programme has played, moving is a recovery decision, not a preference.
+        var playing = playingReferee(routes: 2)
+        #expect(playing.prefer(route: 1, at: 5, reason: "HEVC").isEmpty)
+    }
+
     @Test("Sustained delivery forgives earlier failures")
     func forgiveness() {
         var referee = playingReferee()

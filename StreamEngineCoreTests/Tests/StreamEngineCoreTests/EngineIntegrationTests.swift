@@ -185,6 +185,157 @@ struct EngineEndToEndTests {
         expectOneTimeline(run.player, maximumMissing: 0)
     }
 
+    @Test("A 4K HEVC channel is published as fMP4 renditions that play through a provider cut")
+    func hevcChannel() async throws {
+        var stream = SyntheticTransportStream()
+        stream.videoStreamType = 0x24
+        stream.parameterSets = EncoderSamples.pq
+        stream.audioLanguage = "eng"
+        stream.surroundTracks = [(pid: 0x102, language: "fra")]
+        let channel = try FakeTransportChannel(seconds: 60, lead: 16, burst: 12, cuts: [0: 3], streams: [(0, stream)])
+        defer { channel.stop() }
+        let url = try #require(URL(string: "http://127.0.0.1:\(channel.port)/play/1234.ts"))
+        let run = try await play(routes: [.init(url: url, label: "MPEG-TS")], profile: .fast, seconds: 14)
+
+        #expect(run.failure == nil)
+        #expect(channel.connectionCount >= 2)
+        #expect(run.startup < 3)
+        #expect(run.player.freezes == 0)
+        #expect(!run.player.sawDiscontinuity)
+        #expect(run.replaced.isEmpty)
+        let status = try #require(run.status)
+        #expect(status.reconnects >= 1)
+
+        // One video variant, described so AVPlayer can choose it and set up HDR before the first
+        // picture, and each audio track as its own rendition.
+        let lines = (run.multivariant ?? "").split(separator: "\n").map(String.init)
+        let variant = try #require(lines.first { $0.hasPrefix("#EXT-X-STREAM-INF:") })
+        #expect(variant.contains("CODECS=\"hvc1.2.4.L153.90,mp4a.40.2,ec-3\""))
+        #expect(variant.contains("RESOLUTION=3840x2160"))
+        #expect(variant.contains("FRAME-RATE=25.000"))
+        #expect(variant.contains("VIDEO-RANGE=PQ"))
+        #expect(variant.contains("AUDIO=\"audio\""))
+        let renditions = lines.filter { $0.hasPrefix("#EXT-X-MEDIA:TYPE=AUDIO,") }
+        #expect(renditions.count == 2)
+        let english = renditions.first ?? ""
+        let french = renditions.last ?? ""
+        #expect(english.contains("LANGUAGE=\"en\"") && english.contains("DEFAULT=YES") && english.contains("CHANNELS=\"2\""))
+        #expect(french.contains("LANGUAGE=\"fr\"") && french.contains("DEFAULT=NO") && french.contains("CHANNELS=\"6\""))
+        // Every segment starts with a keyframe, which the video playlist itself says.
+        #expect(run.lastPlaylist.contains("#EXT-X-INDEPENDENT-SEGMENTS"))
+        #expect(run.lastPlaylist.contains("#EXT-X-MAP:URI=\"v1.mp4\""))
+
+        // Video: an hvc1 track with the channel's parameter sets and HDR10 metadata, and one
+        // picture timeline across the cut.
+        let map = try #require(run.player.entries.values.first?.map)
+        let section = try #require(run.initializations[map])
+        let record = try #require(sampleEntry(of: [UInt8](section)[...])?.child("hvcC", skipping: 78))
+        #expect(configurationUnits(Array(record.body))
+                == [EncoderSamples.pqVPS, EncoderSamples.pqSPS, EncoderSamples.pps, EncoderSamples.combinedHDR10])
+        let fragments = expectFragmentedTimeline(run.player, maximumMissing: 0)
+        #expect(fragments.allSatisfy { $0.samples.allSatisfy { $0.duration == 3_600 } })
+
+        // Audio: each rendition unbroken, starting with the pictures.
+        let first = try #require(fragments.first?.samples.first)
+        let pictureStart = Double(Int64(fragments[0].baseDecodeTime) + Int64(first.compositionOffset)) / 90_000
+        #expect(run.audioPlayers.count == 2)
+        for audio in run.audioPlayers {
+            let parsed = audio.downloaded.compactMap { ParsedFragment($0.data) }
+            #expect(parsed.count == audio.downloaded.count)
+            #expect(parsed.count >= 5)
+            expectContinuous(parsed)
+            if let start = parsed.first {
+                #expect(abs(Double(start.baseDecodeTime) / 48_000 - pictureStart) < 0.1)
+            }
+        }
+    }
+
+    @Test("A 4K HEVC Xtream channel moves to the panel's HLS output before it plays, and starts from its window")
+    func hevcPrefersHLS() async throws {
+        var stream = SyntheticTransportStream()
+        stream.videoStreamType = 0x24
+        stream.parameterSets = EncoderSamples.pq
+        let transport = try FakeTransportChannel(seconds: 60, lead: 16, burst: 12, streams: [(0, stream)])
+        defer { transport.stop() }
+        let hls = try FakeHLSChannel(seconds: 60, lead: 16, segmentDelay: 0.2, stream: stream)
+        defer { hls.stop() }
+        let routes: [StreamEngineSession.Route] = [
+            .init(url: try #require(URL(string: "http://127.0.0.1:\(transport.port)/live/user/pass/77.ts")), label: "MPEG-TS"),
+            .init(url: try #require(URL(string: "http://127.0.0.1:\(hls.port)/live/user/pass/77.m3u8")), label: "HLS")
+        ]
+        let run = try await play(routes: routes, profile: .balanced, seconds: 14)
+
+        #expect(run.failure == nil)
+        #expect(run.startup < 5)
+        let status = try #require(run.status)
+        #expect(status.route == "HLS")
+        #expect(status.routeSwitches == 1)
+        #expect(run.player.freezes == 0)
+        #expect(run.replaced.isEmpty)
+        #expect(run.multivariant?.contains("CODECS=\"hvc1.2.4.L153.90,mp4a.40.2\"") == true)
+        // Nothing from the MPEG-TS connection was published: the HLS window's deep join is the reserve.
+        #expect(hls.segmentRequests.count >= 5)
+        expectFragmentedTimeline(run.player, maximumMissing: 0)
+    }
+
+    @Test("A channel that switches from H.264 to HEVC moves the player to fMP4 renditions")
+    func codecSwitch() async throws {
+        var hevc = SyntheticTransportStream(content: 1)
+        hevc.videoStreamType = 0x24
+        hevc.parameterSets = EncoderSamples.pq
+        let channel = try FakeTransportChannel(seconds: 60, lead: 16, burst: 12,
+                                               streams: [(0, SyntheticTransportStream()), (20, hevc)])
+        defer { channel.stop() }
+        let url = try #require(URL(string: "http://127.0.0.1:\(channel.port)/play/1234.ts"))
+        let run = try await play(routes: [.init(url: url, label: "MPEG-TS")], profile: .fast, seconds: 18)
+
+        #expect(run.failure == nil)
+        // MPEG-TS played first; the player was moved once, to the fMP4 renditions.
+        #expect(run.replaced.count == 1)
+        let before = try #require(run.replaced.first)
+        #expect(!before.downloaded.isEmpty)
+        #expect(before.downloaded.allSatisfy { $0.data.first == 0x47 })
+        #expect(run.multivariant?.contains("CODECS=\"hvc1.2.4.L153.90,mp4a.40.2\"") == true)
+        let fragments = expectFragmentedTimeline(run.player, maximumMissing: 0)
+        let encoders = Set(fragments.flatMap { $0.sampleData.compactMap { SyntheticTransportStream.picture(inSample: $0)?.content } })
+        #expect(encoders == [1])
+        #expect(run.player.freezes == 0)
+    }
+
+    @Test("A channel whose MPEG-TS output drops programme moves to the panel's HLS output, which carries all of it",
+          arguments: [
+            // Every eighth 0.4 s chunk of the raw stream never arrives, like a panel whose MPEG-TS
+            // output can't keep up with a 4K channel; its HLS output of the same programme is whole.
+            // One of them holds the keyframe the HLS output's window starts the move at.
+            (Set(stride(from: 7, to: 150, by: 8)), 12.0, 60),
+            // 2.4 s of every 8 go missing, too long to close up on the spot: each is a timeline jump,
+            // and each costs the reserve its length; a 20 s burst (panels send 5–23 s) leaves enough.
+            (Set(stride(from: 3, to: 150, by: 20).flatMap { $0..<($0 + 6) }), 20.0, 200)
+          ])
+    func lossyTransportStream(drops: Set<Int>, burst: Double, maximumMissing: Int) async throws {
+        let transport = try FakeTransportChannel(seconds: 60, lead: 24, burst: burst, drops: drops)
+        defer { transport.stop() }
+        // As on the live panel, the HLS output runs a few seconds ahead of an MPEG-TS output that
+        // falls behind like this, and a 4K segment takes a while to fetch.
+        let hls = try FakeHLSChannel(seconds: 60, lead: 28, segmentDelay: 0.5)
+        defer { hls.stop() }
+        let routes: [StreamEngineSession.Route] = [
+            .init(url: try #require(URL(string: "http://127.0.0.1:\(transport.port)/live/user/pass/77.ts")), label: "MPEG-TS"),
+            .init(url: try #require(URL(string: "http://127.0.0.1:\(hls.port)/live/user/pass/77.m3u8")), label: "HLS")
+        ]
+        let run = try await play(routes: routes, profile: .balanced, seconds: 20)
+
+        #expect(run.failure == nil)
+        let status = try #require(run.status)
+        #expect(status.route == "HLS")
+        #expect(status.routeSwitches == 1)
+        #expect(run.player.freezes == 0)
+        #expect(!run.player.sawDiscontinuity)
+        // What the raw stream dropped in its burst was closed up, never held as a frozen picture:
+        // decode times run one frame apart throughout, and from the move on the programme is whole.
+        expectOneTimeline(run.player, maximumMissing: maximumMissing)
+    }
+
     /// The pictures the player received form one timeline: decode times one frame apart, no
     /// picture twice, and at most `maximumMissing` source pictures skipped.
     private func expectOneTimeline(_ player: VirtualPlayer, maximumMissing: Int, sourceLocation: SourceLocation = #_sourceLocation) {
@@ -203,8 +354,36 @@ struct EngineEndToEndTests {
         }
     }
 
+    /// The fMP4 fragments the player received form one timeline: decode times unbroken from
+    /// fragment to fragment, no picture twice, and at most `maximumMissing` source pictures skipped.
+    @discardableResult
+    private func expectFragmentedTimeline(_ player: VirtualPlayer, maximumMissing: Int,
+                                          sourceLocation: SourceLocation = #_sourceLocation) -> [ParsedFragment] {
+        let fragments = player.downloaded.compactMap { ParsedFragment($0.data) }
+        #expect(fragments.count == player.downloaded.count, "fragments that don't parse", sourceLocation: sourceLocation)
+        expectContinuous(fragments, sourceLocation: sourceLocation)
+        let frames = fragments.flatMap { $0.sampleData.compactMap { SyntheticTransportStream.picture(inSample: $0)?.frame } }
+        #expect(frames.count > 150, sourceLocation: sourceLocation)
+        let increasing = zip(frames.dropFirst(), frames).allSatisfy { $0 > $1 }
+        #expect(increasing, sourceLocation: sourceLocation)
+        if let first = frames.first, let last = frames.last {
+            #expect(last - first + 1 - frames.count <= maximumMissing, "\(last - first + 1 - frames.count) pictures missing",
+                    sourceLocation: sourceLocation)
+        }
+        return fragments
+    }
+
     private struct Run {
         var player: VirtualPlayer
+        /// Players the engine moved off their endpoint, oldest first.
+        var replaced: [VirtualPlayer]
+        /// Fragmented MP4 sessions: the multivariant playlist, a player per audio rendition and
+        /// the initialization sections fetched, by name.
+        var multivariant: String?
+        var audioPlayers: [VirtualPlayer]
+        var initializations: [String: Data]
+        /// The last video (or only) media playlist read.
+        var lastPlaylist: String
         var status: StreamEngineStatus?
         var failure: StreamEngineFailure?
         /// Seconds from start to the first published segment.
@@ -225,21 +404,41 @@ struct EngineEndToEndTests {
         while recorder.ready == nil, recorder.failure == nil, elapsed() < 10 {
             try await Task.sleep(nanoseconds: 50_000_000)
         }
-        let playlistURL = try #require(recorder.ready)
+        var playlistURL = try #require(recorder.ready)
         let startup = elapsed()
+        var media = await resolve(playlistURL)
         var player = VirtualPlayer(epoch: session.programmeEpoch)
+        var audioPlayers = media.audio.map { _ in VirtualPlayer(epoch: session.programmeEpoch) }
+        var replaced: [VirtualPlayer] = []
+        var initializations: [String: Data] = [:]
+        var lastPlaylist = ""
+        var endpointChanges = recorder.endpointChanges
         var nextReload = 0.0
         let end = elapsed() + seconds
         while elapsed() < end, recorder.failure == nil {
+            if recorder.endpointChanges != endpointChanges, let url = recorder.ready {
+                // Like the app: a fresh player item on the new endpoint, joining where it says.
+                endpointChanges = recorder.endpointChanges
+                session.noteDecoderReset()
+                playlistURL = url
+                media = await resolve(url)
+                replaced.append(player)
+                player = VirtualPlayer(epoch: session.programmeEpoch)
+                audioPlayers = media.audio.map { _ in VirtualPlayer(epoch: session.programmeEpoch) }
+                nextReload = 0
+            }
             if elapsed() >= nextReload {
                 // Like AVPlayer: a target duration after a playlist that changed, half of one otherwise.
-                let playlist = await fetch(playlistURL)
-                let changed = playlist.status == 200 && player.read(String(decoding: playlist.body, as: UTF8.self))
+                let base = playlistURL.deletingLastPathComponent()
+                let playlist = await fetch(media.video)
+                if playlist.status == 200 { lastPlaylist = String(decoding: playlist.body, as: UTF8.self) }
+                let changed = playlist.status == 200 && player.read(lastPlaylist)
                 nextReload = elapsed() + (changed ? player.targetDuration : player.targetDuration / 2)
-                while let next = player.nextSequence {
-                    let segment = await fetch(playlistURL.deletingLastPathComponent().appendingPathComponent("s\(next).ts"))
-                    guard segment.status == 200 else { break }
-                    player.received(segment.body, sequence: next)
+                await download(&player, base: base, initializations: &initializations)
+                for (index, url) in media.audio.enumerated() {
+                    let audio = await fetch(url)
+                    if audio.status == 200 { audioPlayers[index].read(String(decoding: audio.body, as: UTF8.self)) }
+                    await download(&audioPlayers[index], base: base, initializations: &initializations)
                 }
             }
             let rate = recorder.rate
@@ -247,7 +446,43 @@ struct EngineEndToEndTests {
             session.reportPlayback(programmeTime: player.position, isWaiting: player.isWaiting, isPlaying: player.isPlaying, rate: rate)
             try await Task.sleep(nanoseconds: 100_000_000)
         }
-        return Run(player: player, status: recorder.status, failure: recorder.failure, startup: startup)
+        return Run(player: player, replaced: replaced, multivariant: media.multivariant, audioPlayers: audioPlayers,
+                   initializations: initializations, lastPlaylist: lastPlaylist, status: recorder.status, failure: recorder.failure,
+                   startup: startup)
+    }
+
+    /// What a player item on `url` plays: that media playlist, or a multivariant playlist's video
+    /// variant and audio renditions.
+    private func resolve(_ url: URL) async -> (video: URL, audio: [URL], multivariant: String?) {
+        let top = await fetch(url)
+        let text = String(decoding: top.body, as: UTF8.self)
+        guard text.contains("#EXT-X-STREAM-INF:") else { return (url, [], nil) }
+        let base = url.deletingLastPathComponent()
+        let lines = text.split(separator: "\n").map(String.init)
+        var video = url
+        if let index = lines.firstIndex(where: { $0.hasPrefix("#EXT-X-STREAM-INF:") }), index + 1 < lines.count {
+            video = base.appendingPathComponent(lines[index + 1])
+        }
+        let audio = lines.filter { $0.hasPrefix("#EXT-X-MEDIA:TYPE=AUDIO,") }.compactMap { line -> URL? in
+            guard let range = line.range(of: "URI=\"") else { return nil }
+            return base.appendingPathComponent(String(line[range.upperBound...].prefix { $0 != "\"" }))
+        }
+        return (video, audio, text)
+    }
+
+    /// Fetches what `player` plays next, in order, with each initialization section before the
+    /// first segment that needs it.
+    private func download(_ player: inout VirtualPlayer, base: URL, initializations: inout [String: Data]) async {
+        while let next = player.nextSequence, let entry = player.entries[next] {
+            if let map = entry.map, initializations[map] == nil {
+                let section = await fetch(base.appendingPathComponent(map))
+                guard section.status == 200 else { return }
+                initializations[map] = section.body
+            }
+            let segment = await fetch(base.appendingPathComponent(entry.uri))
+            guard segment.status == 200 else { return }
+            player.received(segment.body, sequence: next)
+        }
     }
 }
 
@@ -259,6 +494,9 @@ struct VirtualPlayer {
     struct Entry {
         let start: Double
         let duration: Double
+        let uri: String
+        /// The initialization section it plays after (fragmented MP4).
+        let map: String?
     }
 
     let epoch: Date
@@ -282,6 +520,7 @@ struct VirtualPlayer {
         var date: Date?
         var duration = 0.0
         var startOffset = 0.0
+        var map: String?
         var window: [Int] = []
         for line in playlist.split(separator: "\n").map(String.init) {
             if line.hasPrefix("#EXT-X-TARGETDURATION:") {
@@ -294,8 +533,10 @@ struct VirtualPlayer {
                 duration = Double(line.dropFirst("#EXTINF:".count).split(separator: ",")[0]) ?? 0
             } else if line == "#EXT-X-DISCONTINUITY" {
                 sawDiscontinuity = true
-            } else if line.hasPrefix("s"), line.hasSuffix(".ts"), let sequence = Int(line.dropFirst().dropLast(3)), let date {
-                entries[sequence] = Entry(start: date.timeIntervalSince(epoch), duration: duration)
+            } else if line.hasPrefix("#EXT-X-MAP:URI=\"") {
+                map = String(line.dropFirst("#EXT-X-MAP:URI=\"".count).prefix { $0 != "\"" })
+            } else if !line.hasPrefix("#"), !line.isEmpty, let sequence = Self.sequence(of: line), let date {
+                entries[sequence] = Entry(start: date.timeIntervalSince(epoch), duration: duration, uri: line, map: map)
                 window.append(sequence)
             }
         }
@@ -304,6 +545,12 @@ struct VirtualPlayer {
             joinSequence = window.last { (entries[$0]?.start ?? .infinity) <= target + 0.001 } ?? first
         }
         return entries.keys.max() != previousLast
+    }
+
+    /// The media sequence number a segment's name ends with: s12.ts, v12.m4s, a1-12.m4s.
+    static func sequence(of uri: String) -> Int? {
+        let name = uri.split(separator: ".").first.map(String.init) ?? uri
+        return Int(String(name.reversed().prefix { $0.isNumber }.reversed()))
     }
 
     /// The next segment to fetch, once the playlist lists it.
@@ -348,6 +595,7 @@ struct VirtualPlayer {
 final class EngineEventRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var readyURL: URL?
+    private var endpointChangeCount = 0
     private var latestRate = 1.0
     private var latestStatus: StreamEngineStatus?
     private var latestFailure: StreamEngineFailure?
@@ -356,7 +604,10 @@ final class EngineEventRecorder: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         switch event {
-        case .ready(let url), .endpointChanged(let url): readyURL = url
+        case .ready(let url): readyURL = url
+        case .endpointChanged(let url):
+            readyURL = url
+            endpointChangeCount += 1
         case .status(let status): latestStatus = status
         case .pace(let rate): latestRate = rate
         case .failed(let failure): latestFailure = failure
@@ -371,6 +622,7 @@ final class EngineEventRecorder: @unchecked Sendable {
     }
 
     var ready: URL? { read { readyURL } }
+    var endpointChanges: Int { read { endpointChangeCount } }
     var rate: Double { read { latestRate } }
     var status: StreamEngineStatus? { read { latestStatus } }
     var failure: StreamEngineFailure? { read { latestFailure } }
@@ -402,6 +654,8 @@ final class FakeTransportChannel: @unchecked Sendable {
     private let burst: Double
     /// Connection index → seconds after which that connection is cut.
     private let cuts: [Int: Double]
+    /// Chunks the panel never sends: programme its output dropped.
+    private let drops: Set<Int>
     private let origin = ProcessInfo.processInfo.systemUptime
     private let lock = NSLock()
     private var listener: Int32
@@ -411,12 +665,18 @@ final class FakeTransportChannel: @unchecked Sendable {
 
     enum ProviderError: Error { case socket }
 
-    init(seconds: Double, lead: Double, burst: Double, cuts: [Int: Double] = [:]) throws {
-        var stream = SyntheticTransportStream()
-        chunks = (0..<Int(seconds / 0.4)).map { stream.bytes(seconds: 0.4, firstFrame: $0 * 10) }
+    /// `streams` are the encoders of the programme, each from the second it takes over.
+    init(seconds: Double, lead: Double, burst: Double, cuts: [Int: Double] = [:], drops: Set<Int> = [],
+         streams: [(start: Double, stream: SyntheticTransportStream)] = [(0, SyntheticTransportStream())]) throws {
+        var encoders = streams
+        chunks = (0..<Int(seconds / 0.4)).map { index in
+            let current = encoders.lastIndex { $0.start <= Double(index) * 0.4 + 0.001 } ?? 0
+            return encoders[current].stream.bytes(seconds: 0.4, firstFrame: index * 10)
+        }
         self.lead = lead
         self.burst = burst
         self.cuts = cuts
+        self.drops = drops
         listener = try Self.makeListener()
         port = Self.localPort(of: listener)
         let thread = Thread { [self] in acceptLoop() }
@@ -481,7 +741,7 @@ final class FakeTransportChannel: @unchecked Sendable {
         while isRunning, chunk < chunks.count {
             let available = min(chunks.count, Int((lead + elapsed()) / chunkSeconds))
             while chunk < available {
-                guard write(chunks[chunk][offset...], to: client) else { return }
+                guard drops.contains(chunk) || write(chunks[chunk][offset...], to: client) else { return }
                 chunk += 1
                 offset = 0
             }
@@ -577,15 +837,18 @@ final class FakeHLSChannel: @unchecked Sendable {
         let segments: [Data]
         let lead: Double
         let outage: Range<Double>?
+        /// Seconds each segment takes to arrive.
+        let segmentDelay: Double
         let origin = ProcessInfo.processInfo.systemUptime
         private let lock = NSLock()
         private var transportCount = 0
         private var segmentLog: [(time: Double, sequence: Int)] = []
 
-        init(segments: [Data], lead: Double, outage: Range<Double>?) {
+        init(segments: [Data], lead: Double, outage: Range<Double>?, segmentDelay: Double) {
             self.segments = segments
             self.lead = lead
             self.outage = outage
+            self.segmentDelay = segmentDelay
         }
 
         var transportRequests: Int {
@@ -621,6 +884,7 @@ final class FakeHLSChannel: @unchecked Sendable {
                 lock.lock()
                 segmentLog.append((now, sequence))
                 lock.unlock()
+                if segmentDelay > 0 { Thread.sleep(forTimeInterval: segmentDelay) }
                 return .init(status: 200, contentType: "video/mp2t", body: segments[sequence])
             }
             return .notFound()
@@ -631,10 +895,11 @@ final class FakeHLSChannel: @unchecked Sendable {
     private let server: LoopbackHTTPServer
     let port: UInt16
 
-    init(seconds: Double, lead: Double, outage: Range<Double>? = nil) throws {
-        var stream = SyntheticTransportStream()
+    init(seconds: Double, lead: Double, outage: Range<Double>? = nil, segmentDelay: Double = 0,
+         stream: SyntheticTransportStream = SyntheticTransportStream()) throws {
+        var stream = stream
         let segments = (0..<Int(seconds / 2)).map { Data(stream.bytes(seconds: 2, firstFrame: $0 * 50)) }
-        let state = State(segments: segments, lead: lead, outage: outage)
+        let state = State(segments: segments, lead: lead, outage: outage, segmentDelay: segmentDelay)
         self.state = state
         server = LoopbackHTTPServer { request in state.respond(to: request) }
         port = try server.start()

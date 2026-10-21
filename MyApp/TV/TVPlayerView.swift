@@ -511,7 +511,11 @@ struct TVPlayerView: View {
         } else if !playback.firstFrameRendered || playback.showsBufferingIndicator {
             VStack(spacing: Theme.Spacing.sm) {
                 ProgressView()
-                if playback.reconnectAttempt > 0 {
+                if let notice = playback.engineStatus?.notice?.displayText {
+                    Text(notice)
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(.white)
+                } else if playback.reconnectAttempt > 0 {
                     Text("Reconnecting (\(playback.reconnectAttempt)/\(PlaybackController.maxReconnectAttempts))…")
                         .font(Theme.Typography.caption)
                         .foregroundStyle(.white)

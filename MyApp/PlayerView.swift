@@ -3705,7 +3705,7 @@ struct MultiScreenPlayerView: View {
         for channel in visible {
             let id = StreamLinkerAdapters.streamID(channel)
             guard controllers[id] == nil else { continue }
-            let controller = PlaybackController()
+            let controller = PlaybackController(role: .multiviewTile)
             controller.setMuted(true)
             controllers[id] = controller
             controller.load(channel)
@@ -4118,6 +4118,10 @@ private struct PlaybackStatusOverlay: View {
     }
 
     private var statusPill: String? {
+        // Engine reconnects happen behind the reserve and stay off screen; only a real wait shows.
+        if let notice = controller.engineStatus?.notice?.displayText {
+            return notice
+        }
         if controller.reconnectAttempt > 0 {
             return "Reconnecting (\(controller.reconnectAttempt)/\(PlaybackController.maxReconnectAttempts))…"
         }
@@ -4701,12 +4705,17 @@ private struct PlayerDiagnosticsView: View {
 
     var body: some View {
         List {
-            LabeledContent("Engine", value: "AVPlayer")
+            LabeledContent("Engine", value: playback.engineStatus == nil ? "AVPlayer (direct)" : "Banner Stream Engine")
             LabeledContent("Requested channel", value: requestedChannel.name)
             LabeledContent("Active channel", value: playback.channel?.name ?? "None")
             LabeledContent("Channel ID", value: requestedChannel.id.contains("://") ? "Redacted" : requestedChannel.id)
             LabeledContent("State", value: String(describing: playback.state))
-            LabeledContent("Recovery attempt", value: "\(playback.reconnectAttempt) / \(PlaybackController.maxReconnectAttempts)")
+            if playback.engineStatus == nil {
+                LabeledContent("Recovery attempt", value: "\(playback.reconnectAttempt) / \(PlaybackController.maxReconnectAttempts)")
+            }
+            if let engine = playback.engineStatus {
+                StreamEngineDiagnosticsRows(status: engine)
+            }
             if let metadata {
                 if let codec = metadata.codec { LabeledContent("Video codec", value: codec) }
                 if let height = metadata.height { LabeledContent("Resolution", value: "\(metadata.width ?? 0) × \(height)") }
@@ -4714,10 +4723,44 @@ private struct PlayerDiagnosticsView: View {
                 if let bitrate = metadata.bitrate { LabeledContent("Bitrate estimate", value: String(format: "%.2f Mbps", bitrate / 1_000_000)) }
             }
             if let summary = playback.metricsSummary { Text(summary).font(.caption.monospaced()) }
+            if let journal = playback.engineStatus?.journal, !journal.isEmpty {
+                Section("Recent engine decisions") {
+                    ForEach(journal.reversed()) { entry in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entry.message).font(.caption)
+                            Text("\(entry.date.formatted(date: .omitted, time: .standard)) · \(String(format: "%.1f s buffered", entry.buffered))")
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                    }
+                }
+            }
             Text("Unknown metrics are omitted. Provider URLs and authorization headers are not displayed.")
                 .font(.caption).foregroundStyle(Theme.textSecondary)
         }
         .navigationTitle("Diagnostics")
+    }
+}
+
+/// The stream engine's reserve, pace and recovery counters, for the diagnostics screens.
+struct StreamEngineDiagnosticsRows: View {
+    let status: StreamEngineStatus
+
+    var body: some View {
+        LabeledContent("Engine state", value: status.phase.rawValue)
+        LabeledContent("Route", value: status.route)
+        if let codecs = status.codecs, !codecs.isEmpty { LabeledContent("Codecs", value: codecs) }
+        LabeledContent("Buffered ahead", value: String(format: "%.1f s (target %.0f s)", status.buffered, status.target))
+        LabeledContent("Playback speed", value: String(format: "%.3f×", status.playbackRate))
+        if let ratio = status.deliveryRatio {
+            LabeledContent("Line delivers", value: String(format: "%.0f%% of real time", ratio * 100))
+        }
+        if let bitrate = status.bitrate {
+            LabeledContent("Stream bitrate", value: String(format: "%.2f Mbps", bitrate / 1_000_000))
+        }
+        LabeledContent("Connections", value: "\(status.connections) (\(status.reconnects) in background)")
+        LabeledContent("Splices", value: "\(status.splices) · \(status.overlapsRemoved) repeats removed · \(status.timelineRepairs) timeline repairs")
+        LabeledContent("Player item rebuilds", value: "\(status.decoderResets)")
     }
 }
 

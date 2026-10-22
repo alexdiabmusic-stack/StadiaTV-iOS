@@ -113,7 +113,18 @@ nonisolated struct RecoveryReferee {
         var health: StreamHealthMonitor
         /// Silence that is normal for this connection (HLS waits a target duration between segments).
         var silenceFloor: Double = 0
+        /// Programme the provider dropped on this connection in the last `droppedProgrammeWindow`
+        /// seconds, and in how many gaps.
+        var droppedProgramme: Double = 0
+        var droppedGaps = 0
     }
+
+    /// A route that drops this much programme, or this many gaps of it, within the window gives way
+    /// to a route that hasn't: panels' MPEG-TS output drops chunks of 4K streams that their HLS
+    /// output carries whole.
+    static let droppedProgrammeWindow: Double = 30
+    static let droppedProgrammeLimit: Double = 1.5
+    static let droppedGapLimit = 2
 
     let configuration: StreamEngineConfiguration
     let routeCount: Int
@@ -145,6 +156,8 @@ nonisolated struct RecoveryReferee {
     private var deadRoutes: Set<Int> = []
     /// 404s per route since that route last delivered programme.
     private var notFoundCounts: [Int]
+    /// Routes found dropping programme. They aren't switched to for that reason again.
+    private var lossyRoutes: Set<Int> = []
     private var lastFailure: FailureKind?
 
     init(configuration: StreamEngineConfiguration, routeCount: Int, isSingleConnectionAccount: Bool) {
@@ -299,13 +312,25 @@ nonisolated struct RecoveryReferee {
                 actions.append(.disconnect)
                 actions += connectionEnded(.stalled, at: now, openedAt: since, deliveredProgramme: true,
                                            drought: health.programmeDrought(at: now))
-            } else if now - since >= 10, (health.programmeDrought(at: now) ?? 0) < 2 {
-                // Sustained delivery: forgive earlier failures.
-                attempt = 0
-                steppedAttempts = 0
-                accountRejections = 0
-                routeFailures[route] = 0
-                if now - since >= 30 { quickDrops = 0 }
+            } else {
+                if now - since >= 10, (health.programmeDrought(at: now) ?? 0) < 2 {
+                    // Sustained delivery: forgive earlier failures.
+                    attempt = 0
+                    steppedAttempts = 0
+                    accountRejections = 0
+                    routeFailures[route] = 0
+                    if now - since >= 30 { quickDrops = 0 }
+                }
+                if observation.droppedProgramme >= Self.droppedProgrammeLimit || observation.droppedGaps >= Self.droppedGapLimit,
+                   lossyRoutes.insert(route).inserted {
+                    let gaps = observation.droppedGaps == 1 ? "1 gap" : "\(observation.droppedGaps) gaps"
+                    decisionLog.append(String(format: "Provider dropped %.1f s of programme in ", observation.droppedProgramme)
+                                       + "\(gaps) within \(Int(Self.droppedProgrammeWindow)) s on this route")
+                    if let next = nextRoute(after: route), !lossyRoutes.contains(next) {
+                        actions.append(.disconnect)
+                        actions += switchRoute(to: next, at: now, drought: nil, reason: "provider dropping programme")
+                    }
+                }
             }
         }
 
@@ -333,6 +358,18 @@ nonisolated struct RecoveryReferee {
             if case .retrying = notice { notice = nil }
         }
         return actions
+    }
+
+    /// Leaves the current connection for `route` before anything has played: the session knows that
+    /// route carries this stream better. A route already found dead is left alone.
+    mutating func prefer(route: Int, at now: Double, reason: String) -> [Action] {
+        guard !everStreamed, route != currentRoute, route < routeCount, !deadRoutes.contains(route) else { return [] }
+        switch phase {
+        case .connecting, .streaming:
+            return [.disconnect] + switchRoute(to: route, at: now, drought: nil, reason: reason)
+        case .idle, .waiting, .finished:
+            return []
+        }
     }
 
     /// Records the pace decision's effect on the notice: a slowed line is worth telling the viewer about.

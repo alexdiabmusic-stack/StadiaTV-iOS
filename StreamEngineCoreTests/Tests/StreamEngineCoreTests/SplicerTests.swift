@@ -291,6 +291,156 @@ struct SplicerTests {
         expectContinuousAudio(harness, maximumStep: 9_000)
     }
 
+    @Test("Programme the provider drops mid-connection is closed up at once, mid-GOP, with the audio in step")
+    func sourceGapClosed() throws {
+        var stream = SyntheticTransportStream()
+        // A restream that can't keep up loses 0.6 s of pictures and audio alike, mid-GOP.
+        var bytes = stream.bytes(seconds: 3)
+        _ = stream.bytes(seconds: 0.6, firstFrame: 75)
+        bytes += stream.bytes(seconds: 3.4, firstFrame: 90)
+        var harness = PipelineHarness()
+        harness.connection(bytes)
+        harness.finish()
+
+        // Every picture after the gap is kept (the decoder carries on) and follows straight on. The one
+        // before it goes too: with packets missing after it, it can't be known to be whole.
+        #expect(harness.deliveredFrames == Array(0..<74) + Array(90..<174))
+        #expect(Set(harness.videoSteps) == [3_600])
+        #expect(harness.spliceReports.map(\.kind) == [.start])
+        #expect(!harness.units.contains { $0.startsDiscontinuity })
+        #expect(harness.splicer.statistics.sourceGaps == 1)
+        #expect(harness.splicer.statistics.tornUnits == 1)
+        #expect(abs(harness.splicer.statistics.sourceGapSeconds - 0.64) < 0.000_001)
+        #expect(harness.events.contains(.sourceGapClosed(seconds: 0.64)))
+        // The audio after the gap moves with the pictures: no silence, no overlap, still in sync.
+        expectContinuousAudio(harness)
+        let picture = try #require(harness.videoUnits.first { SyntheticTransportStream.picture(of: $0)?.frame == 90 }?.pts)
+        let audio = try #require(harness.audioUnits.compactMap(\.pts).first { MPEGTS.signedDelta($0, picture) >= 0 })
+        #expect(MPEGTS.signedDelta(audio, picture) < 1_920)
+        #expect(harness.segments.allSatisfy { $0.duration < 2.1 })
+    }
+
+    @Test("Audio a muxer sends behind the pictures still plays before the gap it was stamped before")
+    func lateAudioBeforeGap() {
+        var stream = SyntheticTransportStream()
+        let before = transportPackets(stream.bytes(seconds: 3))
+        _ = stream.bytes(seconds: 0.6, firstFrame: 75)
+        let after = transportPackets(stream.bytes(seconds: 3.4, firstFrame: 90))
+        // The last two audio PES from before the gap arrive just after the first picture after it.
+        let late = before.filter { $0.pid == stream.audioPID }.suffix(2)
+        let lateKeys = Set(late.map(\.bytes))
+        let firstPictureEnd = (after.firstIndex { $0.pid == stream.videoPID && $0.payloadUnitStart } ?? 0)
+            + (after.dropFirst().firstIndex { $0.pid != stream.videoPID } ?? 1) - 1
+        var reordered = before.filter { !($0.pid == stream.audioPID && lateKeys.contains($0.bytes)) }.flatMap(\.bytes)
+        reordered += after[..<firstPictureEnd].flatMap(\.bytes) + late.flatMap(\.bytes) + after[firstPictureEnd...].flatMap(\.bytes)
+        var harness = PipelineHarness()
+        harness.connection(reordered)
+        harness.finish()
+
+        #expect(harness.splicer.statistics.sourceGaps == 1)
+        #expect(Set(harness.videoSteps) == [3_600])
+        // The late audio plays in its place before the gap: every step one AAC frame, across the gap too.
+        #expect(Set(harness.audioSteps) == [1_920])
+        expectContinuousAudio(harness)
+    }
+
+    @Test("A picture that lost packets part-way is dropped, not decoded with a hole; a duplicate packet is ignored")
+    func lostPackets() throws {
+        var stream = SyntheticTransportStream()
+        let packets = transportPackets(stream.bytes(seconds: 4))
+        // Frame 75's PES loses a packet from its middle, and a packet of frame 80's comes twice.
+        let starts = packets.indices.filter { packets[$0].pid == stream.videoPID && packets[$0].payloadUnitStart }
+        let lost = (starts[75] + 2)..<(starts[75] + 3)
+        let repeated = starts[80] + 1
+        var damaged: [UInt8] = []
+        for index in packets.indices where !lost.contains(index) {
+            damaged += packets[index].bytes
+            if index == repeated { damaged += packets[index].bytes }
+        }
+        var harness = PipelineHarness()
+        harness.connection(damaged)
+        harness.finish()
+
+        #expect(harness.deliveredFrames == Array(0..<75) + Array(76..<99))
+        #expect(harness.splicer.statistics.tornUnits == 1)
+        #expect(harness.splicer.statistics.sourceGaps == 0)
+        // Frame 80 arrives exactly as sent, without the repeated packet's payload twice.
+        let original = pesUnits(in: packets.flatMap(\.bytes), pid: stream.videoPID)[80]
+        let delivered = try #require(harness.videoUnits.first { SyntheticTransportStream.picture(of: $0)?.frame == 80 })
+        #expect(delivered.packets.count == original.packets.count)
+    }
+
+    @Test("Continuity counters restarting at an HLS segment boundary aren't taken for lost packets")
+    func segmentBoundaryCounters() {
+        var first = SyntheticTransportStream()
+        let a = first.bytes(seconds: 2)
+        // The next segment comes from a segmenter whose counters start afresh.
+        var second = first
+        second.resetContinuity()
+        let b = second.bytes(seconds: 2, firstFrame: 50)
+        var harness = PipelineHarness()
+        harness.segmentedIngest = true
+        harness.connection(a)
+        harness.splicer.segmentEnded()
+        harness.feed(b)
+        harness.finish()
+
+        #expect(harness.splicer.statistics.tornUnits == 0)
+        #expect(harness.deliveredFrames == Array(0..<100))
+    }
+
+    @Test("Another route of the same channel re-sends programme from before anything it delivered, and it's skipped")
+    func otherRouteResends() {
+        var stream = SyntheticTransportStream()
+        let delivered = stream.bytes(seconds: 6, firstFrame: 100)
+        // The backup route's window starts earlier, at a keyframe the first route never delivered.
+        let backup = stream.bytes(seconds: 12, firstFrame: 50)
+        var harness = PipelineHarness()
+        harness.connection(delivered)
+        harness.connection(backup, otherRoute: true)
+        harness.finish()
+
+        let frames = harness.deliveredFrames
+        #expect(zip(frames.dropFirst(), frames).allSatisfy { $0 > $1 })
+        #expect(frames.first == 100 && (frames.last ?? 0) >= 340)
+        #expect(Set(harness.videoSteps) == [3_600])
+        #expect(harness.spliceReports.dropFirst().allSatisfy { $0.kind == .resumed || $0.kind == .overlapRemoved })
+    }
+
+    @Test("A step of a few frames isn't treated as dropped programme")
+    func shortHiccupKept() {
+        var stream = SyntheticTransportStream()
+        var bytes = stream.bytes(seconds: 3)
+        _ = stream.bytes(seconds: 0.16, firstFrame: 75)
+        bytes += stream.bytes(seconds: 2, firstFrame: 79)
+        var harness = PipelineHarness()
+        harness.connection(bytes)
+        harness.finish()
+
+        #expect(harness.splicer.statistics.sourceGaps == 0)
+        #expect(Set(harness.videoSteps) == [3_600, 18_000])
+    }
+
+    @Test("A stream that lowers its picture rate is closed up once, not squeezed")
+    func lowerPictureRate() {
+        var stream = SyntheticTransportStream()
+        var bytes = stream.bytes(seconds: 4)
+        // Two pictures a second from here on, the first one frame after the last at 25 fps.
+        var slow = stream
+        slow.startPTS = stream.pts(frame: 100) + 45_000 - 3_600
+        slow.content = 1
+        slow.frameTicks = 45_000
+        slow.gop = 4
+        bytes += slow.bytes(seconds: 6)
+        var harness = PipelineHarness()
+        harness.connection(bytes)
+        harness.finish()
+
+        #expect(harness.splicer.statistics.sourceGaps == 1)
+        #expect(harness.deliveredPictures.count == 100 + 11)
+        #expect(harness.videoSteps.suffix(9) == Array(repeating: 45_000, count: 9))
+    }
+
     @Test("Source timestamps crossing the 33-bit wrap stay continuous")
     func wrap() {
         var stream = SyntheticTransportStream(startPTS: MPEGTS.timestampModulo - 2 * 90_000)

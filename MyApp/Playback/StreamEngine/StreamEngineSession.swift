@@ -78,6 +78,22 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
     private var pace = PlaybackPaceController()
     private var journal = StreamEngineJournal()
     private var codecs: String?
+    /// Set once HEVC arrives: AVPlayer plays HEVC only from fragmented MP4, so from then on the
+    /// session publishes fMP4 renditions under a multivariant playlist instead of MPEG-TS.
+    private var packager: FragmentedPackager?
+    /// Written once, when the first fMP4 segments are published.
+    private var multivariantPlaylist: Data?
+    /// HEVC was announced while MPEG-TS was already playing: switch at its first segment.
+    private var switchToFragmentedPending = false
+    /// The player must be moved to the fMP4 playlist once it has something to play.
+    private var endpointChangePending = false
+    /// Programme the provider dropped on the current connection, and when: a route that keeps
+    /// dropping it gives way to another.
+    private var droppedProgramme: [(time: Double, seconds: Double)] = []
+    /// The route whose connection last delivered programme.
+    private var deliveredRoute: Int?
+    /// A route to move to once what the current connection delivered so far is committed.
+    private var preferredRoute: Int?
 
     // Connection.
     private var connection: EngineConnection?
@@ -215,11 +231,12 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
             guard let playlist = publication.waitForPlaylist(timeout: 10) else { return .unavailable() }
             return LoopbackHTTPServer.Response(status: 200, contentType: "application/vnd.apple.mpegurl", body: playlist)
         }
-        if file.hasPrefix("s"), file.hasSuffix(".ts"), let sequence = Int(file.dropFirst().dropLast(3)),
-           let data = publication.segment(sequence) {
-            return LoopbackHTTPServer.Response(status: 200, contentType: "video/mp2t", body: data, cacheControl: "max-age=3600")
+        guard let data = publication.file(file) else { return .notFound() }
+        if file.hasSuffix(".m3u8") {
+            return LoopbackHTTPServer.Response(status: 200, contentType: "application/vnd.apple.mpegurl", body: data)
         }
-        return .notFound()
+        let type = file.hasSuffix(".ts") ? "video/mp2t" : file.hasSuffix(".m4s") ? "video/iso.segment" : "video/mp4"
+        return LoopbackHTTPServer.Response(status: 200, contentType: type, body: data, cacheControl: "max-age=3600")
     }
 
     // MARK: - Connections
@@ -230,6 +247,8 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
     private static let tailHoldLimit: Double = 6
     /// Longest the first playlist waits for a few seconds of programme.
     private static let startupWaitLimit: Double = 3
+    /// How far behind its live end HLS ingest joins when the session moves to it mid-stream.
+    private static let switchJoinSeconds: Double = 4
 
     private func perform(_ actions: [RecoveryReferee.Action]) {
         for action in actions {
@@ -247,19 +266,27 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
         closeConnection()
         connectionID += 1
         connectionsOpened += 1
+        let otherRoute = deliveredRoute.map { $0 != route } ?? false
         connectionRoute = route
         let id = connectionID
         aligner.reset()
-        splicer.beginConnection()
+        splicer.beginConnection(otherRoute: otherRoute)
         connectionOpenedAt = now()
         connectionDeliveredProgramme = false
         connectionCadence = 0
+        droppedProgramme.removeAll()
         health.connectionOpened(at: now())
         let emit: (EngineConnectionEvent) -> Void = { [weak self] event in self?.handle(event, connection: id) }
         if let hls = hlsRoutes[route] {
             hlsRoutes[route]?.playlist = nil
+            // Joining deep in the window fills the reserve at start-up. Later (moving here from another
+            // route) the reserve already holds that programme: join at the newest segments, where the next
+            // new programme is, and never further back than what was delivered, which the splicer recognises
+            // by its keyframes (older programme would be taken for a new clock and replayed).
+            let fresh = splicer.outputEnd == nil
             connection = HLSIngestConnection(playlistURL: hls.url, initialPlaylist: hls.playlist, headers: headers,
-                                             joinSeconds: configuration.targetBuffer, resumeAfter: hlsDelivered[route],
+                                             joinSeconds: fresh ? configuration.targetBuffer : min(Self.switchJoinSeconds, max(0, ingestEdge - 2)),
+                                             joinDepth: fresh ? HLSIngestConnection.joinDepth : 1, resumeAfter: hlsDelivered[route],
                                              queue: queue, emit: emit)
         } else {
             connection = TSStreamConnection(url: routes[route].url, headers: headers, queue: queue, emit: emit)
@@ -295,7 +322,7 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
             // Cutting at the keyframe is harmless either way: what came before it is playable now.
             let split = segmenter.holdTail(fromKeyframeAt: keyframe)
             if let closed = split.closed {
-                reserve.append(closed)
+                appendToReserve(closed)
                 publishIfNeeded()
             }
             if split.held, reserveAhead(now()) >= tailHoldMinimum {
@@ -311,7 +338,7 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
         tailHeldSince = nil
         splicer.discardResumePoint()
         if let segment = segmenter.flush() {
-            reserve.append(segment)
+            appendToReserve(segment)
             publishIfNeeded()
         }
     }
@@ -328,6 +355,7 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
             ingest(data, at: time)
         case .segmentDelivered(let sequence):
             hlsDelivered[connectionRoute] = sequence
+            splicer.segmentEnded()
         case .sourceDiscontinuity:
             let finished = splicer.beginSourceDiscontinuity(wallTime: time)
             if !finished.isEmpty { commit(finished, at: time) }
@@ -373,12 +401,17 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
             }
             if !connectionDeliveredProgramme, lastOutputEnd == end {
                 connectionDeliveredProgramme = true
+                deliveredRoute = connectionRoute
                 referee.programmeArrived(at: time)
                 recordDecisions()
             }
         }
-        for segment in finished { reserve.append(segment) }
+        for segment in finished { appendToReserve(segment) }
         if !finished.isEmpty { publishIfNeeded() }
+        if let route = preferredRoute {
+            preferredRoute = nil
+            perform(referee.prefer(route: route, at: time, reason: "HEVC plays from the panel's HLS output"))
+        }
     }
 
     private func handleSplicerEvents(at time: Double) {
@@ -387,6 +420,7 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
             case .program(let program):
                 codecs = program.codecSummary
                 journal.record(.splice, "Program: \(program.codecSummary)", buffered: bufferedAhead(time))
+                if packager == nil, case .video(.hevc)? = program.video?.kind { startFragmentedPublishing(at: time) }
             case .splice(let report):
                 guard report.kind != .start else { continue }
                 if report.kind == .resumed {
@@ -401,10 +435,13 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
                     // Not re-sent: what was held plays before the new connection's programme.
                     tailHeldSince = nil
                     if let segment = segmenter.flush() {
-                        reserve.append(segment)
+                        appendToReserve(segment)
                         publishIfNeeded()
                     }
                 }
+                // A jump inside one connection is a stretch the provider dropped too long to close up
+                // on the spot (or a clock jump): it counts toward the route's dropped programme.
+                if report.kind == .timelineJump { droppedProgramme.append((time, 0)) }
                 var message = "Spliced (\(report.kind.rawValue))"
                 if report.skippedSeconds > 0 { message += String(format: ", skipped %.1f s already played", report.skippedSeconds) }
                 if report.missingSeconds > 0.05 { message += String(format: ", %.1f s of programme missing", report.missingSeconds) }
@@ -412,11 +449,52 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
             case .unsupportedProgram(let reason):
                 journal.record(.warning, reason, buffered: bufferedAhead(time))
                 if !announcedReady { fail(.unsupported(reason)) }
+            case .sourceGapClosed(let seconds):
+                droppedProgramme.append((time, seconds))
+                journal.record(.splice, String(format: "Provider dropped %.2f s of programme: closed up", seconds),
+                               buffered: bufferedAhead(time))
             }
         }
     }
 
     // MARK: - Publishing
+
+    /// Adds a finished segment to the reserve, repackaged as fragmented MP4 in an HEVC session.
+    private func appendToReserve(_ segment: MediaSegment) {
+        if switchToFragmentedPending, FragmentedPackager.carriesHEVC(segment) {
+            // MPEG-TS played up to here; the HEVC programme starts a fresh fMP4 publication and
+            // the player is moved to it as soon as it can start.
+            switchToFragmentedPending = false
+            packager = FragmentedPackager()
+            multivariantPlaylist = nil
+            reserve = SegmentReserve(configuration: reserve.configuration)
+            firstSegmentAt = nil
+            endpointChangePending = true
+            journal.record(.connection, "HEVC: moving the player to fragmented MP4 renditions", buffered: bufferedAhead(now()))
+        }
+        guard let packager else {
+            reserve.append(segment)
+            return
+        }
+        // Without parameter sets so far the segment can't be decoded; the next keyframe brings them.
+        if let packaged = packager.package(segment) { reserve.append(packaged) }
+    }
+
+    /// From now on segments are published as fMP4. Mid-session, MPEG-TS carries on until the
+    /// first HEVC segment is complete.
+    private func startFragmentedPublishing(at time: Double) {
+        guard reserve.segments.isEmpty, !announcedReady else {
+            switchToFragmentedPending = true
+            return
+        }
+        packager = FragmentedPackager()
+        journal.record(.connection, "HEVC: publishing fragmented MP4 renditions", buffered: bufferedAhead(time))
+        // Panels' MPEG-TS output drops chunks of 4K streams that their HLS output carries whole: before
+        // anything plays, move to the HLS route, whose window then fills the reserve at once.
+        if hlsRoutes[connectionRoute] == nil, routes[connectionRoute].label != "HLS" {
+            preferredRoute = routes.indices.first { routes[$0].label == "HLS" }
+        }
+    }
 
     /// Programme time at the end of everything ingested.
     private var ingestEdge: Double { (reserve.ingestEnd ?? 0) + segmenter.openDuration }
@@ -505,6 +583,9 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
                 announcedReady = true
                 journal.record(.connection, "First picture ready", buffered: bufferedAhead(time))
                 emitEvent(.ready(playlistURL))
+            } else if endpointChangePending {
+                endpointChangePending = false
+                emitEvent(.endpointChanged(playlistURL))
             }
         }
     }
@@ -515,11 +596,105 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
         // Where a (re)built player item should start: the keyframe segment under the playhead.
         let target = joinTarget ?? estimatedPlayhead(now()) ?? window.first?.programmeStart ?? 0
         let join = reserve.joinPoint(atOrBefore: target)
+        if let packager {
+            publication.update(files: fragmentedFiles(window: window, join: join, packager: packager))
+            return
+        }
         let offset = join.map { $0.programmeStart - (window.first?.programmeStart ?? 0) }
         let text = HLSPlaylistWriter.mediaPlaylist(segments: window, targetDuration: configuration.segmenter.playlistTargetDuration,
                                                    discontinuitySequence: reserve.evictedDiscontinuities,
                                                    epoch: epoch, startOffset: offset)
-        publication.update(playlist: Data(text.utf8), segments: Array(window))
+        var files = ["live.m3u8": Data(text.utf8)]
+        for segment in window { files["s\(segment.sequence).ts"] = segment.data }
+        publication.update(files: files)
+    }
+
+    /// The multivariant playlist, each rendition's media playlist, and what they list.
+    private func fragmentedFiles(window: ArraySlice<MediaSegment>, join: MediaSegment?,
+                                 packager: FragmentedPackager) -> [String: Data] {
+        var files: [String: Data] = [:]
+        func mediaPlaylist(_ entries: [HLSPlaylistWriter.FragmentEntry], sequence: Int) -> Data {
+            // Every rendition starts where a rebuilt player item should: the same moment in each.
+            let offset = join.flatMap { join in entries.first.map { join.programmeStart - $0.programmeStart } }
+            return Data(HLSPlaylistWriter.fragmentedMediaPlaylist(
+                entries: entries, mediaSequence: sequence, targetDuration: configuration.segmenter.playlistTargetDuration,
+                discontinuitySequence: reserve.evictedDiscontinuities, epoch: epoch, startOffset: offset).utf8)
+        }
+        var video: [HLSPlaylistWriter.FragmentEntry] = []
+        for segment in window {
+            guard let number = segment.initialization else { continue }
+            let map = "v\(number).mp4"
+            if files[map] == nil { files[map] = packager.videoInitialization(number) }
+            files["v\(segment.sequence).m4s"] = segment.data
+            video.append(.init(uri: "v\(segment.sequence).m4s", map: map, duration: segment.duration,
+                               programmeStart: segment.programmeStart, isDiscontinuity: segment.isDiscontinuity,
+                               isIndependent: segment.startsWithKeyframe))
+        }
+        files["video.m3u8"] = mediaPlaylist(video, sequence: window.first?.sequence ?? 0)
+
+        let renditions = packager.audioRenditions
+        for rendition in renditions {
+            var entries: [HLSPlaylistWriter.FragmentEntry] = []
+            var firstSequence: Int?
+            for segment in window {
+                guard let fragment = segment.audio.first(where: { $0.rendition == rendition.index }) else { continue }
+                let map = "a\(rendition.index)-\(fragment.initialization).mp4"
+                if files[map] == nil { files[map] = packager.audioInitialization(rendition: rendition.index, number: fragment.initialization) }
+                let uri = "a\(rendition.index)-\(segment.sequence).m4s"
+                files[uri] = fragment.data
+                firstSequence = firstSequence ?? segment.sequence
+                entries.append(.init(uri: uri, map: map, duration: fragment.duration, programmeStart: fragment.programmeStart,
+                                     isDiscontinuity: segment.isDiscontinuity))
+            }
+            files["audio\(rendition.index).m3u8"] = mediaPlaylist(entries, sequence: firstSequence ?? 0)
+        }
+
+        if multivariantPlaylist == nil, let format = packager.videoFormat {
+            // Bit rates from what the reserve holds: the peak segment and the average.
+            let held = reserve.segments.filter { $0.duration > 0.5 }
+            let rates = held.map { Double(($0.data.count + ($0.audio.first?.data.count ?? 0)) * 8) / $0.duration }
+            let average = rates.isEmpty ? 0 : rates.reduce(0, +) / Double(rates.count)
+            var names: Set<String> = []
+            let audio = renditions.enumerated().map { position, rendition -> HLSPlaylistWriter.AudioRenditionTag in
+                let language = Self.languageTag(rendition.language)
+                var name = Self.languageName(language)
+                var copy = 2
+                while !names.insert(name).inserted {
+                    name = "\(Self.languageName(language)) \(copy)"
+                    copy += 1
+                }
+                return .init(uri: "audio\(rendition.index).m3u8", name: name, language: language,
+                             channels: rendition.format.channelCount, isDefault: position == 0)
+            }
+            var codecs = [format.codecString]
+            for rendition in renditions where !codecs.contains(rendition.format.codecString) { codecs.append(rendition.format.codecString) }
+            multivariantPlaylist = Data(HLSPlaylistWriter.multivariantPlaylist(
+                videoURI: "video.m3u8", bandwidth: Int((rates.max() ?? 0) * 1.1), averageBandwidth: Int(average),
+                codecs: codecs, width: format.width, height: format.height, frameRate: packager.frameRate,
+                videoRange: format.videoRange, audio: audio).utf8)
+        }
+        files["live.m3u8"] = multivariantPlaylist
+        return files
+    }
+
+    /// RFC 5646 tags for the ISO 639-2 codes broadcasters use; others are valid as they are.
+    private static func languageTag(_ code: String) -> String {
+        let twoLetter = ["eng": "en", "fra": "fr", "fre": "fr", "deu": "de", "ger": "de", "ita": "it", "spa": "es", "por": "pt",
+                         "rus": "ru", "ara": "ar", "tur": "tr", "nld": "nl", "dut": "nl", "pol": "pl", "swe": "sv", "nor": "no",
+                         "nob": "nb", "dan": "da", "fin": "fi", "ell": "el", "gre": "el", "ces": "cs", "cze": "cs", "hun": "hu",
+                         "ron": "ro", "rum": "ro", "bul": "bg", "hrv": "hr", "srp": "sr", "slk": "sk", "slo": "sk", "slv": "sl",
+                         "ukr": "uk", "heb": "he", "fas": "fa", "per": "fa", "hin": "hi", "urd": "ur", "zho": "zh", "chi": "zh",
+                         "jpn": "ja", "kor": "ko", "tha": "th", "vie": "vi", "ind": "id", "msa": "ms", "may": "ms", "cat": "ca",
+                         "alb": "sq", "sqi": "sq", "mkd": "mk", "mac": "mk", "bos": "bs", "kur": "ku", "aze": "az", "est": "et",
+                         "lav": "lv", "lit": "lt", "isl": "is", "ice": "is", "gle": "ga", "cym": "cy", "wel": "cy", "eus": "eu",
+                         "baq": "eu", "glg": "gl"]
+        if let tag = twoLetter[code] { return tag }
+        return code.count == 3 && !code.hasPrefix("q") && code != "mis" ? code : "und"
+    }
+
+    private static func languageName(_ tag: String) -> String {
+        guard tag != "und" else { return "Audio" }
+        return (Locale.current.localizedString(forLanguageCode: tag) ?? tag.uppercased()).replacingOccurrences(of: "\"", with: "")
     }
 
     /// The date EXT-X-PROGRAM-DATE-TIME gives to programme time zero.
@@ -539,8 +714,11 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
             journal.record(.recovery, "Reserve empty: holding the picture until it is rebuilt", buffered: buffered)
         }
 
+        droppedProgramme.removeAll { time - $0.time > RecoveryReferee.droppedProgrammeWindow }
         perform(referee.tick(.init(now: time, buffered: buffered, isStarved: starved, health: health,
-                                   silenceFloor: normalSilence)))
+                                   silenceFloor: normalSilence,
+                                   droppedProgramme: droppedProgramme.reduce(0) { $0 + $1.seconds },
+                                   droppedGaps: droppedProgramme.count)))
         guard !stopped else { return }
         if let since = tailHeldSince, time - since >= Self.tailHoldLimit || reserveAhead(time) < tailHoldMinimum - 1 {
             journal.record(.splice, "Reconnect slow: releasing the held GOP", buffered: buffered)
@@ -605,7 +783,7 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
             playbackRate: pace.rate, paceReason: pace.reason.rawValue,
             connections: connectionsOpened, reconnects: referee.reconnects, routeSwitches: referee.routeSwitches,
             splices: statistics.splices, overlapsRemoved: statistics.overlapsRemoved,
-            timelineRepairs: statistics.timebaseResets + statistics.timelineJumps + statistics.gapsClosed,
+            timelineRepairs: statistics.timebaseResets + statistics.timelineJumps + statistics.gapsClosed + statistics.sourceGaps,
             decoderResets: decoderResets, deliveryRatio: health.slowRatio,
             bitrate: health.streamBitrate, notice: referee.notice, journal: journal.recent(12))
     }
@@ -638,32 +816,32 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
 /// The published window, readable from the server's threads.
 nonisolated final class PublicationStore: @unchecked Sendable {
     private let condition = NSCondition()
-    private var playlist: Data?
-    private var segments: [Int: Data] = [:]
+    /// Playlists, initialization sections and segments, by the name AVPlayer requests.
+    private var files: [String: Data] = [:]
     private var closed = false
 
-    func update(playlist: Data, segments window: [MediaSegment]) {
+    func update(files: [String: Data]) {
         condition.lock()
-        self.playlist = playlist
-        segments = Dictionary(uniqueKeysWithValues: window.map { ($0.sequence, $0.data) })
+        self.files = files
         condition.broadcast()
         condition.unlock()
     }
 
+    /// The top-level playlist, once the first one is published.
     func waitForPlaylist(timeout: Double) -> Data? {
         let deadline = Date().addingTimeInterval(timeout)
         condition.lock()
         defer { condition.unlock() }
-        while playlist == nil, !closed {
+        while files["live.m3u8"] == nil, !closed {
             if !condition.wait(until: deadline) { break }
         }
-        return closed ? nil : playlist
+        return closed ? nil : files["live.m3u8"]
     }
 
-    func segment(_ sequence: Int) -> Data? {
+    func file(_ name: String) -> Data? {
         condition.lock()
         defer { condition.unlock() }
-        return segments[sequence]
+        return files[name]
     }
 
     func close() {

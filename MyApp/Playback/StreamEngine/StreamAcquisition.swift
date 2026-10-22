@@ -271,16 +271,20 @@ nonisolated final class HLSIngestConnection: EngineConnection, @unchecked Sendab
     private let joinSeconds: Double
     /// The last segment a previous connection delivered; a reconnect continues right after it.
     private let resumeAfter: Int?
+    /// Segments fetched behind the live end at least.
+    private let joinDepth: Int
 
     /// Segments fetched behind the live end when the deep join isn't possible.
     static let joinDepth = 3
 
     init(playlistURL: URL, initialPlaylist: String?, headers: [String: String], joinSeconds: Double,
-         resumeAfter: Int?, queue: DispatchQueue, emit: @escaping (EngineConnectionEvent) -> Void) {
+         joinDepth: Int = HLSIngestConnection.joinDepth, resumeAfter: Int?, queue: DispatchQueue,
+         emit: @escaping (EngineConnectionEvent) -> Void) {
         self.playlistURL = playlistURL
         self.initialPlaylist = initialPlaylist
         self.headers = headers
         self.joinSeconds = joinSeconds
+        self.joinDepth = max(1, joinDepth)
         self.resumeAfter = resumeAfter
         self.queue = queue
         self.emit = emit
@@ -298,7 +302,7 @@ nonisolated final class HLSIngestConnection: EngineConnection, @unchecked Sendab
             covered += segment.duration
             if covered >= joinSeconds { break }
         }
-        return min(start, max(segments.first?.sequence ?? start, last.sequence - (Self.joinDepth - 1)))
+        return min(start, max(segments.first?.sequence ?? start, last.sequence - (joinDepth - 1)))
     }
 
     func start() {

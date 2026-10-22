@@ -11,8 +11,27 @@ nonisolated struct MediaSegment: Sendable {
     let startsWithKeyframe: Bool
     /// Preceded by EXT-X-DISCONTINUITY: the codecs changed, or content before it was dropped.
     var isDiscontinuity: Bool
+    /// Output-timeline decode times (90 kHz, 33-bit) of the first picture and of the next segment's.
+    var startTime: Int64? = nil
+    var endTime: Int64? = nil
+    /// Fragmented MP4 sessions: `data` is the video fragment, which plays after the initialization
+    /// section with this number; `audio` holds each audio rendition's fragment for the same stretch.
+    var initialization: Int? = nil
+    var audio: [AudioFragment] = []
 
     var programmeEnd: Double { programmeStart + duration }
+    var byteCount: Int { data.count + audio.reduce(0) { $0 + $1.data.count } }
+}
+
+/// One audio rendition's fragment of a media segment. Its audio arrived with the segment's
+/// pictures, so it can start and end a little apart from them; it has its own timing.
+nonisolated struct AudioFragment: Sendable {
+    /// The audio stream's position in the program, which identifies its rendition.
+    let rendition: Int
+    let data: Data
+    let initialization: Int
+    let programmeStart: Double
+    let duration: Double
 }
 
 /// Cuts the normalized transport stream into short HLS segments.
@@ -155,7 +174,7 @@ nonisolated struct HLSSegmenter {
         duration = max(duration, 0.001)
         let segment = MediaSegment(sequence: nextSequence, data: Data(bytes), duration: duration,
                                    programmeStart: programmeTime, startsWithKeyframe: startsWithKeyframe,
-                                   isDiscontinuity: isDiscontinuity)
+                                   isDiscontinuity: isDiscontinuity, startTime: start, endTime: endTime)
         nextSequence += 1
         programmeTime += duration
         lastSegmentSize = bytes.count
@@ -215,7 +234,7 @@ nonisolated struct SegmentReserve {
 
     mutating func append(_ segment: MediaSegment) {
         segments.append(segment)
-        byteCount += segment.data.count
+        byteCount += segment.byteCount
         enforceByteCeiling()
     }
 
@@ -263,7 +282,7 @@ nonisolated struct SegmentReserve {
 
     private mutating func removeFirst() {
         let removed = segments.removeFirst()
-        byteCount -= removed.data.count
+        byteCount -= removed.byteCount
         if removed.isDiscontinuity { evictedDiscontinuities += 1 }
         publishedCount -= 1
     }
@@ -276,7 +295,7 @@ nonisolated struct SegmentReserve {
         }
         while byteCount > configuration.maximumBytes, segments.count - publishedCount > 1 {
             let removed = segments.remove(at: publishedCount)
-            byteCount -= removed.data.count
+            byteCount -= removed.byteCount
             discardedSeconds += removed.duration
             segments[publishedCount].isDiscontinuity = true
         }
@@ -303,6 +322,81 @@ nonisolated enum HLSPlaylistWriter {
             lines.append("#EXTINF:\(String(format: "%.3f", segment.duration)),")
             lines.append("s\(segment.sequence).ts")
         }
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    /// One segment of a fragmented-MP4 media playlist.
+    struct FragmentEntry {
+        var uri: String
+        /// The initialization section it plays after.
+        var map: String
+        var duration: Double
+        var programmeStart: Double
+        var isDiscontinuity: Bool
+        /// Decodable without the segments before it: video that starts with a keyframe (a long GOP
+        /// cut short doesn't), and audio.
+        var isIndependent = true
+    }
+
+    /// A rendition's media playlist for fragmented MP4: EXT-X-MAP before the first segment and
+    /// wherever the initialization section changes.
+    static func fragmentedMediaPlaylist(entries: [FragmentEntry], mediaSequence: Int, targetDuration: Int,
+                                        discontinuitySequence: Int, epoch: Date, startOffset: Double? = nil) -> String {
+        var lines = [
+            "#EXTM3U",
+            "#EXT-X-VERSION:7",
+            "#EXT-X-TARGETDURATION:\(targetDuration)",
+            "#EXT-X-MEDIA-SEQUENCE:\(mediaSequence)",
+            "#EXT-X-DISCONTINUITY-SEQUENCE:\(discontinuitySequence)"
+        ]
+        if entries.allSatisfy(\.isIndependent) { lines.append("#EXT-X-INDEPENDENT-SEGMENTS") }
+        if let startOffset {
+            lines.append("#EXT-X-START:TIME-OFFSET=\(String(format: "%.3f", max(0, startOffset))),PRECISE=NO")
+        }
+        var map: String?
+        for entry in entries {
+            if entry.isDiscontinuity { lines.append("#EXT-X-DISCONTINUITY") }
+            // A player may reset its demuxer at a discontinuity: name the initialization section again.
+            if entry.map != map || entry.isDiscontinuity {
+                lines.append("#EXT-X-MAP:URI=\"\(entry.map)\"")
+                map = entry.map
+            }
+            lines.append("#EXT-X-PROGRAM-DATE-TIME:\(timestamp(epoch.addingTimeInterval(entry.programmeStart)))")
+            lines.append("#EXTINF:\(String(format: "%.3f", entry.duration)),")
+            lines.append(entry.uri)
+        }
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    struct AudioRenditionTag {
+        var uri: String
+        var name: String
+        /// RFC 5646 language tag.
+        var language: String
+        var channels: Int
+        var isDefault: Bool
+    }
+
+    /// The multivariant playlist for a fragmented-MP4 session: one video variant, with its audio as
+    /// separate renditions. CODECS, RESOLUTION, FRAME-RATE and VIDEO-RANGE let AVPlayer decide it
+    /// can play the variant, and set up HDR before the first picture. EXT-X-INDEPENDENT-SEGMENTS
+    /// is left to the media playlists: here it would cover video segments a long GOP was cut in.
+    static func multivariantPlaylist(videoURI: String, bandwidth: Int, averageBandwidth: Int, codecs: [String],
+                                     width: Int, height: Int, frameRate: Double?, videoRange: String,
+                                     audio: [AudioRenditionTag]) -> String {
+        var lines = ["#EXTM3U", "#EXT-X-VERSION:7"]
+        for rendition in audio {
+            lines.append("#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"audio\",NAME=\"\(rendition.name)\",LANGUAGE=\"\(rendition.language)\","
+                         + "DEFAULT=\(rendition.isDefault ? "YES" : "NO"),AUTOSELECT=YES,CHANNELS=\"\(rendition.channels)\","
+                         + "URI=\"\(rendition.uri)\"")
+        }
+        var attributes = ["BANDWIDTH=\(bandwidth)", "AVERAGE-BANDWIDTH=\(averageBandwidth)",
+                          "CODECS=\"\(codecs.joined(separator: ","))\"", "RESOLUTION=\(width)x\(height)"]
+        if let frameRate { attributes.append(String(format: "FRAME-RATE=%.3f", frameRate)) }
+        attributes.append("VIDEO-RANGE=\(videoRange)")
+        if !audio.isEmpty { attributes.append("AUDIO=\"audio\"") }
+        lines.append("#EXT-X-STREAM-INF:" + attributes.joined(separator: ","))
+        lines.append(videoURI)
         return lines.joined(separator: "\n") + "\n"
     }
 

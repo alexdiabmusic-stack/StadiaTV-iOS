@@ -249,42 +249,46 @@ struct MatchesView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, Theme.isMac ? 12 : 20)
 
-                Group {
-                    if let live = liveList.first {
-                        FollowingLiveHero(match: live)
-                    } else if let next = nextUp {
-                        FollowingUpNextHero(
-                            match: next,
-                            isReminderSet: remindedMatchIDs.contains(next.id),
-                            onRemind: { Task { await toggleReminder(for: next) } }
-                        )
-                    } else if !viewModel.isLoadingFollowing {
-                        FollowingNoEventsCard()
+                // Hero + schedule beside news + standings once the window is wide enough.
+                AdaptiveTwoPane(spacing: 0, columnSpacing: 0) {
+                    Group {
+                        if let live = liveList.first {
+                            FollowingLiveHero(match: live)
+                        } else if let next = nextUp {
+                            FollowingUpNextHero(
+                                match: next,
+                                isReminderSet: remindedMatchIDs.contains(next.id),
+                                onRemind: { Task { await toggleReminder(for: next) } }
+                            )
+                        } else if !viewModel.isLoadingFollowing {
+                            FollowingNoEventsCard()
+                        }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, Theme.isMac ? 20 : 28)
+
+                    FollowingComingUpSection(
+                        matches: Array(comingUpVisible.prefix(6)),
+                        fullScheduleMatches: comingUpVisible,
+                        sportFilter: $comingUpSportFilter,
+                        availableSports: availableSports,
+                        streamCountByMatchId: streamStore.countByMatchId,
+                        notOnPlaylistMatches: notOnPlaylist
+                    )
+                    .padding(.bottom, Theme.isMac ? 20 : 28)
+
+                } secondary: {
+                    if !news.isEmpty || newsLoading {
+                        FollowingNewsSection(articles: news, isLoading: newsLoading)
+                            .padding(.bottom, Theme.isMac ? 20 : 28)
+                    }
+
+                    FollowingStandingsSnapshot(
+                        selection: selectedSelection,
+                        favoriteTeams: prefs.favoriteTeams
+                    )
+                    .padding(.horizontal, 20)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, Theme.isMac ? 20 : 28)
-
-                FollowingComingUpSection(
-                    matches: Array(comingUpVisible.prefix(6)),
-                    fullScheduleMatches: comingUpVisible,
-                    sportFilter: $comingUpSportFilter,
-                    availableSports: availableSports,
-                    streamCountByMatchId: streamStore.countByMatchId,
-                    notOnPlaylistMatches: notOnPlaylist
-                )
-                .padding(.bottom, Theme.isMac ? 20 : 28)
-
-                if !news.isEmpty || newsLoading {
-                    FollowingNewsSection(articles: news, isLoading: newsLoading)
-                        .padding(.bottom, Theme.isMac ? 20 : 28)
-                }
-
-                FollowingStandingsSnapshot(
-                    selection: selectedSelection,
-                    favoriteTeams: prefs.favoriteTeams
-                )
-                .padding(.horizontal, 20)
 
                 Spacer(minLength: 120)
             }
@@ -1247,6 +1251,7 @@ private struct FollowingNewsSection: View {
 
 private struct FollowingNewsCard: View {
     let article: ESPNArticle
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -1285,7 +1290,7 @@ private struct FollowingNewsCard: View {
             }
             .padding(10)
         }
-        .frame(width: Theme.isPad ? 260 : 200)
+        .frame(width: sizeClass == .regular ? 260 : 200)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))

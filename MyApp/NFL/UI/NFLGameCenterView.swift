@@ -9,6 +9,7 @@ struct NFLGameCenterView<WatchContent: View, RelatedContent: View>: View {
     @State private var revealed = false
     @State private var showingPaywall = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.adaptiveLayout) private var adaptiveLayout
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var entitlements: EntitlementStore
     private var gameID: String? {
@@ -19,10 +20,12 @@ struct NFLGameCenterView<WatchContent: View, RelatedContent: View>: View {
     private var hideScore: Bool { preferences.spoilerFreeMode && (game?.status == .final || match.state == .final) && !revealed }
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 0) {
+            GameCentreSplit {
                 if let game { NFLGameHeaderView(game: game) }
                 else { VStack(spacing: 12) { Text(match.shortName).font(.title2.bold()); Text(match.statusDetail); if model.error == nil { ProgressView("Loading Game Centre") } }.padding().frame(maxWidth: .infinity).background(Theme.surface) }
-                watchContent()
+                } watch: {
+                    watchContent()
+                } rest: {
                 ScrollView(.horizontal) {
                     HStack { ForEach(["Overview", "Plays", "Box Score", "Stats"], id: \.self) { tab in
                         Button(tab) { model.tab = tab }.buttonStyle(.bordered).tint(model.tab == tab ? Theme.accessibleAccent : .secondary).frame(minHeight: 44)
@@ -39,7 +42,7 @@ struct NFLGameCenterView<WatchContent: View, RelatedContent: View>: View {
                     if entitlements.isPremium {
                         HStack(alignment: .top, spacing: 16) {
                             selected(game)
-                            if geometry.size.width > 950, model.tab == "Plays" {
+                            if geometry.size.width > 950 && !adaptiveLayout.prefersTwoPane, model.tab == "Plays" {
                                 ScrollView { overview(game) }.frame(width: 300)
                             }
                         }

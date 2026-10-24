@@ -22,6 +22,7 @@ struct SoccerGameCentreView<WatchContent: View, RelatedContent: View>: View {
     @ViewBuilder let relatedContent: () -> RelatedContent
     @State private var model: SoccerGameCentreViewModel
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.adaptiveLayout) private var adaptiveLayout
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var entitlements: EntitlementStore
     @State private var revealed = false
@@ -51,7 +52,7 @@ struct SoccerGameCentreView<WatchContent: View, RelatedContent: View>: View {
 
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 0) {
+            GameCentreSplit {
                 if let soccerMatch = snapshot?.match {
                     SoccerGameHeaderView(match: soccerMatch, league: match.league, homeLogo: match.home.logoURL, awayLogo: match.away.logoURL)
                 } else {
@@ -61,7 +62,9 @@ struct SoccerGameCentreView<WatchContent: View, RelatedContent: View>: View {
                         if model.errors.isEmpty { ProgressView("Loading Game Centre") }
                     }.frame(maxWidth: .infinity).padding().background(Theme.surface)
                 }
-                watchContent()
+                } watch: {
+                    watchContent()
+                } rest: {
                 GameTabBar(tabs: availableTabs, selection: Binding(
                     get: { model.selectedTab },
                     set: { fullRefresh = false; model.selectedTab = $0 }
@@ -72,7 +75,7 @@ struct SoccerGameCentreView<WatchContent: View, RelatedContent: View>: View {
                 if matchID == nil {
                     ContentUnavailableView("Match unavailable", systemImage: "soccerball", description: Text("Open this match from the \(providerDisplayName) schedule."))
                 } else if entitlements.isPremium {
-                    content(wide: geometry.size.width > 850)
+                    content(wide: geometry.size.width > 850 && !adaptiveLayout.prefersTwoPane)
                 } else {
                     ScrollView {
                         PremiumGateOverlay(icon: "soccerball", title: "Game Centre", description: "Live match events, lineups, and statistics.", showPaywall: $showingPaywall)

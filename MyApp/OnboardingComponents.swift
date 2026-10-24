@@ -87,7 +87,7 @@ struct OnboardingBottomBar: View {
 
     @Environment(\.horizontalSizeClass) private var sizeClass
 
-    private var maxWidth: CGFloat { sizeClass == .regular ? 600 : .infinity }
+    private var maxWidth: CGFloat { sizeClass == .regular ? 900 : .infinity }
 
     var body: some View {
         VStack(spacing: 0) {

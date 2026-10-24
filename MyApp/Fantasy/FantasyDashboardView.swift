@@ -111,7 +111,7 @@ struct FantasyDashboardView: View {
                 Spacer(minLength: 80)
             }
             .padding(20)
-            .frame(maxWidth: Theme.isPad ? 760 : .infinity)
+            .bannerReadableWidth(760)
             .frame(maxWidth: .infinity, alignment: .center)
         }
     }

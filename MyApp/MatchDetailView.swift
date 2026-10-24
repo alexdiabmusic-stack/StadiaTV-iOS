@@ -149,7 +149,9 @@ struct MatchDetailView: View {
                 }
             } else {
             ScrollView {
-                VStack(spacing: 16) {
+                // Watch sources and the event on the left, game centre and news on the right once
+                // the window is wide enough; one stacked column otherwise (same order).
+                AdaptiveTwoPane(spacing: 16) {
                     eventHeader
                     if match.state != .final {
                         sourcesSection
@@ -163,6 +165,7 @@ struct MatchDetailView: View {
                         highlightsSection
                         scoringSummarySection
                     }
+                } secondary: {
                     GameCentreContainerView(
                         match: match,
                         gameSummary: gameSummary,

@@ -22,10 +22,12 @@ struct CFLGameCenterView<WatchContent: View, RelatedContent: View>: View {
     private var game: CFLGameState? { model.game?.id == gameID ? model.game : nil }
     private var hideScore: Bool { preferences.spoilerFreeMode && (game?.status == .final || match.state == .final) && !revealed }
     var body: some View {
-        VStack(spacing: 0) {
+        GameCentreSplit {
             if let game { CFLGameHeaderView(game: game, league: match.league) }
             else { VStack(spacing: 12) { Text(match.shortName).font(.title2.bold()); Text(match.statusDetail); if model.error == nil { ProgressView("Loading Game Centre") } }.padding().frame(maxWidth: .infinity).background(Theme.surface) }
-            watchContent()
+            } watch: {
+                watchContent()
+            } rest: {
             GameTabBar(tabs: CFLGameTab.allCases, selection: $model.tab)
             if let error = model.error { HStack { Text(error).font(.caption); Button("Retry") { revision += 1 } }.padding(8) }
             if let game {

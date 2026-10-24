@@ -6,6 +6,7 @@ struct NHLGameCenterView<WatchContent: View, RelatedContent: View>: View {
     @ViewBuilder let relatedContent: () -> RelatedContent
     @State private var model = NHLGameCenterViewModel()
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.adaptiveLayout) private var adaptiveLayout
     @EnvironmentObject private var preferences: PreferencesStore
     @State private var revealed = false
     @EnvironmentObject private var entitlements: EntitlementStore
@@ -22,7 +23,7 @@ struct NHLGameCenterView<WatchContent: View, RelatedContent: View>: View {
     private var snapshot: HockeyGameCenterSnapshot? { model.snapshot?.gameID == gameID ? model.snapshot : nil }
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 0) {
+            GameCentreSplit {
                 if let game = snapshot?.game {
                     NHLGameHeaderView(game: game, league: match.league)
                 } else {
@@ -32,7 +33,9 @@ struct NHLGameCenterView<WatchContent: View, RelatedContent: View>: View {
                         if model.errors.isEmpty { ProgressView("Loading Game Centre") }
                     }.frame(maxWidth: .infinity).padding(24).background(Theme.surface)
                 }
-                watchContent()
+                } watch: {
+                    watchContent()
+                } rest: {
                 GameTabBar(tabs: NHLGameTab.allCases, selection: $model.selectedTab)
                 if model.showingCache {
                     Text("Saved data · Last updated \(snapshot?.fetchedAt.formatted(date: .abbreviated, time: .shortened) ?? "unknown")").font(.caption).foregroundStyle(Theme.textSecondary).padding(6)
@@ -42,7 +45,7 @@ struct NHLGameCenterView<WatchContent: View, RelatedContent: View>: View {
                         description: Text("Open this game from the NHL schedule to load its NHL Game Centre."))
                 } else {
                     if entitlements.isPremium {
-                        tabContent(wide: geometry.size.width > 850)
+                        tabContent(wide: geometry.size.width > 850 && !adaptiveLayout.prefersTwoPane)
                     } else {
                         ScrollView {
                             VStack(spacing: 20) {

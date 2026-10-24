@@ -183,7 +183,12 @@ struct RootView: View {
     @EnvironmentObject private var eventChannelRefresh: EventChannelRefreshService
     @EnvironmentObject private var appEnvironment: BannerAppEnvironment
     @State private var showingFavoriteNotificationPrompt = false
+    #if DEBUG
+    // Lets UI verification launch straight into a tab: SIMCTL_CHILD_BANNER_START_TAB=live.
+    @State private var selectedTab: AppTab = AppTab(rawValue: ProcessInfo.processInfo.environment["BANNER_START_TAB"] ?? "") ?? .home
+    #else
     @State private var selectedTab: AppTab = .home
+    #endif
     // `banner://game/{eventID}` links from CarPlay, Live Activities and Siri (see BannerAppEnvironment).
     @State private var deepLinkMatch: Match?
     // Notification taps and `banner://` tab/match links, which carry the league and date (see DeepLink).
@@ -285,6 +290,7 @@ struct RootView: View {
             #endif
         }
         .tint(Theme.accent)
+        .providesAdaptiveLayoutContext()
         .environmentObject(liveViewModel)
         .environmentObject(epgRepository)
         .environment(\.playerStores, PlayerStoreReferences(playlistStore: playlistStore, epgRepository: epgRepository, streamStore: streamStore))

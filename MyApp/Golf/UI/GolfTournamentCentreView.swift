@@ -10,6 +10,8 @@ struct GolfTournamentCentreView<WatchContent: View, RelatedContent: View>: View 
     @ViewBuilder var watchContent: () -> WatchContent
     @ViewBuilder var relatedContent: () -> RelatedContent
 
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.adaptiveLayout) private var adaptiveLayout
     @State private var service = PGATournamentCentreService()
     @State private var tab: Tab = .overview
     @State private var selectedEntry: GolfLeaderboardEntry?
@@ -28,7 +30,9 @@ struct GolfTournamentCentreView<WatchContent: View, RelatedContent: View>: View 
         #if os(tvOS)
         true
         #else
-        Theme.isPad
+        // Driven by available width, not idiom: an unfolded iPhone Duo gets the split too, and the
+        // two panes straddle the fold.
+        adaptiveLayout.isExpanded && adaptiveLayout.foldAxis != .horizontal
         #endif
     }
 

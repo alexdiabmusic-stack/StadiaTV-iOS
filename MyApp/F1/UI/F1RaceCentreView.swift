@@ -5,6 +5,7 @@ struct F1RaceCentreView<WatchContent: View, RelatedContent: View>: View {
     @ViewBuilder let watchContent: () -> WatchContent
     @ViewBuilder let relatedContent: () -> RelatedContent
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.adaptiveLayout) private var adaptiveLayout
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var entitlements: EntitlementStore
     #if DEBUG
@@ -29,7 +30,7 @@ struct F1RaceCentreView<WatchContent: View, RelatedContent: View>: View {
     private var hidden: Bool { preferences.spoilerFreeMode && (model.state?.completed == true || match.state == .final) && !revealed }
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 0) {
+            GameCentreSplit {
                 if let state = model.state {
                     TimelineView(.periodic(from: .now, by: 5)) { context in
                         F1SessionHeaderView(state: state, live: model.isLive(at: context.date), connection: model.connection)
@@ -45,7 +46,9 @@ struct F1RaceCentreView<WatchContent: View, RelatedContent: View>: View {
                     }.padding().frame(maxWidth: .infinity).background(Theme.surface)
                 }
                 NavigationLink("Calendar & results") { F1CalendarView() }.font(.caption).frame(minHeight: 44)
-                watchContent()
+                } watch: {
+                    watchContent()
+                } rest: {
                 ScrollView(.horizontal) {
                     HStack {
                         ForEach(tabs, id: \.self) { item in
@@ -61,7 +64,7 @@ struct F1RaceCentreView<WatchContent: View, RelatedContent: View>: View {
                     VStack { Text(error).font(.caption); Button("Retry") { revision += 1 } }.padding(8)
                 }
                 if entitlements.isPremium {
-                    if let state = model.state { content(state, wide: geometry.size.width > 850) }
+                    if let state = model.state { content(state, wide: geometry.size.width > 850 && !adaptiveLayout.prefersTwoPane) }
                     else if let session, session.start > .now {
                         ContentUnavailableView("Session has not started", systemImage: "flag.checkered", description: Text("Live timing appears when Formula 1 publishes this session."))
                     } else if loadError == nil && model.error == nil {

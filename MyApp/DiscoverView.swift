@@ -5,6 +5,7 @@ struct DiscoverView: View {
     @EnvironmentObject private var articleLibrary: ArticleLibraryStore
     @EnvironmentObject private var podcastStore: PodcastStore
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.adaptiveLayout) private var adaptiveLayout
     @StateObject private var viewModel = NewsViewModel()
     @State private var selectedSport: DiscoverSportFilter = .forYou
     @State private var presentedArticle: ESPNArticle?
@@ -202,7 +203,7 @@ struct DiscoverView: View {
                 }
 
                 if !latestArticles.isEmpty {
-                    if sizeClass == .regular || Theme.isMac {
+                    if sizeClass == .regular || adaptiveLayout.isExpanded || Theme.isMac {
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                             ForEach(latestArticles) { article in
                                 Button { open(article: article) } label: {

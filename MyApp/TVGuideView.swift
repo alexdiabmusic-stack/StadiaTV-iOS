@@ -14,6 +14,7 @@ struct TVGuideView: View {
     @EnvironmentObject private var guideStore: GuideChannelStore
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
+    @Environment(\.adaptiveLayout) private var adaptiveLayout
     @StateObject private var vm: TVGuideViewModel
     var preview: AnyView? = nil
 
@@ -72,39 +73,10 @@ struct TVGuideView: View {
             PlayerView(channel: ch)
         }
         #endif
-        .sheet(item: $selectedProgramme) { prog in
+        // In the expanded two-pane layout the detail is shown beside the grid instead.
+        .sheet(item: sheetProgramme) { prog in
             if let ch = selectedProgrammeChannel {
-                ProgrammeDetailSheet(
-                    programme: prog,
-                    channel: ch,
-                    onPlayLive: {
-                        if ch.playableChannel != nil {
-                            watchStore.recordWatch(ch.playableChannel!)
-                            PlaybackTapClock.record()
-                            if let onChannelSelected {
-                                selectedProgramme = nil
-                                onChannelSelected(ch)
-                            } else {
-                                playingChannel = ch
-                            }
-                        }
-                    },
-                    onPlayCatchup: { url in
-                        guard let playable = ch.playableChannel else { return }
-                        let channel = Channel(
-                            id: "\(playable.id)-catchup",
-                            name: ch.name,
-                            streamURL: url,
-                            logoURL: ch.effectiveLogoURL,
-                            group: ch.categoryId,
-                            playlistID: playable.playlistID,
-                            playlistName: playable.playlistName
-                        )
-                        selectedProgramme = nil
-                        if let onCatchupSelected { onCatchupSelected(channel) }
-                        else { catchupChannel = channel }
-                    }
-                )
+                programmeDetail(prog, channel: ch)
             }
         }
         .sheet(isPresented: $showingBuildGuide) {
@@ -129,6 +101,74 @@ struct TVGuideView: View {
         }
         .onChange(of: guideStore.guideMode) { _, _ in
             vm.applyGuideStore(guideStore, repository: repository)
+        }
+    }
+
+    // MARK: - Programme detail
+
+    /// Detail is shown inline beside the grid when there's room, except when the guide is a
+    /// picker for another screen (`onChannelSelected`), where it keeps the sheet.
+    private var showsInlineDetail: Bool {
+        adaptiveLayout.prefersTwoPane && onChannelSelected == nil
+    }
+
+    private var sheetProgramme: Binding<EPGProgramme?> {
+        Binding(
+            get: { showsInlineDetail ? nil : selectedProgramme },
+            set: { selectedProgramme = $0 }
+        )
+    }
+
+    private func programmeDetail(_ prog: EPGProgramme, channel ch: CanonicalChannel) -> some View {
+        ProgrammeDetailSheet(
+            programme: prog,
+            channel: ch,
+            onPlayLive: {
+                if ch.playableChannel != nil {
+                    watchStore.recordWatch(ch.playableChannel!)
+                    PlaybackTapClock.record()
+                    if let onChannelSelected {
+                        selectedProgramme = nil
+                        onChannelSelected(ch)
+                    } else {
+                        playingChannel = ch
+                    }
+                }
+            },
+            onPlayCatchup: { url in
+                guard let playable = ch.playableChannel else { return }
+                let channel = Channel(
+                    id: "\(playable.id)-catchup",
+                    name: ch.name,
+                    streamURL: url,
+                    logoURL: ch.effectiveLogoURL,
+                    group: ch.categoryId,
+                    playlistID: playable.playlistID,
+                    playlistName: playable.playlistName
+                )
+                selectedProgramme = nil
+                if let onCatchupSelected { onCatchupSelected(channel) }
+                else { catchupChannel = channel }
+            }
+        )
+    }
+
+    @ViewBuilder
+    private var inlineDetailPane: some View {
+        if let prog = selectedProgramme, let ch = selectedProgrammeChannel {
+            programmeDetail(prog, channel: ch)
+                .id(prog.id)
+        } else {
+            VStack(spacing: 8) {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 36))
+                    .foregroundStyle(Theme.textTertiary)
+                Text("Select a programme")
+                    .font(.headline)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Theme.background)
         }
     }
 
@@ -177,29 +217,19 @@ struct TVGuideView: View {
                 // onProgramTap below) and threaded down as plain values, so the grid's
                 // cell-rendering layer doesn't subscribe to either store directly and
                 // re-render on every unrelated fantasy update.
-                let showsFantasyIndicators = !prefs.spoilerFreeMode && fantasyStore.settings.showFantasyIndicatorsInGuide
-                let fantasyRevision = guideFantasyRevision
-                EPGGuideGrid(
-                    vm: vm,
-                    isRefreshing: repository.refreshState == .refreshing,
-                    showsFantasyIndicators: showsFantasyIndicators,
-                    fantasyRevision: fantasyRevision,
-                    fantasyIndicatorCount: { programme, channel in
-                        fantasyStore.fantasyIndicatorCount(for: programme, channel: channel)
-                            + nativeFantasyStore.fantasyIndicatorCount(for: programme, channel: channel)
-                    }
-                ) { channel in
-                    guard channel.playableChannel != nil else { return }
-                    if let onChannelSelected {
-                        onChannelSelected(channel)
-                    } else {
-                        if let ch = channel.playableChannel { watchStore.recordWatch(ch) }
-                        PlaybackTapClock.record()
-                        playingChannel = channel
-                    }
-                } onProgramTap: { programme, channel in
-                    let hasFantasyContext = fantasyStore.settings.showFantasyIndicatorsInGuide && (fantasyStore.fantasyIndicatorCount(for: programme, channel: channel) + nativeFantasyStore.fantasyIndicatorCount(for: programme, channel: channel)) > 0
-                    if programme.isOnNow(), !hasFantasyContext {
+                HStack(spacing: 0) {
+                    let showsFantasyIndicators = !prefs.spoilerFreeMode && fantasyStore.settings.showFantasyIndicatorsInGuide
+                    let fantasyRevision = guideFantasyRevision
+                    EPGGuideGrid(
+                        vm: vm,
+                        isRefreshing: repository.refreshState == .refreshing,
+                        showsFantasyIndicators: showsFantasyIndicators,
+                        fantasyRevision: fantasyRevision,
+                        fantasyIndicatorCount: { programme, channel in
+                            fantasyStore.fantasyIndicatorCount(for: programme, channel: channel)
+                                + nativeFantasyStore.fantasyIndicatorCount(for: programme, channel: channel)
+                        }
+                    ) { channel in
                         guard channel.playableChannel != nil else { return }
                         if let onChannelSelected {
                             onChannelSelected(channel)
@@ -208,12 +238,29 @@ struct TVGuideView: View {
                             PlaybackTapClock.record()
                             playingChannel = channel
                         }
-                    } else {
-                        selectedProgramme = programme
-                        selectedProgrammeChannel = channel
+                    } onProgramTap: { programme, channel in
+                        let hasFantasyContext = fantasyStore.settings.showFantasyIndicatorsInGuide && (fantasyStore.fantasyIndicatorCount(for: programme, channel: channel) + nativeFantasyStore.fantasyIndicatorCount(for: programme, channel: channel)) > 0
+                        if programme.isOnNow(), !hasFantasyContext {
+                            guard channel.playableChannel != nil else { return }
+                            if let onChannelSelected {
+                                onChannelSelected(channel)
+                            } else {
+                                if let ch = channel.playableChannel { watchStore.recordWatch(ch) }
+                                PlaybackTapClock.record()
+                                playingChannel = channel
+                            }
+                        } else {
+                            selectedProgramme = programme
+                            selectedProgrammeChannel = channel
+                        }
+                    } onSetOffset: { channel in
+                        channelForOffset = channel
                     }
-                } onSetOffset: { channel in
-                    channelForOffset = channel
+                    if showsInlineDetail {
+                        Divider().overlay(Theme.hairline)
+                        inlineDetailPane
+                            .frame(width: 380)
+                    }
                 }
             }
         }

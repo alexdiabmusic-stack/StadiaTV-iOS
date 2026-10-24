@@ -7,26 +7,41 @@ struct WelcomeView: View {
     let onGetStarted: () -> Void
     let onRestore: () -> Void
 
-    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var contentOpacity: Double = 0
     @State private var contentOffset: CGFloat = 20
 
-    private var isIPad: Bool { sizeClass == .regular }
-    private var artworkName: String { isIPad ? "BannerWelcomePad" : "BannerWelcomePhone" }
-
     var body: some View {
         GeometryReader { geo in
+            let size = geo.size
+            let isWide = size.width > size.height
+            // Picked from the window's shape, not the idiom: an unfolded iPhone Duo is a wide window.
+            let artworkName = isWide ? "BannerWelcomePad" : "BannerWelcomePhone"
+            // Where the artwork's own "BANNER TV" wordmark ends, as a fraction of its height, and
+            // its pixel aspect ratio (both measured from the bundled images).
+            let wordmarkBottom: CGFloat = isWide ? 0.80 : 0.755
+            let aspect: CGFloat = isWide ? 1448.0 / 1086.0 : 941.0 / 1672.0
+            let controlsHeight: CGFloat = isWide ? 150 : 195
+            // Scale to cover the whole window, then slide the artwork up just enough that its
+            // wordmark ends above the controls. The bottom edge fades into the background.
+            let artHeight = max(size.height, size.width / aspect)
+            let artWidth = artHeight * aspect
+            let wantedOffset = size.height - controlsHeight - 12 - wordmarkBottom * artHeight
+            let offset = min(0, wantedOffset)
+
             ZStack(alignment: .bottom) {
-                // LAYER 1 — Full-screen artwork (already contains icon, wordmark, score cards)
-                artworkLayer(geo: geo)
-
-                // LAYER 2 — Subtle readability gradient over lower third only
-                gradientLayer
-
-                // LAYER 3 — Native headline, subtitle, and CTAs
-                nativeContent
+                Theme.Palette.nearBlack
+                Image(artworkName)
+                    .resizable()
+                    .frame(width: artWidth, height: artHeight)
+                    .mask(edgeFade)
+                    .frame(width: size.width, height: size.height, alignment: .top)
+                    .offset(y: offset)
+                    .clipped()
+                nativeContent(width: size.width, isWide: isWide)
+                    .frame(height: controlsHeight)
+                    .padding(.bottom, max(geo.safeAreaInsets.bottom, 12))
             }
-            .ignoresSafeArea()
+            .frame(width: size.width, height: size.height)
         }
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
@@ -41,56 +56,27 @@ struct WelcomeView: View {
         }
     }
 
-    // MARK: - Artwork
-
-    private func artworkLayer(geo: GeometryProxy) -> some View {
-        Image(artworkName)
-            .resizable()
-            .aspectRatio(contentMode: .fill)
-            .frame(width: geo.size.width, height: geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom)
-            .clipped()
-            .ignoresSafeArea()
-    }
-
-    // MARK: - Gradient
-
-    private var gradientLayer: some View {
-        LinearGradient(
-            stops: [
-                .init(color: .clear, location: 0),
-                .init(color: .black.opacity(0.55), location: 1)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(height: 420)
-        .ignoresSafeArea(edges: .bottom)
+    private var edgeFade: some View {
+        LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.86), .init(color: .clear, location: 1)],
+                       startPoint: .top, endPoint: .bottom)
     }
 
     // MARK: - Native content
 
-    @ViewBuilder
-    private var nativeContent: some View {
-        let maxWidth: CGFloat = isIPad ? 560 : .infinity
-
+    private func nativeContent(width: CGFloat, isWide: Bool) -> some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 0)
-            textBlock
-                .frame(maxWidth: maxWidth)
-                .padding(.bottom, 28)
+            textBlock(isWide: isWide)
+                .padding(.bottom, isWide ? 12 : 20)
             ctaBlock
-                .frame(maxWidth: maxWidth)
         }
-        .padding(.horizontal, isIPad ? 0 : 24)
-        .padding(.bottom, 40)
-        .safeAreaPadding(.bottom)
+        .frame(maxWidth: min(width - 48, 560))
         .frame(maxWidth: .infinity)
         .opacity(contentOpacity)
         .offset(y: contentOffset)
     }
 
-    private var textBlock: some View {
-        Text("Live sports, scores, schedules,\nand your channels.")
+    private func textBlock(isWide: Bool) -> some View {
+        Text(isWide ? "Live sports, scores, schedules, and your channels." : "Live sports, scores, schedules,\nand your channels.")
             .font(.system(size: 17, weight: .regular))
             .foregroundStyle(.white.opacity(0.82))
             .multilineTextAlignment(.center)

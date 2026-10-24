@@ -21,7 +21,7 @@ struct OnboardingView: View {
                 }
 
                 stepContent
-                    .frame(maxWidth: step == .welcome ? .infinity : 600)
+                    .frame(maxWidth: step == .welcome ? .infinity : 900)
                     .frame(maxWidth: .infinity)
                     .frame(maxHeight: .infinity)
 
@@ -37,6 +37,7 @@ struct OnboardingView: View {
             }
         }
         .tint(Theme.accent)
+        .providesAdaptiveLayoutContext()
         .alert("Remove \(sportPendingDeselect?.name ?? "")?",
                isPresented: $showDeselectAlert,
                presenting: sportPendingDeselect) { sport in

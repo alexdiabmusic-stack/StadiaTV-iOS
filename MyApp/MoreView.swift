@@ -36,7 +36,7 @@ struct MoreView: View {
                             .padding(.bottom, Theme.Spacing.section)
                     }
                     .padding(.top, 4)
-                    .frame(maxWidth: Theme.isPad ? 680 : .infinity)
+                    .bannerReadableWidth(680)
                     .frame(maxWidth: .infinity, alignment: .center)
                 }
             }

@@ -12,7 +12,15 @@ struct SportsSelectionView: View {
     @State private var leagueSearch: [String: String] = [:]
 
     @Environment(\.horizontalSizeClass) private var sizeClass
-    private var colCount: Int { sizeClass == .regular ? 4 : 2 }
+    @Environment(\.adaptiveLayout) private var adaptiveLayout
+    // Driven by the window's width: a Duo's inner display is regular-width in portrait too, where
+    // four columns would leave tall empty space beneath short tiles.
+    private var colCount: Int {
+        let width = adaptiveLayout.size.width
+        if width >= 800 { return 4 }
+        if width >= 520 { return 3 }
+        return sizeClass == .regular ? 4 : 2
+    }
 
     private let catalog = SportsCatalogRepository.shared
 
@@ -121,6 +129,7 @@ private struct SportCard: View {
     let isSelected: Bool
     let onTap: () -> Void
 
+    @Environment(\.adaptiveLayout) private var adaptiveLayout
     private var group: SportGroup? { SportsCatalogRepository.shared.sportGroup(for: sport.id) }
 
     var body: some View {
@@ -141,7 +150,7 @@ private struct SportCard: View {
                     .lineLimit(2)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
+            .padding(.vertical, adaptiveLayout.size.width >= 520 ? 40 : 18)
             .background(
                 RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous)
                     .fill(isSelected ? Theme.accent.opacity(0.08) : Theme.surface)

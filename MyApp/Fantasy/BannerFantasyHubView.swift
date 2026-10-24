@@ -23,7 +23,7 @@ struct BannerFantasyHubView: View {
                 Spacer(minLength: 80)
             }
             .padding(20)
-            .frame(maxWidth: Theme.isPad ? 820 : .infinity)
+            .bannerReadableWidth(820)
             .frame(maxWidth: .infinity)
         }
         .task { await nativeStore.load() }
@@ -179,7 +179,7 @@ struct BannerFantasyNativeDashboardView: View {
                 Spacer(minLength: 80)
             }
             .padding(20)
-            .frame(maxWidth: Theme.isPad ? 820 : .infinity)
+            .bannerReadableWidth(820)
             .frame(maxWidth: .infinity)
         }
         .task { await nativeStore.load() }

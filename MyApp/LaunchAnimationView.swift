@@ -73,7 +73,7 @@ struct LaunchAnimationView: View {
         // Render at the full splash height so the SVG is never upscaled.
         // scaleEffect goes 1.0 → (1/splashScale) during the fly-to-navbar transition,
         // scaling down cleanly instead of blurrily scaling up a small rasterised bitmap.
-        let splashHeight = Theme.scaled(36) * Self.splashScale
+        let splashHeight = splashHeight(in: geo)
         let isAllWhite = coordinator.phase == .brandWhite
 
         ZStack {
@@ -87,7 +87,7 @@ struct LaunchAnimationView: View {
                 .opacity(isAllWhite ? 1.0 : 0.0)
         }
         .frame(height: splashHeight)
-        .scaleEffect(logoScale)
+        .scaleEffect(logoScale(for: splashHeight))
         .offset(y: logoOffset(in: geo))
         .animation(
             // No position/scale animation when Reduce Motion is enabled —
@@ -101,8 +101,16 @@ struct LaunchAnimationView: View {
 
     // logoScale is 1.0 while logo is on display at full splash size, then shrinks
     // to 1/splashScale to match the toolbar BrandMark at the end of the fly animation.
-    private var logoScale: CGFloat {
-        coordinator.isTransitioningToHome ? 1.0 / Self.splashScale : 1.0
+    private func logoScale(for splashHeight: CGFloat) -> CGFloat {
+        coordinator.isTransitioningToHome ? Theme.scaled(36) / splashHeight : 1.0
+    }
+
+    /// The wordmark scales with the window (never smaller than the standard splash), so it fills
+    /// a larger display such as the iPhone Duo's inner screen instead of sitting small in the middle.
+    private func splashHeight(in geo: GeometryProxy) -> CGFloat {
+        let standard = Theme.scaled(36) * Self.splashScale
+        let proportional = min(geo.size.width, geo.size.height) * 0.36
+        return min(max(standard, proportional), 560)
     }
 
     /// Vertical offset that places the BrandMark at the nav-bar principal-item Y.

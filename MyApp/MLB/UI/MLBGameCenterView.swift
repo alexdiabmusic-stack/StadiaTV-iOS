@@ -7,6 +7,7 @@ struct MLBGameCenterView<WatchContent: View, RelatedContent: View>: View {
     @ViewBuilder let relatedContent: () -> RelatedContent
     @State private var model = MLBGameCenterViewModel()
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.adaptiveLayout) private var adaptiveLayout
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var entitlements: EntitlementStore
     @State private var revealed = false
@@ -22,7 +23,7 @@ struct MLBGameCenterView<WatchContent: View, RelatedContent: View>: View {
     private var hideScore: Bool { preferences.spoilerFreeMode && (snapshot?.game?.status == .final || match.state == .final) && !revealed }
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 0) {
+            GameCentreSplit {
                 if let game = snapshot?.game { MLBGameHeaderView(game: game, line: snapshot?.line, league: match.league) }
                 else {
                     VStack(spacing: 12) {
@@ -30,7 +31,9 @@ struct MLBGameCenterView<WatchContent: View, RelatedContent: View>: View {
                         if model.errors.isEmpty { ProgressView("Loading Game Centre") }
                     }.frame(maxWidth: .infinity).padding().background(Theme.surface)
                 }
-                watchContent()
+                } watch: {
+                    watchContent()
+                } rest: {
                 ScrollView(.horizontal) {
                     HStack {
                         ForEach(MLBGameTab.allCases) { tab in
@@ -47,7 +50,7 @@ struct MLBGameCenterView<WatchContent: View, RelatedContent: View>: View {
                 if gamePk == nil {
                     ContentUnavailableView("MLB game unavailable", systemImage: "baseball", description: Text("Open this game from the MLB schedule."))
                 } else if entitlements.isPremium {
-                    content(wide: geometry.size.width > 850)
+                    content(wide: geometry.size.width > 850 && !adaptiveLayout.prefersTwoPane)
                 } else {
                     ScrollView {
                         PremiumGateOverlay(icon: "baseball", title: "Game Centre", description: "Live plays, player statistics and game analysis.", showPaywall: $showingPaywall)

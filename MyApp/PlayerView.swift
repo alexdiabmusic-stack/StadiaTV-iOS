@@ -1616,6 +1616,7 @@ private enum SportPlayerTab: String, CaseIterable, Identifiable {
 }
 
 private struct MatchPlayerScreen<VideoContent: View, ChannelPage: View>: View {
+    @Environment(\.adaptiveLayout) private var adaptiveLayout
     let channel: Channel
     let canonicalChannel: CanonicalChannel?
     let match: Match?
@@ -1721,14 +1722,33 @@ private struct MatchPlayerScreen<VideoContent: View, ChannelPage: View>: View {
     private var sport: BannerSport { BannerSport(league: match?.league) }
     private var effectiveTab: SportPlayerTab { sport.tabs.contains(selectedTab) ? selectedTab : sport.tabs.first ?? .game }
 
+    /// How the video and the game centre share the screen. Driven by the real window and fold
+    /// geometry, so unfolding or folding the device only changes frames: the video container
+    /// keeps its structural position (see `AnyLayout` below) and the player session is untouched.
+    private enum Arrangement { case classic, sideBySide, tabletop }
+
+    private var arrangement: Arrangement {
+        guard match != nil else { return .classic }
+        switch adaptiveLayout.foldAxis {
+        case .vertical: return .sideBySide
+        case .horizontal: return .tabletop
+        case nil: return adaptiveLayout.prefersTwoPane ? .sideBySide : .classic
+        }
+    }
+
     var body: some View {
         GeometryReader { proxy in
+            let arrangement = arrangement
             let isLandscape = proxy.size.width > proxy.size.height
-            // The video container stays at one structural position in both orientations
-            // (first child of the VStack); only its frame changes. Portrait and landscape
-            // extras are siblings shown conditionally, so rotating never rebuilds the video.
+            // Full-bleed landscape video with the floating panel only applies to the classic layout.
+            let fullBleed = isLandscape && arrangement == .classic
+            let foldGap: CGFloat = arrangement == .classic ? 0 :
+                (arrangement == .sideBySide ? adaptiveLayout.verticalFoldGap : (adaptiveLayout.divisions.first?.height ?? 0))
+            // The video container stays at one structural position in every arrangement
+            // (first child of the layout); only its frame changes. Portrait and landscape
+            // extras are siblings shown conditionally, so rotating or folding never rebuilds the video.
             ZStack(alignment: .trailing) {
-                VStack(spacing: 0) {
+                AnyLayout(arrangement == .sideBySide ? AnyLayout(HStackLayout(spacing: foldGap)) : AnyLayout(VStackLayout(spacing: foldGap))) {
                     PlayerVideoContainer(
                         channel: channel,
                         match: scoreBugMatch,
@@ -1736,7 +1756,7 @@ private struct MatchPlayerScreen<VideoContent: View, ChannelPage: View>: View {
                         isChromeVisible: isChromeVisible,
                         streamSummary: streamSummary,
                         orientation: orientation,
-                        isLandscape: isLandscape,
+                        isLandscape: fullBleed,
                         hasMultipleSources: hasMultipleSources,
                         isBehindLiveEdge: isBehindLiveEdge,
                         chrome: chrome,
@@ -1752,20 +1772,22 @@ private struct MatchPlayerScreen<VideoContent: View, ChannelPage: View>: View {
                         onCycleSource: onCycleSource,
                         onToggleOrientation: onToggleOrientation,
                         onPiP: onPiP,
-                        topSafeArea: isLandscape ? max(proxy.safeAreaInsets.top, Theme.Spacing.xs) : proxy.safeAreaInsets.top,
-                        horizontalSafeArea: isLandscape ? max(proxy.safeAreaInsets.leading, proxy.safeAreaInsets.trailing) : 0,
+                        topSafeArea: fullBleed ? max(proxy.safeAreaInsets.top, Theme.Spacing.xs) : proxy.safeAreaInsets.top,
+                        horizontalSafeArea: fullBleed ? max(proxy.safeAreaInsets.leading, proxy.safeAreaInsets.trailing) : 0,
                         videoContent: { videoContent }
                     )
-                    .frame(height: isLandscape ? nil : max(320, proxy.size.height * 0.43))
-                    .frame(maxHeight: isLandscape ? .infinity : nil)
+                    .frame(height: videoHeight(arrangement, fullBleed: fullBleed, proxy: proxy))
+                    .frame(maxWidth: arrangement == .sideBySide ? .infinity : nil,
+                           maxHeight: (fullBleed || arrangement == .sideBySide) ? .infinity : nil)
 
-                    if !isLandscape {
+                    if !fullBleed {
                         portraitGameCentre
+                            .frame(width: arrangement == .sideBySide ? companionWidth(proxy: proxy, gap: foldGap) : nil)
                     }
                 }
-                .ignoresSafeArea(edges: isLandscape ? .all : .top)
+                .ignoresSafeArea(edges: fullBleed ? .all : .top)
 
-                if isLandscape {
+                if fullBleed {
                     landscapeChrome(proxy: proxy)
                 }
             }
@@ -1773,6 +1795,25 @@ private struct MatchPlayerScreen<VideoContent: View, ChannelPage: View>: View {
         .background(Color.black.ignoresSafeArea())
         .onChange(of: sport.rawValue) { _, _ in
             selectedTab = sport.tabs.first ?? .game
+        }
+    }
+
+    /// Video takes roughly 60% of the width beside the game centre, but never so little that the
+    /// companion falls below a readable width.
+    private func companionWidth(proxy: GeometryProxy, gap: CGFloat) -> CGFloat {
+        let available = proxy.size.width - gap
+        return min(max(available * 0.4, 320), max(available - 320, 320))
+    }
+
+    private func videoHeight(_ arrangement: Arrangement, fullBleed: Bool, proxy: GeometryProxy) -> CGFloat? {
+        switch arrangement {
+        case .sideBySide: return nil
+        case .tabletop:
+            // Video fills the region above the hinge; the game centre sits below it.
+            let hinge = adaptiveLayout.divisions.first?.minY ?? proxy.size.height * 0.5
+            return max(200, hinge)
+        case .classic:
+            return fullBleed ? nil : max(320, proxy.size.height * 0.43)
         }
     }
 

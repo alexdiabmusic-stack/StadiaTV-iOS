@@ -259,7 +259,9 @@ struct HomeView: View {
 
     private var scrollContent: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 28) {
+            // Two columns when the window is wide enough (Duo unfolded, iPad), one otherwise.
+            // Order is preserved: the primary column's sections come first when stacked.
+            AdaptiveTwoPane(spacing: 28) {
                 // Each section rises upward (positive offset → 0) while fading in.
                 // Offsets increase with depth so deeper sections travel further.
                 // `|| reduceMotion` collapses the offset to 0 for accessibility.
@@ -291,6 +293,7 @@ struct HomeView: View {
                     .offset(y: (showSportsDay || reduceMotion) ? 0 : 30)
                     .animation(reduceMotion ? .easeOut(duration: 0.2) : .easeOut(duration: 0.5), value: showSportsDay)
 
+            } secondary: {
                 liveNowSection
                     .opacity(showLiveNow ? 1 : 0)
                     .offset(y: (showLiveNow || reduceMotion) ? 0 : 34)
@@ -1127,7 +1130,8 @@ private struct TeamMatchupHero: View {
     let onWatch: (Match) -> Void
     let onSetAlert: (Match) -> Void
 
-    private static var cardHeight: CGFloat { Theme.isMac ? 240 : Theme.isPad ? 400 : 300 }
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var cardHeight: CGFloat { Theme.isMac ? 240 : sizeClass == .regular ? 320 : 300 }
     private var isLive: Bool { match?.state == .live }
     private var eventDate: Date? { match?.date ?? pick.startDate }
     private var displayMatch: Match { match ?? pick.streamMatch }
@@ -1338,7 +1342,8 @@ private struct EventHero: View {
     let hasStreams: Bool
     let onWatch: (Match) -> Void
 
-    private static var cardHeight: CGFloat { Theme.isMac ? 240 : Theme.isPad ? 400 : 300 }
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var cardHeight: CGFloat { Theme.isMac ? 240 : sizeClass == .regular ? 320 : 300 }
     private var isLive: Bool { match?.state == .live }
     private var eventDate: Date? { match?.date ?? pick.startDate }
 
@@ -1377,7 +1382,7 @@ private struct EventHero: View {
                 Image("FeaturedHeroBackground")
                     .resizable()
                     .scaledToFill()
-                    .frame(width: proxy.size.width, height: Self.cardHeight)
+                    .frame(width: proxy.size.width, height: cardHeight)
                     .accessibilityHidden(true)
 
                 // Left gradient for text readability
@@ -1390,14 +1395,14 @@ private struct EventHero: View {
                     ],
                     startPoint: .leading, endPoint: .trailing
                 )
-                .frame(width: proxy.size.width, height: Self.cardHeight)
+                .frame(width: proxy.size.width, height: cardHeight)
 
                 if isLive {
                     LinearGradient(
                         colors: [Theme.live.opacity(0.25), .clear],
                         startPoint: .leading, endPoint: .center
                     )
-                    .frame(width: proxy.size.width, height: Self.cardHeight)
+                    .frame(width: proxy.size.width, height: cardHeight)
                 }
 
                 // Left content column
@@ -1451,16 +1456,16 @@ private struct EventHero: View {
                     }
                 }
                 .padding(16)
-                .frame(maxWidth: min(proxy.size.width * 0.62, 240), minHeight: Self.cardHeight, alignment: .topLeading)
+                .frame(maxWidth: min(proxy.size.width * 0.62, 240), minHeight: cardHeight, alignment: .topLeading)
             }
-            .frame(width: proxy.size.width, height: Self.cardHeight)
+            .frame(width: proxy.size.width, height: cardHeight)
             .clipShape(shape)
             .overlay(shape.strokeBorder(
                 isLive ? Theme.live.opacity(0.5) : .white.opacity(0.1),
                 lineWidth: isLive ? 1.5 : 1
             ))
         }
-        .frame(height: Self.cardHeight)
+        .frame(height: cardHeight)
         .frame(maxWidth: .infinity)
     }
 

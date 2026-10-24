@@ -141,32 +141,36 @@ struct LiveView: View {
 
                 sportNavigator
 
-                if visibleMatches.isEmpty {
-                    emptyState
-                } else if selectedSport != nil {
-                    ForEach(visibleMatches) { match in
-                            LiveMatchCard(
-                                match: match,
-                                onSetAlert: { Task { await setAlert(for: match) } },
-                                onAddToCalendar: { Task { await addToCalendar(match) } },
-                                onHide: { hide(match) },
-                                showScoreBar: prefs.showLiveScoreBar,
-                                fantasyContext: liveFantasyContext(for: match),
-                                streamCount: streamStore.count(for: match.id)
-                            )
-                            .buttonStyle(.plain)
-                    }
-                } else {
-                    ForEach(groupedSports, id: \.self) { group in
-                        let groupMatches = visibleMatches.filter { $0.league.group == group }
-                        if !groupMatches.isEmpty {
-                            liveSportSection(sport: group, matches: groupMatches)
+                // Live games beside what's starting soon once the window is wide enough.
+                AdaptiveTwoPane(spacing: 20, hasSecondary: !viewModel.startingSoon.isEmpty) {
+                    if visibleMatches.isEmpty {
+                        emptyState
+                    } else if selectedSport != nil {
+                        ForEach(visibleMatches) { match in
+                                LiveMatchCard(
+                                    match: match,
+                                    onSetAlert: { Task { await setAlert(for: match) } },
+                                    onAddToCalendar: { Task { await addToCalendar(match) } },
+                                    onHide: { hide(match) },
+                                    showScoreBar: prefs.showLiveScoreBar,
+                                    fantasyContext: liveFantasyContext(for: match),
+                                    streamCount: streamStore.count(for: match.id)
+                                )
+                                .buttonStyle(.plain)
+                        }
+                    } else {
+                        ForEach(groupedSports, id: \.self) { group in
+                            let groupMatches = visibleMatches.filter { $0.league.group == group }
+                            if !groupMatches.isEmpty {
+                                liveSportSection(sport: group, matches: groupMatches)
+                            }
                         }
                     }
-                }
 
-                if !viewModel.startingSoon.isEmpty {
-                    startingSoonSection
+                } secondary: {
+                    if !viewModel.startingSoon.isEmpty {
+                        startingSoonSection
+                    }
                 }
             }
             .padding(.horizontal, 20)

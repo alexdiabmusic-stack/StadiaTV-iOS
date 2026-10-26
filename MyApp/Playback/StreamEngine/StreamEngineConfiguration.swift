@@ -67,7 +67,7 @@ nonisolated struct StreamEngineConfiguration: Equatable, Sendable {
         switch profile {
         case .fast:
             return StreamEngineConfiguration(
-                profile: .fast, targetBuffer: 8, lowBuffer: 4, highBuffer: 16, lead: 5, rebufferGoal: 1.5,
+                profile: .fast, targetBuffer: 8, lowBuffer: 4, highBuffer: 16, lead: 6, rebufferGoal: 1.5,
                 buildRate: 0.99, trickleRate: 0.995, slowLineFloor: 0.97, shedRate: 1.01,
                 starvedFailover: 15, maximumReserveBytes: 32 * 1024 * 1024, backBufferSeconds: 20)
         case .balanced:

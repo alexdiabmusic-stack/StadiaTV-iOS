@@ -352,7 +352,7 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
         switch event {
         case .opened(_, let cadence):
             connectionCadence = cadence
-            referee.providerAnswered()
+            referee.providerAnswered(at: time)
         case .received(let bytes):
             health.received(bytes: bytes, at: time)
         case .media(let data):
@@ -561,12 +561,13 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
         var changed = false
         if reserve.publishedCount == 0 {
             guard let first = reserve.segments.first else { return }
-            // AVPlayer reloads a live playlist only a target duration after loading it, so the first
-            // playlist must carry enough to play until then: wait for that (the provider's burst
-            // usually brings it at once), but not for long when the provider sends in real time.
+            // AVPlayer starts a live playlist about three target durations from its end (given less,
+            // it has been seen to start at the edge and hold the picture), and reloads it only a
+            // target duration later. So the first playlist waits for three target durations, which the
+            // provider's burst usually brings at once, but not for long when it sends in real time.
             let firstSegmentAt = self.firstSegmentAt ?? time
             self.firstSegmentAt = firstSegmentAt
-            let startupLead = min(configuration.lead, Double(configuration.segmenter.playlistTargetDuration) + 1)
+            let startupLead = min(configuration.lead, 3 * Double(configuration.segmenter.playlistTargetDuration))
             guard reserve.reserveSeconds >= startupLead || time - firstSegmentAt >= Self.startupWaitLimit else { return }
             reserve.publishNext()
             reserve.publish(before: first.programmeStart + configuration.lead)

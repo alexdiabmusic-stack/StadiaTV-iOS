@@ -46,12 +46,15 @@ nonisolated struct HLSSegmenter {
         /// Shorter first segments so the first picture appears sooner.
         var startupTargetDuration: Double = 1.0
         var startupSegmentCount = 2
-        /// Cut here even without a keyframe (long-GOP sources). IPTV encoders commonly send a keyframe
-        /// every 4 s, which must still cut at keyframes; a cut a frame past this still rounds to the
-        /// target duration, as EXTINF must.
-        var maximumDuration: Double = 4.3
-        /// EXT-X-TARGETDURATION; no segment may round above it.
-        var playlistTargetDuration = 4
+        /// Cut here even without a keyframe, so no segment rounds above the target duration even a
+        /// frame late: a GOP longer than this (IPTV encoders commonly send a keyframe every 4 s) is cut
+        /// mid-GOP, and the segment after it is cut again at the next keyframe, so GOPs still begin
+        /// segments.
+        var maximumDuration: Double = 2.3
+        /// EXT-X-TARGETDURATION; no segment may round above it. AVPlayer plays a live playlist about
+        /// three target durations behind its end; 2 s keeps that at 6 s, the reserve's lead, where 4 s
+        /// asked for 12 s, twice what the first playlist held.
+        var playlistTargetDuration = 2
     }
 
     let configuration: Configuration
@@ -102,7 +105,7 @@ nonisolated struct HLSSegmenter {
                         ? configuration.startupTargetDuration : configuration.targetDuration
                     // Keyframes are measured by decode time, which shifts by a few frames between
                     // IDR and open-GOP pictures; the slack keeps a 2 s GOP cutting every 2 s.
-                    let keyframeCut = unit.isKeyframe && elapsed >= target * 0.75
+                    let keyframeCut = unit.isKeyframe && (elapsed >= target * 0.75 || (!startsWithKeyframe && elapsed >= 0.1))
                     if unit.startsDiscontinuity || keyframeCut || elapsed >= configuration.maximumDuration {
                         if let segment = close(at: time) { finished.append(segment) }
                         beginTiming(at: time, unit: unit)

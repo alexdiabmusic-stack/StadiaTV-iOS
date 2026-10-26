@@ -49,14 +49,16 @@ struct SegmenterTests {
         harness.connection(stream.bytes(seconds: 16))
         harness.finish()
 
-        #expect(harness.segments.map { ($0.duration * 100).rounded() } == [432, 432, 336, 396])
-        #expect(harness.segments.map(\.startsWithKeyframe) == [true, false, false, true])
+        let configuration = HLSSegmenter.Configuration()
         // EXTINF rounded to the nearest second may not exceed the target duration.
-        let ceiling = Double(HLSSegmenter.Configuration().playlistTargetDuration)
-        #expect(harness.segments.allSatisfy { $0.duration.rounded() <= ceiling })
+        #expect(harness.segments.allSatisfy { $0.duration.rounded() <= Double(configuration.playlistTargetDuration) })
+        #expect(harness.segments.allSatisfy { $0.duration <= configuration.maximumDuration + 0.05 })
+        // The 12 s GOP's keyframes (0 and 12 s) each begin a segment, and nothing else is taken for one.
+        #expect(harness.segments.filter(\.startsWithKeyframe).map { $0.programmeStart.rounded() } == [0, 12])
+        #expect(abs(harness.segments.reduce(0) { $0 + $1.duration } - 16) < 0.05)
     }
 
-    @Test("A keyframe every 4 s, common on IPTV encoders, still cuts at every keyframe")
+    @Test("A keyframe every 4 s, common on IPTV encoders, is cut once inside each GOP and again at its keyframe")
     func fourSecondGOP() {
         var stream = SyntheticTransportStream()
         stream.gop = 100
@@ -64,8 +66,11 @@ struct SegmenterTests {
         harness.connection(stream.bytes(seconds: 12))
         harness.finish()
 
-        #expect(harness.segments.map { ($0.duration * 100).rounded() } == [400, 400, 396])
-        #expect(harness.segments.allSatisfy { $0.startsWithKeyframe })
+        let configuration = HLSSegmenter.Configuration()
+        #expect(harness.segments.count == 6)
+        #expect(harness.segments.allSatisfy { $0.duration.rounded() <= Double(configuration.playlistTargetDuration) })
+        #expect(harness.segments.map(\.startsWithKeyframe) == [true, false, true, false, true, false])
+        #expect(harness.segments.filter(\.startsWithKeyframe).map { $0.programmeStart.rounded() } == [0, 4, 8])
     }
 
     @Test("Short GOPs give short startup segments, then the target length")

@@ -181,7 +181,7 @@ struct RefereeTests {
         #expect(after == [.disconnect, .connect(route: 0)])
     }
 
-    @Test("At start-up the first route gets 8 s to answer before the backup is tried, and the whole timeout once it has")
+    @Test("At start-up the first route gets 8 s to answer before the backup is tried, then 4 s to send, and the whole timeout once it sends")
     func startupTimeouts() {
         var monitor = StreamHealthMonitor()
         monitor.connectionOpened(at: 0)
@@ -196,13 +196,23 @@ struct RefereeTests {
         #expect(twoRoutes.tick(observation(8, health: monitor)) == [.disconnect, .connect(route: 1)])
         #expect(twoRoutes.routeSwitches == 1)
 
-        // Answered: the source is up and its first bytes are on the way, so it gets the whole timeout.
+        // Answered and sending: the source is up, so it gets the whole timeout to bring a picture.
+        var sending = monitor
+        sending.received(bytes: 188 * 50, at: 1)
         var answered = RecoveryReferee(configuration: balanced, routeCount: 2, isSingleConnectionAccount: false)
         _ = answered.start(at: 0)
-        answered.providerAnswered()
-        #expect(answered.tick(observation(8, health: monitor)).isEmpty)
-        #expect(answered.tick(observation(limit - 0.25, health: monitor)).isEmpty)
-        #expect(answered.tick(observation(limit, health: monitor)) == [.disconnect, .connect(route: 1)])
+        answered.providerAnswered(at: 0.5)
+        #expect(answered.tick(observation(8, health: sending)).isEmpty)
+        #expect(answered.tick(observation(limit - 0.25, health: sending)).isEmpty)
+        #expect(answered.tick(observation(limit, health: sending)) == [.disconnect, .connect(route: 1)])
+
+        // Answered and then silent for 4 s: a source that has started sends as it answers, so this
+        // output has nothing, and the other is tried.
+        var silent = RecoveryReferee(configuration: balanced, routeCount: 2, isSingleConnectionAccount: false)
+        _ = silent.start(at: 0)
+        silent.providerAnswered(at: 0.5)
+        #expect(silent.tick(observation(4.25, health: monitor)).isEmpty)
+        #expect(silent.tick(observation(4.5, health: monitor)) == [.disconnect, .connect(route: 1)])
 
         // A single route that never answers in the whole timeout may be this device's network rather
         // than the provider, so AVPlayer gets to try the provider URL itself.
@@ -255,19 +265,21 @@ struct RefereeTests {
                 == [.fail(.offAir)])
     }
 
-    @Test("A provider that answers and then sends nothing is off the air after one start-up timeout per route")
+    @Test("A provider that answers and then sends nothing on every route is off the air")
     func silentChannel() {
         let limit = balanced.startupTimeout
         var referee = RecoveryReferee(configuration: balanced, routeCount: 2, isSingleConnectionAccount: false)
         _ = referee.start(at: 0)
         var monitor = StreamHealthMonitor()
         monitor.connectionOpened(at: 0)
-        referee.providerAnswered()
-        #expect(referee.tick(observation(limit, health: monitor)) == [.disconnect, .connect(route: 1)])
+        referee.providerAnswered(at: 0)
+        #expect(referee.tick(observation(4, health: monitor)) == [.disconnect, .connect(route: 1)])
         #expect(referee.drainDecisions().contains("Route 1 has nothing on the air"))
-        monitor.connectionOpened(at: limit)
-        referee.providerAnswered()
-        #expect(referee.tick(observation(2 * limit, health: monitor)) == [.disconnect, .fail(.offAir)])
+        // The last route left gets the whole timeout.
+        monitor.connectionOpened(at: 4)
+        referee.providerAnswered(at: 4)
+        #expect(referee.tick(observation(4 + limit - 0.25, health: monitor)).isEmpty)
+        #expect(referee.tick(observation(4 + limit, health: monitor)) == [.disconnect, .fail(.offAir)])
     }
 
     @Test("Bytes that never make a picture aren't a channel off the air: AVPlayer still gets its try")
@@ -277,11 +289,11 @@ struct RefereeTests {
         _ = referee.start(at: 0)
         var monitor = StreamHealthMonitor()
         monitor.connectionOpened(at: 0)
-        referee.providerAnswered()
+        referee.providerAnswered(at: 0)
         monitor.received(bytes: 188 * 100, at: 1)
         #expect(referee.tick(observation(limit, health: monitor)) == [.disconnect, .connect(route: 1)])
         monitor.connectionOpened(at: limit)
-        referee.providerAnswered()
+        referee.providerAnswered(at: limit)
         monitor.received(bytes: 188 * 100, at: limit + 1)
         #expect(referee.tick(observation(2 * limit, health: monitor)) == [.disconnect, .fail(.startupFailed)])
     }
@@ -728,6 +740,9 @@ struct PaceAndHealthTests {
             #expect(profile.slowLineFloor <= profile.buildRate)
             // A forced cut, even a frame late, rounds to no more than the target duration.
             #expect((profile.segmenter.maximumDuration + 0.1).rounded() <= Double(profile.segmenter.playlistTargetDuration))
+            // AVPlayer starts about three target durations behind the live end, so the first
+            // playlist (no more than the lead) must be able to hold that much.
+            #expect(profile.lead >= 3 * Double(profile.segmenter.playlistTargetDuration))
         }
         let tile = maximum.forMultiviewTile()
         #expect(tile.profile == .fast)

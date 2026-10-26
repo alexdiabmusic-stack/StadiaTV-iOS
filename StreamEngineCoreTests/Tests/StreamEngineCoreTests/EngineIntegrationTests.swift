@@ -417,6 +417,29 @@ struct EngineEndToEndTests {
         #expect((segments.last ?? 0) >= (segments.first ?? 0) + 3)
     }
 
+    @Test("The first playlist holds three target durations: AVPlayer starts a live playlist that far behind its end")
+    func firstPlaylistDepth() async throws {
+        // A panel's usual burst on connect, then programme in real time.
+        let channel = try FakeTransportChannel(seconds: 30, lead: 16, burst: 7)
+        defer { channel.stop() }
+        let url = try #require(URL(string: "http://127.0.0.1:\(channel.port)/play/1234.ts"))
+        let recorder = EngineEventRecorder()
+        let session = try StreamEngine.shared.makeSession(routes: [.init(url: url, label: "MPEG-TS")], headers: [:],
+                                                          configuration: .profile(.balanced), isSingleConnectionAccount: false,
+                                                          onEvent: { recorder.record($0) })
+        session.start()
+        defer { session.stop() }
+        let started = ProcessInfo.processInfo.systemUptime
+        while recorder.ready == nil, ProcessInfo.processInfo.systemUptime - started < 10 {
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        let playlist = await fetch(try #require(recorder.ready))
+        var player = VirtualPlayer(epoch: session.programmeEpoch)
+        player.read(String(decoding: playlist.body, as: UTF8.self))
+        let listed = player.entries.values.reduce(0) { $0 + $1.duration }
+        #expect(listed >= 3 * player.targetDuration - 0.05)
+    }
+
     @Test("A channel that switches from H.264 to HEVC moves the player to fMP4 renditions")
     func codecSwitch() async throws {
         var hevc = SyntheticTransportStream(content: 1)

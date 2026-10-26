@@ -174,8 +174,9 @@ nonisolated struct RecoveryReferee {
     private var firstEmptyAnswerAt: [Double?]
     /// Routes that waited out a whole start-up timeout without programme.
     private var timedOutRoutes: Set<Int> = []
-    /// The provider answered the current connection (an HTTP response, or a first playlist).
+    /// The provider answered the current connection (an HTTP response, or a first playlist), and when.
     private var connectionAnswered = false
+    private var answeredAt: Double?
     /// The connection that just timed out at start-up never received a byte of media.
     private var connectionSilent = false
 
@@ -222,8 +223,10 @@ nonisolated struct RecoveryReferee {
 
     /// The provider answered the current connection: from now on its silence is the provider's,
     /// not the network's.
-    mutating func providerAnswered() {
-        if case .connecting = phase { connectionAnswered = true }
+    mutating func providerAnswered(at now: Double) {
+        guard case .connecting = phase, !connectionAnswered else { return }
+        connectionAnswered = true
+        answeredAt = now
     }
 
     /// The current connection ended on its own (or the engine closed it after `disconnect`).
@@ -327,19 +330,24 @@ nonisolated struct RecoveryReferee {
             if now >= until { actions.append(connect(route: route, at: now, reason: "retry")) }
         case .connecting(let route, let since):
             // An on-demand source nobody else is watching (an event channel, typically) takes the panel
-            // up to 8 s to start: it answers once the source is up, or refuses (502) when it can't
-            // start it on this output, and then its other output usually works. So a backup route is
-            // tried when the first hasn't answered in 8 s; one that has answered gets the whole
-            // start-up timeout to bring a picture.
-            let unanswered = !connectionAnswered && routeCount > 1 && triedRoutes.count < routeCount
-            let limit = everStreamed ? configuration.deadChannelTimeout
-                : unanswered ? min(configuration.startupTimeout, Self.unansweredFirstRouteLimit) : configuration.startupTimeout
+            // up to 8 s to start: it answers once the source is up and sends straight away, or refuses
+            // (502) when it can't start it on this output, and then its other output usually works.
+            // So while a backup route is left, the first route gets 8 s to answer and, once it has,
+            // 4 s to start sending; one that sends gets the whole start-up timeout to bring a picture.
+            let health = observation.health
+            let silent = (health.lastByteAt ?? since) <= (health.connectedAt ?? since)
+            let firstWithBackup = !everStreamed && routeCount > 1 && triedRoutes.count < routeCount
+            var limit = everStreamed ? configuration.deadChannelTimeout : configuration.startupTimeout
+            if firstWithBackup, !connectionAnswered {
+                limit = min(limit, Self.unansweredFirstRouteLimit)
+            } else if firstWithBackup, silent, let answeredAt {
+                limit = min(limit, answeredAt - since + Self.silentAfterAnswerLimit)
+            }
             if now - since >= limit {
-                decisionLog.append("No programme \(Int(limit)) s after connecting")
+                decisionLog.append(String(format: "No programme %.0f s after connecting", now - since))
                 if !everStreamed {
                     if limit >= configuration.startupTimeout { timedOutRoutes.insert(route) }
-                    let health = observation.health
-                    connectionSilent = (health.lastByteAt ?? since) <= (health.connectedAt ?? since)
+                    connectionSilent = silent
                 }
                 actions.append(.disconnect)
                 actions += connectionEnded(.deadChannel, at: now, openedAt: since, deliveredProgramme: false,
@@ -428,6 +436,7 @@ nonisolated struct RecoveryReferee {
         connectionTimes.removeAll { now - $0 > 60 }
         triedRoutes.insert(route)
         connectionAnswered = false
+        answeredAt = nil
         connectionSilent = false
         phase = .connecting(route: route, since: now)
         decisionLog.append("Connecting (route \(route + 1)/\(routeCount)): \(reason)")
@@ -477,6 +486,8 @@ nonisolated struct RecoveryReferee {
     /// How long the first route may go unanswered at start-up while a backup route exists. On the
     /// live panel cold sources answered within 7.9 s, and refusals came after 8.4 s or later.
     static let unansweredFirstRouteLimit: Double = 8
+    /// How long it may then stay silent: a source that has started sends as it answers.
+    static let silentAfterAnswerLimit: Double = 4
 
     /// Before anything plays, an answer with nothing to play counts against its route: a server error
     /// or an empty response twice, at least a second apart, or once after the panel spent seconds

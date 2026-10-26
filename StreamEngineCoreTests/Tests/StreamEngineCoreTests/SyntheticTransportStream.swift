@@ -30,6 +30,9 @@ struct SyntheticTransportStream {
     var content: UInt8 = 0
     /// Keyframes after the first are non-IDR intra pictures (H.264 I slices, HEVC CRA).
     var openGOP = false
+    /// An IDR every this many frames, and at the other keyframes intra pictures that come without
+    /// parameter sets, as some broadcast encoders send them (SPS and PPS only with their IDRs).
+    var idrInterval: Int?
     /// NAL units (without start codes) sent before each keyframe's slice instead of placeholder
     /// parameter sets: a real VPS/SPS/PPS (and SEI) lets the stream be repackaged as fragmented MP4.
     var parameterSets: [[UInt8]]?
@@ -89,6 +92,7 @@ struct SyntheticTransportStream {
 
     func kind(of frame: Int) -> PictureKind {
         guard frame % gop == 0 else { return .predicted }
+        if let idrInterval { return frame % idrInterval == 0 ? .idr : .intra }
         return openGOP && frame > 0 ? .intra : .idr
     }
 
@@ -138,15 +142,16 @@ struct SyntheticTransportStream {
                          pcr: dts - 9_000, randomAccess: kind != .predicted)
     }
 
-    /// An access unit delimiter, parameter sets on keyframes, then one slice whose payload starts
+    /// An access unit delimiter, parameter sets on keyframes (only on IDRs with `idrInterval`), then one slice whose payload starts
     /// with the frame number (7 bits per byte, so no start code can appear) and the encoder identity.
     func elementaryStream(frame: Int, kind: PictureKind) -> [UInt8] {
         var es: [UInt8]
+        let carriesParameterSets = kind == .idr || (kind == .intra && idrInterval == nil)
         if videoStreamType == 0x24 {
             es = [0, 0, 0, 1, 0x46, 0x01, 0x50]
-            if kind != .predicted, let parameterSets {
+            if carriesParameterSets, let parameterSets {
                 for unit in parameterSets { es += [0, 0, 0, 1] + unit }
-            } else if kind != .predicted {
+            } else if carriesParameterSets {
                 es += [0, 0, 0, 1, 0x40, 0x01, 0x0C, 0x01, 0xFF, 0xFF, 0x01, 0x60]
                 es += [0, 0, 0, 1, 0x42, 0x01, 0x01, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90]
                 es += [0, 0, 0, 1, 0x44, 0x01, 0xC1, 0x72, 0xB4, 0x62, 0x40]
@@ -158,9 +163,9 @@ struct SyntheticTransportStream {
             }
         } else {
             es = [0, 0, 0, 1, 0x09, 0xF0]
-            if kind != .predicted, let parameterSets {
+            if carriesParameterSets, let parameterSets {
                 for unit in parameterSets { es += [0, 0, 0, 1] + unit }
-            } else if kind != .predicted {
+            } else if carriesParameterSets {
                 es += [0, 0, 0, 1, 0x67, 0x64, 0x00, 0x1F, 0xAC, 0xD9, 0x40, 0x50, 0x05, 0xBB, 0x01, 0x10]
                 es += [0, 0, 0, 1, 0x68, 0xEB, 0xE3, 0xCB, 0x22, 0xC0]
             }

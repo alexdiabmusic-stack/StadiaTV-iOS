@@ -212,6 +212,17 @@ struct TransportStreamTests {
         #expect(!predicted.isKeyframe)
     }
 
+    @Test("An H.264 I-frame without its parameter sets isn't a keyframe, even flagged for random access")
+    func h264IntraWithoutParameterSets() throws {
+        // An encoder that sends SPS and PPS only with an IDR every 4 s, and an I-frame every second.
+        var stream = SyntheticTransportStream()
+        stream.idrInterval = 100
+        let bare = try inspection(of: stream.elementaryStream(frame: 50, kind: .intra), codec: .h264, randomAccess: true)
+        #expect(!bare.isKeyframe)
+        let idr = try inspection(of: stream.elementaryStream(frame: 100, kind: .idr), codec: .h264)
+        #expect(idr.isKeyframe && idr.isInstantRefresh)
+    }
+
     @Test("HEVC IDR and CRA pictures are keyframes; only IDR resets the decoder")
     func hevcKeyframes() throws {
         var stream = SyntheticTransportStream()

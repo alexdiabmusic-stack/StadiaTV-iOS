@@ -456,6 +456,13 @@ final class PlaybackController: ObservableObject {
         for handler in Array(failureObservers.values) { handler(reason) }
     }
 
+    /// The current item is playing its programme: the start-up watchdog and any stall timer stand down.
+    private func itemStarted() {
+        itemHasPlayed = true
+        stallTask?.cancel()
+        watchdogTask?.cancel()
+    }
+
     private func markFirstFrame() {
         guard !firstFrameRendered, currentItem != nil else { return }
         firstFrameRendered = true
@@ -517,6 +524,7 @@ final class PlaybackController: ObservableObject {
 
                 if hasPicture {
                     secondsPlayingWithoutPicture = 0
+                    if !self.itemHasPlayed { self.itemStarted() }
                     self.markFirstFrame()
                 } else if isPlaying {
                     secondsPlayingWithoutPicture += 1
@@ -535,7 +543,10 @@ final class PlaybackController: ObservableObject {
                     }
                     guard !Task.isCancelled, self.generation == generation else { return }
                     advertisesVideo = result
-                    if !result { self.markFirstFrame() }
+                    if !result {
+                        self.itemStarted()
+                        self.markFirstFrame()
+                    }
                 }
                 if advertisesVideo == true, secondsPlayingWithoutPicture >= Self.videolessFailureSeconds {
                     PlaybackMetrics.logger.info("Playing \(secondsPlayingWithoutPicture) s with no picture on a video stream")
@@ -600,9 +611,9 @@ final class PlaybackController: ObservableObject {
         guard currentItem != nil, !isWaitingToReconnect else { return }
         switch player.timeControlStatus {
         case .playing:
-            itemHasPlayed = true
-            stallTask?.cancel()
-            watchdogTask?.cancel()
+            // An engine item is told to play immediately, so AVPlayer reports playing before it has
+            // anything to show: it has started once it shows a picture (see the monitor).
+            if !usesEngine { itemStarted() }
             if reconnectAttempt > 0 {
                 PlaybackMetrics.logger.info("Reconnected after \(self.reconnectAttempt) attempt(s)")
                 reconnectAttempt = 0
@@ -751,8 +762,12 @@ final class PlaybackController: ObservableObject {
             }
         case .failed:
             let reason = Self.safeErrorMessage(item.error)
-            if itemHasPlayed {
-                if usesEngine { rebuildEngineItem(reason: "player item failed") } else { reconnect(reason: reason) }
+            if usesEngine {
+                // Once the channel has shown a picture the engine still holds its programme, so a new
+                // item rejoins it; before that, AVPlayer couldn't play the engine's stream at all.
+                if firstFrameRendered { rebuildEngineItem(reason: "player item failed") } else { startupFailed(reason) }
+            } else if itemHasPlayed {
+                reconnect(reason: reason)
             } else {
                 startupFailed(reason)
             }
@@ -1020,8 +1035,10 @@ final class PlaybackController: ObservableObject {
         let status = player.timeControlStatus
         // Once the channel has shown a picture, any wait is the viewer waiting (a rebuilt item included).
         let waiting = (itemHasPlayed || firstFrameRendered) && !isUserPaused && status == .waitingToPlayAtSpecifiedRate
+        // Until the item shows a picture its position is only where it will start, which the engine
+        // mustn't publish against.
         session.reportPlayback(programmeTime: programmeTime, isWaiting: waiting,
-                               isPlaying: status == .playing, rate: Double(player.rate))
+                               isPlaying: itemHasPlayed && status == .playing, rate: Double(player.rate))
     }
 
     private func applyEngineRate(_ rate: Double) {

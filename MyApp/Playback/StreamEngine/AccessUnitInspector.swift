@@ -5,8 +5,10 @@ import Foundation
 /// Splices and segment cuts may only happen at such pictures; anything else would hand
 /// VideoToolbox frames whose references it never saw. The first coded slice decides:
 /// an IDR/IRAP picture, or (for broadcast H.264 that only sends periodic I-frames with
-/// recovery points) a slice whose header says it is intra-coded. The transport layer's
-/// random-access flag is only used when the NAL units can't be read.
+/// recovery points) a slice whose header says it is intra-coded, when the sequence parameter
+/// set comes with it: some encoders send their parameter sets only with an IDR every few
+/// seconds and flag the I-frames between as random access too, but no decoder can start at
+/// one. The transport layer's random-access flag is only used when the NAL units can't be read.
 nonisolated enum AccessUnitInspector {
     struct Result: Equatable {
         var isKeyframe: Bool
@@ -103,7 +105,7 @@ nonisolated private struct NALScanner {
         case .nalHeader:
             classifyNAL(bytes)
         case .h264Slice:
-            verdict = Self.isIntraSlice(bytes)
+            verdict = Self.isIntraSlice(bytes) && sequenceParameterSet != nil
         case .mpeg2Picture:
             let pictureCodingType = (bytes[1] >> 3) & 0x07
             verdict = pictureCodingType == 1 || sawMPEG2SequenceHeader

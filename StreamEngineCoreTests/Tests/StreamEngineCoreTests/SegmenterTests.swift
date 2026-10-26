@@ -41,6 +41,31 @@ struct SegmenterTests {
         }
     }
 
+    @Test("I-frames without parameter sets don't start the output or a segment: only IDRs, which carry them, do")
+    func intraWithoutParameterSets() throws {
+        // SPS and PPS only with an IDR every 4 s, an I-frame flagged for random access every second,
+        // and a connection that joins just before one of those I-frames.
+        var stream = SyntheticTransportStream()
+        stream.gop = 25
+        stream.idrInterval = 100
+        var harness = PipelineHarness()
+        harness.connection(stream.bytes(seconds: 12, firstFrame: 40))
+        harness.finish()
+
+        // Frames 40–339: the output starts at the IDR at 100, and only the IDRs at 100, 200 and 300
+        // begin segments (the GOPs between are cut at 2.3 s, as long GOPs are).
+        #expect(harness.deliveredFrames.first == 100)
+        #expect(harness.segments.first?.startsWithKeyframe == true)
+        let keyframeStarts = harness.segments.filter(\.startsWithKeyframe)
+        #expect(keyframeStarts.count == 3)
+        for segment in keyframeStarts {
+            let firstPicture = try #require(pesUnits(in: [UInt8](segment.data), pid: 0x100).first)
+            let header = try #require(firstPicture.parseHeader())
+            let inspection = AccessUnitInspector.inspect(firstPicture, dataOffset: header.dataOffset, codec: .h264)
+            #expect(inspection.isInstantRefresh && inspection.sequenceParameterSet != nil)
+        }
+    }
+
     @Test("A long-GOP source is cut at the maximum length, and still at its keyframes")
     func longGOP() {
         var stream = SyntheticTransportStream()

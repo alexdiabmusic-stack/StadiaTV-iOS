@@ -278,6 +278,145 @@ struct EngineEndToEndTests {
         expectFragmentedTimeline(run.player, maximumMissing: 0)
     }
 
+    @Test("An Xtream channel that's off the air is reported within seconds, not retried for the viewer to watch")
+    func offAirChannel() async throws {
+        // Panels answer 502 on both outputs of an event channel with no event on.
+        let transport = try FakeTransportChannel(seconds: 20, lead: 16, burst: 8, answer: 502)
+        defer { transport.stop() }
+        let hls = try FakeHLSChannel(seconds: 20, lead: 16, answer: 502)
+        defer { hls.stop() }
+        let routes: [StreamEngineSession.Route] = [
+            .init(url: try #require(URL(string: "http://127.0.0.1:\(transport.port)/live/user/pass/77.ts")), label: "MPEG-TS"),
+            .init(url: try #require(URL(string: "http://127.0.0.1:\(hls.port)/live/user/pass/77.m3u8")), label: "HLS")
+        ]
+        let recorder = EngineEventRecorder()
+        let session = try StreamEngine.shared.makeSession(routes: routes, headers: [:], configuration: .profile(.balanced),
+                                                          isSingleConnectionAccount: false, onEvent: { recorder.record($0) })
+        session.start()
+        defer { session.stop() }
+        let started = ProcessInfo.processInfo.systemUptime
+        while recorder.failure == nil, recorder.ready == nil, ProcessInfo.processInfo.systemUptime - started < 15 {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        #expect(recorder.failure == .offAir)
+        #expect(recorder.ready == nil)
+        #expect(ProcessInfo.processInfo.systemUptime - started < 6)
+        // AVPlayer would get the same answers, so the player shows the message instead of trying again.
+        #expect(recorder.failure?.allowsDirectPlayback == false)
+        #expect(transport.connectionCount >= 2)
+        #expect(hls.playlistRequests >= 2)
+    }
+
+    @Test("A channel that answers and then sends nothing on both outputs is reported off the air after one wait per output")
+    func silentChannel() async throws {
+        let transport = try FakeTransportChannel(seconds: 20, lead: 16, burst: 8, silent: true)
+        defer { transport.stop() }
+        // A negative lead: the live playlist lists no segments for the whole test.
+        let hls = try FakeHLSChannel(seconds: 20, lead: -100)
+        defer { hls.stop() }
+        let routes: [StreamEngineSession.Route] = [
+            .init(url: try #require(URL(string: "http://127.0.0.1:\(transport.port)/live/user/pass/77.ts")), label: "MPEG-TS"),
+            .init(url: try #require(URL(string: "http://127.0.0.1:\(hls.port)/live/user/pass/77.m3u8")), label: "HLS")
+        ]
+        // A short start-up timeout keeps the test quick; the rule is the same at 12 s.
+        var configuration = StreamEngineConfiguration.profile(.balanced)
+        configuration.startupTimeout = 3
+        let recorder = EngineEventRecorder()
+        let session = try StreamEngine.shared.makeSession(routes: routes, headers: [:], configuration: configuration,
+                                                          isSingleConnectionAccount: false, onEvent: { recorder.record($0) })
+        session.start()
+        defer { session.stop() }
+        let started = ProcessInfo.processInfo.systemUptime
+        while recorder.failure == nil, recorder.ready == nil, ProcessInfo.processInfo.systemUptime - started < 15 {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        // The HLS output lists no segments yet; the MPEG-TS output answered and stayed silent.
+        #expect(recorder.failure == .offAir)
+        #expect(ProcessInfo.processInfo.systemUptime - started < 9)
+        #expect(transport.connectionCount == 1)
+    }
+
+    @Test("A channel the panel takes 7 s to start plays from its MPEG-TS output, without the engine giving up on it")
+    func slowStartingChannel() async throws {
+        // An on-demand source nobody else is watching: the panel answers once it has started it.
+        let transport = try FakeTransportChannel(seconds: 60, lead: 16, burst: 8, startupDelay: 7)
+        defer { transport.stop() }
+        let hls = try FakeHLSChannel(seconds: 60, lead: 16)
+        defer { hls.stop() }
+        let routes: [StreamEngineSession.Route] = [
+            .init(url: try #require(URL(string: "http://127.0.0.1:\(transport.port)/live/user/pass/77.ts")), label: "MPEG-TS"),
+            .init(url: try #require(URL(string: "http://127.0.0.1:\(hls.port)/live/user/pass/77.m3u8")), label: "HLS")
+        ]
+        let run = try await play(routes: routes, profile: .balanced, seconds: 12, readyWithin: 20)
+
+        #expect(run.failure == nil)
+        #expect(run.startup >= 7)
+        #expect(run.startup < 11)
+        let status = try #require(run.status)
+        #expect(status.route == "MPEG-TS")
+        #expect(status.routeSwitches == 0)
+        #expect(transport.connectionCount == 1)
+        #expect(hls.playlistRequests == 0)
+        #expect(run.player.freezes == 0)
+    }
+
+    @Test("A channel the panel can't start on its MPEG-TS output plays from HLS without waiting for the refusal")
+    func refusedSlowStart() async throws {
+        // The panel tries to start the source on MPEG-TS for 9 s and then answers 502; its HLS output works.
+        let transport = try FakeTransportChannel(seconds: 60, lead: 16, burst: 8, answer: 502, startupDelay: 9)
+        defer { transport.stop() }
+        let hls = try FakeHLSChannel(seconds: 60, lead: 16)
+        defer { hls.stop() }
+        let routes: [StreamEngineSession.Route] = [
+            .init(url: try #require(URL(string: "http://127.0.0.1:\(transport.port)/live/user/pass/77.ts")), label: "MPEG-TS"),
+            .init(url: try #require(URL(string: "http://127.0.0.1:\(hls.port)/live/user/pass/77.m3u8")), label: "HLS")
+        ]
+        let run = try await play(routes: routes, profile: .balanced, seconds: 10, readyWithin: 20)
+
+        #expect(run.failure == nil)
+        #expect(run.startup >= 8)
+        #expect(run.startup < 10)
+        let status = try #require(run.status)
+        #expect(status.route == "HLS")
+        #expect(run.player.freezes == 0)
+    }
+
+    @Test("A player that's still starting sees the playlist keep growing: AVPlayer fails a live playlist that stops changing")
+    func playlistGrowsBeforePlayback() async throws {
+        let channel = try FakeTransportChannel(seconds: 40, lead: 16, burst: 6)
+        defer { channel.stop() }
+        let url = try #require(URL(string: "http://127.0.0.1:\(channel.port)/play/1234.ts"))
+        let recorder = EngineEventRecorder()
+        let session = try StreamEngine.shared.makeSession(routes: [.init(url: url, label: "MPEG-TS")], headers: [:],
+                                                          configuration: .profile(.balanced), isSingleConnectionAccount: false,
+                                                          onEvent: { recorder.record($0) })
+        session.start()
+        defer { session.stop() }
+        let started = ProcessInfo.processInfo.systemUptime
+        func elapsed() -> Double { ProcessInfo.processInfo.systemUptime - started }
+        while recorder.ready == nil, elapsed() < 10 { try await Task.sleep(nanoseconds: 50_000_000) }
+        let playlistURL = try #require(recorder.ready)
+
+        // Like AVPlayer while it starts: it has read the playlist, reports where it will start from,
+        // and isn't playing yet.
+        var player = VirtualPlayer(epoch: session.programmeEpoch)
+        var segments: [Int] = []
+        var lastChange = elapsed()
+        var longestUnchanged = 0.0
+        let watchUntil = elapsed() + 9
+        while elapsed() < watchUntil {
+            let playlist = await fetch(playlistURL)
+            if player.read(String(decoding: playlist.body, as: UTF8.self)) { lastChange = elapsed() }
+            longestUnchanged = max(longestUnchanged, elapsed() - lastChange)
+            segments.append(player.entries.count)
+            let start = player.entries.values.map(\.start).min()
+            session.reportPlayback(programmeTime: start, isWaiting: false, isPlaying: false, rate: 1)
+            try await Task.sleep(nanoseconds: 500_000_000)
+        }
+        #expect(longestUnchanged < 1.5 * player.targetDuration)
+        #expect((segments.last ?? 0) >= (segments.first ?? 0) + 3)
+    }
+
     @Test("A channel that switches from H.264 to HEVC moves the player to fMP4 renditions")
     func codecSwitch() async throws {
         var hevc = SyntheticTransportStream(content: 1)
@@ -392,7 +531,7 @@ struct EngineEndToEndTests {
 
     /// Plays `routes` through a real engine session, with a virtual player on the local playlist.
     private func play(routes: [StreamEngineSession.Route], profile: StreamEngineConfiguration.Profile,
-                      seconds: Double) async throws -> Run {
+                      seconds: Double, readyWithin: Double = 10) async throws -> Run {
         let recorder = EngineEventRecorder()
         let session = try StreamEngine.shared.makeSession(routes: routes, headers: [:], configuration: .profile(profile),
                                                           isSingleConnectionAccount: false, onEvent: { recorder.record($0) })
@@ -401,7 +540,7 @@ struct EngineEndToEndTests {
         let started = ProcessInfo.processInfo.systemUptime
         func elapsed() -> Double { ProcessInfo.processInfo.systemUptime - started }
 
-        while recorder.ready == nil, recorder.failure == nil, elapsed() < 10 {
+        while recorder.ready == nil, recorder.failure == nil, elapsed() < readyWithin {
             try await Task.sleep(nanoseconds: 50_000_000)
         }
         var playlistURL = try #require(recorder.ready)
@@ -656,6 +795,15 @@ final class FakeTransportChannel: @unchecked Sendable {
     private let cuts: [Int: Double]
     /// Chunks the panel never sends: programme its output dropped.
     private let drops: Set<Int>
+    /// The status every request gets; anything but 200 comes with an empty body (502 for a
+    /// channel that's off the air).
+    private let answer: Int
+    /// Seconds the panel takes to answer, counted from the first request: an on-demand source that
+    /// nobody else is watching has to be started first.
+    private let startupDelay: Double
+    /// Answers 200 and then sends nothing: a channel whose source is down.
+    private let silent: Bool
+    private var firstRequestAt: Double?
     private let origin = ProcessInfo.processInfo.systemUptime
     private let lock = NSLock()
     private var listener: Int32
@@ -667,6 +815,7 @@ final class FakeTransportChannel: @unchecked Sendable {
 
     /// `streams` are the encoders of the programme, each from the second it takes over.
     init(seconds: Double, lead: Double, burst: Double, cuts: [Int: Double] = [:], drops: Set<Int> = [],
+         answer: Int = 200, startupDelay: Double = 0, silent: Bool = false,
          streams: [(start: Double, stream: SyntheticTransportStream)] = [(0, SyntheticTransportStream())]) throws {
         var encoders = streams
         chunks = (0..<Int(seconds / 0.4)).map { index in
@@ -677,6 +826,9 @@ final class FakeTransportChannel: @unchecked Sendable {
         self.burst = burst
         self.cuts = cuts
         self.drops = drops
+        self.answer = answer
+        self.startupDelay = startupDelay
+        self.silent = silent
         listener = try Self.makeListener()
         port = Self.localPort(of: listener)
         let thread = Thread { [self] in acceptLoop() }
@@ -732,8 +884,25 @@ final class FakeTransportChannel: @unchecked Sendable {
 
     private func serve(_ client: Int32, index: Int) {
         Self.configure(client)
-        guard readRequestHead(client),
-              write(Array("HTTP/1.1 200 OK\r\nContent-Type: video/mp2t\r\nConnection: close\r\n\r\n".utf8), to: client) else { return }
+        guard readRequestHead(client) else { return }
+        if startupDelay > 0 {
+            lock.lock()
+            let first = firstRequestAt ?? elapsed()
+            firstRequestAt = first
+            lock.unlock()
+            while isRunning, elapsed() < first + startupDelay { Thread.sleep(forTimeInterval: 0.02) }
+        }
+        guard answer == 200 else {
+            _ = write(Array("HTTP/1.1 \(answer) Off Air\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".utf8), to: client)
+            return
+        }
+        guard write(Array("HTTP/1.1 200 OK\r\nContent-Type: video/mp2t\r\nConnection: close\r\n\r\n".utf8), to: client) else { return }
+        if silent {
+            var probe: UInt8 = 0
+            // Hold the connection open until the client gives up on it.
+            while isRunning, recv(client, &probe, 1, Int32(MSG_DONTWAIT)) != 0 { Thread.sleep(forTimeInterval: 0.05) }
+            return
+        }
         let openedAt = elapsed()
         var chunk = max(0, Int((lead + openedAt - burst) / chunkSeconds))
         // A panel's buffer rarely starts on a packet boundary.
@@ -839,16 +1008,26 @@ final class FakeHLSChannel: @unchecked Sendable {
         let outage: Range<Double>?
         /// Seconds each segment takes to arrive.
         let segmentDelay: Double
+        /// The status playlists and segments get (502 for a channel that's off the air).
+        let answer: Int
         let origin = ProcessInfo.processInfo.systemUptime
         private let lock = NSLock()
         private var transportCount = 0
+        private var playlistCount = 0
         private var segmentLog: [(time: Double, sequence: Int)] = []
 
-        init(segments: [Data], lead: Double, outage: Range<Double>?, segmentDelay: Double) {
+        init(segments: [Data], lead: Double, outage: Range<Double>?, segmentDelay: Double, answer: Int) {
             self.segments = segments
             self.lead = lead
             self.outage = outage
             self.segmentDelay = segmentDelay
+            self.answer = answer
+        }
+
+        var playlistRequests: Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return playlistCount
         }
 
         var transportRequests: Int {
@@ -872,8 +1051,14 @@ final class FakeHLSChannel: @unchecked Sendable {
                 lock.unlock()
                 return .notFound()
             }
+            if name == "77.m3u8" {
+                lock.lock()
+                playlistCount += 1
+                lock.unlock()
+            }
+            if answer != 200 { return .init(status: answer, contentType: "text/plain", body: Data()) }
             if outage?.contains(now) == true { return .unavailable() }
-            let available = min(segments.count, Int((lead + now) / 2))
+            let available = max(0, min(segments.count, Int((lead + now) / 2)))
             if name == "77.m3u8" {
                 let first = max(0, available - 10)
                 var lines = ["#EXTM3U", "#EXT-X-VERSION:3", "#EXT-X-TARGETDURATION:2", "#EXT-X-MEDIA-SEQUENCE:\(first)"]
@@ -895,17 +1080,18 @@ final class FakeHLSChannel: @unchecked Sendable {
     private let server: LoopbackHTTPServer
     let port: UInt16
 
-    init(seconds: Double, lead: Double, outage: Range<Double>? = nil, segmentDelay: Double = 0,
+    init(seconds: Double, lead: Double, outage: Range<Double>? = nil, segmentDelay: Double = 0, answer: Int = 200,
          stream: SyntheticTransportStream = SyntheticTransportStream()) throws {
         var stream = stream
         let segments = (0..<Int(seconds / 2)).map { Data(stream.bytes(seconds: 2, firstFrame: $0 * 50)) }
-        let state = State(segments: segments, lead: lead, outage: outage, segmentDelay: segmentDelay)
+        let state = State(segments: segments, lead: lead, outage: outage, segmentDelay: segmentDelay, answer: answer)
         self.state = state
         server = LoopbackHTTPServer { request in state.respond(to: request) }
         port = try server.start()
     }
 
     var transportRequests: Int { state.transportRequests }
+    var playlistRequests: Int { state.playlistRequests }
     /// Segments served, with the channel time each was requested at.
     var segmentRequests: [(time: Double, sequence: Int)] { state.segmentRequests }
 

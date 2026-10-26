@@ -38,6 +38,9 @@ nonisolated final class EngineHTTPClient: NSObject, URLSessionDataDelegate, @unc
     struct Callbacks: Sendable {
         let data: @Sendable (Data, HTTPURLResponse?) -> Void
         let completion: @Sendable (Error?, HTTPURLResponse?) -> Void
+        /// The response head, as soon as it arrives: before any body, so a provider that answers and
+        /// then sends nothing can be told from one that never answered.
+        var response: (@Sendable (HTTPURLResponse) -> Void)? = nil
     }
 
     private let lock = NSLock()
@@ -83,6 +86,15 @@ nonisolated final class EngineHTTPClient: NSObject, URLSessionDataDelegate, @unc
         lock.unlock()
         task.resume()
         return task
+    }
+
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
+                    completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void) {
+        lock.lock()
+        let callbacks = self.callbacks[dataTask.taskIdentifier]
+        lock.unlock()
+        if let response = response as? HTTPURLResponse { callbacks?.response?(response) }
+        completionHandler(.allow)
     }
 
     func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
@@ -143,6 +155,10 @@ nonisolated final class TSStreamConnection: EngineConnection, @unchecked Sendabl
             completion: { [weak self] error, response in
                 guard let self else { return }
                 self.queue.async { self.completed(error, response: response) }
+            },
+            response: { [weak self] response in
+                guard let self else { return }
+                self.queue.async { self.responded(response) }
             })
         task = EngineHTTPClient.shared.start(EngineHTTPClient.request(url: url, headers: headers), callbacks: callbacks)
     }
@@ -151,6 +167,18 @@ nonisolated final class TSStreamConnection: EngineConnection, @unchecked Sendabl
         finished = true
         task?.cancel()
         task = nil
+    }
+
+    /// The provider answered. A refusal is reported at once; otherwise the stream counts as open even
+    /// before its first bytes, which a source that's starting up can take seconds to send.
+    private func responded(_ response: HTTPURLResponse) {
+        guard !finished, !opened else { return }
+        guard (200..<300).contains(response.statusCode) else {
+            finish(EngineHTTPClient.failure(forStatus: response.statusCode))
+            return
+        }
+        opened = true
+        emit(.opened(status: response.statusCode, cadence: 0))
     }
 
     private func received(_ data: Data, response: HTTPURLResponse?) {

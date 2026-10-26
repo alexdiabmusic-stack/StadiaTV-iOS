@@ -15,6 +15,9 @@ nonisolated enum StreamEngineFailure: Error, Equatable, Sendable {
     case notFound
     /// The provider stayed silent after the reserve ran out.
     case sourceUnavailable
+    /// Every route answered with nothing to play (a server error, an empty response, or silence):
+    /// how panels answer for a channel that isn't broadcasting, such as an event channel between events.
+    case offAir
 
     var message: String {
         switch self {
@@ -24,6 +27,7 @@ nonisolated enum StreamEngineFailure: Error, Equatable, Sendable {
         case .accountInUse: return "Your IPTV account is being used on another device. Retry to watch here."
         case .notFound: return "This channel is no longer available from your provider."
         case .sourceUnavailable: return "Lost connection to the stream."
+        case .offAir: return "This channel isn't broadcasting right now. Choose another broadcast or try again later."
         }
     }
 
@@ -31,7 +35,7 @@ nonisolated enum StreamEngineFailure: Error, Equatable, Sendable {
     var allowsDirectPlayback: Bool {
         switch self {
         case .unsupported, .startupFailed: return true
-        case .accountRejected, .accountInUse, .notFound, .sourceUnavailable: return false
+        case .accountRejected, .accountInUse, .notFound, .sourceUnavailable, .offAir: return false
         }
     }
 }
@@ -159,6 +163,21 @@ nonisolated struct RecoveryReferee {
     /// Routes found dropping programme. They aren't switched to for that reason again.
     private var lossyRoutes: Set<Int> = []
     private var lastFailure: FailureKind?
+    /// Before anything plays: routes whose provider answered with nothing to play. A server error or
+    /// an empty response, twice and at least a second apart (or once, when the panel took seconds to
+    /// give it), or silence through a whole start-up timeout after answering. AVPlayer would get the
+    /// same answers, so once every route is off the air the viewer is told straight away instead of
+    /// watching retries.
+    private var offAirRoutes: Set<Int> = []
+    /// Server errors and empty responses per route before anything played, and when the first came.
+    private var emptyAnswers: [Int]
+    private var firstEmptyAnswerAt: [Double?]
+    /// Routes that waited out a whole start-up timeout without programme.
+    private var timedOutRoutes: Set<Int> = []
+    /// The provider answered the current connection (an HTTP response, or a first playlist).
+    private var connectionAnswered = false
+    /// The connection that just timed out at start-up never received a byte of media.
+    private var connectionSilent = false
 
     init(configuration: StreamEngineConfiguration, routeCount: Int, isSingleConnectionAccount: Bool) {
         self.configuration = configuration
@@ -166,6 +185,8 @@ nonisolated struct RecoveryReferee {
         self.isSingleConnectionAccount = isSingleConnectionAccount
         self.routeFailures = Array(repeating: 0, count: max(1, routeCount))
         self.notFoundCounts = Array(repeating: 0, count: max(1, routeCount))
+        self.emptyAnswers = Array(repeating: 0, count: max(1, routeCount))
+        self.firstEmptyAnswerAt = Array(repeating: nil, count: max(1, routeCount))
     }
 
     var currentRoute: Int {
@@ -195,7 +216,14 @@ nonisolated struct RecoveryReferee {
         streamedRoutes.insert(route)
         deadRoutes.remove(route)
         notFoundCounts[route] = 0
+        offAirRoutes.removeAll()
         if notice != .slowLine { notice = nil }
+    }
+
+    /// The provider answered the current connection: from now on its silence is the provider's,
+    /// not the network's.
+    mutating func providerAnswered() {
+        if case .connecting = phase { connectionAnswered = true }
     }
 
     /// The current connection ended on its own (or the engine closed it after `disconnect`).
@@ -265,9 +293,14 @@ nonisolated struct RecoveryReferee {
         attempt += 1
         if !everStreamed {
             startupAttempts += 1
+            if let verdict = noteStartupAnswer(kind, route: route, at: now, openedAt: openedAt, drought: drought) { return verdict }
             // Two tries per route and the start-up timeout's worth of patience, so a network blip
-            // at the moment of tuning in isn't taken for a stream that won't start.
+            // at the moment of tuning in isn't taken for a stream that won't start. A route that
+            // waited out the whole timeout has had its chance.
             if startupAttempts >= 2 * routeCount, now - startedAt >= configuration.startupTimeout {
+                return [finish(.startupFailed)]
+            }
+            if (0..<routeCount).allSatisfy({ timedOutRoutes.contains($0) || offAirRoutes.contains($0) || deadRoutes.contains($0) }) {
                 return [finish(.startupFailed)]
             }
         }
@@ -292,13 +325,22 @@ nonisolated struct RecoveryReferee {
             return []
         case .waiting(let route, let until):
             if now >= until { actions.append(connect(route: route, at: now, reason: "retry")) }
-        case .connecting(_, let since):
-            // A backup route makes waiting out a dead first route at start-up pointless.
-            let startupLimit = routeCount > 1 && triedRoutes.count < routeCount
-                ? min(configuration.startupTimeout, 6) : configuration.startupTimeout
-            let limit = everStreamed ? configuration.deadChannelTimeout : startupLimit
+        case .connecting(let route, let since):
+            // An on-demand source nobody else is watching (an event channel, typically) takes the panel
+            // up to 8 s to start: it answers once the source is up, or refuses (502) when it can't
+            // start it on this output, and then its other output usually works. So a backup route is
+            // tried when the first hasn't answered in 8 s; one that has answered gets the whole
+            // start-up timeout to bring a picture.
+            let unanswered = !connectionAnswered && routeCount > 1 && triedRoutes.count < routeCount
+            let limit = everStreamed ? configuration.deadChannelTimeout
+                : unanswered ? min(configuration.startupTimeout, Self.unansweredFirstRouteLimit) : configuration.startupTimeout
             if now - since >= limit {
                 decisionLog.append("No programme \(Int(limit)) s after connecting")
+                if !everStreamed {
+                    if limit >= configuration.startupTimeout { timedOutRoutes.insert(route) }
+                    let health = observation.health
+                    connectionSilent = (health.lastByteAt ?? since) <= (health.connectedAt ?? since)
+                }
                 actions.append(.disconnect)
                 actions += connectionEnded(.deadChannel, at: now, openedAt: since, deliveredProgramme: false,
                                            drought: observation.health.programmeDrought(at: now))
@@ -385,6 +427,8 @@ nonisolated struct RecoveryReferee {
         connectionTimes.append(now)
         connectionTimes.removeAll { now - $0 > 60 }
         triedRoutes.insert(route)
+        connectionAnswered = false
+        connectionSilent = false
         phase = .connecting(route: route, since: now)
         decisionLog.append("Connecting (route \(route + 1)/\(routeCount)): \(reason)")
         return .connect(route: route)
@@ -420,10 +464,48 @@ nonisolated struct RecoveryReferee {
         return .fail(failure)
     }
 
-    /// The next route worth trying after `route`, skipping dead ones.
+    /// The next route worth trying after `route`, skipping dead ones and, before anything plays,
+    /// ones found off the air.
     private func nextRoute(after route: Int) -> Int? {
         guard routeCount > 1 else { return nil }
-        return (1..<routeCount).map { (route + $0) % routeCount }.first { !deadRoutes.contains($0) }
+        return (1..<routeCount).map { (route + $0) % routeCount }.first { !deadRoutes.contains($0) && !offAirRoutes.contains($0) }
+    }
+
+    /// A refusal the panel took this long to give is the panel failing to start the source (it tries
+    /// for about 10 s before answering 502), not a passing hiccup.
+    static let consideredRefusal: Double = 5
+    /// How long the first route may go unanswered at start-up while a backup route exists. On the
+    /// live panel cold sources answered within 7.9 s, and refusals came after 8.4 s or later.
+    static let unansweredFirstRouteLimit: Double = 8
+
+    /// Before anything plays, an answer with nothing to play counts against its route: a server error
+    /// or an empty response twice, at least a second apart, or once after the panel spent seconds
+    /// trying, or silence through a whole start-up timeout after the provider answered. Returns the
+    /// verdict once every route is off the air, or the move to the next route when this one just went
+    /// off the air; nil to carry on as usual.
+    private mutating func noteStartupAnswer(_ kind: FailureKind, route: Int, at now: Double, openedAt: Double?,
+                                            drought: Double?) -> [Action]? {
+        switch kind {
+        case .server, .endOfStream:
+            let first = firstEmptyAnswerAt[route] ?? now
+            firstEmptyAnswerAt[route] = first
+            emptyAnswers[route] += 1
+            let considered = openedAt.map { now - $0 >= Self.consideredRefusal } ?? false
+            guard considered || (emptyAnswers[route] >= 2 && now - first >= 1) else { return nil }
+        case .deadChannel where connectionAnswered && connectionSilent:
+            break
+        default:
+            return nil
+        }
+        guard offAirRoutes.insert(route).inserted else { return nil }
+        decisionLog.append("Route \(route + 1) has nothing on the air")
+        if (0..<routeCount).allSatisfy({ offAirRoutes.contains($0) || deadRoutes.contains($0) }) {
+            return [finish(.offAir)]
+        }
+        if let next = nextRoute(after: route) {
+            return switchRoute(to: next, at: now, drought: drought, reason: "nothing on the air on this route")
+        }
+        return nil
     }
 
     /// Immediate first retry, short backoff while the reserve covers the gap, then the stepped

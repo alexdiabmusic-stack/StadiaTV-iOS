@@ -118,6 +118,8 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
     private var playerRate: Double = 0
     private var playerWaiting = false
     private var playerPlaying = false
+    /// The player has played at least once. Until then its reports only say where it will start.
+    private var playerHasPlayed = false
     private var firstPublishedAt: Double?
     /// When the first segment reached the reserve.
     private var firstSegmentAt: Double?
@@ -188,6 +190,7 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
             }
             playerWaiting = isWaiting
             playerPlaying = isPlaying
+            if isPlaying { playerHasPlayed = true }
             playerRate = rate
         }
     }
@@ -349,6 +352,7 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
         switch event {
         case .opened(_, let cadence):
             connectionCadence = cadence
+            referee.providerAnswered(at: time)
         case .received(let bytes):
             health.received(bytes: bytes, at: time)
         case .media(let data):
@@ -519,16 +523,18 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
 
     /// AVPlayer's position, extrapolated between reports.
     private func estimatedPlayhead(_ time: Double) -> Double? {
-        if let playhead, let reportedAt = playheadReportedAt {
+        if let playhead, let reportedAt = playheadReportedAt, playerHasPlayed {
             let advance = playerPlaying ? max(0, time - reportedAt) * max(0, playerRate) : 0
             return playhead + min(advance, 3)
         }
-        // No report yet: assume playback began about a second after the first segment went out,
-        // so publishing never stalls on a player that doesn't report.
+        // No report yet, or the player hasn't started playing: assume playback began about a second
+        // after the first segment went out, so the playlist keeps growing. A player still starting
+        // reports the position it will start from; publishing no further than that would leave the
+        // playlist unchanged, which AVPlayer treats as an error after 1.5 target durations.
         if let firstPublishedAt, let start = firstPublishedStart {
             return start + max(0, time - firstPublishedAt - 1)
         }
-        return nil
+        return playhead
     }
 
     private func bufferedAhead(_ time: Double) -> Double {
@@ -555,12 +561,13 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
         var changed = false
         if reserve.publishedCount == 0 {
             guard let first = reserve.segments.first else { return }
-            // AVPlayer reloads a live playlist only a target duration after loading it, so the first
-            // playlist must carry enough to play until then: wait for that (the provider's burst
-            // usually brings it at once), but not for long when the provider sends in real time.
+            // AVPlayer starts a live playlist about three target durations from its end (given less,
+            // it has been seen to start at the edge and hold the picture), and reloads it only a
+            // target duration later. So the first playlist waits for three target durations, which the
+            // provider's burst usually brings at once, but not for long when it sends in real time.
             let firstSegmentAt = self.firstSegmentAt ?? time
             self.firstSegmentAt = firstSegmentAt
-            let startupLead = min(configuration.lead, Double(configuration.segmenter.playlistTargetDuration) + 1)
+            let startupLead = min(configuration.lead, 3 * Double(configuration.segmenter.playlistTargetDuration))
             guard reserve.reserveSeconds >= startupLead || time - firstSegmentAt >= Self.startupWaitLimit else { return }
             reserve.publishNext()
             reserve.publish(before: first.programmeStart + configuration.lead)

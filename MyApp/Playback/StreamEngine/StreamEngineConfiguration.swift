@@ -48,8 +48,9 @@ nonisolated struct StreamEngineConfiguration: Equatable, Sendable {
     var stallSafetyMargin: Double = 6
     /// Connected but no programme at all: the channel is dead at the provider.
     var deadChannelTimeout: Double = 14
-    /// No first picture on a route within this long counts as a failed attempt.
-    var startupTimeout: Double = 10
+    /// No first picture on a route within this long counts as a failed attempt. Long enough for a
+    /// panel to start an on-demand source nobody else is watching (4–8 s on the live panel tested).
+    var startupTimeout: Double = 12
     /// Seconds of visible freeze, with the provider still silent, before the source is reported failed.
     var starvedFailover: Double
     /// No programme for this long switches reconnects to the 15/30/60 s stepped schedule.
@@ -66,7 +67,7 @@ nonisolated struct StreamEngineConfiguration: Equatable, Sendable {
         switch profile {
         case .fast:
             return StreamEngineConfiguration(
-                profile: .fast, targetBuffer: 8, lowBuffer: 4, highBuffer: 16, lead: 5, rebufferGoal: 1.5,
+                profile: .fast, targetBuffer: 8, lowBuffer: 4, highBuffer: 16, lead: 6, rebufferGoal: 1.5,
                 buildRate: 0.99, trickleRate: 0.995, slowLineFloor: 0.97, shedRate: 1.01,
                 starvedFailover: 15, maximumReserveBytes: 32 * 1024 * 1024, backBufferSeconds: 20)
         case .balanced:

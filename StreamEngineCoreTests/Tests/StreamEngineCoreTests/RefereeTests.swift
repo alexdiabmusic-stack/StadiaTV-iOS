@@ -181,25 +181,134 @@ struct RefereeTests {
         #expect(after == [.disconnect, .connect(route: 0)])
     }
 
-    @Test("At start-up a dead route is abandoned after 6 s when there is a backup, 10 s when there isn't")
+    @Test("At start-up the first route gets 8 s to answer before the backup is tried, then 4 s to send, and the whole timeout once it sends")
     func startupTimeouts() {
         var monitor = StreamHealthMonitor()
         monitor.connectionOpened(at: 0)
+        let limit = balanced.startupTimeout
+        #expect(limit >= 10)
 
+        // No answer in 8 s: panels answer an on-demand source within that once it's up, or refuse it
+        // on this output a little later, when the other output usually works.
         var twoRoutes = RecoveryReferee(configuration: balanced, routeCount: 2, isSingleConnectionAccount: false)
         #expect(twoRoutes.start(at: 0) == [.connect(route: 0)])
-        let early = twoRoutes.tick(observation(5.75, health: monitor))
-        #expect(early.isEmpty)
-        let switched = twoRoutes.tick(observation(6, health: monitor))
-        #expect(switched == [.disconnect, .connect(route: 1)])
+        #expect(twoRoutes.tick(observation(7.75, health: monitor)).isEmpty)
+        #expect(twoRoutes.tick(observation(8, health: monitor)) == [.disconnect, .connect(route: 1)])
         #expect(twoRoutes.routeSwitches == 1)
 
+        // Answered and sending: the source is up, so it gets the whole timeout to bring a picture.
+        var sending = monitor
+        sending.received(bytes: 188 * 50, at: 1)
+        var answered = RecoveryReferee(configuration: balanced, routeCount: 2, isSingleConnectionAccount: false)
+        _ = answered.start(at: 0)
+        answered.providerAnswered(at: 0.5)
+        #expect(answered.tick(observation(8, health: sending)).isEmpty)
+        #expect(answered.tick(observation(limit - 0.25, health: sending)).isEmpty)
+        #expect(answered.tick(observation(limit, health: sending)) == [.disconnect, .connect(route: 1)])
+
+        // Answered and then silent for 4 s: a source that has started sends as it answers, so this
+        // output has nothing, and the other is tried.
+        var silent = RecoveryReferee(configuration: balanced, routeCount: 2, isSingleConnectionAccount: false)
+        _ = silent.start(at: 0)
+        silent.providerAnswered(at: 0.5)
+        #expect(silent.tick(observation(4.25, health: monitor)).isEmpty)
+        #expect(silent.tick(observation(4.5, health: monitor)) == [.disconnect, .connect(route: 1)])
+
+        // A single route that never answers in the whole timeout may be this device's network rather
+        // than the provider, so AVPlayer gets to try the provider URL itself.
         var oneRoute = RecoveryReferee(configuration: balanced, routeCount: 1, isSingleConnectionAccount: false)
         _ = oneRoute.start(at: 0)
-        let patient = oneRoute.tick(observation(9.75, health: monitor))
-        #expect(patient.isEmpty)
-        let retried = oneRoute.tick(observation(10, health: monitor))
-        #expect(retried == [.disconnect, .connect(route: 0)])
+        #expect(oneRoute.tick(observation(limit - 0.25, health: monitor)).isEmpty)
+        #expect(oneRoute.tick(observation(limit, health: monitor)) == [.disconnect, .fail(.startupFailed)])
+        #expect(StreamEngineFailure.startupFailed.allowsDirectPlayback)
+    }
+
+    @Test("A channel that's off the air on every route is reported within seconds, and not handed to AVPlayer")
+    func offAirChannel() {
+        // Panels answer an event channel with nothing on 502 or 503, on both outputs.
+        for (routes, code) in [(2, 502), (1, 503)] {
+            var referee = RecoveryReferee(configuration: balanced, routeCount: routes, isSingleConnectionAccount: false)
+            _ = referee.start(at: 0)
+            var now = 0.0
+            var outcome: [RecoveryReferee.Action] = []
+            var answers = 0
+            while answers < 20 {
+                answers += 1
+                now += 0.1
+                outcome = referee.connectionEnded(.server(code), at: now, openedAt: now - 0.1, deliveredProgramme: false, drought: nil)
+                guard let delay = retryDelay(referee, after: outcome, at: now) else { break }
+                if delay > 0 {
+                    now += delay
+                    _ = referee.tick(observation(now, health: StreamHealthMonitor()))
+                }
+            }
+            #expect(outcome == [.fail(.offAir)])
+            #expect(now < 5)
+            #expect(answers >= 2 * routes)
+        }
+        #expect(!StreamEngineFailure.offAir.allowsDirectPlayback)
+    }
+
+    @Test("A refusal the panel took seconds to give puts its route off the air at once")
+    func consideredRefusal() {
+        var referee = RecoveryReferee(configuration: balanced, routeCount: 2, isSingleConnectionAccount: false)
+        _ = referee.start(at: 0)
+        // The panel tried to start the source for 10 s, then answered 502: try the other output now.
+        #expect(referee.connectionEnded(.server(502), at: 10, openedAt: 0, deliveredProgramme: false, drought: nil)
+                == [.connect(route: 1)])
+        #expect(referee.drainDecisions().contains("Route 1 has nothing on the air"))
+        // There it refuses at once (panels answer 503 and then 888 to repeated requests): a second
+        // refusal a second later settles it.
+        #expect(referee.connectionEnded(.server(503), at: 10.2, openedAt: 10.1, deliveredProgramme: false, drought: nil).isEmpty)
+        if case .waiting(_, let until) = referee.phase { _ = referee.tick(observation(until, health: StreamHealthMonitor())) }
+        #expect(referee.connectionEnded(.server(888), at: 12, openedAt: 11.9, deliveredProgramme: false, drought: nil)
+                == [.fail(.offAir)])
+    }
+
+    @Test("A provider that answers and then sends nothing on every route is off the air")
+    func silentChannel() {
+        let limit = balanced.startupTimeout
+        var referee = RecoveryReferee(configuration: balanced, routeCount: 2, isSingleConnectionAccount: false)
+        _ = referee.start(at: 0)
+        var monitor = StreamHealthMonitor()
+        monitor.connectionOpened(at: 0)
+        referee.providerAnswered(at: 0)
+        #expect(referee.tick(observation(4, health: monitor)) == [.disconnect, .connect(route: 1)])
+        #expect(referee.drainDecisions().contains("Route 1 has nothing on the air"))
+        // The last route left gets the whole timeout.
+        monitor.connectionOpened(at: 4)
+        referee.providerAnswered(at: 4)
+        #expect(referee.tick(observation(4 + limit - 0.25, health: monitor)).isEmpty)
+        #expect(referee.tick(observation(4 + limit, health: monitor)) == [.disconnect, .fail(.offAir)])
+    }
+
+    @Test("Bytes that never make a picture aren't a channel off the air: AVPlayer still gets its try")
+    func undecodableChannel() {
+        let limit = balanced.startupTimeout
+        var referee = RecoveryReferee(configuration: balanced, routeCount: 2, isSingleConnectionAccount: false)
+        _ = referee.start(at: 0)
+        var monitor = StreamHealthMonitor()
+        monitor.connectionOpened(at: 0)
+        referee.providerAnswered(at: 0)
+        monitor.received(bytes: 188 * 100, at: 1)
+        #expect(referee.tick(observation(limit, health: monitor)) == [.disconnect, .connect(route: 1)])
+        monitor.connectionOpened(at: limit)
+        referee.providerAnswered(at: limit)
+        monitor.received(bytes: 188 * 100, at: limit + 1)
+        #expect(referee.tick(observation(2 * limit, health: monitor)) == [.disconnect, .fail(.startupFailed)])
+    }
+
+    @Test("A server error at tune-in that doesn't repeat isn't taken for a channel off the air")
+    func transientServerError() {
+        var referee = RecoveryReferee(configuration: balanced, routeCount: 1, isSingleConnectionAccount: false)
+        _ = referee.start(at: 0)
+        // Two refusals in quick succession are one hiccup, not a verdict.
+        #expect(referee.connectionEnded(.server(503), at: 0.1, openedAt: 0, deliveredProgramme: false, drought: nil) == [.connect(route: 0)])
+        let second = referee.connectionEnded(.server(503), at: 0.2, openedAt: 0.1, deliveredProgramme: false, drought: nil)
+        #expect(!second.contains(.fail(.offAir)))
+        if case .waiting(_, let until) = referee.phase { _ = referee.tick(observation(until, health: StreamHealthMonitor())) }
+        referee.programmeArrived(at: 1)
+        #expect(referee.phase == .streaming(route: 0, since: 1))
     }
 
     @Test("A source that never plays fails after two attempts per route and the start-up timeout")
@@ -220,7 +329,7 @@ struct RefereeTests {
             }
         }
         #expect(outcome == [.fail(.startupFailed)])
-        #expect(attempts == 7)
+        #expect(attempts == 8)
         #expect(now >= balanced.startupTimeout)
         #expect(StreamEngineFailure.startupFailed.allowsDirectPlayback)
     }
@@ -631,6 +740,9 @@ struct PaceAndHealthTests {
             #expect(profile.slowLineFloor <= profile.buildRate)
             // A forced cut, even a frame late, rounds to no more than the target duration.
             #expect((profile.segmenter.maximumDuration + 0.1).rounded() <= Double(profile.segmenter.playlistTargetDuration))
+            // AVPlayer starts about three target durations behind the live end, so the first
+            // playlist (no more than the lead) must be able to hold that much.
+            #expect(profile.lead >= 3 * Double(profile.segmenter.playlistTargetDuration))
         }
         let tile = maximum.forMultiviewTile()
         #expect(tile.profile == .fast)

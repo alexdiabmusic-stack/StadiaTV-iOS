@@ -32,6 +32,7 @@ nonisolated final class NativeLivePlayer: @unchecked Sendable {
     private let videoRenderer: AVSampleBufferVideoRenderer
     private let audioRenderer: AVSampleBufferAudioRenderer
     private let synchronizer: AVSampleBufferRenderSynchronizer
+    private let renderers: NativeRenderers
     private let feed: NativeFeed
     private let queue: DispatchQueue
     /// Where the picture is, for the engine: programme time, waiting, playing, rate.
@@ -60,6 +61,7 @@ nonisolated final class NativeLivePlayer: @unchecked Sendable {
          reportPlayback: @escaping @Sendable (Double?, Bool, Bool, Double) -> Void,
          onEvent: @escaping @Sendable (Event) -> Void) {
         self.feed = feed
+        self.renderers = renderers
         videoRenderer = renderers.videoRenderer
         audioRenderer = renderers.audioRenderer
         synchronizer = renderers.synchronizer
@@ -105,8 +107,7 @@ nonisolated final class NativeLivePlayer: @unchecked Sendable {
             flushObserver = nil
             synchronizer.rate = 0
             // The renderers outlive this player: the next channel mustn't open on this one's picture.
-            videoRenderer.flush(removingDisplayedImage: true, completionHandler: nil)
-            audioRenderer.flush()
+            renderers.flush(removingDisplayedImage: true)
         }
     }
 
@@ -138,7 +139,7 @@ nonisolated final class NativeLivePlayer: @unchecked Sendable {
 
     /// Hands the renderers whatever they will take.
     private func enqueue() {
-        while videoRenderer.isReadyForMoreMediaData, let next = scheduler.nextVideo() {
+        while !renderers.isFlushingVideo, videoRenderer.isReadyForMoreMediaData, let next = scheduler.nextVideo() {
             // The first picture: the clock is set to it (still) before it's queued.
             perform(next.commands)
             guard let buffer = videoBuffer(next.entry) else { continue }
@@ -205,8 +206,7 @@ nonisolated final class NativeLivePlayer: @unchecked Sendable {
         for command in commands {
             switch command {
             case .flush:
-                videoRenderer.flush()
-                audioRenderer.flush()
+                renderers.flush(removingDisplayedImage: false)
             case .setClock(let time, let rate):
                 synchronizer.setRate(Float(rate), time: CMTime(seconds: time, preferredTimescale: NativeVideoTrack.timescale))
             case .setRate(let rate):
@@ -386,6 +386,8 @@ nonisolated final class NativeRenderers: @unchecked Sendable {
     let audioRenderer = AVSampleBufferAudioRenderer()
     let synchronizer = AVSampleBufferRenderSynchronizer()
     let queue = DispatchQueue(label: "BannerTV.NativeRenderers", qos: .userInteractive)
+    /// Queue-confined: video flushes still on their way through the main queue.
+    private var pendingVideoFlushes = 0
 
     /// On the main actor, which owns the layer; the renderers themselves work from any queue.
     @MainActor init(displayLayer: AVSampleBufferDisplayLayer) {
@@ -395,5 +397,22 @@ nonisolated final class NativeRenderers: @unchecked Sendable {
         synchronizer.delaysRateChangeUntilHasSufficientMediaData = false
         synchronizer.addRenderer(videoRenderer)
         synchronizer.addRenderer(audioRenderer)
+    }
+
+    /// No picture may be queued while this is true: a flush still to come would drop it.
+    var isFlushingVideo: Bool { pendingVideoFlushes > 0 }
+
+    /// Drops what the renderers hold. Call on `queue`. Flushing the video renderer can rebuild its
+    /// video queue, which lays out the display layer on the calling thread, and the layer belongs
+    /// to the main thread (picture in picture watches it there), so that flush runs on the main
+    /// queue; pictures wait until it has.
+    func flush(removingDisplayedImage: Bool) {
+        audioRenderer.flush()
+        pendingVideoFlushes += 1
+        let videoRenderer = videoRenderer
+        DispatchQueue.main.async { [self] in
+            videoRenderer.flush(removingDisplayedImage: removingDisplayedImage, completionHandler: nil)
+            queue.async { self.pendingVideoFlushes -= 1 }
+        }
     }
 }

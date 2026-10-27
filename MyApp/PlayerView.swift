@@ -3785,52 +3785,7 @@ struct MultiScreenPlayerView: View {
     }
 }
 
-/// Picture in picture's controls for the native player, which has no AVPlayer for them to drive.
 #if os(iOS)
-nonisolated private final class NativePictureInPicturePlayback: NSObject, AVPictureInPictureSampleBufferPlaybackDelegate, @unchecked Sendable {
-    private weak var controller: PlaybackController?
-    private let lock = NSLock()
-    private var isPaused = false
-
-    init(controller: PlaybackController) {
-        self.controller = controller
-    }
-
-    /// The viewer paused or played: the window's button follows.
-    @MainActor func update(isPaused paused: Bool, pip: AVPictureInPictureController?) {
-        lock.lock()
-        let changed = paused != isPaused
-        isPaused = paused
-        lock.unlock()
-        if changed { pip?.invalidatePlaybackState() }
-    }
-
-    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, setPlaying playing: Bool) {
-        Task { @MainActor [weak self] in
-            if playing { self?.controller?.play() } else { self?.controller?.pause() }
-        }
-    }
-
-    func pictureInPictureControllerTimeRangeForPlayback(_ pictureInPictureController: AVPictureInPictureController) -> CMTimeRange {
-        // Live: nothing to scrub through.
-        CMTimeRange(start: .negativeInfinity, duration: .positiveInfinity)
-    }
-
-    func pictureInPictureControllerIsPlaybackPaused(_ pictureInPictureController: AVPictureInPictureController) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return isPaused
-    }
-
-    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
-                                    didTransitionToRenderSize newRenderSize: CMVideoDimensions) {}
-
-    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
-                                    skipByInterval skipInterval: CMTime, completion completionHandler: @escaping () -> Void) {
-        completionHandler()
-    }
-}
-
 /// Holds an AVPictureInPictureController so StreamTile can check PiP state from stop().
 private final class PiPHolder: ObservableObject {
     @Published var controller: AVPictureInPictureController?
@@ -4055,7 +4010,7 @@ private struct PlayerSurface: UIViewRepresentable {
     static func dismantleUIView(_ view: PlayerLayerView, coordinator: Coordinator) {
         coordinator.readyObservation?.invalidate()
         #if os(iOS)
-        coordinator.pipObservation?.invalidate()
+        coordinator.stopUsingPictureInPicture()
         #endif
         view.nativeVideo = nil
     }
@@ -4064,38 +4019,55 @@ private struct PlayerSurface: UIViewRepresentable {
         var pipController: AVPictureInPictureController?
         var readyObservation: NSKeyValueObservation?
         #if os(iOS)
-        var pipObservation: NSKeyValueObservation?
-        private var pipShowsNative: Bool?
-        private var nativePlayback: NativePictureInPicturePlayback?
+        private var pipObservation: NSKeyValueObservation?
+        /// AVPlayer's picture in picture, for this surface's own layer.
+        private var playerPictureInPicture: AVPictureInPictureController?
+        private weak var nativeVideo: NativeVideoOutput?
 
-        /// Builds picture in picture for the player now showing the picture, when that changed
-        /// (not while its window is open); returns the new controller. Otherwise keeps the native
-        /// window's play/pause button in step.
+        /// Picks the picture in picture of the player now showing the picture: AVPlayer's for this
+        /// surface's layer, or the native layer's, which only the layer's owner makes (one for good;
+        /// see `NativeVideoOutput`). Returns it when that changed (never while a window is open).
+        /// Also keeps the native window's play/pause button in step.
         func configurePictureInPicture(for view: PlayerLayerView, controller: PlaybackController) -> AVPictureInPictureController? {
-            let native = controller.usesNativePlayer
-            nativePlayback?.update(isPaused: controller.isUserPaused, pip: pipController)
-            guard native != pipShowsNative, pipController?.isPictureInPictureActive != true,
-                  AVPictureInPictureController.isPictureInPictureSupported() else { return nil }
-            let pip: AVPictureInPictureController?
-            if native {
-                let playback = NativePictureInPicturePlayback(controller: controller)
-                playback.update(isPaused: controller.isUserPaused, pip: nil)
-                nativePlayback = playback
-                pip = AVPictureInPictureController(contentSource: .init(sampleBufferDisplayLayer: controller.nativeVideo.layer,
-                                                                        playbackDelegate: playback))
+            guard AVPictureInPictureController.isPictureInPictureSupported() else { return nil }
+            nativeVideo = controller.nativeVideo
+            controller.nativeVideo.setPictureInPicturePaused(controller.isUserPaused)
+            let wanted: AVPictureInPictureController?
+            if controller.usesNativePlayer {
+                wanted = controller.nativeVideo.pictureInPictureController { [weak controller] playing in
+                    if playing { controller?.play() } else { controller?.pause() }
+                }
             } else {
-                nativePlayback = nil
-                pip = AVPictureInPictureController(playerLayer: view.playerLayer)
+                if playerPictureInPicture == nil { playerPictureInPicture = AVPictureInPictureController(playerLayer: view.playerLayer) }
+                wanted = playerPictureInPicture
             }
-            guard let pip else { return nil }
-            pipShowsNative = native
-            pip.canStartPictureInPictureAutomaticallyFromInline = true
-            pipController = pip
-            pipObservation = pip.observe(\.isPictureInPictureActive, options: [.new]) { @Sendable [weak controller] _, change in
+            guard let wanted, wanted !== pipController, pipController?.isPictureInPictureActive != true else { return nil }
+            // Only the one showing the picture may open by itself as the app leaves.
+            setStartsAutomatically(false)
+            pipController = wanted
+            setStartsAutomatically(true)
+            pipObservation = wanted.observe(\.isPictureInPictureActive, options: [.new]) { @Sendable [weak controller] _, change in
                 let isActive = change.newValue ?? false
                 Task { @MainActor [weak controller] in controller?.pictureInPictureChanged(isActive: isActive) }
             }
-            return pip
+            return wanted
+        }
+
+        /// The surface is going. The native layer's controller outlives it, so it mustn't open by
+        /// itself for a layer this surface no longer shows.
+        func stopUsingPictureInPicture() {
+            pipObservation?.invalidate()
+            pipObservation = nil
+            if pipController?.isPictureInPictureActive != true { setStartsAutomatically(false) }
+        }
+
+        private func setStartsAutomatically(_ starts: Bool) {
+            guard let pipController else { return }
+            if pipController === playerPictureInPicture {
+                pipController.canStartPictureInPictureAutomaticallyFromInline = starts
+            } else {
+                nativeVideo?.setPictureInPictureStartsAutomatically(starts, for: self)
+            }
         }
         #endif
 

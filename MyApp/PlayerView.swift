@@ -430,7 +430,7 @@ struct PlayerView: View {
                 pipController = controller
                 #endif
             }
-            .modifier(OriginalVideoSize(mode: aspectMode, videoSize: playback.player.currentItem?.presentationSize ?? .zero))
+            .modifier(OriginalVideoSize(mode: aspectMode, videoSize: playback.presentationSize))
             .overlay { PlaybackStatusOverlay(controller: playback, channel: activePlaybackChannel, failoverNotice: failoverNotice) }
             #if os(macOS)
             .onTapGesture(count: 2) { NSApplication.shared.keyWindow?.toggleFullScreen(nil) }
@@ -614,7 +614,7 @@ struct PlayerView: View {
             }, onCatchupSelected: { channel in
                 switchChannel(to: channel)
                 showingGuideFromPlayer = false
-            }, viewModel: playerGuideModel, preview: AnyView(VideoSurface(player: playback.player, showsPlaybackControls: false, allowsPictureInPicture: false) { _ in }))
+            }, viewModel: playerGuideModel, preview: AnyView(VideoSurface(player: playback.player, nativeVideo: playback.nativeVideo, showsPlaybackControls: false, allowsPictureInPicture: false) { _ in }))
         }
         #else
         .fullScreenCover(isPresented: panelBinding(.guide)) {
@@ -626,7 +626,7 @@ struct PlayerView: View {
             }, onCatchupSelected: { channel in
                 switchChannel(to: channel)
                 showingGuideFromPlayer = false
-            }, viewModel: playerGuideModel, preview: AnyView(VideoSurface(player: playback.player, showsPlaybackControls: false, allowsPictureInPicture: false) { _ in }))
+            }, viewModel: playerGuideModel, preview: AnyView(VideoSurface(player: playback.player, nativeVideo: playback.nativeVideo, showsPlaybackControls: false, allowsPictureInPicture: false) { _ in }))
         }
         #endif
         .overlay(alignment: .trailing) {
@@ -1163,14 +1163,14 @@ struct PlayerView: View {
         }
         // onAppear can fire again (e.g. after a full-screen cover); only load if nothing is
         // playing — including nothing already started by CarPlay on this same shared controller.
-        if playback.channel != activePlaybackChannel || playback.currentItem == nil {
+        if playback.channel != activePlaybackChannel || !playback.hasStream {
             playback.notePendingTapDate(initialTapDate)
             loadActiveStream()
         }
     }
 
     private func loadActiveStream() {
-        guard lastAppliedLoadToken != streamSelection.loadToken || playback.currentItem == nil
+        guard lastAppliedLoadToken != streamSelection.loadToken || !playback.hasStream
                 || playback.channel != streamSelection.activeChannel else { return }
         lastAppliedLoadToken = streamSelection.loadToken
         currentPlayerItem = nil
@@ -3785,8 +3785,53 @@ struct MultiScreenPlayerView: View {
     }
 }
 
-/// Holds an AVPictureInPictureController so StreamTile can check PiP state from stop().
+/// Picture in picture's controls for the native player, which has no AVPlayer for them to drive.
 #if os(iOS)
+nonisolated private final class NativePictureInPicturePlayback: NSObject, AVPictureInPictureSampleBufferPlaybackDelegate, @unchecked Sendable {
+    private weak var controller: PlaybackController?
+    private let lock = NSLock()
+    private var isPaused = false
+
+    init(controller: PlaybackController) {
+        self.controller = controller
+    }
+
+    /// The viewer paused or played: the window's button follows.
+    @MainActor func update(isPaused paused: Bool, pip: AVPictureInPictureController?) {
+        lock.lock()
+        let changed = paused != isPaused
+        isPaused = paused
+        lock.unlock()
+        if changed { pip?.invalidatePlaybackState() }
+    }
+
+    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, setPlaying playing: Bool) {
+        Task { @MainActor [weak self] in
+            if playing { self?.controller?.play() } else { self?.controller?.pause() }
+        }
+    }
+
+    func pictureInPictureControllerTimeRangeForPlayback(_ pictureInPictureController: AVPictureInPictureController) -> CMTimeRange {
+        // Live: nothing to scrub through.
+        CMTimeRange(start: .negativeInfinity, duration: .positiveInfinity)
+    }
+
+    func pictureInPictureControllerIsPlaybackPaused(_ pictureInPictureController: AVPictureInPictureController) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return isPaused
+    }
+
+    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
+                                    didTransitionToRenderSize newRenderSize: CMVideoDimensions) {}
+
+    func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
+                                    skipByInterval skipInterval: CMTime, completion completionHandler: @escaping () -> Void) {
+        completionHandler()
+    }
+}
+
+/// Holds an AVPictureInPictureController so StreamTile can check PiP state from stop().
 private final class PiPHolder: ObservableObject {
     @Published var controller: AVPictureInPictureController?
     var isActive: Bool { controller?.isPictureInPictureActive == true }
@@ -3891,6 +3936,29 @@ private final class PlayerLayerView: UIView {
         set { playerLayer.player = newValue }
     }
 
+    /// The native player's picture, shown over AVPlayer's while this view hosts it.
+    var nativeVideo: NativeVideoOutput? {
+        didSet {
+            guard nativeVideo !== oldValue else { return }
+            oldValue?.detach(from: layer)
+            nativeVideo?.attach(to: layer, gravity: playerLayer.videoGravity)
+        }
+    }
+
+    var videoGravity: AVLayerVideoGravity {
+        get { playerLayer.videoGravity }
+        set {
+            guard newValue != playerLayer.videoGravity else { return }
+            playerLayer.videoGravity = newValue
+            nativeVideo?.update(layer, gravity: newValue)
+        }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        nativeVideo?.update(layer, gravity: playerLayer.videoGravity)
+    }
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         playerLayer.videoGravity = .resizeAspect
@@ -3906,6 +3974,8 @@ private final class PlayerLayerView: UIView {
 
 private struct VideoSurface: UIViewRepresentable {
     let player: AVPlayer
+    /// Shows the native player's picture too (the guide's preview of the main player).
+    var nativeVideo: NativeVideoOutput? = nil
     let showsPlaybackControls: Bool
     let allowsPictureInPicture: Bool
     var onPiPControllerReady: ((AVPictureInPictureController) -> Void)? = nil
@@ -3915,6 +3985,7 @@ private struct VideoSurface: UIViewRepresentable {
     func makeUIView(context: Context) -> PlayerLayerView {
         let view = PlayerLayerView()
         view.player = player
+        view.nativeVideo = nativeVideo
         #if os(iOS)
         if allowsPictureInPicture, AVPictureInPictureController.isPictureInPictureSupported(),
            let pip = AVPictureInPictureController(playerLayer: view.playerLayer) {
@@ -3930,6 +4001,11 @@ private struct VideoSurface: UIViewRepresentable {
         if view.player !== player {
             view.player = player
         }
+        view.nativeVideo = nativeVideo
+    }
+
+    static func dismantleUIView(_ view: PlayerLayerView, coordinator: Coordinator) {
+        view.nativeVideo = nil
     }
 
     final class Coordinator: NSObject {
@@ -3950,13 +4026,11 @@ private struct PlayerSurface: UIViewRepresentable {
     func makeUIView(context: Context) -> PlayerLayerView {
         let view = PlayerLayerView()
         view.player = controller.player
-        view.playerLayer.videoGravity = videoGravity
+        view.videoGravity = videoGravity
+        view.nativeVideo = controller.nativeVideo
         context.coordinator.observeReadyForDisplay(of: view.playerLayer, controller: controller)
         #if os(iOS)
-        if AVPictureInPictureController.isPictureInPictureSupported(),
-           let pip = AVPictureInPictureController(playerLayer: view.playerLayer) {
-            pip.canStartPictureInPictureAutomaticallyFromInline = true
-            context.coordinator.pipController = pip
+        if let pip = context.coordinator.configurePictureInPicture(for: view, controller: controller) {
             onPiPControllerReady?(pip)
         }
         #endif
@@ -3967,18 +4041,63 @@ private struct PlayerSurface: UIViewRepresentable {
         if view.player !== controller.player {
             view.player = controller.player
         }
-        if view.playerLayer.videoGravity != videoGravity {
-            view.playerLayer.videoGravity = videoGravity
+        view.videoGravity = videoGravity
+        view.nativeVideo = controller.nativeVideo
+        #if os(iOS)
+        // Picture in picture follows whichever player shows the picture.
+        if let pip = context.coordinator.configurePictureInPicture(for: view, controller: controller) {
+            let onReady = onPiPControllerReady
+            DispatchQueue.main.async { onReady?(pip) }
         }
+        #endif
     }
 
     static func dismantleUIView(_ view: PlayerLayerView, coordinator: Coordinator) {
         coordinator.readyObservation?.invalidate()
+        #if os(iOS)
+        coordinator.pipObservation?.invalidate()
+        #endif
+        view.nativeVideo = nil
     }
 
     final class Coordinator: NSObject {
         var pipController: AVPictureInPictureController?
         var readyObservation: NSKeyValueObservation?
+        #if os(iOS)
+        var pipObservation: NSKeyValueObservation?
+        private var pipShowsNative: Bool?
+        private var nativePlayback: NativePictureInPicturePlayback?
+
+        /// Builds picture in picture for the player now showing the picture, when that changed
+        /// (not while its window is open); returns the new controller. Otherwise keeps the native
+        /// window's play/pause button in step.
+        func configurePictureInPicture(for view: PlayerLayerView, controller: PlaybackController) -> AVPictureInPictureController? {
+            let native = controller.usesNativePlayer
+            nativePlayback?.update(isPaused: controller.isUserPaused, pip: pipController)
+            guard native != pipShowsNative, pipController?.isPictureInPictureActive != true,
+                  AVPictureInPictureController.isPictureInPictureSupported() else { return nil }
+            let pip: AVPictureInPictureController?
+            if native {
+                let playback = NativePictureInPicturePlayback(controller: controller)
+                playback.update(isPaused: controller.isUserPaused, pip: nil)
+                nativePlayback = playback
+                pip = AVPictureInPictureController(contentSource: .init(sampleBufferDisplayLayer: controller.nativeVideo.layer,
+                                                                        playbackDelegate: playback))
+            } else {
+                nativePlayback = nil
+                pip = AVPictureInPictureController(playerLayer: view.playerLayer)
+            }
+            guard let pip else { return nil }
+            pipShowsNative = native
+            pip.canStartPictureInPictureAutomaticallyFromInline = true
+            pipController = pip
+            pipObservation = pip.observe(\.isPictureInPictureActive, options: [.new]) { @Sendable [weak controller] _, change in
+                let isActive = change.newValue ?? false
+                Task { @MainActor [weak controller] in controller?.pictureInPictureChanged(isActive: isActive) }
+            }
+            return pip
+        }
+        #endif
 
         func observeReadyForDisplay(of layer: AVPlayerLayer, controller: PlaybackController) {
             readyObservation = layer.observe(\.isReadyForDisplay, options: [.initial, .new]) { @Sendable [weak controller] layer, _ in
@@ -3995,6 +4114,29 @@ private final class PlayerLayerView: NSView {
     var player: AVPlayer? {
         get { playerLayer.player }
         set { playerLayer.player = newValue }
+    }
+
+    /// The native player's picture, shown over AVPlayer's while this view hosts it.
+    var nativeVideo: NativeVideoOutput? {
+        didSet {
+            guard nativeVideo !== oldValue else { return }
+            oldValue?.detach(from: playerLayer)
+            nativeVideo?.attach(to: playerLayer, gravity: playerLayer.videoGravity)
+        }
+    }
+
+    var videoGravity: AVLayerVideoGravity {
+        get { playerLayer.videoGravity }
+        set {
+            guard newValue != playerLayer.videoGravity else { return }
+            playerLayer.videoGravity = newValue
+            nativeVideo?.update(playerLayer, gravity: newValue)
+        }
+    }
+
+    override func layout() {
+        super.layout()
+        nativeVideo?.update(playerLayer, gravity: playerLayer.videoGravity)
     }
 
     override init(frame: CGRect) {
@@ -4016,6 +4158,8 @@ private final class PlayerLayerView: NSView {
 
 private struct VideoSurface: NSViewRepresentable {
     let player: AVPlayer
+    /// Shows the native player's picture too (the guide's preview of the main player).
+    var nativeVideo: NativeVideoOutput? = nil
     let showsPlaybackControls: Bool
     let allowsPictureInPicture: Bool
     var onPiPControllerReady: ((AVPictureInPictureController) -> Void)? = nil
@@ -4023,6 +4167,7 @@ private struct VideoSurface: NSViewRepresentable {
     func makeNSView(context: Context) -> PlayerLayerView {
         let view = PlayerLayerView()
         view.player = player
+        view.nativeVideo = nativeVideo
         return view
     }
 
@@ -4030,6 +4175,11 @@ private struct VideoSurface: NSViewRepresentable {
         if view.player !== player {
             view.player = player
         }
+        view.nativeVideo = nativeVideo
+    }
+
+    static func dismantleNSView(_ view: PlayerLayerView, coordinator: ()) {
+        view.nativeVideo = nil
     }
 }
 
@@ -4046,7 +4196,8 @@ private struct PlayerSurface: NSViewRepresentable {
     func makeNSView(context: Context) -> PlayerLayerView {
         let view = PlayerLayerView()
         view.player = controller.player
-        view.playerLayer.videoGravity = videoGravity
+        view.videoGravity = videoGravity
+        view.nativeVideo = controller.nativeVideo
         context.coordinator.observeReadyForDisplay(of: view.playerLayer, controller: controller)
         return view
     }
@@ -4055,13 +4206,13 @@ private struct PlayerSurface: NSViewRepresentable {
         if view.player !== controller.player {
             view.player = controller.player
         }
-        if view.playerLayer.videoGravity != videoGravity {
-            view.playerLayer.videoGravity = videoGravity
-        }
+        view.videoGravity = videoGravity
+        view.nativeVideo = controller.nativeVideo
     }
 
     static func dismantleNSView(_ view: PlayerLayerView, coordinator: Coordinator) {
         coordinator.readyObservation?.invalidate()
+        view.nativeVideo = nil
     }
 
     final class Coordinator: NSObject {
@@ -4747,6 +4898,7 @@ private struct PlayerDiagnosticsView: View {
     var body: some View {
         List {
             LabeledContent("Engine", value: playback.engineStatus == nil ? "AVPlayer (direct)" : "Banner Stream Engine")
+            if let player = playback.playerDescription { LabeledContent("Player", value: player) }
             LabeledContent("Requested channel", value: requestedChannel.name)
             LabeledContent("Active channel", value: playback.channel?.name ?? "None")
             LabeledContent("Channel ID", value: requestedChannel.id.contains("://") ? "Redacted" : requestedChannel.id)

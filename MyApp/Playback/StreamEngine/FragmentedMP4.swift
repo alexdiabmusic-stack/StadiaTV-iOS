@@ -184,7 +184,7 @@ nonisolated enum FragmentedMP4 {
     }
 
     /// ES_Descriptor with the AudioSpecificConfig (ISO/IEC 14496-1 and -14).
-    private static func elementaryStreamDescriptor(_ format: AudioTrackFormat) -> [UInt8] {
+    static func elementaryStreamDescriptor(_ format: AudioTrackFormat) -> [UInt8] {
         var decoderConfig = ByteWriter()
         decoderConfig.bytes += [0x40, 0x15]
         let bufferSize = UInt32(768 * max(1, format.channelCount))

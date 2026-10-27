@@ -536,6 +536,83 @@ struct FragmentedPackagerTests {
         #expect(types == [1, 5])
     }
 
+    @Test("Native output: every picture once as a sample, parameter sets in the format, AAC frames with their ES descriptor")
+    func nativeSamples() throws {
+        var stream = SyntheticTransportStream()
+        stream.parameterSets = [EncoderSamples.avcHighSPS, EncoderSamples.avcHighPPS]
+        stream.audioLanguage = "eng"
+        let source = segments(&stream, seconds: 6)
+        let packager = FragmentedPackager(writesFragments: false, collectsSamples: true)
+        let packaged = source.compactMap { packager.package($0) }
+        #expect(packaged.count == source.count && source.count >= 3)
+        // No fMP4 is written for a native renderer.
+        #expect(packaged.allSatisfy { $0.data.isEmpty && $0.audio.allSatisfy(\.data.isEmpty) })
+        let natives = try packaged.map { try #require($0.native) }
+
+        let video = natives.compactMap(\.video)
+        #expect(video.count == natives.count)
+        let format = try #require(video.first?.format)
+        #expect(format.codec == .h264 && format.codecString == "avc1.640020")
+        #expect(format.parameterSets == [EncoderSamples.avcHighSPS, EncoderSamples.avcHighPPS])
+        #expect(video.allSatisfy { $0.formatNumber == 1 })
+        let samples = video.flatMap(\.samples)
+        // Every picture once and in order, decode times one picture apart across segments.
+        let frames = samples.compactMap { SyntheticTransportStream.picture(inSample: [UInt8]($0.data)[...])?.frame }
+        #expect(frames == Array(0..<frames.count) && frames.count >= 145)
+        #expect(zip(samples, samples.dropFirst()).allSatisfy { $1.decodeTime == $0.decodeTime + $0.duration })
+        #expect(samples.allSatisfy { $0.duration == 3_600 && $0.compositionOffset == 3_600 })
+        // Each segment starts with a sync sample, and only keyframes are.
+        #expect(video.allSatisfy { $0.samples.first?.isSync == true })
+        let syncFrames = samples.filter(\.isSync).compactMap { SyntheticTransportStream.picture(inSample: [UInt8]($0.data)[...])?.frame }
+        #expect(syncFrames == Array(stride(from: 0, to: frames.count, by: 50)))
+        // Parameter sets and delimiters are in the format, not the samples.
+        let types = Set(samples.flatMap { lengthPrefixedUnits([UInt8]($0.data)[...]).map { AVCParameterSets.nalType($0.first ?? 0) } })
+        #expect(types == [1, 5])
+        // Each segment's start, on the samples' clock, is its first picture's decode time.
+        for native in natives {
+            let first = try #require(native.video?.samples.first)
+            #expect(abs(native.timelineStart - Double(first.decodeTime) / 90_000) < 0.001)
+        }
+
+        // Audio: one track whose frames run on unbroken, starting with the pictures, and the ES
+        // descriptor (tag 3, holding the AudioSpecificConfig) for the decoder.
+        let audio = natives.compactMap { $0.audio.first }
+        #expect(audio.count == natives.count)
+        let track = try #require(audio.first)
+        #expect(track.format.codec == .aac && track.language == "eng" && track.rendition == 0)
+        let cookie = try #require(track.magicCookie)
+        #expect(cookie.first == 0x03)
+        #expect(cookie.suffix(track.format.configuration.count + 3).prefix(track.format.configuration.count) == track.format.configuration[...])
+        let audioSamples = audio.flatMap(\.samples)
+        #expect(zip(audioSamples, audioSamples.dropFirst()).allSatisfy { $1.decodeTime == $0.decodeTime + $0.duration })
+        #expect(audioSamples.allSatisfy { $0.duration == 1_024 && $0.isSync })
+        let pictureStart = Double(samples[0].presentationTime) / 90_000
+        let audioStart = Double(audioSamples[0].decodeTime) / Double(track.format.sampleRate)
+        #expect(abs(audioStart - pictureStart) < 0.1)
+    }
+
+    @Test("Native output: new parameter sets start a new format even when the picture format stays the same")
+    func nativeParameterSetChange() throws {
+        var stream = SyntheticTransportStream()
+        stream.parameterSets = [EncoderSamples.avcHighSPS, EncoderSamples.avcHighPPS]
+        let packager = FragmentedPackager(writesFragments: false, collectsSamples: true)
+        let first = try #require(packager.package(segment(&stream, sequence: 0, frames: 0..<50)))
+        // The same SPS with another PPS: same codec, size and colour, but the decoder needs the new set.
+        var otherPPS = EncoderSamples.avcHighPPS
+        otherPPS[otherPPS.count - 1] ^= 0x02
+        stream.parameterSets = [EncoderSamples.avcHighSPS, otherPPS]
+        let second = try #require(packager.package(segment(&stream, sequence: 1, frames: 50..<100)))
+        #expect(first.native?.video?.formatNumber == 1)
+        #expect(second.native?.video?.formatNumber == 2)
+        #expect(second.native?.video?.format.parameterSets == [EncoderSamples.avcHighSPS, otherPPS])
+        // An fMP4 packager keeps those in the samples instead, under the same initialization section.
+        let fmp4 = FragmentedPackager()
+        stream.parameterSets = [EncoderSamples.avcHighSPS, EncoderSamples.avcHighPPS]
+        _ = fmp4.package(segment(&stream, sequence: 0, frames: 0..<50))
+        stream.parameterSets = [EncoderSamples.avcHighSPS, otherPPS]
+        #expect(fmp4.package(segment(&stream, sequence: 1, frames: 50..<100))?.initialization == 1)
+    }
+
     /// Frames `frames` as one segment whose last picture lasts until the next frame's decode time.
     private func segment(_ stream: inout SyntheticTransportStream, sequence: Int, frames: Range<Int>,
                          isDiscontinuity: Bool = false) -> MediaSegment {

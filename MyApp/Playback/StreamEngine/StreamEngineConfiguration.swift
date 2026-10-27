@@ -58,6 +58,10 @@ nonisolated struct StreamEngineConfiguration: Equatable, Sendable {
     /// Ceiling on connection attempts per minute, so a broken provider is never hammered.
     var maximumConnectionsPerMinute = 15
 
+    /// Hand decodable samples to the app's own renderer (`StreamEngineSession.nativeFeed`) instead of
+    /// publishing local HLS for AVPlayer: the first picture can show as soon as the first segment is cut.
+    var nativeOutput = false
+
     // Storage.
     var maximumReserveBytes: Int
     var backBufferSeconds: Double

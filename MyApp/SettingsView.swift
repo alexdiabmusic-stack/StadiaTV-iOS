@@ -1551,6 +1551,17 @@ struct PlayerPlaybackSettingsView: View {
                     .padding(.bottom, 10)
                 Divider().overlay(Theme.hairline)
                 SettingsToggleRow(
+                    title: "Instant Start",
+                    isOn: Binding(get: { prefs.playerNativeRendererEnabled }, set: { prefs.setPlayerNativeRendererEnabled($0) })
+                )
+                .disabled(!prefs.playerStreamEngineEnabled)
+                Text("Shows live channels from their first frame with BannerTV's own video renderer instead of waiting for Apple's player to buffer. Channels it can't show, and AirPlay, use Apple's player. Applies from the next channel.")
+                    .font(.footnote)
+                    .foregroundStyle(Theme.textSecondary)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
+                Divider().overlay(Theme.hairline)
+                SettingsToggleRow(
                     title: "Prefer 4K Streams",
                     isOn: Binding(get: { prefs.preferUHDStreams }, set: { prefs.setPreferUHDStreams($0) })
                 )

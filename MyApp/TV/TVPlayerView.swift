@@ -104,7 +104,7 @@ struct TVPlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             TVVideoSurface(controller: playback, aspect: aspectMode)
-                .modifier(OriginalVideoSize(mode: aspectMode, videoSize: playback.player.currentItem?.presentationSize ?? .zero))
+                .modifier(OriginalVideoSize(mode: aspectMode, videoSize: playback.presentationSize))
                 .ignoresSafeArea()
             playbackStatus
             if let match = displayedScoreMatch, prefs.showLiveScoreBadge, !isScoreDismissed {
@@ -257,7 +257,7 @@ struct TVPlayerView: View {
                 }
             }
             aspectMode = PlayerAspectMode.saved(for: channel.id)
-            if playback.channel != channel || playback.currentItem == nil { playback.load(channel) }
+            if playback.channel != channel || !playback.hasStream { playback.load(channel) }
             watchStore.recordWatch(channel)
             revealChromeTemporarily()
         }
@@ -634,7 +634,8 @@ struct TVPlayerView: View {
 
 // MARK: - AVPlayerLayer surface
 
-/// Attaches the controller's AVPlayer to a layer and reports the first displayable frame.
+/// Attaches the controller's AVPlayer to a layer and reports the first displayable frame; the
+/// native player's picture shows over it while that plays.
 private struct TVVideoSurface: UIViewRepresentable {
     let controller: PlaybackController
     let aspect: PlayerAspectMode
@@ -645,6 +646,7 @@ private struct TVVideoSurface: UIViewRepresentable {
         let view = TVPlayerUIView()
         view.playerLayer.player = controller.player
         view.playerLayer.videoGravity = aspect.videoGravity
+        view.nativeVideo = controller.nativeVideo
         view.backgroundColor = .black
         context.coordinator.readyObservation = view.playerLayer.observe(\.isReadyForDisplay, options: [.initial, .new]) { @Sendable [weak controller] layer, _ in
             guard layer.isReadyForDisplay else { return }
@@ -658,10 +660,13 @@ private struct TVVideoSurface: UIViewRepresentable {
         if view.playerLayer.player !== controller.player {
             view.playerLayer.player = controller.player
         }
+        view.nativeVideo = controller.nativeVideo
+        controller.nativeVideo.update(view.layer, gravity: aspect.videoGravity)
     }
 
     static func dismantleUIView(_ view: TVPlayerUIView, coordinator: Coordinator) {
         coordinator.readyObservation?.invalidate()
+        view.nativeVideo = nil
     }
 
     final class Coordinator {
@@ -671,9 +676,17 @@ private struct TVVideoSurface: UIViewRepresentable {
     class TVPlayerUIView: UIView {
         override class var layerClass: AnyClass { AVPlayerLayer.self }
         var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+        var nativeVideo: NativeVideoOutput? {
+            didSet {
+                guard nativeVideo !== oldValue else { return }
+                oldValue?.detach(from: layer)
+                nativeVideo?.attach(to: layer, gravity: playerLayer.videoGravity)
+            }
+        }
         override func layoutSubviews() {
             super.layoutSubviews()
             playerLayer.frame = bounds
+            nativeVideo?.update(layer, gravity: playerLayer.videoGravity)
         }
     }
 }

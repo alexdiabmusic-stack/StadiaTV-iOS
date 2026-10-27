@@ -30,9 +30,14 @@ nonisolated final class FragmentedPackager {
         var carryTime: Int64 = 0
     }
 
+    /// Fragmented MP4 for AVPlayer; decodable samples for the app's own renderer (`MediaSegment.native`).
+    private let writesFragments: Bool
+    private let collectsSamples: Bool
+
     private(set) var videoFormat: VideoTrackFormat?
     /// The initialization section's parameter sets: identical copies in the samples are dropped.
     private var parameterSets: Set<[UInt8]> = []
+    private var nativeVideoFormat: NativeVideoFormat?
     private var videoInitialization = 0
     private var videoClock: Int64?
     /// Where the previous video fragment's decode times ended.
@@ -42,6 +47,11 @@ nonisolated final class FragmentedPackager {
     private var audioInitializations: [Int: [Int: Data]] = [:]
     private var fragmentSequence: UInt32 = 0
     private var frameDurations: [Int64] = []
+
+    init(writesFragments: Bool = true, collectsSamples: Bool = false) {
+        self.writesFragments = writesFragments
+        self.collectsSamples = collectsSamples
+    }
 
     /// Audio renditions whose format is known, in PMT order.
     var audioRenditions: [AudioRendition] {
@@ -61,8 +71,7 @@ nonisolated final class FragmentedPackager {
     /// The fMP4 version of `segment`, or nil when it can't be played yet (no parameter sets so far).
     func package(_ segment: MediaSegment) -> MediaSegment? {
         let demuxed = Self.demux(segment.data)
-        guard let program = demuxed.program, let videoStream = program.video, case .video(let codec) = videoStream.kind,
-              codec == .hevc || codec == .h264 else { return nil }
+        guard let program = demuxed.program else { return nil }
         if audioStates.isEmpty {
             audioStates = program.audio.enumerated().compactMap { index, stream in
                 guard case .audio(let audioCodec) = stream.kind, [.aac, .ac3, .eac3].contains(audioCodec) else { return nil }
@@ -70,6 +79,10 @@ nonisolated final class FragmentedPackager {
             }
             if audioStates.count > 4 { audioStates.removeLast(audioStates.count - 4) }
         }
+        guard let videoStream = program.video else {
+            return collectsSamples ? packageAudioOnly(segment, demuxed: demuxed, program: program) : nil
+        }
+        guard case .video(let codec) = videoStream.kind, codec == .hevc || codec == .h264 else { return nil }
         var discontinuity = segment.isDiscontinuity
 
         // Pictures, in decode order.
@@ -88,12 +101,17 @@ nonisolated final class FragmentedPackager {
         guard let first = pictures.first else { return nil }
 
         // A new picture format, or the first one, starts an initialization section. Parameter sets
-        // that change without changing the format stay in the samples, where the decoder finds them.
+        // that change without changing the format stay in the samples, where the decoder finds them;
+        // a native renderer's format description holds them instead, so for it any change is a new format.
         if let format = videoFormat(codec: codec, es: first.es, nals: first.nals),
-           videoFormat.map({ !Self.sameFormat($0, format.format) }) ?? true {
+           videoFormat.map({ !Self.sameFormat($0, format.format) }) ?? true
+            || (collectsSamples && nativeVideoFormat?.parameterSets != format.ordered) {
             if videoFormat != nil { discontinuity = true }
             videoFormat = format.format
             parameterSets = format.parameterSets
+            nativeVideoFormat = NativeVideoFormat(codec: format.format.codec, parameterSets: format.ordered,
+                                                  width: format.format.width, height: format.format.height,
+                                                  colour: format.format.colour, codecString: format.format.codecString)
             videoInitialization += 1
             videoInitializations[videoInitialization] = FragmentedMP4.initializationSection(for: .video(format.format))
             videoInitializations = videoInitializations.filter { $0.key > videoInitialization - 16 }
@@ -141,17 +159,23 @@ nonisolated final class FragmentedPackager {
         }
         videoNextDecodeTime = base + samples.reduce(0) { $0 + Int64($1.duration) }
         fragmentSequence += 1
-        let video = FragmentedMP4.fragment(sequence: fragmentSequence, baseDecodeTime: UInt64(max(0, base)),
-                                           samples: samples, payload: payload, compositionOffsets: true)
+        let video = writesFragments ? FragmentedMP4.fragment(sequence: fragmentSequence, baseDecodeTime: UInt64(max(0, base)),
+                                                              samples: samples, payload: payload, compositionOffsets: true) : Data()
+        let nativeVideo = collectsSamples ? nativeVideoFormat.map {
+            NativeVideoTrack(formatNumber: videoInitialization, format: $0,
+                             samples: Self.nativeSamples(samples, payload: payload, baseDecodeTime: base))
+        } : nil
 
         // Audio renditions: the audio that arrived with these pictures.
         var fragments: [AudioFragment] = []
+        var nativeAudio: [NativeAudioTrack] = []
         for slot in audioStates.indices {
             let stream = program.audio.indices.contains(audioStates[slot].index) ? program.audio[audioStates[slot].index] : nil
             let units = stream.map { demuxed.units[$0.pid] ?? [] } ?? []
             let built = audioFragment(slot: slot, units: units, segment: segment, videoStart: first.dts, continues: !discontinuity)
             if built.formatChanged { discontinuity = true }
             if let fragment = built.fragment { fragments.append(fragment) }
+            if let track = built.native { nativeAudio.append(track) }
         }
 
         var packaged = MediaSegment(sequence: segment.sequence, data: video, duration: segment.duration,
@@ -159,12 +183,56 @@ nonisolated final class FragmentedPackager {
                                     isDiscontinuity: discontinuity, startTime: segment.startTime, endTime: segment.endTime)
         packaged.initialization = videoInitialization
         packaged.audio = fragments
+        if collectsSamples {
+            // The segment's start, on the same unwrapped clock as the samples.
+            let start = segment.startTime.map { first.dts + MPEGTS.signedDelta($0, MPEGTS.wrap(first.dts)) } ?? first.dts
+            packaged.native = NativeSamples(timelineStart: Double(start) / Double(MPEGTS.clockRate), video: nativeVideo, audio: nativeAudio)
+        }
         return packaged
+    }
+
+    /// Native output of a radio channel: its audio alone, timed from the segment's start.
+    private func packageAudioOnly(_ segment: MediaSegment, demuxed: Demuxed, program: TSProgram) -> MediaSegment? {
+        guard let startTime = segment.startTime else { return nil }
+        let start = unwrap(startTime, clock: &videoClock)
+        var nativeAudio: [NativeAudioTrack] = []
+        for slot in audioStates.indices {
+            let stream = program.audio.indices.contains(audioStates[slot].index) ? program.audio[audioStates[slot].index] : nil
+            let units = stream.map { demuxed.units[$0.pid] ?? [] } ?? []
+            if let track = audioFragment(slot: slot, units: units, segment: segment, videoStart: start,
+                                         continues: !segment.isDiscontinuity).native {
+                nativeAudio.append(track)
+            }
+        }
+        guard !nativeAudio.isEmpty else { return nil }
+        var packaged = MediaSegment(sequence: segment.sequence, data: Data(), duration: segment.duration,
+                                    programmeStart: segment.programmeStart, startsWithKeyframe: segment.startsWithKeyframe,
+                                    isDiscontinuity: segment.isDiscontinuity, startTime: segment.startTime, endTime: segment.endTime)
+        packaged.native = NativeSamples(timelineStart: Double(start) / Double(MPEGTS.clockRate), video: nil, audio: nativeAudio)
+        return packaged
+    }
+
+    /// A fragment's samples as separate access units, decode times running on from `baseDecodeTime`.
+    private static func nativeSamples(_ samples: [FragmentedMP4.Sample], payload: Data, baseDecodeTime: Int64) -> [NativeSample] {
+        var output: [NativeSample] = []
+        output.reserveCapacity(samples.count)
+        var offset = payload.startIndex
+        var time = baseDecodeTime
+        for sample in samples {
+            let end = offset + sample.size
+            output.append(NativeSample(data: payload.subdata(in: offset..<end), decodeTime: time, duration: Int64(sample.duration),
+                                       compositionOffset: Int64(sample.compositionOffset),
+                                       isSync: sample.flags == FragmentedMP4.syncFlags))
+            offset = end
+            time += Int64(sample.duration)
+        }
+        return output
     }
 
     // MARK: - Video
 
-    private func videoFormat(codec: TSProgram.VideoCodec, es: [UInt8], nals: [Range<Int>]) -> (format: VideoTrackFormat, parameterSets: Set<[UInt8]>)? {
+    private func videoFormat(codec: TSProgram.VideoCodec, es: [UInt8], nals: [Range<Int>])
+        -> (format: VideoTrackFormat, parameterSets: Set<[UInt8]>, ordered: [[UInt8]])? {
         func units(_ wanted: UInt8) -> [[UInt8]] {
             var seen: Set<[UInt8]> = []
             return nals.compactMap { range in
@@ -187,14 +255,14 @@ nonisolated final class FragmentedPackager {
             let configuration = HEVCParameterSets.decoderConfiguration(info: info, vps: vps, sps: sps, pps: pps, sei: metadata)
             let format = VideoTrackFormat(codec: .hevc, configuration: configuration, codecString: HEVCParameterSets.codecString(info),
                                           width: info.width, height: info.height, colour: info.colour)
-            return (format, Set(vps + sps + pps))
+            return (format, Set(vps + sps + pps), vps + sps + pps)
         case .h264:
             let sps = units(7), pps = units(8)
             guard let first = sps.first, !pps.isEmpty, let info = AVCParameterSets.parseSPS(first) else { return nil }
             let format = VideoTrackFormat(codec: .h264, configuration: AVCParameterSets.decoderConfiguration(info: info, sps: sps, pps: pps),
                                           codecString: AVCParameterSets.codecString(sps: first),
                                           width: info.width, height: info.height, colour: info.colour)
-            return (format, Set(sps + pps))
+            return (format, Set(sps + pps), sps + pps)
         case .mpeg2, .mpeg1:
             return nil
         }
@@ -237,7 +305,7 @@ nonisolated final class FragmentedPackager {
 
     /// `continues`: the timeline runs on from the previous segment, so decode times must too.
     private func audioFragment(slot: Int, units: [PESUnit], segment: MediaSegment, videoStart: Int64, continues: Bool)
-        -> (fragment: AudioFragment?, formatChanged: Bool) {
+        -> (fragment: AudioFragment?, native: NativeAudioTrack?, formatChanged: Bool) {
         var state = audioStates[slot]
         defer { audioStates[slot] = state }
         // Access units: time (90 kHz) and bytes.
@@ -291,7 +359,7 @@ nonisolated final class FragmentedPackager {
             state.carry = split.consumed < bytes.count && bytes.count - split.consumed < 16_384 ? Array(bytes[split.consumed...]) : []
             state.carryTime = time
         }
-        guard let format = state.format else { return (nil, formatChanged) }
+        guard let format = state.format else { return (nil, nil, formatChanged) }
 
         let rate = Int64(format.sampleRate)
         let step = Int64(format.samplesPerFrame)
@@ -332,12 +400,18 @@ nonisolated final class FragmentedPackager {
         let start = base ?? state.nextDecodeTime ?? timescaled(videoStart)
         state.nextDecodeTime = base == nil ? state.nextDecodeTime : running
         fragmentSequence += 1
-        let data = FragmentedMP4.fragment(sequence: fragmentSequence, baseDecodeTime: UInt64(max(0, start)), samples: samples,
-                                          payload: payload, compositionOffsets: false)
+        let data = writesFragments ? FragmentedMP4.fragment(sequence: fragmentSequence, baseDecodeTime: UInt64(max(0, start)), samples: samples,
+                                                             payload: payload, compositionOffsets: false) : Data()
         let offset = base.map { Double($0) / Double(rate) - Double(videoStart) / Double(MPEGTS.clockRate) } ?? 0
         let duration = base.map { Double(running - $0) / Double(rate) } ?? segment.duration
+        var native: NativeAudioTrack?
+        if collectsSamples, let base {
+            native = NativeAudioTrack(rendition: state.index, language: state.language, formatNumber: state.initialization, format: format,
+                                      magicCookie: format.codec == .aac ? FragmentedMP4.elementaryStreamDescriptor(format) : nil,
+                                      samples: Self.nativeSamples(samples, payload: payload, baseDecodeTime: base))
+        }
         return (AudioFragment(rendition: state.index, data: data, initialization: state.initialization,
-                              programmeStart: segment.programmeStart + offset, duration: duration), formatChanged)
+                              programmeStart: segment.programmeStart + offset, duration: duration), native, formatChanged)
     }
 
     // MARK: - Helpers

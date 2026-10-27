@@ -417,6 +417,68 @@ struct EngineEndToEndTests {
         #expect((segments.last ?? 0) >= (segments.first ?? 0) + 3)
     }
 
+    @Test("Native output hands the renderer the first segment at once, every segment once and in order, and restarts at a keyframe")
+    func nativeOutput() async throws {
+        // A provider that bursts only 3 s on connect: the HLS publication would wait for 6 s.
+        var stream = SyntheticTransportStream()
+        stream.parameterSets = [EncoderSamples.avcHighSPS, EncoderSamples.avcHighPPS]
+        let channel = try FakeTransportChannel(seconds: 40, lead: 16, burst: 3, streams: [(0, stream)])
+        defer { channel.stop() }
+        let url = try #require(URL(string: "http://127.0.0.1:\(channel.port)/play/1234.ts"))
+        var configuration = StreamEngineConfiguration.profile(.balanced)
+        configuration.nativeOutput = true
+        let recorder = EngineEventRecorder()
+        let session = try StreamEngine.shared.makeSession(routes: [.init(url: url, label: "MPEG-TS")], headers: [:],
+                                                          configuration: configuration, isSingleConnectionAccount: false,
+                                                          onEvent: { recorder.record($0) })
+        let received = NativeItemCollector()
+        session.nativeFeed.setListener { [feed = session.nativeFeed] in received.take(feed.drain()) }
+        session.start()
+        defer { session.stop() }
+        let started = ProcessInfo.processInfo.systemUptime
+        func elapsed() -> Double { ProcessInfo.processInfo.systemUptime - started }
+        while recorder.ready == nil, elapsed() < 10 { try await Task.sleep(nanoseconds: 20_000_000) }
+        #expect(recorder.ready != nil)
+        #expect(elapsed() < 2)
+
+        // A renderer playing in real time: the engine keeps handing over what's ahead of it.
+        while elapsed() < 6 {
+            let segments = received.segments
+            if let first = segments.first {
+                let position = first.programmeStart + max(0, elapsed() - 1)
+                session.reportPlayback(programmeTime: position, isWaiting: false, isPlaying: true, rate: 1)
+            }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        let segments = received.segments
+        #expect(segments.count >= 3)
+        #expect(segments.first?.startsWithKeyframe == true)
+        #expect(segments.map(\.sequence) == Array((segments.first?.sequence ?? 0)..<((segments.first?.sequence ?? 0) + segments.count)))
+        let samples = segments.compactMap(\.samples.video).flatMap(\.samples)
+        let frames = samples.compactMap { SyntheticTransportStream.picture(inSample: [UInt8]($0.data)[...])?.frame }
+        #expect(frames == Array((frames.first ?? 0)..<((frames.first ?? 0) + frames.count)))
+        #expect(segments.allSatisfy { !$0.samples.audio.isEmpty })
+
+        // A renderer restart: flush, then the segments from the keyframe at or before the position again.
+        received.reset()
+        let position = (segments.last?.programmeStart ?? 0) + 0.5
+        session.reportPlayback(programmeTime: position, isWaiting: false, isPlaying: true, rate: 1)
+        session.noteDecoderReset()
+        let restartedAt = elapsed()
+        while received.items.isEmpty, elapsed() - restartedAt < 3 { try await Task.sleep(nanoseconds: 20_000_000) }
+        let items = received.items
+        guard case .restart(let time)? = items.first else {
+            Issue.record("the feed didn't start with a restart")
+            return
+        }
+        #expect(time >= position - 0.01)
+        guard case .segment(let joined)? = items.dropFirst().first else {
+            Issue.record("no segment after the restart")
+            return
+        }
+        #expect(joined.startsWithKeyframe && joined.programmeStart <= time)
+    }
+
     @Test("The first playlist holds three target durations: AVPlayer starts a live playlist that far behind its end")
     func firstPlaylistDepth() async throws {
         // A panel's usual burst on connect, then programme in real time.
@@ -773,7 +835,7 @@ final class EngineEventRecorder: @unchecked Sendable {
         case .status(let status): latestStatus = status
         case .pace(let rate): latestRate = rate
         case .failed(let failure): latestFailure = failure
-        case .decoderResetRequested: break
+        case .decoderResetRequested, .nativeOutputUnsupported: break
         }
     }
 
@@ -1119,4 +1181,32 @@ final class FakeHLSChannel: @unchecked Sendable {
     var segmentRequests: [(time: Double, sequence: Int)] { state.segmentRequests }
 
     func stop() { server.stop() }
+}
+
+/// What a native renderer would have been handed, in order.
+final class NativeItemCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var collected: [NativeFeed.Item] = []
+
+    func take(_ items: [NativeFeed.Item]) {
+        lock.lock()
+        collected += items
+        lock.unlock()
+    }
+
+    func reset() {
+        lock.lock()
+        collected.removeAll()
+        lock.unlock()
+    }
+
+    var items: [NativeFeed.Item] {
+        lock.lock()
+        defer { lock.unlock() }
+        return collected
+    }
+
+    var segments: [NativeFeed.Segment] {
+        items.compactMap { if case .segment(let segment) = $0 { return segment } else { return nil } }
+    }
 }

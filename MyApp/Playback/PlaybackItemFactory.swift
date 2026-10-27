@@ -48,10 +48,14 @@ nonisolated enum PlayerBufferProfile: String, CaseIterable, Identifiable, Codabl
     }
 }
 
-/// Mirrors `UserPreferences.playerStreamEngineEnabled` for the playback controllers, which have no
-/// preferences store of their own.
+/// Mirrors the stream engine's preferences (`UserPreferences.playerStreamEngineEnabled` and
+/// friends) for the playback controllers, which have no preferences store of their own.
 enum StreamEngineSettings {
     static var isEnabled = true
+    /// The main player renders engine channels itself (`NativeLivePlayer`).
+    static var usesNativePlayer = true
+    /// The audio language the viewer last chose (a language tag), for the native player's track.
+    static var preferredAudioLanguage: String?
 }
 
 // MARK: - Item factory

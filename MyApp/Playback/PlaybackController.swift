@@ -19,6 +19,11 @@ import UIKit
 /// applies the engine's playback pace. Streams the engine doesn't carry (on-demand, catch-up,
 /// adaptive or encrypted HLS) play directly, as does everything when the engine is turned off.
 ///
+/// The main player can skip AVPlayer for engine channels: `NativeLivePlayer` renders the engine's
+/// samples itself and shows a picture as soon as the first keyframe is in, where AVPlayer waits for
+/// seconds of playlist. If it can't play a channel (a codec it doesn't take, no picture in time,
+/// AirPlay), the engine starts again for AVPlayer.
+///
 /// Responsibilities:
 /// - start-up tuning (buffer profile, first eligible variant, play immediately when ready)
 /// - start-up watchdog and fallback URLs (e.g. an Xtream `.ts` URL tried as `.m3u8` first)
@@ -149,6 +154,29 @@ final class PlaybackController: ObservableObject {
     private static let maxEngineItemRebuilds = 3
     private static let engineItemRebuildWindow: TimeInterval = 120
 
+    // Native player.
+    /// The native player's picture, which the video surfaces show.
+    private(set) lazy var nativeVideo = NativeVideoOutput()
+    /// The engine's samples play through `NativeLivePlayer` rather than AVPlayer.
+    @Published private(set) var usesNativePlayer = false
+    /// The native player's picture size (AVPlayer's is its item's).
+    @Published private(set) var nativeVideoSize: CGSize = .zero
+    private var nativePlayer: NativeLivePlayer?
+    /// Distinguishes the current native player's events from those of one already stopped.
+    private var nativeToken: UUID?
+    /// The current engine session feeds the native player.
+    private var engineUsesNative = false
+    /// The native player couldn't play the current channel; until the next one, AVPlayer plays it.
+    private var nativeRefused = false
+    /// The native player has played sound (a picture may not follow: radio, or a codec it lacks).
+    private var nativeAudioStarted = false
+    /// Something other than the viewer holds the native player still (an interruption, the background).
+    private var nativeHeld = false
+    /// A picture-in-picture window shows the native picture, so it keeps playing in the background.
+    private var isPictureInPictureActive = false
+    /// How long the native player may take from the engine's first segment to a picture.
+    private static let nativeStartTimeout: Duration = .seconds(6)
+
     init(tapDate: Date? = nil, bufferProfile: PlayerBufferProfile = .balanced, role: Role = .primary) {
         self.pendingTapDate = tapDate
         self.bufferProfile = bufferProfile
@@ -163,6 +191,20 @@ final class PlaybackController: ObservableObject {
     }
 
     // MARK: - Public API
+
+    /// Something is loaded or on its way: a player item, or a stream engine session.
+    var hasStream: Bool { currentItem != nil || engineSession != nil }
+
+    /// The picture's size, whichever player shows it.
+    var presentationSize: CGSize {
+        usesNativePlayer ? nativeVideoSize : (player.currentItem?.presentationSize ?? .zero)
+    }
+
+    /// Which player shows the picture, for diagnostics.
+    var playerDescription: String? {
+        guard usesEngine else { return nil }
+        return usesNativePlayer ? "Instant Start (native renderer)" : "AVPlayer"
+    }
 
     /// Loads the engine's actual track groups for any platform presentation.
     /// Re-check item ownership after each suspension; old track menus must never reach a new feed.
@@ -241,6 +283,7 @@ final class PlaybackController: ObservableObject {
         isUserPaused = false
         isBehindLiveEdge = false
         pausedAt = nil
+        nativeRefused = false
         setBuffering(false)
 
         var metrics = PlaybackMetrics(tapDate: tapDate, url: channel.streamURL)
@@ -277,7 +320,8 @@ final class PlaybackController: ObservableObject {
         watchdogTask?.cancel()
         stallTask?.cancel()
         player.pause()
-        if currentItem != nil { state = .paused }
+        updateNativePause()
+        if currentItem != nil || nativePlayer != nil { state = .paused }
         setBuffering(false)
     }
 
@@ -297,11 +341,12 @@ final class PlaybackController: ObservableObject {
 
     func setMuted(_ muted: Bool) {
         player.isMuted = muted
+        nativePlayer?.setMuted(muted)
         isMuted = muted
     }
 
     func togglePlayPause() {
-        if isUserPaused || player.timeControlStatus == .paused { play() } else { pause() }
+        if isUserPaused || (nativePlayer == nil && player.timeControlStatus == .paused) { play() } else { pause() }
     }
 
     /// Caps resolution and bitrate on the current (and future) items.
@@ -328,10 +373,11 @@ final class PlaybackController: ObservableObject {
     /// Jumps to the live point of a live stream.
     func seekToLiveEdge() {
         if usesEngine, let session = engineSession {
-            // Hand the whole reserve to the player and rejoin near its newest programme.
+            // Hand the whole reserve to the player and rejoin near its newest programme: the native
+            // player is handed it from there, AVPlayer needs a new item.
             session.jumpToLive()
             isBehindLiveEdge = false
-            if currentItem != nil { startEngineItem(url: session.playlistURL) }
+            if nativePlayer == nil, currentItem != nil { startEngineItem(url: session.playlistURL) }
             return
         }
         guard let item = currentItem, item.duration.isIndefinite,
@@ -354,7 +400,15 @@ final class PlaybackController: ObservableObject {
 
     /// Called by the video surface when its AVPlayerLayer has a frame to show.
     func surfaceReadyForDisplay() {
+        guard nativePlayer == nil else { return }
         markFirstFrame()
+    }
+
+    /// Called by the iOS player surface as its picture-in-picture window opens and closes.
+    func pictureInPictureChanged(isActive: Bool) {
+        isPictureInPictureActive = isActive
+        // Closed while the app is in the background: like AVPlayer, the native player stops there.
+        if !isActive, backgroundedAt != nil { holdNativeInBackground() }
     }
 
     // MARK: - Item lifecycle
@@ -464,7 +518,7 @@ final class PlaybackController: ObservableObject {
     }
 
     private func markFirstFrame() {
-        guard !firstFrameRendered, currentItem != nil else { return }
+        guard !firstFrameRendered, currentItem != nil || nativePlayer != nil else { return }
         firstFrameRendered = true
         setHoldsPlaybackPriority(false)
         metrics?.record(.firstFrame)
@@ -477,6 +531,11 @@ final class PlaybackController: ObservableObject {
     }
 
     private func resumePlayback() {
+        if let nativePlayer {
+            nativeHeld = false
+            nativePlayer.setPaused(isUserPaused)
+            return
+        }
         guard currentItem != nil else { return }
         if usesEngine {
             // The engine decides how much to buffer; AVPlayer plays whatever it has been given.
@@ -828,15 +887,16 @@ final class PlaybackController: ObservableObject {
             MainActor.assumeIsolated {
                 // Headphones unplugged: pause rather than blasting the speaker.
                 if rawReason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue,
-                   self?.currentItem != nil, self?.isUserPaused == false {
+                   self?.currentItem != nil || self?.nativePlayer != nil, self?.isUserPaused == false {
                     self?.pause()
                 }
+                self?.audioRouteChanged()
             }
         })
         #endif
         #if canImport(UIKit)
         systemTokens.add(center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.backgroundedAt = Date() }
+            MainActor.assumeIsolated { self?.enteredBackground() }
         })
         systemTokens.add(center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.returnedToForeground() }
@@ -846,11 +906,16 @@ final class PlaybackController: ObservableObject {
 
     #if os(iOS) || os(tvOS)
     private func handleInterruption(rawType: UInt?, rawOptions: UInt) {
-        guard let rawType, let type = AVAudioSession.InterruptionType(rawValue: rawType), currentItem != nil else { return }
+        guard let rawType, let type = AVAudioSession.InterruptionType(rawValue: rawType),
+              currentItem != nil || nativePlayer != nil else { return }
         switch type {
         case .began:
-            wasPlayingBeforeInterruption = !isUserPaused && player.timeControlStatus != .paused
+            wasPlayingBeforeInterruption = !isUserPaused && (nativePlayer != nil || player.timeControlStatus != .paused)
             player.pause()
+            if nativePlayer != nil {
+                nativeHeld = true
+                updateNativePause()
+            }
             pausedAt = Date()
             watchdogTask?.cancel()
             stallTask?.cancel()
@@ -871,8 +936,35 @@ final class PlaybackController: ObservableObject {
     }
     #endif
 
+    private func enteredBackground() {
+        backgroundedAt = Date()
+        guard nativePlayer != nil else { return }
+        // Picture in picture opens as the app leaves; give it a moment before deciding.
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1.5))
+            guard let self, self.backgroundedAt != nil, !self.isPictureInPictureActive else { return }
+            self.holdNativeInBackground()
+        }
+    }
+
+    /// Off screen, AVPlayer stops a video it shows unless picture in picture has it; so does the
+    /// native player, which would otherwise carry on as sound alone.
+    private func holdNativeInBackground() {
+        guard nativePlayer != nil, !isUserPaused else { return }
+        nativeHeld = true
+        updateNativePause()
+    }
+
     private func returnedToForeground() {
         defer { backgroundedAt = nil }
+        if nativePlayer != nil {
+            guard nativeHeld, !isUserPaused else { return }
+            if let backgroundedAt, Date().timeIntervalSince(backgroundedAt) > Self.staleBufferInterval {
+                seekToLiveEdge()
+            }
+            resumePlayback()
+            return
+        }
         guard currentItem != nil, !isUserPaused, player.rate == 0 else { return }
         if let backgroundedAt, Date().timeIntervalSince(backgroundedAt) > Self.staleBufferInterval {
             seekToLiveEdge()
@@ -890,7 +982,12 @@ final class PlaybackController: ObservableObject {
         guard StreamEngineSettings.isEnabled, !isExternalVideoPlaybackActive,
               let routes = StreamEnginePlanner.routes(for: channel.streamURL) else { return false }
         let profile = StreamEngineConfiguration.profile(bufferProfile.engineProfile)
-        engineConfiguration = role == .multiviewTile ? profile.forMultiviewTile() : profile
+        var configuration = role == .multiviewTile ? profile.forMultiviewTile() : profile
+        // The native player is for the main player's pictures; AirPlay takes only its sound.
+        let native = StreamEngineSettings.usesNativePlayer && role == .primary && !isAudioOnlySession
+            && !nativeRefused && !Self.audioRouteIsAirPlay
+        configuration.nativeOutput = native
+        engineConfiguration = configuration
         // Only a known one-stream account makes a quick drop look like another device taking over.
         let singleConnection = XtreamAccountStatusStore.shared.statusByPlaylistID[channel.playlistID]?.maxConnections == 1
         let token = UUID()
@@ -911,11 +1008,12 @@ final class PlaybackController: ObservableObject {
         engineToken = token
         engineSession = session
         usesEngine = true
+        engineUsesNative = native
         engineRate = 1.0
         engineItemRebuilds.removeAll()
         player.automaticallyWaitsToMinimizeStalling = false
         state = isUserPaused ? .paused : .connecting
-        PlaybackMetrics.logger.info("Stream engine: \(routes.map(\.label).joined(separator: " → "), privacy: .public), \(self.engineConfiguration.profile.rawValue, privacy: .public) reserve")
+        PlaybackMetrics.logger.info("Stream engine: \(routes.map(\.label).joined(separator: " → "), privacy: .public), \(self.engineConfiguration.profile.rawValue, privacy: .public) reserve, \(native ? "native player" : "AVPlayer", privacy: .public)")
         session.start()
 
         // The engine reports failure itself; this only guards against it never answering.
@@ -924,17 +1022,19 @@ final class PlaybackController: ObservableObject {
         watchdogTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(30))
             guard let self, !Task.isCancelled, self.generation == startGeneration,
-                  self.usesEngine, self.currentItem == nil else { return }
+                  self.usesEngine, self.currentItem == nil, self.nativePlayer == nil else { return }
             self.fallbackToDirect(reason: "the stream engine didn't start in time")
         }
         return true
     }
 
     private func stopEngine() {
+        stopNativePlayer()
         engineSession?.stop()
         engineSession = nil
         engineToken = nil
         usesEngine = false
+        engineUsesNative = false
         engineStatus = nil
         engineRate = 1.0
         engineItemRebuilds.removeAll()
@@ -945,8 +1045,8 @@ final class PlaybackController: ObservableObject {
         guard token == engineToken, usesEngine, let session = engineSession else { return }
         switch event {
         case .ready(let url):
-            guard currentItem == nil else { return }
-            startEngineItem(url: url)
+            guard currentItem == nil, nativePlayer == nil else { return }
+            if engineUsesNative { startNativePlayer(session) } else { startEngineItem(url: url) }
         case .endpointChanged(let url):
             guard currentItem != nil else { return }
             rebuildEngineItem(url: url, reason: "local server moved")
@@ -958,7 +1058,13 @@ final class PlaybackController: ObservableObject {
         case .pace(let rate):
             applyEngineRate(rate)
         case .decoderResetRequested:
-            rebuildEngineItem(url: session.playlistURL, reason: "player stalled with programme available")
+            if nativePlayer != nil {
+                restartNativePlayback(reason: "renderer stalled with programme available", counts: true)
+            } else {
+                rebuildEngineItem(url: session.playlistURL, reason: "player stalled with programme available")
+            }
+        case .nativeOutputUnsupported(let codec):
+            restartEngineWithoutNative(reason: "\(codec) video")
         case .failed(let failure):
             PlaybackMetrics.logger.info("Stream engine stopped: \(failure.message, privacy: .public)")
             if failure.allowsDirectPlayback, !firstFrameRendered {
@@ -1043,6 +1149,7 @@ final class PlaybackController: ObservableObject {
 
     private func applyEngineRate(_ rate: Double) {
         engineRate = rate
+        nativePlayer?.setRate(rate)
         let effective = effectiveEngineRate
         player.defaultRate = effective
         if player.rate > 0 { player.rate = effective }
@@ -1054,6 +1161,156 @@ final class PlaybackController: ObservableObject {
         if engineRate < 1, !item.canPlaySlowForward { return 1 }
         if engineRate > 1, !item.canPlayFastForward { return 1 }
         return Float(engineRate)
+    }
+
+    // MARK: - Native player
+
+    /// Plays the engine's samples through the native renderer.
+    private func startNativePlayer(_ session: StreamEngineSession) {
+        isWaitingToReconnect = false
+        generation += 1
+        let generation = generation
+        detachItemObservers()
+        watchdogTask?.cancel()
+        monitorTask?.cancel()
+        stallTask?.cancel()
+        itemHasPlayed = false
+        nativeAudioStarted = false
+        nativeHeld = false
+
+        let token = UUID()
+        let native = NativeLivePlayer(
+            feed: session.nativeFeed, renderers: nativeVideo.renderers,
+            preferredAudioLanguage: StreamEngineSettings.preferredAudioLanguage,
+            reportPlayback: { [weak session] programmeTime, waiting, playing, rate in
+                session?.reportPlayback(programmeTime: programmeTime, isWaiting: waiting, isPlaying: playing, rate: rate)
+            },
+            onEvent: { @Sendable [weak self] event in
+                DispatchQueue.main.async { [weak self] in
+                    MainActor.assumeIsolated { self?.handleNativeEvent(event, token: token) }
+                }
+            })
+        nativeToken = token
+        nativePlayer = native
+        usesNativePlayer = true
+        nativeVideoSize = .zero
+        nativeVideo.isActive = true
+        native.setMuted(isMuted)
+        native.setRate(engineRate)
+        native.setPaused(isUserPaused)
+        native.start()
+        if !firstFrameRendered { state = isUserPaused ? .paused : .connecting }
+        metrics?.record(.itemCreated)
+        publishMetrics()
+
+        // The engine has a keyframe in by now. No picture in time means the renderer can't show
+        // this stream, unless it's sound alone.
+        watchdogTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.nativeStartTimeout)
+            guard let self, !Task.isCancelled, self.generation == generation, self.nativePlayer != nil,
+                  !self.itemHasPlayed, !self.isUserPaused else { return }
+            if self.nativeAudioStarted, !self.engineCarriesVideo {
+                self.nativeStarted()
+            } else {
+                self.restartEngineWithoutNative(reason: "no picture from the native renderer")
+            }
+        }
+    }
+
+    private func stopNativePlayer() {
+        guard let nativePlayer else { return }
+        nativePlayer.stop()
+        self.nativePlayer = nil
+        nativeToken = nil
+        nativeHeld = false
+        nativeVideo.isActive = false
+        usesNativePlayer = false
+        nativeVideoSize = .zero
+    }
+
+    private func handleNativeEvent(_ event: NativeLivePlayer.Event, token: UUID) {
+        guard token == nativeToken, nativePlayer != nil else { return }
+        switch event {
+        case .pictureShown:
+            nativeStarted()
+        case .audioStarted:
+            nativeAudioStarted = true
+            // Radio. A video channel's picture may just not be in yet: the watchdog decides.
+            if engineStatus != nil, !engineCarriesVideo { nativeStarted() }
+        case .waiting(let waiting):
+            guard itemHasPlayed, !isUserPaused else { return }
+            state = waiting ? .buffering : .playing
+            setBuffering(waiting)
+        case .videoFormat(let width, let height, let codec, let frameRate):
+            nativeVideoSize = CGSize(width: width, height: height)
+            onMetadata?(StreamRuntimeMetadata(width: Int(width.rounded()), height: Int(height.rounded()), codec: codec,
+                                              frameRate: frameRate, bitrate: nil))
+        case .rendererFailed(let reason):
+            restartEngineWithoutNative(reason: "renderer failed: \(reason)")
+        case .restartNeeded:
+            restartNativePlayback(reason: "renderer flushed", counts: false)
+        }
+    }
+
+    /// The native player is showing the channel (or playing its sound, for radio).
+    private func nativeStarted() {
+        guard !itemHasPlayed else { return }
+        itemStarted()
+        if !isUserPaused { state = .playing }
+        setBuffering(false)
+        markFirstFrame()
+    }
+
+    private func updateNativePause() {
+        nativePlayer?.setPaused(isUserPaused || nativeHeld)
+    }
+
+    /// The renderers need the programme again from a keyframe: the engine hands it over from where
+    /// the picture is. The system asks for this (back from the background, a new audio output);
+    /// a renderer that stalls with programme in hand `counts` towards giving up on it.
+    private func restartNativePlayback(reason: String, counts: Bool) {
+        guard let session = engineSession else { return }
+        if counts {
+            let now = Date()
+            engineItemRebuilds.removeAll { now.timeIntervalSince($0) > Self.engineItemRebuildWindow }
+            guard engineItemRebuilds.count < Self.maxEngineItemRebuilds else {
+                restartEngineWithoutNative(reason: "renderer kept stalling")
+                return
+            }
+            engineItemRebuilds.append(now)
+        }
+        PlaybackMetrics.logger.info("Restarting the native renderer (\(reason, privacy: .public))")
+        session.noteDecoderReset()
+    }
+
+    /// The native player can't play this channel: the engine starts again, publishing for AVPlayer.
+    private func restartEngineWithoutNative(reason: String) {
+        guard engineUsesNative, let channel else { return }
+        PlaybackMetrics.logger.info("Playing through AVPlayer instead of the native renderer (\(reason, privacy: .public))")
+        nativeRefused = true
+        generation += 1
+        cancelTasks()
+        stopEngine()
+        if !startEngine(for: channel) {
+            PlaybackItemFactory.apply(bufferProfile, to: player)
+            urlIndex = 0
+            reconnectAttempt = 0
+            startCurrentURL()
+        }
+    }
+
+    /// AirPlay takes only the native player's sound; AVPlayer can send the picture as well.
+    private func audioRouteChanged() {
+        guard engineUsesNative, Self.audioRouteIsAirPlay else { return }
+        restartEngineWithoutNative(reason: "AirPlay")
+    }
+
+    private static var audioRouteIsAirPlay: Bool {
+        #if os(iOS) || os(tvOS)
+        return AVAudioSession.sharedInstance().currentRoute.outputs.contains { $0.portType == .airPlay }
+        #else
+        return false
+        #endif
     }
 
     private var engineCarriesVideo: Bool {

@@ -48,6 +48,9 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
         case pace(Double)
         /// AVPlayer has been stuck for a while with programme available: rebuild its item.
         case decoderResetRequested
+        /// Native output only: the stream's video is in a codec the native renderer doesn't take
+        /// (MPEG-2, say), so it should play through AVPlayer.
+        case nativeOutputUnsupported(String)
         case failed(StreamEngineFailure)
     }
 
@@ -94,6 +97,11 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
     private var deliveredRoute: Int?
     /// A route to move to once what the current connection delivered so far is committed.
     private var preferredRoute: Int?
+    /// Native output: where published segments go instead of the local HLS publication, and the
+    /// last one handed over.
+    let nativeFeed = NativeFeed()
+    private var lastFedSequence: Int?
+    private var reportedNativeUnsupported = false
 
     // Connection.
     private var connection: EngineConnection?
@@ -152,6 +160,8 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
                                                            maximumBytes: configuration.maximumReserveBytes))
         self.referee = RecoveryReferee(configuration: configuration, routeCount: routes.count,
                                        isSingleConnectionAccount: isSingleConnectionAccount)
+        // The native renderer takes samples of every codec, so every segment is packaged from the start.
+        if configuration.nativeOutput { packager = FragmentedPackager(writesFragments: false, collectsSamples: true) }
     }
 
     var playlistURL: URL { baseURL.appendingPathComponent("live.m3u8") }
@@ -205,7 +215,11 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
             }
             holdForRebuffer = false
             journal.record(.recovery, "Jumped to the newest programme", buffered: bufferedAhead(now()))
-            renderPlaylist()
+            if configuration.nativeOutput, let target = joinTarget {
+                feedNative(restartAt: target)
+            } else {
+                renderPlaylist()
+            }
         }
     }
 
@@ -213,8 +227,12 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
     func noteDecoderReset() {
         queue.async { [self] in
             decoderResets += 1
-            journal.record(.decoder, "Player item rebuilt", buffered: bufferedAhead(now()))
-            renderPlaylist()
+            journal.record(.decoder, configuration.nativeOutput ? "Renderer restarted" : "Player item rebuilt", buffered: bufferedAhead(now()))
+            if configuration.nativeOutput, let head = estimatedPlayhead(now()) ?? reserve.published.first?.programmeStart {
+                feedNative(restartAt: head)
+            } else {
+                renderPlaylist()
+            }
         }
     }
 
@@ -424,7 +442,14 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
             case .program(let program):
                 codecs = program.codecSummary
                 journal.record(.splice, "Program: \(program.codecSummary)", buffered: bufferedAhead(time))
-                if packager == nil, case .video(.hevc)? = program.video?.kind { startFragmentedPublishing(at: time) }
+                if case .video(.hevc)? = program.video?.kind {
+                    if configuration.nativeOutput { preferHLSOutputForHEVC() } else if packager == nil { startFragmentedPublishing(at: time) }
+                }
+                if configuration.nativeOutput, !reportedNativeUnsupported, case .video(let codec)? = program.video?.kind,
+                   codec != .h264, codec != .hevc {
+                    reportedNativeUnsupported = true
+                    emitEvent(.nativeOutputUnsupported(codec.rawValue))
+                }
             case .splice(let report):
                 guard report.kind != .start else { continue }
                 if report.kind == .resumed {
@@ -493,8 +518,13 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
         }
         packager = FragmentedPackager()
         journal.record(.connection, "HEVC: publishing fragmented MP4 renditions", buffered: bufferedAhead(time))
-        // Panels' MPEG-TS output drops chunks of 4K streams that their HLS output carries whole: before
-        // anything plays, move to the HLS route, whose window then fills the reserve at once.
+        preferHLSOutputForHEVC()
+    }
+
+    /// Panels' MPEG-TS output drops chunks of 4K streams that their HLS output carries whole: before
+    /// anything plays, move to the HLS route, whose window then fills the reserve at once.
+    private func preferHLSOutputForHEVC() {
+        guard reserve.segments.isEmpty, !announcedReady else { return }
         if hlsRoutes[connectionRoute] == nil, routes[connectionRoute].label != "HLS" {
             preferredRoute = routes.indices.first { routes[$0].label == "HLS" }
         }
@@ -565,9 +595,10 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
             // it has been seen to start at the edge and hold the picture), and reloads it only a
             // target duration later. So the first playlist waits for three target durations, which the
             // provider's burst usually brings at once, but not for long when it sends in real time.
+            // The native renderer starts from the first segment.
             let firstSegmentAt = self.firstSegmentAt ?? time
             self.firstSegmentAt = firstSegmentAt
-            let startupLead = min(configuration.lead, 3 * Double(configuration.segmenter.playlistTargetDuration))
+            let startupLead = configuration.nativeOutput ? 0 : min(configuration.lead, 3 * Double(configuration.segmenter.playlistTargetDuration))
             guard reserve.reserveSeconds >= startupLead || time - firstSegmentAt >= Self.startupWaitLimit else { return }
             reserve.publishNext()
             reserve.publish(before: first.programmeStart + configuration.lead)
@@ -600,6 +631,10 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
     private func renderPlaylist() {
         let window = reserve.published
         guard !window.isEmpty else { return }
+        if configuration.nativeOutput {
+            feedNative()
+            return
+        }
         // Where a (re)built player item should start: the keyframe segment under the playhead.
         let target = joinTarget ?? estimatedPlayhead(now()) ?? window.first?.programmeStart ?? 0
         let join = reserve.joinPoint(atOrBefore: target)
@@ -614,6 +649,27 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
         var files = ["live.m3u8": Data(text.utf8)]
         for segment in window { files["s\(segment.sequence).ts"] = segment.data }
         publication.update(files: files)
+    }
+
+    /// Native output: hands the renderer each newly published segment once, in order. A restart has
+    /// it flush and play on from `programmeTime`, from the keyframe segment at or before it.
+    private func feedNative(restartAt programmeTime: Double? = nil) {
+        var window = reserve.published
+        var items: [NativeFeed.Item] = []
+        if let programmeTime, let join = reserve.joinPoint(atOrBefore: programmeTime) {
+            items.append(.restart(programmeTime: programmeTime))
+            window = window.drop { $0.sequence < join.sequence }
+        } else if let last = lastFedSequence {
+            window = window.drop { $0.sequence <= last }
+        }
+        for segment in window {
+            lastFedSequence = segment.sequence
+            guard let samples = segment.native else { continue }
+            items.append(.segment(.init(sequence: segment.sequence, programmeStart: segment.programmeStart, duration: segment.duration,
+                                        isDiscontinuity: segment.isDiscontinuity, startsWithKeyframe: segment.startsWithKeyframe,
+                                        samples: samples)))
+        }
+        nativeFeed.push(items)
     }
 
     /// The multivariant playlist, each rendition's media playlist, and what they list.
@@ -685,7 +741,7 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
     }
 
     /// RFC 5646 tags for the ISO 639-2 codes broadcasters use; others are valid as they are.
-    private static func languageTag(_ code: String) -> String {
+    static func languageTag(_ code: String) -> String {
         let twoLetter = ["eng": "en", "fra": "fr", "fre": "fr", "deu": "de", "ger": "de", "ita": "it", "spa": "es", "por": "pt",
                          "rus": "ru", "ara": "ar", "tur": "tr", "nld": "nl", "dut": "nl", "pol": "pl", "swe": "sv", "nor": "no",
                          "nob": "nb", "dan": "da", "fin": "fi", "ell": "el", "gre": "el", "ces": "cs", "cze": "cs", "hun": "hu",
@@ -816,6 +872,7 @@ nonisolated final class StreamEngineSession: @unchecked Sendable {
         connection?.cancel()
         connection = nil
         publication.close()
+        nativeFeed.close()
         StreamEngine.shared.remove(sessionID: id)
     }
 }

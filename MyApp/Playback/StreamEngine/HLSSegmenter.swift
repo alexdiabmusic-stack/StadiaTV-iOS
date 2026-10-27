@@ -18,9 +18,11 @@ nonisolated struct MediaSegment: Sendable {
     /// section with this number; `audio` holds each audio rendition's fragment for the same stretch.
     var initialization: Int? = nil
     var audio: [AudioFragment] = []
+    /// Native output: the segment's samples for the app's own renderer.
+    var native: NativeSamples? = nil
 
     var programmeEnd: Double { programmeStart + duration }
-    var byteCount: Int { data.count + audio.reduce(0) { $0 + $1.data.count } }
+    var byteCount: Int { data.count + audio.reduce(0) { $0 + $1.data.count } + (native?.byteCount ?? 0) }
 }
 
 /// One audio rendition's fragment of a media segment. Its audio arrived with the segment's

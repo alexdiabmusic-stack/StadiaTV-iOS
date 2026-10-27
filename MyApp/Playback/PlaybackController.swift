@@ -176,6 +176,7 @@ final class PlaybackController: ObservableObject {
     private var isPictureInPictureActive = false
     /// How long the native player may take from the engine's first segment to a picture.
     private static let nativeStartTimeout: Duration = .seconds(6)
+    private var nativePictureTask: Task<Void, Never>?
 
     init(tapDate: Date? = nil, bufferProfile: PlayerBufferProfile = .balanced, role: Role = .primary) {
         self.pendingTapDate = tapDate
@@ -1219,6 +1220,7 @@ final class PlaybackController: ObservableObject {
 
     private func stopNativePlayer() {
         guard let nativePlayer else { return }
+        nativePictureTask?.cancel()
         nativePlayer.stop()
         self.nativePlayer = nil
         nativeToken = nil
@@ -1231,6 +1233,8 @@ final class PlaybackController: ObservableObject {
     private func handleNativeEvent(_ event: NativeLivePlayer.Event, token: UUID) {
         guard token == nativeToken, nativePlayer != nil else { return }
         switch event {
+        case .pictureQueued:
+            watchForNativePicture()
         case .pictureShown:
             nativeStarted()
         case .audioStarted:
@@ -1249,6 +1253,24 @@ final class PlaybackController: ObservableObject {
             restartEngineWithoutNative(reason: "renderer failed: \(reason)")
         case .restartNeeded:
             restartNativePlayback(reason: "renderer flushed", counts: false)
+        }
+    }
+
+    /// The first keyframe is queued: the layer says when it's on screen. Only the main actor may
+    /// read that, so it's watched here.
+    private func watchForNativePicture() {
+        let generation = generation
+        nativePictureTask?.cancel()
+        nativePictureTask = Task { [weak self] in
+            for _ in 0..<100 {
+                guard let self, !Task.isCancelled, self.generation == generation,
+                      self.nativePlayer != nil, !self.itemHasPlayed else { return }
+                if self.nativeVideo.layer.isReadyForDisplay {
+                    self.nativeStarted()
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(30))
+            }
         }
     }
 

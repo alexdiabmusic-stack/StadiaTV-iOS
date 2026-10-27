@@ -11,7 +11,10 @@ import CoreMedia
 /// programme is in hand. Everything runs on the renderers' serial queue; events go to `onEvent`.
 nonisolated final class NativeLivePlayer: @unchecked Sendable {
     nonisolated enum Event: Sendable {
-        /// The first picture is on screen.
+        /// The first keyframe is with the video renderer; the layer says when it's on screen, which
+        /// only the main actor can read.
+        case pictureQueued
+        /// The renderer has been showing pictures for a while, should the layer never say so.
         case pictureShown
         /// Radio: the sound has started.
         case audioStarted
@@ -26,7 +29,6 @@ nonisolated final class NativeLivePlayer: @unchecked Sendable {
         case restartNeeded
     }
 
-    private let displayLayer: AVSampleBufferDisplayLayer
     private let videoRenderer: AVSampleBufferVideoRenderer
     private let audioRenderer: AVSampleBufferAudioRenderer
     private let synchronizer: AVSampleBufferRenderSynchronizer
@@ -43,8 +45,9 @@ nonisolated final class NativeLivePlayer: @unchecked Sendable {
     private var audioDescriptions: [NativePlaybackScheduler.AudioFormatKey: CMFormatDescription] = [:]
     private var announcedSize: (width: Double, height: Double)?
     private var announcedAudioStart = false
+    private var announcedPictureQueued = false
     private var announcedPicture = false
-    /// When the video renderer was first seen rendering, should the layer never say it's ready.
+    /// When the video renderer was first seen rendering.
     private var renderingSince: Double?
     private var wasWaiting = false
     private var reportedFailure = false
@@ -57,7 +60,6 @@ nonisolated final class NativeLivePlayer: @unchecked Sendable {
          reportPlayback: @escaping @Sendable (Double?, Bool, Bool, Double) -> Void,
          onEvent: @escaping @Sendable (Event) -> Void) {
         self.feed = feed
-        displayLayer = renderers.displayLayer
         videoRenderer = renderers.videoRenderer
         audioRenderer = renderers.audioRenderer
         synchronizer = renderers.synchronizer
@@ -75,7 +77,7 @@ nonisolated final class NativeLivePlayer: @unchecked Sendable {
             // A new audio output (headphones, AirPlay, a call ending) makes the renderer drop what it
             // holds: everything is handed over again from the keyframe before the picture.
             flushObserver = NotificationCenter.default.addObserver(
-                forName: AVSampleBufferAudioRenderer.wasFlushedAutomaticallyNotification, object: audioRenderer, queue: nil
+                forName: .AVSampleBufferAudioRendererWasFlushedAutomatically, object: audioRenderer, queue: nil
             ) { [weak self] _ in
                 guard let self else { return }
                 queue.async { self.requestRestart() }
@@ -157,8 +159,12 @@ nonisolated final class NativeLivePlayer: @unchecked Sendable {
 
         let now = ProcessInfo.processInfo.systemUptime
         if !announcedPicture, scheduler.hasVideo, scheduler.hasShownPicture {
+            if !announcedPictureQueued {
+                announcedPictureQueued = true
+                emit(.pictureQueued)
+            }
             if videoRenderer.status == .rendering { renderingSince = renderingSince ?? now }
-            if displayLayer.isReadyForDisplay || now - (renderingSince ?? now) >= 0.5 {
+            if let renderingSince, now - renderingSince >= 0.5 {
                 announcedPicture = true
                 emit(.pictureShown)
             }
@@ -371,19 +377,18 @@ nonisolated final class NativeLivePlayer: @unchecked Sendable {
     }
 }
 
-/// The renderers a controller's native players use, one after another: the picture's layer and its
-/// video renderer, an audio renderer, and the synchronizer whose clock keeps them together. Keeping
+/// The renderers a controller's native players use, one after another: the picture layer's video
+/// renderer, an audio renderer, and the synchronizer whose clock keeps them together. Keeping
 /// them across channels keeps one layer on screen (and in picture in picture), and their one queue
 /// puts each player's last use of them before the next player's first.
 nonisolated final class NativeRenderers: @unchecked Sendable {
-    let displayLayer: AVSampleBufferDisplayLayer
     let videoRenderer: AVSampleBufferVideoRenderer
     let audioRenderer = AVSampleBufferAudioRenderer()
     let synchronizer = AVSampleBufferRenderSynchronizer()
     let queue = DispatchQueue(label: "BannerTV.NativeRenderers", qos: .userInteractive)
 
-    init(displayLayer: AVSampleBufferDisplayLayer) {
-        self.displayLayer = displayLayer
+    /// On the main actor, which owns the layer; the renderers themselves work from any queue.
+    @MainActor init(displayLayer: AVSampleBufferDisplayLayer) {
         videoRenderer = displayLayer.sampleBufferRenderer
         audioRenderer.audioTimePitchAlgorithm = .timeDomain
         // The scheduler decides when there's enough to run on.

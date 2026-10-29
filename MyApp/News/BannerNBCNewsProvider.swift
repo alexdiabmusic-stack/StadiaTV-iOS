@@ -54,7 +54,9 @@ nonisolated struct NBCSportsNewsProvider: SportsNewsProvider {
                                 published: BannerRSSParser.parseDate(item.publishedRaw),
                                 url: URL(string: urlStr),
                                 imageURL: item.imageURL.flatMap(URL.init(string:)),
-                                leagueID: targetLeagueID,
+                                leagueID: [.soccer, .golf, .tennis, .racing].contains(league.group)
+                                    ? BannerNewsDeduplicator.classify(headline: title, description: item.description, tags: item.categories).leagueID
+                                    : targetLeagueID,
                                 teamIDs: [],
                                 playerIDs: [],
                                 sourceName: nil,
@@ -66,7 +68,8 @@ nonisolated struct NBCSportsNewsProvider: SportsNewsProvider {
                                 ),
                                 publisher: "NBC Sports",
                                 articleType: nil,
-                                authorByline: item.author
+                                authorByline: item.author,
+                                primarySport: league.group
                             )
                         }
                     } catch { return [] }
@@ -85,8 +88,8 @@ nonisolated struct NBCSportsNewsProvider: SportsNewsProvider {
 
     private func nbcFeeds(for league: League) -> [String] {
         let b = Self.nbcBase
-        // Primary feed always included (classifies itself via headline matching)
-        var feeds = ["\(b)/rss/index.rss"]
+        // A general feed cannot inherit the requested league.
+        var feeds: [String] = []
 
         // Sport-specific feeds (NBC uses slug-based paths)
         let slug = nbcSlug(for: league)
@@ -103,7 +106,7 @@ nonisolated struct NBCSportsNewsProvider: SportsNewsProvider {
                  : league.path.contains("college") ? "college-football"
                  : nil
         case .basketball:
-            return league.path.contains("nba") ? "nba" : nil
+            return league.path == "basketball/nba" ? "nba" : nil
         case .baseball:  return "mlb"
         case .hockey:    return "nhl"
         case .soccer:    return "soccer"

@@ -184,6 +184,11 @@ struct MoreView: View {
 
     private var personalizationSection: some View {
         SettingsSection(title: "PERSONALIZATION") {
+            NavigationLink { ViewingExperienceSettingsView() } label: {
+                SettingsNavRow(icon: "tv", title: "Viewing Experience", subtitle: String(localized: prefs.viewingExperience.title))
+            }
+            .buttonStyle(.plain)
+            Divider().overlay(Theme.hairline)
             NavigationLink { AppearanceSettingsView() } label: {
                 SettingsNavRow(
                     icon: "circle.lefthalf.filled",

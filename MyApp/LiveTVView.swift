@@ -180,6 +180,7 @@ private struct MultiscreenSession: Identifiable {
 /// rename, add to group) live in swipe actions and the context menu, so the row
 /// has a single tap target.
 struct ChannelListRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let channel: Channel
     let action: () -> Void
     var isFavorite: Bool = false
@@ -202,7 +203,7 @@ struct ChannelListRow: View {
                         Text(channel.name)
                             .font(Theme.Typography.headline)
                             .foregroundStyle(Theme.textPrimary)
-                            .lineLimit(1)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                         if isFavorite {
                             Image(systemName: "star.fill")
                                 .font(Theme.Typography.caption)
@@ -231,6 +232,7 @@ struct ChannelListRow: View {
 /// "Now: {programme}" with a thin progress bar, refreshed every minute from the guide.
 /// Reads the EPG through non-observing references so guide imports don't re-render every row.
 private struct ChannelNowPlayingLine: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let channelID: String
     let fallback: String
     @Environment(\.playerStores) private var stores
@@ -242,7 +244,7 @@ private struct ChannelNowPlayingLine: View {
                     Text("Now: \(programme.title)")
                         .font(Theme.Typography.caption)
                         .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                     ProgressView(value: programme.progress(at: context.date))
                         .progressViewStyle(.linear)
                         .tint(Theme.accent)
@@ -254,7 +256,7 @@ private struct ChannelNowPlayingLine: View {
                 Text(fallback)
                     .font(Theme.Typography.caption)
                     .foregroundStyle(Theme.textSecondary)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
             }
         }
     }

@@ -39,6 +39,14 @@ struct BasketballGameCenterView<WatchContent: View, RelatedContent: View>: View 
     private var snapshot: BasketballGameSnapshot? { model.snapshot?.gameID == gameID ? model.snapshot : nil }
     private var hideScore: Bool { preferences.spoilerFreeMode && (snapshot?.game?.status == .final || match.state == .final) && !revealed }
 
+    private var visibleTabs: [BasketballGameTab] {
+        var tabs: [BasketballGameTab] = [.overview]
+        if snapshot?.plays.isEmpty == false { tabs.append(.plays) }
+        if snapshot?.homeBox.isEmpty == false || snapshot?.awayBox.isEmpty == false { tabs.append(.boxscore) }
+        if snapshot?.shots.isEmpty == false { tabs.append(.shots) }
+        return tabs
+    }
+
     var body: some View {
         GeometryReader { geometry in
             GameCentreSplit {
@@ -52,7 +60,7 @@ struct BasketballGameCenterView<WatchContent: View, RelatedContent: View>: View 
                 } watch: {
                     watchContent()
                 } rest: {
-                GameTabBar(tabs: BasketballGameTab.allCases, selection: Binding(
+                GameTabBar(tabs: visibleTabs, selection: Binding(
                     get: { model.selectedTab },
                     set: { fullRefresh = false; model.selectedTab = $0 }
                 ))
@@ -79,6 +87,9 @@ struct BasketballGameCenterView<WatchContent: View, RelatedContent: View>: View 
             #else
             PaywallView()
             #endif
+        }
+        .onChange(of: visibleTabs) { _, tabs in
+            if !tabs.contains(model.selectedTab) { model.selectedTab = .overview }
         }
         .onChange(of: scenePhase) { _, phase in if phase == .active { fullRefresh = true } }
         .task {

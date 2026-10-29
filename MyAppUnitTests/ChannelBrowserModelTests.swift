@@ -30,6 +30,14 @@ struct ChannelBrowserModelTests {
         [channel("a", "ESPN"), channel("b", "Équipe 21"), channel("c", "dazn 1"), channel("d", "Fox Sports")]
     }
 
+    @Test("Twenty thousand channels preserve stable favorites across reordered catalogs")
+    func largePlaylist() {
+        let channels = (0..<20_000).map { channel(String($0), "Channel \($0)", group: "Sports") }
+        #expect(ids(channels, query: "Channel 19999") == ["19999"])
+        #expect(ids(Array(channels.reversed()), source: .favorites, favourites: ["19999", "0"]) == ["19999", "0"])
+        #expect(ids(channels, hidden: ["0", "19999"]).count == 19_998)
+    }
+
     // MARK: Ordering
 
     @Test("Provider order is kept, and hidden channels are left out")
@@ -75,6 +83,14 @@ struct ChannelBrowserModelTests {
         #expect(ids(lineup, query: "sports") == ["d"])
         #expect(ids(lineup, query: "zzz").isEmpty)
         #expect(ids(lineup, query: "news", customNames: ["c": "Sky News"]) == ["c"])
+    }
+
+    @Test("Search normalizes punctuation and whitespace and includes provider categories")
+    func categorySearch() {
+        let channels = [channel("a", "BBC - News", group: "United Kingdom"), channel("b", "TSN", group: "Sports")]
+        #expect(ids(channels, query: "bbc    news") == ["a"])
+        #expect(ids(channels, query: "united-kingdom") == ["a"])
+        #expect(ids(channels, source: .favorites, hidden: ["a"], favourites: ["a"]).isEmpty)
     }
 
     // MARK: Channel numbers

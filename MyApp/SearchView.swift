@@ -56,6 +56,8 @@ struct SearchView: View {
         var teams: [UniversalSearchResult] = []
         var liveGames: [UniversalSearchResult] = []
         var games: [UniversalSearchResult] = []
+        var completedGames: [UniversalSearchResult] = []
+        var otherGames: [UniversalSearchResult] = []
         var news: [UniversalSearchResult] = []
         var highlights: [UniversalSearchResult] = []
         var channels: [UniversalSearchResult] = []
@@ -68,7 +70,12 @@ struct SearchView: View {
             case .team, .league:
                 teams.append(result)
             case .match(let match):
-                if match.state == .live { liveGames.append(result) } else { games.append(result) }
+                switch BannerGameStatus(presentationOf: match) {
+                case .live: liveGames.append(result)
+                case .scheduled, .pregame: games.append(result)
+                case .final: completedGames.append(result)
+                default: otherGames.append(result)
+                }
             case .article(let article):
                 if article.isSearchHighlight { highlights.append(result) } else { news.append(result) }
             case .channel:
@@ -89,7 +96,9 @@ struct SearchView: View {
         }
         add("Teams & Leagues", teams)
         add("Live Now", liveGames, limit: 5)
-        add("Upcoming Games", games, limit: 5)
+        add(String(localized: "Upcoming Games"), games, limit: 5)
+        add(String(localized: "Completed Games"), completedGames, limit: 5)
+        add(String(localized: "Other Events"), otherGames, limit: 5)
         add("News", news, limit: 5)
         add("Highlights", highlights, limit: 3)
         add("Channels", channels, limit: channels.count)
@@ -864,8 +873,7 @@ private extension Match {
 
 private extension ESPNArticle {
     var isSearchHighlight: Bool {
-        let text = "\(type ?? "") \(headline) \(categories.joined(separator: " "))".searchNormalized
-        return text.contains("highlight") || text.contains("video") || text.contains("media") || text.contains("play")
+        isHighlight
     }
 }
 

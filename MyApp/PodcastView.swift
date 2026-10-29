@@ -2021,7 +2021,7 @@ struct PodcastCarousel: View {
             PodcastSectionHeader(title: "SPORTS TALK", actionTitle: "See All", action: onShowAll)
                 .padding(.horizontal, 4)
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 14) {
+                HStack(alignment: .top, spacing: 14) {
                     ForEach(feeds) { feed in
                         let podcast = Podcast(
                             id: feed.feedURL.absoluteString,

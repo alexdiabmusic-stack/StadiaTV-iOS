@@ -64,6 +64,13 @@ struct LiveBrowserView: View {
                 )
             }
 
+            Section {
+                scopeRow(title: "Recent Channels", systemImage: "clock", count: watchStore.recents.count, scope: .recent)
+                NavigationLink {
+                    ChannelBrowserView(scope: .highDefinition, onPlay: onPlay, isPickingMultiscreen: $isPickingMultiscreen, selectedMultiChannels: $selectedMultiChannels)
+                } label: { Label("HD / 4K", systemImage: "4k.tv") }
+            }
+
             // Custom groups
             Section {
                 ForEach(customGroups.groups) { group in

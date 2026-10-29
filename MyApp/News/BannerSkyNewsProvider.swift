@@ -13,10 +13,10 @@ nonisolated struct SkySportsNewsProvider: SportsNewsProvider {
 
     // Sky feed IDs mapped by sport (from Sky's public RSS directory)
     private nonisolated static let feedByLeagueGroup: [SportGroup: [Int]] = [
-        .soccer:      [12040, 12801, 12803, 12604],  // main, premier league, football news, transfers
-        .racing:      [12040, 12614],                // main + F1/motorsport
-        .tennis:      [12040, 12615],
-        .golf:        [12040, 12616],
+        .soccer:      [12801, 12803, 12604],  // main, premier league, football news, transfers
+        .racing:      [12614],                // main + F1/motorsport
+        .tennis:      [12615],
+        .golf:        [12616],
         .cycling:     [12040],
         .basketball:  [12040],
         .baseball:    [12040],
@@ -70,7 +70,9 @@ nonisolated struct SkySportsNewsProvider: SportsNewsProvider {
                                 published: BannerRSSParser.parseDate(item.publishedRaw),
                                 url: URL(string: urlStr),
                                 imageURL: item.imageURL.flatMap(URL.init(string:)),
-                                leagueID: targetLeagueID,
+                                leagueID: [.soccer, .golf, .tennis].contains(league.group)
+                                    ? BannerNewsDeduplicator.classify(headline: title, description: item.description, tags: item.categories).leagueID
+                                    : targetLeagueID,
                                 teamIDs: [],
                                 playerIDs: [],
                                 sourceName: nil,
@@ -82,7 +84,8 @@ nonisolated struct SkySportsNewsProvider: SportsNewsProvider {
                                 ),
                                 publisher: "Sky Sports",
                                 articleType: nil,
-                                authorByline: item.author
+                                authorByline: item.author,
+                                primarySport: league.group
                             )
                         }
                     } catch { return [] }

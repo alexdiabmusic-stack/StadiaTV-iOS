@@ -26,6 +26,8 @@ actor BannerNewsHTTPClient {
     private var etags: [String: String] = [:]
     private var lastModified: [String: String] = [:]
     private var cachedResponses: [String: Data] = [:]
+    private var fetchedAt: [String: Date] = [:]
+    private var inFlight: [String: Task<Data, Error>] = [:]
 
     private let session: URLSession = {
         let cfg = URLSessionConfiguration.default
@@ -42,6 +44,19 @@ actor BannerNewsHTTPClient {
     /// Fetch data from a URL, using conditional GET when an ETag/Last-Modified is cached.
     /// Returns cached data on 304. Throws on non-2xx excluding 304.
     func data(from url: URL, accept: String? = nil) async throws -> Data {
+        let key = url.absoluteString
+        if let date = fetchedAt[key], Date().timeIntervalSince(date) < 300,
+           let cached = cachedResponses[key] { return cached }
+        if let pending = inFlight[key] { return try await pending.value }
+        let task = Task { try await self.fetch(url: url, accept: accept) }
+        inFlight[key] = task
+        defer { inFlight[key] = nil }
+        let result = try await task.value
+        fetchedAt[key] = Date()
+        return result
+    }
+
+    private func fetch(url: URL, accept: String?) async throws -> Data {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
 
@@ -88,14 +103,14 @@ actor BannerNewsHTTPClient {
                 attempt += 1
                 if attempt < maxAttempts {
                     let delay = pow(2.0, Double(attempt)) * 0.5 * Double.random(in: 0.5...1.5)
-                    try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 }
             } catch HTTPError.timeout {
                 lastError = HTTPError.timeout
                 attempt += 1
                 if attempt < maxAttempts {
                     let delay = Double.random(in: 0.75...1.5)
-                    try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 }
             } catch {
                 throw error  // non-retryable
@@ -109,5 +124,6 @@ actor BannerNewsHTTPClient {
         etags.removeValue(forKey: key)
         lastModified.removeValue(forKey: key)
         cachedResponses.removeValue(forKey: key)
+        fetchedAt.removeValue(forKey: key)
     }
 }

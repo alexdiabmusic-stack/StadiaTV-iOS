@@ -128,7 +128,8 @@ struct MyApp: App {
             // Channel refresh — parallel across all playlists (see PlaylistStore.refreshAll).
             .task { await playlistStore.refreshAll() }
             // Fantasy — load local state first, then refresh ESPN and event contexts concurrently.
-            .task(priority: .utility) {
+            .task(id: preferences.sportsFeaturesVisible, priority: .utility) {
+                guard preferences.sportsFeaturesVisible else { return }
                 await bannerFantasyStore.load()
                 // Not needed for the first screen; don't compete with launch or the first stream.
                 await PlaybackPriority.waitForBackgroundSlot()
@@ -167,9 +168,45 @@ struct MyApp: App {
         }
     }
 
-enum AppTab: String, Hashable {
+enum AppTab: String, Hashable, Identifiable {
+    case home, following, live, discover, settings, channels, guide, library
 
-    case home, following, live, discover, settings
+    var id: String { rawValue }
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .home: "Home"
+        case .following: "Following"
+        case .live: "Live"
+        case .discover: "Discover"
+        case .settings: "Settings"
+        case .channels: "Channels"
+        case .guide: "Guide"
+        case .library: "Library"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .home: "house.fill"
+        case .following: "star.fill"
+        case .live: "dot.radiowaves.left.and.right"
+        case .discover: "safari.fill"
+        case .settings: "gearshape.fill"
+        case .channels: "tv"
+        case .guide: "calendar"
+        case .library: "film"
+        }
+    }
+}
+
+/// The active experience owns tab order; destinations keep the same stable IDs.
+/// Future experiences can supply another configuration without changing stores.
+struct NavigationConfiguration {
+    let tabs: [AppTab]
+    static let sports = NavigationConfiguration(tabs: [.home, .following, .live, .discover, .settings])
+    static let liveTV = NavigationConfiguration(tabs: [.home, .channels, .guide, .library, .settings])
+    static func configuration(for experience: ViewingExperience) -> Self { experience == .sports ? .sports : .liveTV }
 }
 
 struct RootView: View {
@@ -183,6 +220,9 @@ struct RootView: View {
     @EnvironmentObject private var eventChannelRefresh: EventChannelRefreshService
     @EnvironmentObject private var appEnvironment: BannerAppEnvironment
     @State private var showingFavoriteNotificationPrompt = false
+    private var navigation: NavigationConfiguration { .configuration(for: prefs.viewingExperience) }
+    @State private var restoredTabs: [ViewingExperience: AppTab] = [:]
+    @State private var pendingRequestedTab: AppTab?
     #if DEBUG
     // Lets UI verification launch straight into a tab: SIMCTL_CHILD_BANNER_START_TAB=live.
     @State private var selectedTab: AppTab = AppTab(rawValue: ProcessInfo.processInfo.environment["BANNER_START_TAB"] ?? "") ?? .home
@@ -230,10 +270,9 @@ struct RootView: View {
     private var macNavigationBody: some View {
         NavigationSplitView {
             List(selection: macSidebarSelection) {
-                macSidebarRow("Home", systemImage: "house.fill").tag(AppTab.home)
-                macSidebarRow("Following", systemImage: "star.fill").tag(AppTab.following)
-                macSidebarRow("Live", systemImage: "dot.radiowaves.left.and.right").tag(AppTab.live)
-                macSidebarRow("Discover", systemImage: "safari.fill").tag(AppTab.discover)
+                ForEach(navigation.tabs) { tab in
+                    macSidebarRow(String(localized: tab.title), systemImage: tab.systemImage).tag(tab)
+                }
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 188, ideal: Theme.Mac.Sidebar.width)
@@ -246,11 +285,16 @@ struct RootView: View {
     @ViewBuilder
     private var macDetailContent: some View {
         switch selectedTab {
-        case .home: HomeView(switchToFollowing: { selectedTab = .following })
+        case .home:
+            if prefs.viewingExperience == .liveTV { TelevisionHomeView() }
+            else { HomeView(switchToFollowing: { selectedTab = .following }) }
         case .following: MatchesView()
         case .live: LiveView()
         case .discover: DiscoverView()
         case .settings: MoreView()
+        case .channels: NavigationStack { LiveChannelsView().navigationTitle("Channels") }
+        case .guide: NavigationStack { TVGuideView().navigationTitle("Guide") }
+        case .library: NavigationStack { EntertainmentLibraryView() }
         }
     }
     #endif
@@ -261,25 +305,13 @@ struct RootView: View {
             macNavigationBody
             #else
             TabView(selection: $selectedTab) {
-                Tab("Home", systemImage: "house.fill", value: AppTab.home) {
-                    HomeView(switchToFollowing: { selectedTab = .following })
-                        .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
-                }
-                Tab("Following", systemImage: "star.fill", value: AppTab.following) {
-                    MatchesView()
-                        .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
-                }
-                Tab("Live", systemImage: "dot.radiowaves.left.and.right", value: AppTab.live) {
-                    LiveView()
-                        .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
-                }
-                Tab("Discover", systemImage: "safari.fill", value: AppTab.discover) {
-                    DiscoverView()
-                        .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
-                }
-                Tab("Settings", systemImage: "gearshape.fill", value: AppTab.settings) {
-                    MoreView()
-                        .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
+                ForEach(navigation.tabs) { tab in
+                    Tab(value: tab) {
+                        tabDestination(tab)
+                            .safeAreaInset(edge: .bottom, spacing: 0) { miniPlayerBar }
+                    } label: {
+                        Label { Text(tab.title) } icon: { Image(systemName: tab.systemImage) }
+                    }
                 }
             }
             .tabViewStyle(.sidebarAdaptable)
@@ -288,6 +320,12 @@ struct RootView: View {
             .toolbarBackground(.visible, for: .tabBar)
             #endif
             #endif
+        }
+        .onChange(of: prefs.viewingExperience) { previous, current in
+            restoredTabs[previous] = selectedTab
+            selectedTab = pendingRequestedTab.flatMap { navigation.tabs.contains($0) ? $0 : nil }
+                ?? restoredTabs[current].flatMap { navigation.tabs.contains($0) ? $0 : nil } ?? .home
+            pendingRequestedTab = nil
         }
         .tint(Theme.accent)
         .providesAdaptiveLayoutContext()
@@ -324,7 +362,7 @@ struct RootView: View {
         }
         .onChange(of: appEnvironment.requestedTab) { _, tab in
             guard let tab else { return }
-            selectedTab = tab
+            route(to: tab)
             appEnvironment.requestedTab = nil
         }
         .fullScreenCoverCompat(item: $deepLinkMatch) { MatchDetailView(match: $0) }
@@ -340,14 +378,38 @@ struct RootView: View {
         }
     }
 
+    @ViewBuilder
+    private func tabDestination(_ tab: AppTab) -> some View {
+        switch tab {
+        case .home:
+            if prefs.viewingExperience == .liveTV { TelevisionHomeView() }
+            else { HomeView(switchToFollowing: { selectedTab = .following }) }
+        case .following: MatchesView()
+        case .live: LiveView()
+        case .discover: DiscoverView()
+        case .settings: MoreView()
+        case .channels: NavigationStack { LiveChannelsView().navigationTitle("Channels") }
+        case .guide: NavigationStack { TVGuideView().navigationTitle("Guide") }
+        case .library: NavigationStack { EntertainmentLibraryView() }
+        }
+    }
+
+    private func route(to tab: AppTab) {
+        if navigation.tabs.contains(tab) { selectedTab = tab }
+        else {
+            pendingRequestedTab = tab
+            prefs.setViewingExperience([.channels, .guide, .library].contains(tab) ? .liveTV : .sports)
+        }
+    }
+
     private func open(_ link: DeepLink) {
         switch link {
         case .match(let leagueID, let matchID, let date):
             notificationMatch = DeepLinkMatchTarget(leagueID: leagueID, matchID: matchID, date: date)
         case .home: selectedTab = .home
-        case .following: selectedTab = .following
-        case .live: selectedTab = .live
-        case .discover: selectedTab = .discover
+        case .following: route(to: .following)
+        case .live: selectedTab = prefs.viewingExperience == .liveTV ? .channels : .live
+        case .discover: route(to: .discover)
         case .settings: selectedTab = .settings
         }
     }
@@ -384,7 +446,7 @@ struct RootView: View {
         #if os(tvOS)
         showingFavoriteNotificationPrompt = false
         #else
-        showingFavoriteNotificationPrompt = prefs.shouldPromptForFavoriteTeamNotifications
+        showingFavoriteNotificationPrompt = prefs.sportsFeaturesVisible && prefs.shouldPromptForFavoriteTeamNotifications
         #endif
     }
 

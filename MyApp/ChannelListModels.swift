@@ -27,6 +27,7 @@ final class ChannelBrowserModel: ObservableObject {
         var customNames: [String: String]
         var query: String
         var sortOrder: ChannelSortOrder
+        var searchTerms: [String: String] = [:]
     }
 
     private var computeTask: Task<Void, Never>?
@@ -73,9 +74,9 @@ final class ChannelBrowserModel: ObservableObject {
         case .all:
             base = input.channels.filter { !input.hiddenIDs.contains($0.id) }
         case .favorites:
-            base = input.favoriteIDs.compactMap { input.channelsByID[$0] }
+            base = input.favoriteIDs.compactMap { input.channelsByID[$0] }.filter { !input.hiddenIDs.contains($0.id) }
         case .ids(let ids):
-            base = ids.compactMap { input.channelsByID[$0] }
+            base = ids.compactMap { input.channelsByID[$0] }.filter { !input.hiddenIDs.contains($0.id) }
         case .playlistGroup(_, let title):
             base = input.byPlaylist.filter { ($0.group ?? "") == title && !input.hiddenIDs.contains($0.id) }
         }
@@ -97,7 +98,10 @@ final class ChannelBrowserModel: ObservableObject {
         for channel in base {
             let name = input.customNames[channel.id] ?? channel.name
             let key = needsKey ? sortKey(name) : ""
-            if let needle, !key.contains(needle) { continue }
+            if let needle {
+                let searchable = sortKey(name + " " + channel.name + " " + (channel.group ?? "") + " " + (input.searchTerms[channel.id] ?? ""))
+                if !searchable.contains(needle) { continue }
+            }
             let number = input.sortOrder == .channelNumber ? channelNumber(name) : nil
             keyed.append(Keyed(channel: channel, key: key, number: number))
         }
@@ -126,6 +130,7 @@ final class ChannelBrowserModel: ObservableObject {
     /// Case- and diacritic-insensitive key; comparing these approximates localized ordering cheaply.
     nonisolated static func sortKey(_ name: String) -> String {
         name.folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil)
+            .components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }.joined(separator: " ")
     }
 
     /// The number a provider puts in front of a channel name: "12. ESPN", "7 - BBC", "103| TNT", "5) Sky".

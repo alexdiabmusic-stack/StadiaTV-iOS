@@ -119,7 +119,7 @@ nonisolated struct CBSRSSNewsProvider: SportsNewsProvider {
             if league.path.contains("nfl") { result.append(("nfl", league)) }
             else if league.path.contains("college") { result.append(("college-football", league)) }
         case .basketball:
-            if league.path.contains("nba") { result.append(("nba", league)) }
+            if league.path == "basketball/nba" { result.append(("nba", league)) }
             else if league.path.contains("college") { result.append(("college-basketball", league)) }
         case .baseball:
             result.append(("mlb", league))

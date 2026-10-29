@@ -239,7 +239,7 @@ struct TVArticleCard: View {
             .clipped()
 
             VStack(alignment: .leading, spacing: 8) {
-                Text(article.league.shortName.uppercased())
+                Text(article.categoryLabel)
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(Theme.accent)
                 Text(article.headline)

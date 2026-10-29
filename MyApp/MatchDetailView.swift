@@ -138,6 +138,15 @@ struct MatchDetailView: View {
                     picksSection
                     matchNewsSection
                 }
+            } else if match.league.path == "soccer/uefa.champions", let seed = ChampionsLeagueMapper.seed(from: match) {
+                SoccerGameCentreView(match: match, leaguePath: match.league.path, providerID: .fotmob, providerDisplayName: "FotMob",
+                    service: ChampionsLeagueGameCentreService(base: seed), cache: .championsLeague,
+                    pollingPolicy: SoccerPollingPolicy(live: 30, halftime: 30, pregameWithin15Min: 60, pregameWithin1Hour: 120, pregameBeyond1Hour: 300, delayedOrSuspended: 60, fallback: 120),
+                    availableTabs: [.overview, .timeline, .lineups, .stats],
+                    seed: ChampionsLeagueMapper.seed(from:),
+                    watchContent: { if match.state != .final { sourcesSection } }) {
+                    matchNewsSection
+                }
             } else if match.league.path == "soccer/esp.1" {
                 SoccerGameCentreView(match: match, leaguePath: "soccer/esp.1", providerID: .laliga, providerDisplayName: "La Liga",
                     service: LaLigaGameCentreService(officialSource: LaLigaProvider.shared), cache: .laliga, pollingPolicy: .laliga, availableTabs: [.overview, .timeline, .lineups, .stats, .commentary, .shots],
@@ -373,7 +382,7 @@ struct MatchDetailView: View {
     /// Only a league outside this set falls through to the generic screen the legacy summary feeds.
     private static let nativeGameCentreLeaguePaths: Set<String> = [
         "hockey/nhl", "baseball/mlb", "football/nfl", "football/cfl", "racing/f1", "golf/pga",
-        "basketball/nba", "basketball/wnba", "soccer/eng.1", "soccer/usa.1", "soccer/esp.1",
+        "basketball/nba", "basketball/wnba", "soccer/eng.1", "soccer/usa.1", "soccer/esp.1", "soccer/uefa.champions",
     ]
 
     /// Loads boxscore stats once, then keeps polling while the game is live.

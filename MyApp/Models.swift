@@ -783,4 +783,12 @@ nonisolated struct ESPNArticle: Identifiable, Hashable {
     var isPremium: Bool = false
     /// Topic tags surfaced by the Now feed.
     var categories: [String] = []
+    /// Publisher is distinct from the author's byline.
+    var publisher: String? = nil
+    /// Nil for legacy callers; normalized feeds supply a truthful broad category
+    /// when a league cannot be established.
+    var validatedCategory: String? = nil
+    var relevantTeamIDs: [String] = []
+
+    var categoryLabel: String { validatedCategory ?? league.shortName }
 }

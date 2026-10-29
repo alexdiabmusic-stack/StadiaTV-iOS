@@ -12,17 +12,31 @@ struct GameScoreRow: View {
 
     var body: some View {
         Group {
-            if dynamicTypeSize.isAccessibilitySize {
+            if !GameCentreArchetype(match: match).usesHeadToHeadParticipantUI {
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    Label(match.name, systemImage: match.league.group.systemImage)
+                        .font(Theme.Typography.title)
+                        .foregroundStyle(Theme.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let venue = match.venue, !venue.isEmpty {
+                        Text(venue)
+                            .font(Theme.Typography.callout)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else if dynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: 12) {
                     team(match.leadingSide)
                     score
                     team(match.trailingSide)
                 }
             } else {
-                HStack(alignment: .center, spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
                     team(match.leadingSide)
                         .frame(maxWidth: .infinity)
                     score
+                        .frame(height: logoSize)
                         .layoutPriority(1)
                     team(match.trailingSide)
                         .frame(maxWidth: .infinity)
@@ -30,8 +44,10 @@ struct GameScoreRow: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(match.leadingSide.displayName) versus \(match.trailingSide.displayName)")
-        .accessibilityValue(showsScore ? "\(match.leadingSide.score ?? "–") to \(match.trailingSide.score ?? "–")" : String(localized: "Upcoming"))
+        .accessibilityLabel(GameCentreArchetype(match: match).usesHeadToHeadParticipantUI
+            ? "\(match.leadingSide.displayName) versus \(match.trailingSide.displayName)" : match.name)
+        .accessibilityValue(GameCentreArchetype(match: match).usesHeadToHeadParticipantUI && showsScore
+            ? "\(match.leadingSide.score ?? "–") to \(match.trailingSide.score ?? "–")" : match.statusDetail)
     }
 
     private var score: some View {

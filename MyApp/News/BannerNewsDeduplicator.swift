@@ -30,10 +30,10 @@ enum BannerNewsDeduplicator {
             let titleKey = normalizeTitle(article.headline)
 
             if !urlKey.isEmpty && seenURLs.contains(urlKey) { continue }
-            if seenTitles.contains(titleKey) { continue }
+            if !titleKey.isEmpty && seenTitles.contains(titleKey) { continue }
 
             if !urlKey.isEmpty { seenURLs.insert(urlKey) }
-            seenTitles.insert(titleKey)
+            if !titleKey.isEmpty { seenTitles.insert(titleKey) }
             result.append(article)
         }
         return result
@@ -89,35 +89,64 @@ enum BannerNewsDeduplicator {
         return Array(sorted.prefix(limit))
     }
 
+    nonisolated static func hasAmbiguousLeagueEvidence(headline: String, description: String?) -> Bool {
+        if isMultiEventRoundup(headline) { return true }
+        let headlineLeagues = identifiedLeagues(in: headline)
+        return (headlineLeagues.isEmpty ? identifiedLeagues(in: description ?? "") : headlineLeagues).count > 1
+    }
+
+    nonisolated private static func isMultiEventRoundup(_ headline: String) -> Bool {
+        let normalized = headline.lowercased().replacingOccurrences(of: "’", with: "'")
+        return normalized.contains("today's top games") || normalized.contains("games to watch, best bets")
+    }
+
     // MARK: - League classification
 
     /// Attempts to identify the most relevant league for a headline + description.
     nonisolated static func classify(headline: String, description: String?, tags: [String] = []) -> (sport: SportGroup?, leagueID: BannerEntityID?) {
-        let text = ([headline, description ?? ""] + tags).joined(separator: " ").lowercased()
-
-        // Sorted from most-specific to least-specific so short tokens don't collide.
-        let orderedLeagues: [League] = League.all.sorted { lhs, rhs in
-            let lMax = lhs.keywords.map(\.count).max() ?? 0
-            let rMax = rhs.keywords.map(\.count).max() ?? 0
-            return lMax > rMax
+        if isMultiEventRoundup(headline) { return (nil, nil) }
+        // Broadcast keywords such as "football", "Sunday" or "basketball" are
+        // not league evidence. Headline evidence takes priority over feed tags.
+        let headlineLeagues = identifiedLeagues(in: headline)
+        let candidates = headlineLeagues.isEmpty
+            ? identifiedLeagues(in: ([description ?? ""] + tags).joined(separator: " "))
+            : headlineLeagues
+        if candidates.count == 1, let league = candidates.first {
+            return (league.group, SportsIdentityResolver.canonicalLeagueID(for: league))
         }
+        let groups = Set(candidates.map(\.group))
+        if !candidates.isEmpty { return (groups.count == 1 ? groups.first : nil, nil) }
+        let text = ([headline, description ?? ""] + tags).joined(separator: " ")
+        let sports: [(SportGroup, [String])] = [
+            (.basketball, ["basketball"]), (.hockey, ["hockey"]),
+            (.baseball, ["baseball"]), (.soccer, ["soccer"]),
+            (.golf, ["golf"]), (.tennis, ["tennis"]), (.racing, ["motorsport", "racing"])
+        ]
+        let matched = sports.filter { _, words in words.contains { containsPhrase($0, in: text) } }
+        return (matched.count == 1 ? matched.first?.0 : nil, nil)
+    }
 
-        for league in orderedLeagues {
-            for keyword in league.keywords {
-                let k = keyword.lowercased()
-                // Require word-boundary match for short tokens (≤ 4 chars) to reduce false positives
-                if k.count <= 4 {
-                    let pattern = "\\b\(NSRegularExpression.escapedPattern(for: k))\\b"
-                    if let _ = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive)
-                        .firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) {
-                        return (league.group, SportsIdentityResolver.canonicalLeagueID(for: league))
-                    }
-                } else if text.contains(k) {
-                    return (league.group, SportsIdentityResolver.canonicalLeagueID(for: league))
-                }
+    private nonisolated static func identifiedLeagues(in text: String) -> [League] {
+        League.all.filter { league in
+            var names = [league.name, league.shortName]
+            switch league.path {
+            case "racing/f1": names += ["Formula 1", "Formula One"]
+            case "soccer/eng.1": names += ["Premier League"]
+            case "soccer/esp.1": names += ["La Liga", "LaLiga"]
+            case "baseball/mlb": names += ["World Series"]
+            case "football/nfl": names += ["Monday Night Football", "MNF", "Super Bowl"]
+            case "hockey/nhl": names += ["National Hockey League"]
+            case "basketball/nba": names += ["National Basketball Association"]
+            case "basketball/wnba": names += ["Women's National Basketball Association"]
+            default: break
             }
+            return names.contains { containsPhrase($0, in: text) }
         }
-        return (nil, nil)
+    }
+
+    private nonisolated static func containsPhrase(_ phrase: String, in text: String) -> Bool {
+        let pattern = "(?<![\\p{L}\\p{N}])" + NSRegularExpression.escapedPattern(for: phrase) + "(?![\\p{L}\\p{N}])"
+        return text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
     }
 
     // MARK: - Helpers
@@ -132,7 +161,13 @@ enum BannerNewsDeduplicator {
         }
         if comps.queryItems?.isEmpty == true { comps.queryItems = nil }
         comps.fragment = nil
-        return (comps.url?.absoluteString ?? "").lowercased()
+        // URL paths and query values may be case-sensitive.
+        comps.scheme = comps.scheme?.lowercased()
+        comps.host = comps.host?.lowercased()
+        comps.queryItems = comps.queryItems?.sorted {
+            $0.name == $1.name ? ($0.value ?? "") < ($1.value ?? "") : $0.name < $1.name
+        }
+        return comps.url?.absoluteString ?? ""
     }
 
     private nonisolated static func normalizeTitle(_ title: String) -> String {
@@ -140,10 +175,13 @@ enum BannerNewsDeduplicator {
         // Strip publisher suffixes like " - ESPN", " | FOX Sports"
         for sep in [" - ", " | ", " – "] {
             if let range = t.range(of: sep, options: .backwards) {
-                t = String(t[..<range.lowerBound])
+                let suffix = t[range.upperBound...].trimmingCharacters(in: .whitespaces)
+                if ["espn", "fox sports", "bbc sport", "cbs sports", "nbc sports", "sky sports"].contains(suffix) {
+                    t = String(t[..<range.lowerBound])
+                }
             }
         }
-        t = t.replacingOccurrences(of: "[^a-z0-9 ]", with: "", options: .regularExpression)
+        t = t.replacingOccurrences(of: #"[^\p{L}\p{N} ]"#, with: "", options: .regularExpression)
         t = t.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
         return t.trimmingCharacters(in: .whitespaces)
     }

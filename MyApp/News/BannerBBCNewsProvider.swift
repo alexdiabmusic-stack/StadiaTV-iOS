@@ -58,7 +58,9 @@ nonisolated struct BBCSportNewsProvider: SportsNewsProvider {
                                 published: BannerRSSParser.parseDate(item.publishedRaw),
                                 url: URL(string: urlStr),
                                 imageURL: item.imageURL.flatMap(URL.init(string:)),
-                                leagueID: targetLeagueID,
+                                leagueID: [.soccer, .golf, .tennis].contains(league.group)
+                                    ? BannerNewsDeduplicator.classify(headline: title, description: item.description, tags: item.categories).leagueID
+                                    : targetLeagueID,
                                 teamIDs: [],
                                 playerIDs: [],
                                 sourceName: nil,
@@ -70,7 +72,8 @@ nonisolated struct BBCSportNewsProvider: SportsNewsProvider {
                                 ),
                                 publisher: "BBC Sport",
                                 articleType: nil,
-                                authorByline: item.author
+                                authorByline: item.author,
+                                primarySport: league.group
                             )
                         }
                     } catch { return [] }

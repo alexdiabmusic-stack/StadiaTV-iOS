@@ -33,7 +33,7 @@ nonisolated enum FotMobDate {
     /// verified live 2026-09-24.
     static func parse(_ value: String?) -> Date? {
         guard let value else { return nil }
-        return formatter.date(from: value)
+        return formatter.date(from: value) ?? (try? Date.ISO8601FormatStyle().parse(value))
     }
     // `ISO8601DateFormatter` predates Sendable but is never mutated after creation
     // here — read-only use is safe across concurrent callers.

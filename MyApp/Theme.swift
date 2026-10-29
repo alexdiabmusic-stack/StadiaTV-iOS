@@ -8,20 +8,20 @@ import AppKit
 /// BannerTV visual language — neutral foundation with colour reserved for meaning.
 enum Theme {
     static let background       = dynamic(dark: 0x080B12, light: 0xF4F5F7)
-    static let surface          = dynamic(dark: 0x141923, light: 0xFFFFFF)
-    static let surfaceElevated  = dynamic(dark: 0x1D2533, light: 0xE8EAEF)
-    static let accent           = Color(hex: 0x4B86F7)
+    static let surface          = dynamic(dark: 0x151D2B, light: 0xFFFFFF)
+    static let surfaceElevated  = dynamic(dark: 0x1C2638, light: 0xE8EAEF)
+    static let accent           = dynamic(dark: 0x5488FF, light: 0x1D4ED8)
     static let accessibleAccent = dynamic(dark: 0x60A5FA, light: 0x1D4ED8)
     static let actionFill       = Color(hex: 0x1D4ED8)
-    static let live             = Color(hex: 0xEF5966)
+    static let live             = dynamic(dark: 0xEF5966, light: 0xB71F36)
     /// `live` as a fill behind a white label (3.2:1 on `live` itself; 4.8:1 here).
     static let liveFill         = Color(hex: 0xD92D3F)
-    static let starting         = Color(hex: 0xE6B65D)
-    static let upcoming         = Color(hex: 0x54BC8A)
+    static let starting         = upcoming
+    static let upcoming         = dynamic(dark: 0xD7B36B, light: 0x795600)
     static let textPrimary      = dynamic(dark: 0xF7F8FA, light: 0x15181D)
     static let textSecondary    = dynamic(dark: 0x9BA4B5, light: 0x5C6470)
     // Both pass 4.5:1 against every background and surface (was 3.2-3.7 dark, 2.5-3.0 light).
-    static let textTertiary     = dynamic(dark: 0x808898, light: 0x5F6672)
+    static let textTertiary     = dynamic(dark: 0x8A94A6, light: 0x5F6672)
     static let hairline         = dynamic(dark: 0xFFFFFF, light: 0x000000, darkAlpha: 0.07, lightAlpha: 0.09)
 
     private static func dynamic(dark: UInt, light: UInt, darkAlpha: Double = 1, lightAlpha: Double = 1) -> Color {
@@ -84,7 +84,7 @@ enum Theme {
 
     enum Typography {
         static let score = Font.system(.title, weight: .semibold).monospacedDigit()
-        static let section = Font.system(.subheadline, weight: .semibold)
+        static let section = Font.system(.headline, weight: .semibold)
         static let display = Font.system(.largeTitle, weight: .bold)
         static let title = Font.system(.title2, weight: .bold)
         static let headline = Font.system(.headline, weight: .semibold)

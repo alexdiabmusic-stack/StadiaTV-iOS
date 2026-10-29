@@ -390,7 +390,7 @@ struct PlayerView: View {
             channel: activePlaybackChannel,
             canonicalChannel: canonicalChannel,
             match: prefs.spoilerFreeMode ? nil : liveScoreMatch,
-            scoreBugMatch: prefs.showLiveScoreBadge && !isScoreDismissed ? displayedScoreMatch : nil,
+            scoreBugMatch: prefs.sportsFeaturesVisible && prefs.showLiveScoreBadge && !isScoreDismissed ? displayedScoreMatch : nil,
             matchResolutionState: matchResolutionState,
             selectedTab: $selectedPlayerTab,
             isChromeVisible: isChromeVisible && !controlsLocked,
@@ -447,7 +447,9 @@ struct PlayerView: View {
                 onSelectChannel: { switchChannel(to: $0) }
             )
         }
-        .overlay(alignment: .topTrailing) { PlayerSportsAlertBanner() }
+        .overlay(alignment: .topTrailing) {
+            if prefs.sportsFeaturesVisible { PlayerSportsAlertBanner() }
+        }
         .onGeometryChange(for: Bool.self) { $0.size.width > $0.size.height } action: { landscape in
             isLandscapeLayout = landscape
         }
@@ -1270,6 +1272,7 @@ struct PlayerView: View {
     }
 
     private func findAndPollLiveMatch(for targetChannel: Channel) async {
+        guard prefs.sportsFeaturesVisible else { return }
         let channel = targetChannel
         matchResolutionState = .resolving
 
@@ -2508,6 +2511,7 @@ private struct SportGameCentre: View {
 /// Portrait page for channels without a connected match: Now/Next from the guide
 /// (with a reminder for Next), channel details, and more channels in the same group.
 private struct PlayerChannelInfoPage: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let channel: Channel
     let canonicalChannel: CanonicalChannel?
     let isResolvingMatch: Bool
@@ -2577,7 +2581,10 @@ private struct PlayerChannelInfoPage: View {
                     Text(now.title)
                         .font(Theme.Typography.title)
                         .foregroundStyle(Theme.textPrimary)
-                    HStack(spacing: Theme.Spacing.xs) {
+                    let layout = dynamicTypeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: Theme.Spacing.xs))
+                        : AnyLayout(HStackLayout(spacing: Theme.Spacing.xs))
+                    layout {
                         Text(timeRange(now)).font(Theme.Typography.captionDigits)
                         ProgressView(value: now.progress(at: date)).tint(Theme.live)
                     }
@@ -2671,7 +2678,7 @@ private struct PlayerChannelInfoPage: View {
     private func nextProgramme(after date: Date) -> EPGProgramme? {
         guard let epg = stores?.epgRepository,
               let canonicalID = canonicalChannel?.id ?? epg.canonicalChannel(forProviderChannelID: channel.id, playlistID: channel.playlistID)?.id else { return nil }
-        return epg.nextProgramme(for: canonicalID, after: date)
+        return epg.nextProgramme(for: canonicalID, after: date, includingBoundary: true)
     }
 
     private func timeRange(_ programme: EPGProgramme) -> String {
@@ -4137,6 +4144,8 @@ private struct PlaybackStatusOverlay: View {
             if let summary = controller.metricsSummary {
                 Text(summary)
                     .font(.caption2.monospacedDigit())
+                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                    .accessibilityHidden(true)
                     .foregroundStyle(.white)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)

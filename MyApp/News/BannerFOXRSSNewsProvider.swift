@@ -58,7 +58,9 @@ nonisolated struct FOXRSSNewsProvider: SportsNewsProvider {
                                 published: BannerRSSParser.parseDate(item.publishedRaw),
                                 url: URL(string: urlStr),
                                 imageURL: item.imageURL.flatMap(URL.init(string:)),
-                                leagueID: targetLeagueID,
+                                leagueID: [.soccer, .golf, .tennis].contains(league.group)
+                                    ? BannerNewsDeduplicator.classify(headline: title, description: item.description, tags: item.categories).leagueID
+                                    : targetLeagueID,
                                 teamIDs: [],
                                 playerIDs: [],
                                 sourceName: nil,
@@ -70,7 +72,8 @@ nonisolated struct FOXRSSNewsProvider: SportsNewsProvider {
                                 ),
                                 publisher: "FOX Sports",
                                 articleType: nil,
-                                authorByline: item.author
+                                authorByline: item.author,
+                                primarySport: league.group
                             )
                         }
                     } catch { return [] }
@@ -93,8 +96,7 @@ nonisolated struct FOXRSSNewsProvider: SportsNewsProvider {
 
         // FOX RSS feeds use ?tag=nfl&partnerKey=... or ?tag=nba&partnerKey=...
         guard let tag = foxTag(for: league) else {
-            // Fall back to general FOX Sports feed
-            return ["\(base)?partnerKey=\(pk)"]
+            return []
         }
         return ["\(base)?tag=\(tag)&partnerKey=\(pk)"]
     }
@@ -106,7 +108,7 @@ nonisolated struct FOXRSSNewsProvider: SportsNewsProvider {
                  : league.path.contains("college") ? "college-football"
                  : nil
         case .basketball:
-            return league.path.contains("nba") ? "nba"
+            return league.path == "basketball/nba" ? "nba"
                  : league.path.contains("college") ? "college-basketball"
                  : nil
         case .baseball:  return "mlb"
@@ -114,7 +116,7 @@ nonisolated struct FOXRSSNewsProvider: SportsNewsProvider {
         case .soccer:    return "soccer"
         case .golf:      return "golf"
         case .tennis:    return "tennis"
-        case .racing:    return "nascar"  // FOX has NASCAR, not F1
+        case .racing:    return nil  // NASCAR is not evidence of Formula 1 coverage.
         default:         return nil
         }
     }

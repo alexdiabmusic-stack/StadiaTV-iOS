@@ -11,7 +11,6 @@ nonisolated enum FotMobStatusMapper {
         if raw["cancelled"].bool == true { return .cancelled }
         if raw["awarded"].bool == true { return .fullTime }
         if raw["finished"].bool == true { return .fullTime }
-        if raw["started"].bool != true { return .scheduled }
         let key = (raw["reason"]["shortKey"].string ?? raw["reason"]["longKey"].string ?? "").lowercased()
         switch key {
         case "halftime_short", "halftime": return .halftime
@@ -25,6 +24,7 @@ nonisolated enum FotMobStatusMapper {
         if key.contains("abandon") { return .abandoned }
         if key.contains("delay") { return .delayed }
         if key.contains("cancel") { return .cancelled }
+        if raw["started"].bool != true { return .scheduled }
         if key.contains("half") { return key.contains("time") ? .halftime : .secondHalf }
         // Started but no recognized reason key — safest inferred default while live.
         return key.isEmpty ? .firstHalf : .unknown(key)

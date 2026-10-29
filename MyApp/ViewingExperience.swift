@@ -1,15 +1,16 @@
 import SwiftUI
 
 nonisolated enum ViewingExperience: String, Codable, CaseIterable, Identifiable {
-    case sports, liveTV
+    case sports, liveTV, complete
     var id: String { rawValue }
     var title: LocalizedStringResource {
-        switch self { case .sports: "Sports Mode"; case .liveTV: "Live TV Mode" }
+        switch self { case .sports: "Sports Mode"; case .liveTV: "Live TV Mode"; case .complete: "Complete Mode" }
     }
     var summary: LocalizedStringResource {
         switch self {
         case .sports: "Scores, teams, games and sports discovery."
         case .liveTV: "Live channels, television guide and entertainment."
+        case .complete: "Movies, series, live television and sports, together."
         }
     }
     var icon: String { self == .sports ? "sportscourt" : "tv" }
@@ -25,9 +26,20 @@ nonisolated enum SportsIntegrationLevel: String, Codable, CaseIterable, Identifi
 
 struct ViewingExperienceSettingsView: View {
     @EnvironmentObject private var preferences: PreferencesStore
+    @AppStorage("banner.complete.sportsVisibility.v1") private var visibility = "balanced"
+    @AppStorage("banner.playback.autoplayEpisodes.v1") private var autoplay = false
 
     var body: some View {
         Form {
+            Section("Complete Mode") {
+                Toggle("Autoplay Next Episode", isOn: $autoplay)
+                Picker("Sports Visibility", selection: $visibility) {
+                    Text("Minimal").tag("minimal")
+                    Text("Balanced").tag("balanced")
+                    Text("Prominent").tag("prominent")
+                }
+                NavigationLink("Watchlist & History") { EntertainmentCollectionsView() }
+            }
             Section("Viewing Experience") {
                 ForEach(ViewingExperience.allCases) { experience in
                     Button {

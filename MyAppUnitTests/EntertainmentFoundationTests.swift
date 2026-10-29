@@ -26,12 +26,13 @@ struct EntertainmentFoundationTests {
         preferences.viewingExperience = .sports
         #expect(preferences.selectedLeagueIDs == ["hockey/nhl"])
         #expect(NavigationConfiguration.configuration(for: .sports).tabs == [.home, .following, .live, .discover, .settings])
-        #expect(ViewingExperience.allCases.count == 2)
+        #expect(ViewingExperience.allCases.count == 3)
+        #expect(NavigationConfiguration.configuration(for: .complete).tabs == [.home, .television, .movies, .series, .sports])
     }
 
     @Test func unknownFutureModeFallsBackWithoutResettingData() throws {
         let value = try JSONDecoder().decode(UserPreferences.self,
-            from: Data(#"{"viewingExperience":"complete","selectedLeagueIDs":["hockey/nhl"]}"#.utf8))
+            from: Data(#"{"viewingExperience":"futureMode","selectedLeagueIDs":["hockey/nhl"]}"#.utf8))
         #expect(value.viewingExperience == .sports)
         #expect(value.selectedLeagueIDs.contains("hockey/nhl"))
     }

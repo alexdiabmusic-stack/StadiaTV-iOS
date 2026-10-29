@@ -406,7 +406,7 @@ final class PreferencesStore: ObservableObject {
 
     var viewingExperience: ViewingExperience { prefs.viewingExperience }
     var sportsIntegration: SportsIntegrationLevel { prefs.sportsIntegration }
-    var sportsFeaturesVisible: Bool { viewingExperience == .sports || sportsIntegration != .hidden }
+    var sportsFeaturesVisible: Bool { viewingExperience != .liveTV || sportsIntegration != .hidden }
     func setViewingExperience(_ value: ViewingExperience) { prefs.viewingExperience = value; persist() }
     func setSportsIntegration(_ value: SportsIntegrationLevel) { prefs.sportsIntegration = value; persist() }
 

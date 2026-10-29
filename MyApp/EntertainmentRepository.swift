@@ -37,7 +37,11 @@ final class EntertainmentRepository {
     private(set) var sourceErrors: [UUID: String] = [:]
     private(set) var progress: [String: EntertainmentProgress] = [:]
     private(set) var watchlist: Set<String> = []
+    private(set) var savedWatchlistItems: [String: EntertainmentItem] = [:]
+    private(set) var savedHistoryItems: [String: EntertainmentItem] = [:]
     private(set) var revision = 0
+    private(set) var userStateRevision = 0
+    private(set) var hiddenContinueWatching: Set<String> = []
     private var refreshed: [String: Date] = [:]
     private var attempted: [String: Date] = [:]
     private var loaded = false
@@ -52,7 +56,16 @@ final class EntertainmentRepository {
         if let data = defaults.data(forKey: "banner.entertainment.progress.v1") {
             progress = (try? JSONDecoder().decode([String: EntertainmentProgress].self, from: data)) ?? [:]
         }
+        if let data = defaults.data(forKey: "banner.entertainment.historyItems.v1"),
+           let saved = try? JSONDecoder().decode([String: EntertainmentItem].self, from: data) {
+            savedHistoryItems = saved
+        }
+        hiddenContinueWatching = Set(defaults.stringArray(forKey: "banner.entertainment.hiddenContinue.v1") ?? [])
         watchlist = Set(defaults.stringArray(forKey: "banner.entertainment.watchlist.v1") ?? [])
+        if let data = defaults.data(forKey: "banner.entertainment.watchlistItems.v1"),
+           let saved = try? JSONDecoder().decode([String: EntertainmentItem].self, from: data) {
+            savedWatchlistItems = saved
+        }
     }
 
     func load() async {
@@ -71,6 +84,13 @@ final class EntertainmentRepository {
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
+        // Retain legacy history presentation before refreshed inventory can evict it.
+        for item in catalog + seasonsBySeries.values.flatMap({ $0.flatMap(\.episodes) })
+            where watchProgress(for: item) != nil { retainHistoryItem(item, persist: false) }
+        persistHistoryItems()
+        // Capture legacy saved titles before a source refresh can evict them.
+        for item in catalog where watchlist.contains(item.id) { savedWatchlistItems[item.id] = item }
+        persistWatchlistItems()
         let configuredIDs = Set(playlists.map(\.id))
         items.removeAll { $0.sources.allSatisfy { !configuredIDs.contains($0.sourceID) } }
         sourceErrors = sourceErrors.filter { configuredIDs.contains($0.key) }
@@ -124,6 +144,23 @@ final class EntertainmentRepository {
     }
 
     private func markUnknown(sourceID: UUID, kind: EntertainmentKind) {
+        if kind == .series {
+            for id in Array(seasonsBySeries.keys) {
+                seasonsBySeries[id] = seasonsBySeries[id]?.map { season in
+                    var season = season
+                    season.episodes = season.episodes.map { episode in
+                        var episode = episode
+                        episode.sources = episode.sources.map { source in
+                            var source = source
+                            if source.sourceID == sourceID { source.availability = .unknown }
+                            return source
+                        }
+                        return episode
+                    }
+                    return season
+                }
+            }
+        }
         for index in items.indices where items[index].kind == kind {
             for source in items[index].sources.indices where items[index].sources[source].sourceID == sourceID {
                 items[index].sources[source].availability = .unknown
@@ -140,6 +177,8 @@ final class EntertainmentRepository {
     }
 
     private func loadDetail(_ item: EntertainmentItem, playlists: [Playlist]) async {
+        // Episode identity is enriched through its validated series/season mapping only.
+        guard item.kind != .episode else { return }
         guard let source = item.sources.first, let playlist = playlists.first(where: { $0.id == source.sourceID }) else { return }
         var updated = item
         if playlist.kind == .xtream {
@@ -211,25 +250,55 @@ final class EntertainmentRepository {
         progress[item.progressID] ?? progress[item.id]
     }
 
-    func record(_ value: EntertainmentProgress) {
+    func record(_ value: EntertainmentProgress, item: EntertainmentItem? = nil) {
+        if let item { retainHistoryItem(item) }
+        userStateRevision += 1
         progress[value.contentID] = value
-        if progress.count > 2000, let oldest = progress.min(by: { $0.value.lastWatched < $1.value.lastWatched })?.key { progress[oldest] = nil }
+        if hiddenContinueWatching.remove(value.contentID) != nil {
+            defaults.set(Array(hiddenContinueWatching), forKey: "banner.entertainment.hiddenContinue.v1")
+        }
         if let data = try? JSONEncoder().encode(progress) { defaults.set(data, forKey: "banner.entertainment.progress.v1") }
     }
 
     func toggleWatchlist(_ id: String) {
+        userStateRevision += 1
+        if let item = item(for: id) { savedWatchlistItems[id] = item }
         if watchlist.contains(id) { watchlist.remove(id) } else { watchlist.insert(id) }
         defaults.set(Array(watchlist), forKey: "banner.entertainment.watchlist.v1")
+        savedWatchlistItems = savedWatchlistItems.filter { watchlist.contains($0.key) }
+        persistWatchlistItems()
+    }
+
+    func hideFromContinueWatching(_ item: EntertainmentItem) {
+        userStateRevision += 1
+        hiddenContinueWatching.insert(item.progressID)
+        defaults.set(Array(hiddenContinueWatching), forKey: "banner.entertainment.hiddenContinue.v1")
+    }
+
+    func markWatched(_ item: EntertainmentItem) {
+        let previous = watchProgress(for: item)
+        record(EntertainmentProgress(contentID: item.progressID,
+            sourceVariantID: previous?.sourceVariantID ?? item.sources.first?.id ?? "",
+            position: previous?.duration ?? previous?.position ?? 0, duration: previous?.duration,
+            lastWatched: Date(), completed: true), item: item)
     }
 
     func removeProgress(for item: EntertainmentItem) {
+        userStateRevision += 1
         progress[item.progressID] = nil
         progress[item.id] = nil
+        savedHistoryItems[item.progressID] = nil
+        savedHistoryItems[item.id] = nil
+        persistHistoryItems()
         if let data = try? JSONEncoder().encode(progress) { defaults.set(data, forKey: "banner.entertainment.progress.v1") }
     }
 
     func item(for id: String) -> EntertainmentItem? {
-        catalog.first { $0.id == id || $0.sources.contains { $0.id == id } }
+        if let item = catalog.first(where: { $0.id == id || $0.sources.contains { $0.id == id } }) { return item }
+        if let episode = seasonsBySeries.values.lazy.flatMap({ $0 }).lazy.flatMap({ $0.episodes }).first(where: { $0.id == id }) { return episode }
+        guard var saved = savedWatchlistItems[id] ?? savedHistoryItems[id] ?? savedHistoryItems.values.first(where: { $0.id == id }) else { return nil }
+        saved.sources = saved.sources.map { var source = $0; source.availability = .unavailable; return source }
+        return saved
     }
 
     nonisolated static func canonicalPresentation(_ items: [EntertainmentItem]) -> [EntertainmentItem] {
@@ -250,7 +319,28 @@ final class EntertainmentRepository {
         return result
     }
 
+    private func retainHistoryItem(_ item: EntertainmentItem, persist: Bool = true) {
+        guard watchProgress(for: item) != nil || item.kind != .series else { return }
+        guard savedHistoryItems[item.progressID] != item else { return }
+        savedHistoryItems[item.progressID] = item
+        if persist { persistHistoryItems() }
+    }
+
+    private func persistHistoryItems() {
+        if let data = try? JSONEncoder().encode(savedHistoryItems) {
+            defaults.set(data, forKey: "banner.entertainment.historyItems.v1")
+        }
+    }
+
+    private func persistWatchlistItems() {
+        if let data = try? JSONEncoder().encode(savedWatchlistItems) {
+            defaults.set(data, forKey: "banner.entertainment.watchlistItems.v1")
+        }
+    }
+
     private func persist() async {
+        for item in catalog where watchlist.contains(item.id) { savedWatchlistItems[item.id] = item }
+        persistWatchlistItems()
         await disk.write(.init(items: items, seasons: seasonsBySeries, refreshed: refreshed))
     }
 

@@ -106,13 +106,13 @@ nonisolated struct EntertainmentProgress: Codable, Equatable, Sendable {
     var lastWatched: Date
     var completed: Bool
 
-    static func recording(contentID: String, variant: String, position: Double, duration: Double?, at date: Date = Date()) -> Self? {
+    static func recording(contentID: String, variant: String, position: Double, duration: Double?, at date: Date = Date(), completionFraction: Double = 0.95) -> Self? {
         guard position.isFinite, position >= 0 else { return nil }
         let duration = duration.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
         return Self(contentID: contentID, sourceVariantID: variant,
                     position: duration.map { min(position, $0) } ?? position,
                     duration: duration, lastWatched: date,
-                    completed: duration.map { position >= $0 * 0.95 && position >= 60 } ?? false)
+                    completed: duration.map { position >= $0 * (completionFraction.isFinite ? min(1, max(0.5, completionFraction)) : 0.95) && position >= min(60, $0) } ?? false)
     }
 }
 

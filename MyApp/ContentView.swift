@@ -169,7 +169,7 @@ struct MyApp: App {
     }
 
 enum AppTab: String, Hashable, Identifiable {
-    case home, following, live, discover, settings, channels, guide, library
+    case home, following, live, discover, settings, channels, guide, library, movies, series, sports, television
 
     var id: String { rawValue }
 
@@ -183,6 +183,10 @@ enum AppTab: String, Hashable, Identifiable {
         case .channels: "Channels"
         case .guide: "Guide"
         case .library: "Library"
+        case .movies: "Movies"
+        case .series: "Series"
+        case .sports: "Sports"
+        case .television: "Live TV"
         }
     }
 
@@ -196,6 +200,10 @@ enum AppTab: String, Hashable, Identifiable {
         case .channels: "tv"
         case .guide: "calendar"
         case .library: "film"
+        case .movies: "film"
+        case .series: "play.rectangle"
+        case .sports: "sportscourt"
+        case .television: "tv"
         }
     }
 }
@@ -206,7 +214,10 @@ struct NavigationConfiguration {
     let tabs: [AppTab]
     static let sports = NavigationConfiguration(tabs: [.home, .following, .live, .discover, .settings])
     static let liveTV = NavigationConfiguration(tabs: [.home, .channels, .guide, .library, .settings])
-    static func configuration(for experience: ViewingExperience) -> Self { experience == .sports ? .sports : .liveTV }
+    static let complete = NavigationConfiguration(tabs: [.home, .television, .movies, .series, .sports])
+    static func configuration(for experience: ViewingExperience) -> Self {
+        switch experience { case .sports: .sports; case .liveTV: .liveTV; case .complete: .complete }
+    }
 }
 
 struct RootView: View {
@@ -223,6 +234,7 @@ struct RootView: View {
     private var navigation: NavigationConfiguration { .configuration(for: prefs.viewingExperience) }
     @State private var restoredTabs: [ViewingExperience: AppTab] = [:]
     @State private var pendingRequestedTab: AppTab?
+    @State private var showingSettings = false
     #if DEBUG
     // Lets UI verification launch straight into a tab: SIMCTL_CHILD_BANNER_START_TAB=live.
     @State private var selectedTab: AppTab = AppTab(rawValue: ProcessInfo.processInfo.environment["BANNER_START_TAB"] ?? "") ?? .home
@@ -286,7 +298,8 @@ struct RootView: View {
     private var macDetailContent: some View {
         switch selectedTab {
         case .home:
-            if prefs.viewingExperience == .liveTV { TelevisionHomeView() }
+            if prefs.viewingExperience == .complete { CompleteHomeView() }
+            else if prefs.viewingExperience == .liveTV { TelevisionHomeView() }
             else { HomeView(switchToFollowing: { selectedTab = .following }) }
         case .following: MatchesView()
         case .live: LiveView()
@@ -295,6 +308,10 @@ struct RootView: View {
         case .channels: NavigationStack { LiveChannelsView().navigationTitle("Channels") }
         case .guide: NavigationStack { TVGuideView().navigationTitle("Guide") }
         case .library: NavigationStack { EntertainmentLibraryView() }
+        case .movies: CompleteLibraryRoot(kind: .movie)
+        case .series: CompleteLibraryRoot(kind: .series)
+        case .television: CompleteTelevisionView()
+        case .sports: CompleteSportsView()
         }
     }
     #endif
@@ -304,7 +321,10 @@ struct RootView: View {
             #if os(macOS)
             macNavigationBody
             #else
-            TabView(selection: $selectedTab) {
+            TabView(selection: Binding(
+                get: { navigation.tabs.contains(selectedTab) ? selectedTab : .home },
+                set: { if navigation.tabs.contains($0) { selectedTab = $0 } }
+            )) {
                 ForEach(navigation.tabs) { tab in
                     Tab(value: tab) {
                         tabDestination(tab)
@@ -354,6 +374,7 @@ struct RootView: View {
             deepLinks.clear()
             open(link)
         }
+        .sheet(isPresented: $showingSettings) { MoreView(showsDoneButton: true) }
         .sheet(item: $notificationMatch) { DeepLinkMatchSheet(target: $0) }
         .onChange(of: appEnvironment.pendingDeepLink) { _, link in
             guard let link else { return }
@@ -382,7 +403,8 @@ struct RootView: View {
     private func tabDestination(_ tab: AppTab) -> some View {
         switch tab {
         case .home:
-            if prefs.viewingExperience == .liveTV { TelevisionHomeView() }
+            if prefs.viewingExperience == .complete { CompleteHomeView() }
+            else if prefs.viewingExperience == .liveTV { TelevisionHomeView() }
             else { HomeView(switchToFollowing: { selectedTab = .following }) }
         case .following: MatchesView()
         case .live: LiveView()
@@ -391,11 +413,23 @@ struct RootView: View {
         case .channels: NavigationStack { LiveChannelsView().navigationTitle("Channels") }
         case .guide: NavigationStack { TVGuideView().navigationTitle("Guide") }
         case .library: NavigationStack { EntertainmentLibraryView() }
+        case .movies: CompleteLibraryRoot(kind: .movie)
+        case .series: CompleteLibraryRoot(kind: .series)
+        case .television: CompleteTelevisionView()
+        case .sports: CompleteSportsView()
         }
     }
 
     private func route(to tab: AppTab) {
-        if navigation.tabs.contains(tab) { selectedTab = tab }
+        if prefs.viewingExperience == .complete {
+            switch tab {
+            case .settings: showingSettings = true
+            case .channels, .guide: selectedTab = .television
+            case .library: selectedTab = .movies
+            case .following, .live, .discover: selectedTab = .sports
+            default: selectedTab = tab
+            }
+        } else if navigation.tabs.contains(tab) { selectedTab = tab }
         else {
             pendingRequestedTab = tab
             prefs.setViewingExperience([.channels, .guide, .library].contains(tab) ? .liveTV : .sports)
@@ -408,9 +442,9 @@ struct RootView: View {
             notificationMatch = DeepLinkMatchTarget(leagueID: leagueID, matchID: matchID, date: date)
         case .home: selectedTab = .home
         case .following: route(to: .following)
-        case .live: selectedTab = prefs.viewingExperience == .liveTV ? .channels : .live
+        case .live: route(to: prefs.viewingExperience == .sports ? .live : .channels)
         case .discover: route(to: .discover)
-        case .settings: selectedTab = .settings
+        case .settings: route(to: .settings)
         }
     }
 

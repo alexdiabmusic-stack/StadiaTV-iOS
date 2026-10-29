@@ -31,7 +31,7 @@ struct TelevisionHomeView: View {
                         }
                     }
                     if !recent.isEmpty {
-                        TelevisionChannelSection(title: "Continue Watching", channels: recent, onPlay: { playing = $0 }, allowsHistoryRemoval: true)
+                        TelevisionChannelSection(title: "Recently Watched", channels: recent, onPlay: { playing = $0 }, allowsHistoryRemoval: true)
                     }
                     if !onNow.isEmpty {
                         TelevisionChannelSection(title: "On Now", channels: onNow, onPlay: { playing = $0 })
@@ -79,7 +79,7 @@ struct TelevisionHomeView: View {
     }
 }
 
-private struct TelevisionChannelSection: View {
+struct TelevisionChannelSection: View {
     let title: LocalizedStringResource
     let channels: [Channel]
     let onPlay: (Channel) -> Void
@@ -175,7 +175,7 @@ private struct TelevisionUpcomingSection: View {
     }
 }
 
-private struct TelevisionSportsSection: View {
+struct TelevisionSportsSection: View {
     let level: SportsIntegrationLevel
     @EnvironmentObject private var preferences: PreferencesStore
     @EnvironmentObject private var live: LiveViewModel
@@ -190,7 +190,13 @@ private struct TelevisionSportsSection: View {
                         MatchDetailView(match: match)
                     } label: {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("\(match.away.displayName) · \(match.home.displayName)").font(.headline)
+                            if [.golf, .motorsport, .combatSport].contains(GameCentreArchetype(match: match)) {
+                                Label(match.name, systemImage: GameCentreArchetype(match: match).systemImage).font(.headline)
+                            } else {
+                                GameScoreRow(match: match, showsScore: match.state != .pre && !preferences.spoilerFreeMode,
+                                    logoSize: 28, showsFullNames: true)
+                            }
+                            Text(match.league.shortName + " · " + match.statusDetail).font(.caption).foregroundStyle(.secondary)
                             Text(match.date, format: .dateTime.weekday().hour().minute()).font(.subheadline)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading).padding()
@@ -204,7 +210,7 @@ private struct TelevisionSportsSection: View {
                 NavigationLink("Following") { MatchesView() }
             }
         }
-        .task(id: "\(level.rawValue)|\(preferences.favoriteTeams.map(\.id).joined())") {
+        .task(id: "\(level.rawValue)|\(preferences.favoriteTeams.map(\.id).joined())|\(live.allLive.map { $0.id + $0.statusDetail }.joined())") {
             guard !preferences.favoriteTeams.isEmpty || level == .full else { matches = []; return }
             let snapshot = await SportsRepository.shared.liveMatchSnapshot(leagues: preferences.followedLeagues,
                 startingSoonWindow: 24 * 3600, nextLimit: 30)

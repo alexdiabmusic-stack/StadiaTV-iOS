@@ -2,9 +2,15 @@ import SwiftUI
 import AVKit
 
 struct EntertainmentLibraryView: View {
+    var fixedKind: EntertainmentKind? = nil
     @EnvironmentObject private var playlists: PlaylistStore
     private let repository = EntertainmentRepository.shared
     @State private var query = ""
+    @State private var sourceID = ""
+    @State private var releaseYear = ""
+    @State private var availableOnly = false
+    @State private var years: [Int] = []
+    @State private var recommended: [EntertainmentItem] = []
     @State private var kind: EntertainmentKind = .movie
     @State private var watchlistOnly = false
     @State private var recentFirst = false
@@ -23,23 +29,27 @@ struct EntertainmentLibraryView: View {
                         .font(.subheadline).foregroundStyle(.secondary)
                     Button("Retry") { Task { await refresh(force: true) } }
                 }
+                if fixedKind != nil && query.isEmpty && !watchlistOnly && category.isEmpty && genre.isEmpty {
+                    if let featured = recommended.first { CompleteHero(item: featured) }
+                    CompleteContentRail(title: "Explore Your Library", items: Array(recommended.dropFirst()), showsProgress: false)
+                }
                 if !continuing.isEmpty {
                     Text("Continue Watching").font(.title2.bold())
                     ForEach(continuing) { item in
-                        NavigationLink { EntertainmentDetailView(itemID: item.seriesID ?? item.id) } label: {
+                        NavigationLink(value: item.seriesID ?? item.id) {
                             EntertainmentLibraryRow(item: item, progress: repository.watchProgress(for: item))
                         }
                         .buttonStyle(.plain)
                         .contextMenu {
-                            Button("Remove from Continue Watching", role: .destructive) { repository.removeProgress(for: item) }
+                            Button("Remove from Continue Watching", role: .destructive) { repository.hideFromContinueWatching(item) }
                         }
                     }
                 }
-                Picker("Content type", selection: $kind) {
+                if fixedKind == nil { Picker("Content type", selection: $kind) {
                     Text("Movies").tag(EntertainmentKind.movie)
                     Text("TV Shows").tag(EntertainmentKind.series)
                 }
-                .pickerStyle(.segmented)
+                .pickerStyle(.segmented) }
                 if repository.isRefreshing && results.isEmpty && repository.sourceErrors.isEmpty {
                     ProgressView("Loading your library…").frame(maxWidth: .infinity).padding()
                 } else if results.isEmpty {
@@ -48,7 +58,7 @@ struct EntertainmentLibraryView: View {
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 140, maximum: 200), spacing: 16)], spacing: 22) {
                         ForEach(results) { item in
-                            NavigationLink { EntertainmentDetailView(itemID: item.id) } label: {
+                            NavigationLink(value: item.id) {
                                 EntertainmentPosterCard(item: item)
                             }
                             .buttonStyle(.plain)
@@ -59,11 +69,22 @@ struct EntertainmentLibraryView: View {
             .padding(Theme.Spacing.screen)
         }
         .background(Theme.background)
-        .navigationTitle("Library")
+        .navigationDestination(for: String.self) { EntertainmentDetailView(itemID: $0) }
+        .navigationTitle(fixedKind == .movie ? "Movies" : fixedKind == .series ? "Series" : "Library")
         .searchable(text: $query, prompt: "Search your library")
         .toolbar {
             Menu {
                 Toggle("Watchlist", isOn: $watchlistOnly)
+                Toggle("Available Only", isOn: $availableOnly)
+                Picker("Source", selection: $sourceID) {
+                    Text("All Sources").tag("")
+                    ForEach(playlists.playlists) { Text($0.name).tag($0.id.uuidString) }
+                }
+                Picker("Release Year", selection: $releaseYear) {
+                    Text("All Years").tag("")
+                    ForEach(years, id: \.self) { Text(String($0)).tag(String($0)) }
+                }
+                NavigationLink("Watchlist & History") { EntertainmentCollectionsView() }
                 Toggle("Recently Added", isOn: $recentFirst)
                 Picker("Category", selection: $category) {
                     Text("All Categories").tag("")
@@ -79,7 +100,7 @@ struct EntertainmentLibraryView: View {
         }
         .refreshable { await refresh(force: true) }
         .task(id: playlists.channelsRevision) { await refresh(force: false) }
-        .task(id: "\(repository.revision)|\(query)|\(kind.rawValue)|\(watchlistOnly)|\(recentFirst)|\(category)|\(genre)|\(repository.watchlist.hashValue)|\(repository.progress.hashValueForSearch)") {
+        .task(id: "\(repository.revision)|\(query)|\(kind.rawValue)|\(watchlistOnly)|\(recentFirst)|\(category)|\(genre)|\(sourceID)|\(releaseYear)|\(availableOnly)|\(repository.userStateRevision)") {
             await updateResults()
         }
     }
@@ -91,14 +112,19 @@ struct EntertainmentLibraryView: View {
     private func updateResults() async {
         do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
         let items = repository.catalog
+        let selectedSource = sourceID, selectedYear = releaseYear, onlyAvailable = availableOnly
         let progress = repository.progress
+        let hidden = repository.hiddenContinueWatching
         let episodes = repository.seasonsBySeries.values.flatMap { $0.flatMap(\.episodes) }
         let watchlist = repository.watchlist
-        let query = query, kind = kind, only = watchlistOnly, newest = recentFirst, category = category, genre = genre
+        let query = query, kind = fixedKind ?? kind, only = watchlistOnly, newest = recentFirst, category = category, genre = genre
         let result = await Task.detached(priority: .userInitiated) {
             let key = EntertainmentMatching.normalized(query)
             let matches = items.filter {
                 $0.kind == kind && (!only || watchlist.contains($0.id)) &&
+                (selectedSource.isEmpty || $0.sources.contains { $0.sourceID.uuidString == selectedSource }) &&
+                (selectedYear.isEmpty || $0.metadata.year.map(String.init) == selectedYear) &&
+                (!onlyAvailable || $0.isPlayable || ($0.kind == .series && $0.sources.contains { $0.availability == .available })) &&
                 (category.isEmpty || $0.sources.contains { $0.category == category }) &&
                 (genre.isEmpty || $0.metadata.genres.contains(genre)) &&
                 (key.isEmpty || EntertainmentMatching.normalized($0.title + " " + $0.metadata.genres.joined(separator: " ")).contains(key))
@@ -108,23 +134,21 @@ struct EntertainmentLibraryView: View {
             }
             let categories = Set(items.flatMap { $0.sources.compactMap(\.category) }).sorted()
             let continuing = (items + episodes).filter {
-                guard let state = progress[$0.progressID] ?? progress[$0.id] else { return false }
-                return !state.completed && state.position > 0 && $0.isPlayable
+                guard (kind == .movie ? $0.kind == .movie : $0.kind == .episode),
+                      let state = progress[$0.progressID] ?? progress[$0.id] else { return false }
+                return !hidden.contains($0.progressID) && !state.completed && state.position > 0 && $0.isPlayable
             }.sorted { ((progress[$0.progressID] ?? progress[$0.id])?.lastWatched ?? .distantPast) > ((progress[$1.progressID] ?? progress[$1.id])?.lastWatched ?? .distantPast) }
-            return (matches, categories, Array(continuing.prefix(10)), Set(items.flatMap { $0.metadata.genres }).sorted())
+            let recommendations = EntertainmentDiscovery.recommendations(items: matches, kind: kind,
+                progress: progress, watchlist: watchlist, excluding: Set(continuing.map(\.id)), limit: 8)
+            return (matches, categories, Array(continuing.prefix(10)), Set(items.flatMap { $0.metadata.genres }).sorted(),
+                Set(items.compactMap { $0.metadata.year }).sorted(by: >), recommendations)
         }.value
         guard !Task.isCancelled else { return }
-        results = result.0; categories = result.1; continuing = result.2; genres = result.3
+        results = result.0; categories = result.1; continuing = result.2; genres = result.3; years = result.4; recommended = result.5
     }
 }
 
-private extension Dictionary where Key == String, Value == EntertainmentProgress {
-    var hashValueForSearch: String {
-        values.map { "\($0.contentID):\($0.position):\($0.completed)" }.sorted().joined(separator: "|")
-    }
-}
-
-private struct EntertainmentPosterCard: View {
+struct EntertainmentPosterCard: View {
     let item: EntertainmentItem
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -133,7 +157,7 @@ private struct EntertainmentPosterCard: View {
                     Image(systemName: item.kind == .movie ? "film" : "tv").font(.largeTitle).foregroundStyle(Theme.accent)
                 }
             }
-            .aspectRatio(2 / 3, contentMode: .fit)
+            .aspectRatio(item.kind == .episode ? 16 / 9 : 2 / 3, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             Text(item.title).font(.headline).lineLimit(3)
             if let year = item.metadata.year { Text(String(year)).font(.caption).foregroundStyle(.secondary) }
@@ -145,7 +169,7 @@ private struct EntertainmentPosterCard: View {
     }
 }
 
-private struct EntertainmentLibraryRow: View {
+struct EntertainmentLibraryRow: View {
     let item: EntertainmentItem
     let progress: EntertainmentProgress?
     var body: some View {
@@ -189,9 +213,15 @@ struct EntertainmentDetailView: View {
                                   systemImage: repository.watchlist.contains(item.id) ? "checkmark" : "plus")
                         }
                         .buttonStyle(.bordered)
+                        if item.kind != .series {
+                            Button(repository.watchProgress(for: item)?.completed == true ? "Mark Unwatched" : "Mark Watched") {
+                                if repository.watchProgress(for: item)?.completed == true { repository.removeProgress(for: item) }
+                                else { repository.markWatched(item) }
+                            }
+                        }
                         if loading { ProgressView() }
                     }
-                    if item.kind == .movie {
+                    if item.kind != .series {
                         EntertainmentPlayButton(item: item) { chooseSource(item) }
                     } else {
                         EntertainmentEpisodeBrowser(series: item, selectedSeason: $selectedSeason, onPlay: chooseSource)
@@ -214,7 +244,7 @@ struct EntertainmentDetailView: View {
         .task(id: itemID) { await loadDetail() }
         .confirmationDialog("Choose a source", isPresented: Binding(get: { sourceChoice != nil }, set: { if !$0 { sourceChoice = nil } })) {
             if let choice = sourceChoice {
-                ForEach(choice.sources.filter { $0.availability == .available }) { source in
+                ForEach(choice.sources.filter { $0.availability == .available && $0.container?.isEmpty == false }) { source in
                     Button(sourceLabel(source)) { Task { await play(choice, source: source) } }
                 }
             }
@@ -240,7 +270,7 @@ struct EntertainmentDetailView: View {
     }
 
     private func chooseSource(_ item: EntertainmentItem) {
-        let sources = item.sources.filter { $0.availability == .available }
+        let sources = item.sources.filter { $0.availability == .available && $0.container?.isEmpty == false }
         if sources.count == 1, let source = sources.first { Task { await play(item, source: source) } }
         else if !sources.isEmpty { sourceChoice = item }
     }
@@ -271,6 +301,7 @@ private struct EntertainmentDetailHeader: View {
             HStack {
                 if let year = item.metadata.year { Text(String(year)) }
                 if let runtime = item.metadata.runtimeMinutes { Text("\(runtime) min") }
+                if let rating = item.metadata.contentRating { Text(rating) }
             }
             .font(.subheadline).foregroundStyle(.secondary)
             if !item.metadata.genres.isEmpty { Text(item.metadata.genres.formatted(.list(type: .and))).font(.subheadline) }
@@ -335,14 +366,8 @@ private struct EntertainmentEpisodeBrowser: View {
     private var seasons: [EntertainmentSeason] { repository.seasonsBySeries[series.id] ?? [] }
     private var selected: EntertainmentSeason? { seasons.first { $0.number == selectedSeason } ?? seasons.first }
     private var recommendedEpisode: EntertainmentItem? {
-        let episodes = seasons.flatMap(\.episodes)
-        let watched = episodes.filter { repository.watchProgress(for: $0) != nil }.sorted {
-            (repository.watchProgress(for: $0)?.lastWatched ?? .distantPast) > (repository.watchProgress(for: $1)?.lastWatched ?? .distantPast)
-        }
-        guard let last = watched.first, let state = repository.watchProgress(for: last) else { return nil }
-        if !state.completed, last.isPlayable { return last }
-        guard state.completed, let index = episodes.firstIndex(where: { $0.id == last.id }) else { return nil }
-        return episodes.dropFirst(index + 1).first { $0.isPlayable && $0.episodeNumber != nil }
+        EntertainmentDiscovery.nextEpisode(seriesID: series.id,
+            episodes: seasons.flatMap(\.episodes), progress: repository.progress)
     }
 
     var body: some View {
@@ -357,7 +382,7 @@ private struct EntertainmentEpisodeBrowser: View {
             } else {
                 Picker("Season", selection: $selectedSeason) {
                     ForEach(seasons) { season in
-                        Text("Season \(season.number)").tag(Optional(season.number))
+                        Text("Season \(season.number) · \(season.episodes.filter(\.isPlayable).count) available").tag(Optional(season.number))
                     }
                 }
                 if let selected {
@@ -396,12 +421,22 @@ struct EntertainmentPlaybackPresentation: Identifiable {
 
 /// Native on-demand controls drive the same PlaybackController and AVPlayer as live TV.
 struct EntertainmentPlayerView: View {
-    let presentation: EntertainmentPlaybackPresentation
+    @State private var presentation: EntertainmentPlaybackPresentation
+    @State private var nextEpisode: EntertainmentItem?
+    @State private var changingEpisode = false
+    @State private var choosingAlternative = false
+    @EnvironmentObject private var playlists: PlaylistStore
+    @AppStorage("banner.playback.autoplayEpisodes.v1") private var autoplay = false
+
+    init(presentation: EntertainmentPlaybackPresentation) {
+        _presentation = State(initialValue: presentation)
+    }
     @Environment(\.dismiss) private var dismiss
     @StateObject private var playback = BannerAppEnvironment.shared.playbackController
     private let repository = EntertainmentRepository.shared
     @State private var failure: String?
     @State private var lastPosition: Double = 0
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
@@ -417,12 +452,45 @@ struct EntertainmentPlayerView: View {
                         VStack(spacing: 12) {
                             Text(failure)
                             Button("Retry") { start() }
+                            if presentation.item.sources.contains(where: { $0.id != presentation.source.id && $0.availability == .available && $0.container?.isEmpty == false }) {
+                                Button("Choose Another Source") { choosingAlternative = true }
+                            }
+                        }
+                        .padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    } else if let nextEpisode {
+                        VStack(spacing: 12) {
+                            Text("Up Next").font(.headline)
+                            Text(nextEpisode.title)
+                            Button("Play Next Episode") { Task { await playNext(nextEpisode) } }
+                                .disabled(changingEpisode)
                         }
                         .padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
                     } else if playback.showsBufferingIndicator { ProgressView() }
                 }
         }
+        .confirmationDialog("Choose Another Source", isPresented: $choosingAlternative) {
+            ForEach(presentation.item.sources.filter { $0.id != presentation.source.id && $0.availability == .available && $0.container?.isEmpty == false }) { source in
+                Button(playlists.playlists.first(where: { $0.id == source.sourceID })?.name ?? String(localized: "Source")) {
+                    Task { await switchSource(source) }
+                }
+            }
+        }
         .onAppear { start() }
+        .onChange(of: scenePhase) { _, phase in if phase != .active { saveProgress() } }
+        .onChange(of: playback.state) { _, state in
+            if state == .paused { saveProgress() }
+            if state == .ended {
+                saveProgress()
+                if let seriesID = presentation.item.seriesID {
+                    nextEpisode = EntertainmentDiscovery.nextEpisode(seriesID: seriesID,
+                        episodes: repository.seasonsBySeries[seriesID]?.flatMap(\.episodes) ?? [],
+                        progress: repository.progress)
+                }
+            }
+        }
+        .task(id: nextEpisode?.id) {
+            if autoplay, scenePhase == .active, let nextEpisode { await playNext(nextEpisode) }
+        }
         .task {
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .seconds(5)) } catch { return }
@@ -434,6 +502,41 @@ struct EntertainmentPlayerView: View {
             playback.onFailure = nil
             playback.onItemReady = nil
             if playback.channel?.id == presentation.channel.id { playback.stop() }
+        }
+    }
+
+    private func switchSource(_ source: EntertainmentSource) async {
+        guard !changingEpisode else { return }
+        changingEpisode = true
+        defer { changingEpisode = false }
+        saveProgress()
+        do {
+            let channel = try await repository.channel(for: presentation.item, source: source,
+                playlists: playlists.playlists, channels: playlists.allChannels)
+            guard !Task.isCancelled else { return }
+            presentation = EntertainmentPlaybackPresentation(item: presentation.item, source: source, channel: channel)
+            start()
+        } catch {
+            failure = String(localized: "This source could not be opened. Choose another source or try again.")
+        }
+    }
+
+    private func playNext(_ episode: EntertainmentItem) async {
+        guard !changingEpisode else { return }
+        changingEpisode = true
+        defer { changingEpisode = false }
+        let sources = episode.sources.filter { $0.availability == .available && $0.container?.isEmpty == false }
+        guard let source = sources.first(where: { $0.sourceID == presentation.source.sourceID }) ?? sources.first else { return }
+        do {
+            let channel = try await repository.channel(for: episode, source: source,
+                playlists: playlists.playlists, channels: playlists.allChannels)
+            guard !Task.isCancelled else { return }
+            saveProgress()
+            presentation = EntertainmentPlaybackPresentation(item: episode, source: source, channel: channel)
+            nextEpisode = nil
+            start()
+        } catch {
+            failure = String(localized: "The next episode could not be opened. Please try again from the series.")
         }
     }
 
@@ -455,6 +558,6 @@ struct EntertainmentPlayerView: View {
         guard position.isFinite, position > 0, playback.currentItem?.status == .readyToPlay else { return }
         lastPosition = position
         if let progress = EntertainmentProgress.recording(contentID: presentation.item.progressID, variant: presentation.source.id,
-            position: position, duration: playback.currentItem?.duration.seconds) { repository.record(progress) }
+            position: position, duration: playback.currentItem?.duration.seconds) { repository.record(progress, item: presentation.item) }
     }
 }

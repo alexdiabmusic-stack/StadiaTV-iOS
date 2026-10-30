@@ -245,6 +245,12 @@ struct UserPreferences: Codable, Equatable {
     var guideTimeScaleMinutes: Int = 60
     var playerBarActions: [String] = PlayerBarAction.defaultOrder.map(\.rawValue)
     var playerBufferProfile: PlayerBufferProfile = .balanced
+    /// Live channels play through the stream engine (reserve, background reconnects, splicing).
+    /// Off hands provider URLs straight to AVPlayer, for troubleshooting a provider.
+    var playerStreamEngineEnabled = true
+    /// The main player renders the engine's live channels itself, which starts them sooner than
+    /// AVPlayer can. Off plays them through AVPlayer.
+    var playerNativeRendererEnabled = true
     /// When false (default), Auto prefers 1080p/720p mirrors, which start faster than 4K.
     var preferUHDStreams = false
 
@@ -284,7 +290,7 @@ struct UserPreferences: Codable, Equatable {
         case playerMaximumStreams, playerDefaultCategory
         case playerDoubleTapSeeks, commercialBreakMode, preferredAudioLanguage, preferredSubtitleLanguage
         case playerPanelTimeoutSeconds, guideTimeScaleMinutes, playerBarActions
-        case playerBufferProfile, preferUHDStreams
+        case playerBufferProfile, playerStreamEngineEnabled, playerNativeRendererEnabled, preferUHDStreams
         case selectedCatalogLeagueIDs, selectedCatalogSportIDs
     }
 
@@ -331,6 +337,8 @@ struct UserPreferences: Codable, Equatable {
         playerBarActions = try container.decodeIfPresent([String].self, forKey: .playerBarActions)
             ?? PlayerBarAction.defaultOrder.map(\.rawValue)
         playerBufferProfile = (try? container.decodeIfPresent(PlayerBufferProfile.self, forKey: .playerBufferProfile)) ?? .balanced
+        playerStreamEngineEnabled = try container.decodeIfPresent(Bool.self, forKey: .playerStreamEngineEnabled) ?? true
+        playerNativeRendererEnabled = try container.decodeIfPresent(Bool.self, forKey: .playerNativeRendererEnabled) ?? true
         preferUHDStreams = try container.decodeIfPresent(Bool.self, forKey: .preferUHDStreams) ?? false
         selectedCatalogLeagueIDs = try container.decodeIfPresent(Set<String>.self, forKey: .selectedCatalogLeagueIDs) ?? []
         selectedCatalogSportIDs  = try container.decodeIfPresent(Set<String>.self, forKey: .selectedCatalogSportIDs) ?? []
@@ -370,7 +378,7 @@ final class PreferencesStore: ObservableObject {
             persist()
         }
         CloudSyncService.shared.setEnabled(prefs.cloudSyncEnabled)
-        StreamRankingSettings.preferUHD = prefs.preferUHDStreams
+        applyPlaybackSettings()
         NotificationCenter.default.addObserver(
             forName: .bannertvCloudSyncDidChange,
             object: nil,
@@ -398,7 +406,7 @@ final class PreferencesStore: ObservableObject {
               cloud != prefs else { return }
         prefs = cloud
         NotificationCenter.default.post(name: .bannerPreferencesChanged, object: nil)
-        StreamRankingSettings.preferUHD = prefs.preferUHDStreams
+        applyPlaybackSettings()
         if let data = try? JSONEncoder().encode(prefs) {
             UserDefaults.standard.set(data, forKey: defaultsKey)
         }
@@ -435,7 +443,7 @@ final class PreferencesStore: ObservableObject {
         prefs = cloud
         prefs.hasCompletedOnboarding = true
         prefs.cloudSyncEnabled = true
-        StreamRankingSettings.preferUHD = prefs.preferUHDStreams
+        applyPlaybackSettings()
         persist()
         CloudSyncService.shared.setEnabled(true)
         return true
@@ -618,7 +626,11 @@ final class PreferencesStore: ObservableObject {
     var commercialBreakMode: Bool { prefs.commercialBreakMode }
     func setCommercialBreakMode(_ value: Bool) { prefs.commercialBreakMode = value; persist() }
     var preferredAudioLanguage: String { prefs.preferredAudioLanguage }
-    func setPreferredAudioLanguage(_ value: String) { prefs.preferredAudioLanguage = value; persist() }
+    func setPreferredAudioLanguage(_ value: String) {
+        prefs.preferredAudioLanguage = value
+        StreamEngineSettings.preferredAudioLanguage = value.isEmpty ? nil : value
+        persist()
+    }
     var preferredSubtitleLanguage: String { prefs.preferredSubtitleLanguage }
     func setPreferredSubtitleLanguage(_ value: String) { prefs.preferredSubtitleLanguage = value; persist() }
 
@@ -632,6 +644,28 @@ final class PreferencesStore: ObservableObject {
 
     var playerBufferProfile: PlayerBufferProfile { prefs.playerBufferProfile }
     func setPlayerBufferProfile(_ v: PlayerBufferProfile) { prefs.playerBufferProfile = v; persist() }
+
+    var playerStreamEngineEnabled: Bool { prefs.playerStreamEngineEnabled }
+    func setPlayerStreamEngineEnabled(_ v: Bool) {
+        prefs.playerStreamEngineEnabled = v
+        StreamEngineSettings.isEnabled = v
+        persist()
+    }
+
+    var playerNativeRendererEnabled: Bool { prefs.playerNativeRendererEnabled }
+    func setPlayerNativeRendererEnabled(_ v: Bool) {
+        prefs.playerNativeRendererEnabled = v
+        StreamEngineSettings.usesNativePlayer = v
+        persist()
+    }
+
+    /// Mirrors the playback preferences for code that has no preferences store.
+    private func applyPlaybackSettings() {
+        StreamRankingSettings.preferUHD = prefs.preferUHDStreams
+        StreamEngineSettings.isEnabled = prefs.playerStreamEngineEnabled
+        StreamEngineSettings.usesNativePlayer = prefs.playerNativeRendererEnabled
+        StreamEngineSettings.preferredAudioLanguage = prefs.preferredAudioLanguage.isEmpty ? nil : prefs.preferredAudioLanguage
+    }
 
     var preferUHDStreams: Bool { prefs.preferUHDStreams }
     func setPreferUHDStreams(_ v: Bool) {

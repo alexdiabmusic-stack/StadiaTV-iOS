@@ -101,6 +101,7 @@ struct PlayerUpgradeTests {
         #expect(!preferences.commercialBreakMode)
         #expect(preferences.preferredAudioLanguage.isEmpty)
         #expect(preferences.playerPanelTimeoutSeconds == 4)
+        #expect(preferences.playerStreamEngineEnabled)
     }
 
     @Test func preferencesRoundTrip() throws {
@@ -108,6 +109,7 @@ struct PlayerUpgradeTests {
         preferences.preferredAudioLanguage = "fr"
         preferences.preferredSubtitleLanguage = "off"
         preferences.commercialBreakMode = true
+        preferences.playerStreamEngineEnabled = false
         preferences.savedMultiviewSlots = [
             "1": SavedMultiviewLayout(channelIDs: ["playlist:a", "playlist:b"], layout: "twoHorizontal"),
             "4": SavedMultiviewLayout(channelIDs: ["playlist:c", "playlist:d", "playlist:e"], layout: "three")

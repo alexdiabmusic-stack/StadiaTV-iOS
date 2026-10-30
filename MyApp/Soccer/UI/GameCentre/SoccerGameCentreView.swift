@@ -50,6 +50,19 @@ struct SoccerGameCentreView<WatchContent: View, RelatedContent: View>: View {
     private var snapshot: SoccerGameCentreSnapshot? { model.snapshot?.matchID == matchID ? model.snapshot : nil }
     private var hideScore: Bool { preferences.spoilerFreeMode && (snapshot?.match?.status == .fullTime || match.state == .final) && !revealed }
 
+    private var visibleTabs: [SoccerGameTab] {
+        availableTabs.filter { tab in
+            switch tab {
+            case .overview: true
+            case .timeline: snapshot?.events.isEmpty == false
+            case .lineups: snapshot?.homeLineup != nil || snapshot?.awayLineup != nil
+            case .stats: snapshot?.homeStats != nil || snapshot?.awayStats != nil
+            case .commentary: snapshot?.commentary.isEmpty == false
+            case .shots: snapshot?.shots.isEmpty == false
+            }
+        }
+    }
+
     var body: some View {
         GeometryReader { geometry in
             GameCentreSplit {
@@ -65,7 +78,7 @@ struct SoccerGameCentreView<WatchContent: View, RelatedContent: View>: View {
                 } watch: {
                     watchContent()
                 } rest: {
-                GameTabBar(tabs: availableTabs, selection: Binding(
+                GameTabBar(tabs: visibleTabs, selection: Binding(
                     get: { model.selectedTab },
                     set: { fullRefresh = false; model.selectedTab = $0 }
                 ))
@@ -93,6 +106,9 @@ struct SoccerGameCentreView<WatchContent: View, RelatedContent: View>: View {
             PaywallView()
             #endif
         }
+        .onChange(of: visibleTabs) { _, tabs in
+            if !tabs.contains(model.selectedTab) { model.selectedTab = .overview }
+        }
         .onChange(of: scenePhase) { _, phase in if phase == .active { fullRefresh = true } }
         .task {
             var previous: Bool?
@@ -115,8 +131,8 @@ struct SoccerGameCentreView<WatchContent: View, RelatedContent: View>: View {
                 case .overview:
                     GameOverviewScroll {
                         SoccerOverviewView(snapshot: snapshot, league: match.league,
-                            onViewAllEvents: availableTabs.contains(.timeline) ? { fullRefresh = false; model.selectedTab = .timeline } : nil,
-                            onViewAllStats: availableTabs.contains(.stats) ? { fullRefresh = false; model.selectedTab = .stats } : nil)
+                            onViewAllEvents: visibleTabs.contains(.timeline) ? { fullRefresh = false; model.selectedTab = .timeline } : nil,
+                            onViewAllStats: visibleTabs.contains(.stats) ? { fullRefresh = false; model.selectedTab = .stats } : nil)
                         relatedContent()
                     }
                 case .timeline:

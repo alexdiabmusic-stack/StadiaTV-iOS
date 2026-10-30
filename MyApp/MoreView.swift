@@ -3,6 +3,8 @@ import SwiftUI
 // MARK: - Root Settings Hub
 
 struct MoreView: View {
+    var showsDoneButton = false
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var playlists: PlaylistStore
     @EnvironmentObject private var watchStore: WatchStore
@@ -41,6 +43,11 @@ struct MoreView: View {
                 }
             }
             .navigationTitle("Settings")
+            .toolbar {
+                if showsDoneButton {
+                    ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                }
+            }
             .sheet(isPresented: $showingTeamEditor) { TeamEditorView() }
             .confirmationDialog("Reset Personalization", isPresented: $showingResetConfirmation, titleVisibility: .visible) {
                 Button("Redo Setup", role: .destructive) { prefs.resetOnboarding() }
@@ -184,6 +191,11 @@ struct MoreView: View {
 
     private var personalizationSection: some View {
         SettingsSection(title: "PERSONALIZATION") {
+            NavigationLink { ViewingExperienceSettingsView() } label: {
+                SettingsNavRow(icon: "tv", title: "Viewing Experience", subtitle: String(localized: prefs.viewingExperience.title))
+            }
+            .buttonStyle(.plain)
+            Divider().overlay(Theme.hairline)
             NavigationLink { AppearanceSettingsView() } label: {
                 SettingsNavRow(
                     icon: "circle.lefthalf.filled",

@@ -65,6 +65,11 @@ struct EPGRepositoryGuideImportTests {
             try await Task.sleep(nanoseconds: 100_000_000)
         }
         #expect(found, "a programme 48h out was not retained — retention window regression")
+        let programme = try #require(repository.nextProgramme(for: "test-channel-zzz"))
+        #expect(repository.nextProgramme(for: "test-channel-zzz", after: programme.start, includingBoundary: true)?.id == programme.id,
+                "Up Next must include a programme starting exactly at the preceding programme's end")
+        #expect(repository.nextProgramme(for: "test-channel-zzz", after: programme.start) == nil,
+                "The default next lookup remains strictly after the current instant")
 
         // Give the scheduled refresh (which is what actually parses customEPGURLs) a moment
         // to fully settle, then confirm state didn't get stuck at .loadingEPG.

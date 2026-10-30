@@ -14,6 +14,7 @@ struct TVGuideView: View {
     @EnvironmentObject private var guideStore: GuideChannelStore
     @EnvironmentObject private var fantasyStore: FantasyStore
     @EnvironmentObject private var nativeFantasyStore: BannerFantasyStore
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.adaptiveLayout) private var adaptiveLayout
     @StateObject private var vm: TVGuideViewModel
     var preview: AnyView? = nil
@@ -109,7 +110,7 @@ struct TVGuideView: View {
     /// Detail is shown inline beside the grid when there's room, except when the guide is a
     /// picker for another screen (`onChannelSelected`), where it keeps the sheet.
     private var showsInlineDetail: Bool {
-        adaptiveLayout.prefersTwoPane && onChannelSelected == nil
+        adaptiveLayout.prefersTwoPane && onChannelSelected == nil && !dynamicTypeSize.isAccessibilitySize
     }
 
     private var sheetProgramme: Binding<EPGProgramme?> {
@@ -193,6 +194,10 @@ struct TVGuideView: View {
                     .foregroundStyle(Theme.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
+                NavigationLink("Manage Playlists") { PlaylistsView() }
+                    .buttonStyle(.borderedProminent)
+                    .frame(minHeight: 44)
+
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -212,6 +217,8 @@ struct TVGuideView: View {
             Divider().overlay(Theme.hairline)
             if guideStore.guideMode == .myGuide && !guideStore.hasConfigured {
                 myGuideSetupPrompt
+            } else if dynamicTypeSize.isAccessibilitySize {
+                accessibleGuide
             } else {
                 // Computed here (TVGuideView already observes both fantasy stores for
                 // onProgramTap below) and threaded down as plain values, so the grid's
@@ -266,11 +273,75 @@ struct TVGuideView: View {
         }
     }
 
+    /// Large-text guide uses expandable, full-width programme rows instead of a fixed timeline.
+    private var accessibleGuide: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 20) {
+                    DatePicker("Date", selection: $vm.selectedDate, displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                        .labelsHidden()
+                        .accessibilityLabel("Date")
+                        .onChange(of: vm.selectedDate) { _, _ in vm.update(repository: repository) }
+                        .id("guideStart")
+                    Button("Now") {
+                        vm.scrollToNow()
+                        proxy.scrollTo("guideStart", anchor: .top)
+                    }
+                    ForEach(Array(vm.visibleChannels.enumerated()), id: \.element.id) { index, channel in
+                        VStack(alignment: .leading, spacing: 12) {
+                            Button {
+                                guard let playable = channel.playableChannel else { return }
+                                watchStore.recordWatch(playable)
+                                PlaybackTapClock.record()
+                                if let onChannelSelected { onChannelSelected(channel) }
+                                else { playingChannel = channel }
+                            } label: {
+                                Label(channel.name, systemImage: "play.circle")
+                                    .font(.headline)
+                                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            }
+                            let start = Calendar.current.isDateInToday(vm.selectedDate) ? Date() : vm.guideWindowStart
+                            let programmes = vm.programmes(for: channel, in: start...vm.guideWindowEnd)
+                            if programmes.isEmpty {
+                                Text("No programme information").font(.body).foregroundStyle(Theme.textSecondary)
+                            } else {
+                                ForEach(programmes) { programme in
+                                    Button {
+                                        selectedProgramme = programme
+                                        selectedProgrammeChannel = channel
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Text(programme.title).font(.body)
+                                            Text("\(programme.start.formatted(date: .omitted, time: .shortened)) – \(programme.end.formatted(date: .omitted, time: .shortened))")
+                                                .font(.caption).monospacedDigit()
+                                                .foregroundStyle(Theme.textSecondary)
+                                            if programme.isOnNow() { Text("Now").font(.caption.bold()).foregroundStyle(Theme.accessibleAccent) }
+                                        }
+                                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                                        .padding(12)
+                                        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        .onAppear { vm.prefetchProgrammesAround(rowIndex: index, visibleRowCount: 5) }
+                    }
+                }
+                .padding(16)
+            }
+        }
+    }
+
     // MARK: - Guide header
 
     private var guideHeader: some View {
         VStack(spacing: 6) {
-            HStack(spacing: 10) {
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                : AnyLayout(HStackLayout(spacing: 10))
+            layout {
                 GuideModeControl(
                     mode: guideStore.guideMode,
                     myGuideCount: guideStore.selectedCount
@@ -289,7 +360,7 @@ struct TVGuideView: View {
                     Image(systemName: "slider.horizontal.3")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(vm.filterCategoryId != nil ? Theme.accent : Theme.textPrimary)
-                        .frame(width: 36, height: 34)
+                        .frame(width: 44, height: 44)
                         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -306,7 +377,7 @@ struct TVGuideView: View {
                         Image(systemName: "xmark")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Theme.textPrimary)
-                            .frame(width: 36, height: 34)
+                            .frame(width: 44, height: 44)
                             .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -323,15 +394,17 @@ struct TVGuideView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Theme.textSecondary)
-                TextField("Search channels…", text: $channelSearchQuery)
+                TextField("Search channels or programmes…", text: $channelSearchQuery)
                     .font(.subheadline)
                     .foregroundStyle(Theme.textPrimary)
                     .autocorrectionDisabled()
                     #if os(iOS)
                     .textInputAutocapitalization(.never)
                     #endif
-                    .onChange(of: channelSearchQuery) { _, q in
-                        vm.setChannelNameFilter(q)
+                    .task(id: channelSearchQuery) {
+                        try? await Task.sleep(for: .milliseconds(250))
+                        guard !Task.isCancelled else { return }
+                        vm.setChannelNameFilter(channelSearchQuery)
                     }
                 if !channelSearchQuery.isEmpty {
                     Button {
@@ -398,12 +471,16 @@ struct TVGuideView: View {
 // MARK: - Guide Mode Control
 
 struct GuideModeControl: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let mode: GuideMode
     let myGuideCount: Int
     let onSelect: (GuideMode) -> Void
 
     var body: some View {
-        HStack(spacing: 2) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(spacing: 2))
+        layout {
             modeButton(.myGuide, label: "My Guide")
             modeButton(.allChannels, label: "All Channels")
         }
@@ -418,17 +495,19 @@ struct GuideModeControl: View {
             #if !os(tvOS)
             Haptic.impact(.light)
             #endif
-            withAnimation(.snappy) { onSelect(target) }
+            withAnimation(Theme.Motion.snappy) { onSelect(target) }
         } label: {
-            Text(label)
+            Text(LocalizedStringKey(label))
                 .font(.caption.weight(.bold))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: 44)
                 .foregroundStyle(selected ? .white : Theme.textSecondary)
                 .padding(.horizontal, 13)
                 .padding(.vertical, 7)
                 .background(selected ? Theme.accent : Color.clear, in: Capsule())
         }
         .buttonStyle(.plain)
-        .animation(.snappy, value: selected)
+        .animation(Theme.Motion.snappy, value: selected)
     }
 }
 
@@ -689,7 +768,8 @@ private struct ProgrammeGridView: View {
             let now = Date()
             ForEach(visibleCells) { cell in
                 if let prog = cell.programme {
-                    ProgrammeCell(
+                    GuideViewportProgrammeCell(
+                        scrollState: scrollState, cellX: cell.x,
                         programme: prog,
                         width: cell.width,
                         now: now,
@@ -931,11 +1011,34 @@ private struct JumpToNowOverlayView: View {
                 .transition(.scale(scale: 0.85).combined(with: .opacity))
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: isNowOffScreen)
+        .animation(Theme.Motion.snappy, value: isNowOffScreen)
     }
 }
 
 // MARK: - Programme Cell
+
+/// Only this lightweight leaf observes horizontal scrolling; row layout stays cached.
+private struct GuideViewportProgrammeCell: View {
+    @ObservedObject var scrollState: EPGScrollState
+    let cellX: CGFloat
+    let programme: EPGProgramme
+    let width: CGFloat
+    let now: Date
+    let timeRangeLabel: String
+    let hasCatchup: Bool
+    let fantasyIndicatorCount: Int
+    let streamCount: Int
+    let onTap: () -> Void
+
+    var body: some View {
+        let inset = min(max(0, scrollState.offset.x - cellX), max(0, width - 36))
+        let available = min(width - inset, max(36, scrollState.viewSize.width - TVGuideViewModel.channelColumnWidth))
+        ProgrammeCell(programme: programme, width: width, now: now,
+                      timeRangeLabel: timeRangeLabel, hasCatchup: hasCatchup,
+                      fantasyIndicatorCount: fantasyIndicatorCount, streamCount: streamCount,
+                      textLeadingInset: inset, visibleTextWidth: available, onTap: onTap)
+    }
+}
 
 struct ProgrammeCell: View {
     let programme: EPGProgramme
@@ -948,6 +1051,8 @@ struct ProgrammeCell: View {
     var hasCatchup: Bool = false
     var fantasyIndicatorCount: Int = 0
     var streamCount: Int = 0
+    var textLeadingInset: CGFloat = 0
+    var visibleTextWidth: CGFloat? = nil
     let onTap: () -> Void
 
     private var isCurrent: Bool { programme.isOnNow(at: now) }
@@ -960,7 +1065,10 @@ struct ProgrammeCell: View {
     // label (accessibilityLabel) — the precomputed timeRangeLabel covers everything else.
     nonisolated static let timeFmt: DateFormatter = {
         let f = DateFormatter()
-        f.dateFormat = "h:mm a"
+        f.dateStyle = .none
+        f.timeStyle = .short
+        f.locale = .autoupdatingCurrent
+        f.timeZone = .autoupdatingCurrent
         return f
     }()
 
@@ -986,6 +1094,8 @@ struct ProgrammeCell: View {
             // Text content — responsive to card width
             if width >= 36 {
                 cellContent
+                    .frame(width: visibleTextWidth ?? width, alignment: .leading)
+                    .offset(x: textLeadingInset)
             }
 
             // Catch-up and Fantasy badges stay inside the existing cell height.
@@ -1016,22 +1126,25 @@ struct ProgrammeCell: View {
                     .padding(3)
             }
         }
+        .clipped()
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
         .accessibilityElement(children: .ignore)
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel(accessibilityLabel)
+        .accessibilityAction { onTap() }
     }
 
     @ViewBuilder
     private var cellContent: some View {
-        let narrow = width < 70
+        let contentWidth = visibleTextWidth ?? width
+        let narrow = contentWidth < 70
         VStack(alignment: .leading, spacing: 2) {
             Text(programme.title)
-                .font(.system(size: narrow ? 10 : 12, weight: .semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(Theme.textPrimary)
-                .lineLimit(1)
-            if width > 90 {
+                .lineLimit(contentWidth > 90 ? 2 : 1)
+            if contentWidth > 90 {
                 Text(timeSubtitle)
                     .font(Theme.Typography.overline)
                     .foregroundStyle(isCurrent ? Theme.accent : Theme.textSecondary)
@@ -1086,8 +1199,9 @@ struct ChannelLogoCell: View {
             }
             Text(channel.name)
                 .font(Theme.Typography.overline)
-                .foregroundStyle(Theme.textTertiary)
-                .lineLimit(1)
+                .foregroundStyle(Theme.textPrimary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
                 .frame(maxWidth: TVGuideViewModel.channelColumnWidth - 8)
         }
         .frame(width: TVGuideViewModel.channelColumnWidth, height: TVGuideViewModel.rowHeight)
@@ -1381,10 +1495,10 @@ struct ProgrammeDetailSheet: View {
         VStack(spacing: 10) {
             if !hasReminder {
                 Picker("Remind me", selection: $selectedLeadTime) {
-                    Text("5 min before").tag(5)
-                    Text("10 min before").tag(10)
-                    Text("15 min before").tag(15)
-                    Text("30 min before").tag(30)
+                    Text("5 min").tag(5).accessibilityLabel("5 minutes before")
+                    Text("10 min").tag(10).accessibilityLabel("10 minutes before")
+                    Text("15 min").tag(15).accessibilityLabel("15 minutes before")
+                    Text("30 min").tag(30).accessibilityLabel("30 minutes before")
                 }
                 .pickerStyle(.segmented)
             }

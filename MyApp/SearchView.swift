@@ -9,6 +9,9 @@ struct SearchView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var viewModel = SearchViewModel()
     @State private var query = ""
+    @State private var contentFilter = "all"
+    @State private var entertainmentResults: [EntertainmentItem] = []
+    private let entertainment = EntertainmentRepository.shared
     @State private var playingChannel: Channel?
     @State private var presentedArticle: ESPNArticle?
     @State private var presentedPodcast: Podcast?
@@ -56,6 +59,8 @@ struct SearchView: View {
         var teams: [UniversalSearchResult] = []
         var liveGames: [UniversalSearchResult] = []
         var games: [UniversalSearchResult] = []
+        var completedGames: [UniversalSearchResult] = []
+        var otherGames: [UniversalSearchResult] = []
         var news: [UniversalSearchResult] = []
         var highlights: [UniversalSearchResult] = []
         var channels: [UniversalSearchResult] = []
@@ -68,7 +73,12 @@ struct SearchView: View {
             case .team, .league:
                 teams.append(result)
             case .match(let match):
-                if match.state == .live { liveGames.append(result) } else { games.append(result) }
+                switch BannerGameStatus(presentationOf: match) {
+                case .live: liveGames.append(result)
+                case .scheduled, .pregame: games.append(result)
+                case .final: completedGames.append(result)
+                default: otherGames.append(result)
+                }
             case .article(let article):
                 if article.isSearchHighlight { highlights.append(result) } else { news.append(result) }
             case .channel:
@@ -89,7 +99,9 @@ struct SearchView: View {
         }
         add("Teams & Leagues", teams)
         add("Live Now", liveGames, limit: 5)
-        add("Upcoming Games", games, limit: 5)
+        add(String(localized: "Upcoming Games"), games, limit: 5)
+        add(String(localized: "Completed Games"), completedGames, limit: 5)
+        add(String(localized: "Other Events"), otherGames, limit: 5)
         add("News", news, limit: 5)
         add("Highlights", highlights, limit: 3)
         add("Channels", channels, limit: channels.count)
@@ -123,7 +135,7 @@ struct SearchView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .searchable(text: $query, prompt: "Teams, leagues, games, channels, players")
+            .searchable(text: $query, prompt: "Movies, series, teams, channels and more")
             .fullScreenCoverCompat(item: $playingChannel) { channel in
                 PlayerView(channel: channel)
             }
@@ -146,13 +158,23 @@ struct SearchView: View {
             await viewModel.loadFavoritePlayers(favoriteTeams: prefs.favoriteTeams)
         }
         .task { await podcastStore.ensureCatalogLoaded() }
+        .task { await entertainment.load() }
+        .task(id: "\(query)|\(entertainment.revision)|\(contentFilter)") {
+            do { try await Task.sleep(for: .milliseconds(250)) } catch { return }
+            let inventory = entertainment.catalog + entertainment.seasonsBySeries.values.flatMap { $0.flatMap(\.episodes) }
+            let query = query
+            let kind = EntertainmentKind(rawValue: contentFilter)
+            let result = await Task.detached(priority: .userInitiated) {
+                EntertainmentDiscovery.search(inventory, query: query, kind: kind)
+            }.value
+            guard !Task.isCancelled else { return }
+            entertainmentResults = result
+        }
     }
 
     @ViewBuilder private var content: some View {
         if trimmedQuery.isEmpty {
             idleState
-        } else if sections.isEmpty {
-            emptyState
         } else {
             resultsList
         }
@@ -199,6 +221,23 @@ struct SearchView: View {
     private var resultsList: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 10) {
+                Picker("Content type", selection: $contentFilter) {
+                    Text("All").tag("all")
+                    Text("Movies").tag("movie")
+                    Text("Series").tag("series")
+                    Text("Episodes").tag("episode")
+                    Text("Sports & Live TV").tag("sports")
+                }
+                if contentFilter == "all" {
+                    let exact = results.filter { EntertainmentMatching.normalized($0.title) == EntertainmentMatching.normalized(trimmedQuery) }
+                    if !exact.isEmpty {
+                        Text("Top Results").font(.title2.bold())
+                        ForEach(Array(exact.prefix(4))) { result in row(for: result) }
+                    }
+                }
+                if contentFilter == "all" || contentFilter == "sports" { CompleteProgrammeSearch(query: trimmedQuery) }
+                if contentFilter != "sports" { EntertainmentSearchSections(items: entertainmentResults, limit: contentFilter == "all" ? 6 : 100) }
+                if contentFilter == "all" || contentFilter == "sports" {
                 ForEach(Array(sections.enumerated()), id: \.element.title) { index, section in
                     if index > 0 {
                         Divider()
@@ -209,6 +248,7 @@ struct SearchView: View {
                     ForEach(section.results) { result in
                         row(for: result)
                     }
+                }
                 }
             }
             .padding(16)
@@ -864,8 +904,7 @@ private extension Match {
 
 private extension ESPNArticle {
     var isSearchHighlight: Bool {
-        let text = "\(type ?? "") \(headline) \(categories.joined(separator: " "))".searchNormalized
-        return text.contains("highlight") || text.contains("video") || text.contains("media") || text.contains("play")
+        isHighlight
     }
 }
 

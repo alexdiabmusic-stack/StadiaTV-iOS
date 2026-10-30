@@ -29,12 +29,31 @@ nonisolated enum StreamLinkerAdapters {
     }
 
     static func event(_ match: Match) -> LinkerEvent {
-        LinkerEvent(
+        var home = team(match.home)
+        var away = team(match.away)
+        // NBA same-city fixtures may arrive without the provider's nickname field.
+        // Remove only the shared city prefix, never a generic word from either team.
+        if match.league.path == "basketball/nba" {
+            let homeWords = match.home.displayName.split(separator: " ")
+            let awayWords = match.away.displayName.split(separator: " ")
+            let sharedCount = zip(homeWords, awayWords).prefix { $0.lowercased() == $1.lowercased() }.count
+            if sharedCount >= 2 {
+                let homeNickname = homeWords.dropFirst(sharedCount).joined(separator: " ")
+                let awayNickname = awayWords.dropFirst(sharedCount).joined(separator: " ")
+                if homeNickname.count >= 4, awayNickname.count >= 4,
+                   !LinkerAliases.allGeneric(LinkerText.clean(homeNickname)),
+                   !LinkerAliases.allGeneric(LinkerText.clean(awayNickname)) {
+                    home.nick = homeNickname
+                    away.nick = awayNickname
+                }
+            }
+        }
+        return LinkerEvent(
             id: match.id,
             league: match.league.path,
             kickoff: match.date,
-            home: team(match.home),
-            away: team(match.away),
+            home: home,
+            away: away,
             broadcasts: match.broadcasts,
             isNational: isNational(match.league)
         )

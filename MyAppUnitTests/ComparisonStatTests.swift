@@ -44,6 +44,6 @@ struct ComparisonStatTests {
     @Test("Equal values have no leader")
     func equalValuesHaveNoLeader() {
         let stat = ComparisonStat.parse(id: "x", label: "X", away: "10", home: "10", teamAwayName: "Away", teamHomeName: "Home")
-        #expect(stat?.leader == .none)
+        #expect(stat.map { $0.leader == .none } == true)
     }
 }

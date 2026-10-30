@@ -138,3 +138,20 @@ nonisolated enum GuideProgrammeIndexing {
         return index.mapValues { deduplicated($0.sorted { $0.start < $1.start }) }
     }
 }
+
+/// Prefix tokens prevent short channel names (TSN) from matching inside Sportsnet.
+nonisolated struct GuideSearchQuery {
+    private let terms: [String]
+
+    init(_ query: String) { terms = Self.tokens(query) }
+
+    func matches(_ text: String) -> Bool {
+        let words = Self.tokens(text)
+        return terms.allSatisfy { term in words.contains { $0.hasPrefix(term) } }
+    }
+
+    private static func tokens(_ text: String) -> [String] {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+            .split { !$0.isLetter && !$0.isNumber }.map(String.init)
+    }
+}

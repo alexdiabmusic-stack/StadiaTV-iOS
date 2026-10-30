@@ -21,6 +21,13 @@ struct NHLGameCenterView<WatchContent: View, RelatedContent: View>: View {
     }
     private var hideScore: Bool { preferences.spoilerFreeMode && (snapshot?.game?.status == .final || match.state == .final) && !revealed }
     private var snapshot: HockeyGameCenterSnapshot? { model.snapshot?.gameID == gameID ? model.snapshot : nil }
+    private var availableTabs: [NHLGameTab] {
+        var tabs: [NHLGameTab] = [.overview]
+        if snapshot?.events.isEmpty == false { tabs.append(.plays) }
+        if snapshot?.players.isEmpty == false || snapshot?.teamStats.isEmpty == false { tabs.append(.boxscore) }
+        return tabs
+    }
+
     var body: some View {
         GeometryReader { geometry in
             GameCentreSplit {
@@ -36,7 +43,7 @@ struct NHLGameCenterView<WatchContent: View, RelatedContent: View>: View {
                 } watch: {
                     watchContent()
                 } rest: {
-                GameTabBar(tabs: NHLGameTab.allCases, selection: $model.selectedTab)
+                GameTabBar(tabs: availableTabs, selection: $model.selectedTab)
                 if model.showingCache {
                     Text("Saved data · Last updated \(snapshot?.fetchedAt.formatted(date: .abbreviated, time: .shortened) ?? "unknown")").font(.caption).foregroundStyle(Theme.textSecondary).padding(6)
                 }
@@ -59,6 +66,9 @@ struct NHLGameCenterView<WatchContent: View, RelatedContent: View>: View {
             }
             .background(Theme.background)
             .foregroundStyle(Theme.textPrimary)
+        }
+        .onChange(of: availableTabs) { _, tabs in
+            if !tabs.contains(model.selectedTab) { model.selectedTab = .overview }
         }
         .tint(Theme.accessibleAccent)
         .blur(radius: hideScore ? 12 : 0)
@@ -109,6 +119,7 @@ struct NHLGameCenterView<WatchContent: View, RelatedContent: View>: View {
                 if let error = model.errors["landing"] { errorNotice("Game overview is temporarily unavailable.", detail: error) }
 
                 let scoringEvents = snapshot?.scoringSummary.isEmpty == false ? (snapshot?.scoringSummary ?? []) : (snapshot?.events ?? []).filter { $0.eventType == .goal }
+                if !scoringEvents.isEmpty || snapshot?.recapURL != nil {
                 GameDetailSection(title: "Scoring") {
                     EventTimeline(events: NHLGamePresentation.timeline(events: scoringEvents, game: snapshot?.game), league: match.league,
                                   emptyText: match.state == .pre ? "No scoring yet." : "No goals in this game yet.")
@@ -117,6 +128,7 @@ struct NHLGameCenterView<WatchContent: View, RelatedContent: View>: View {
                             .font(.subheadline.weight(.semibold)).foregroundStyle(Theme.accessibleAccent)
                             .frame(minHeight: 44)
                     }
+                }
                 }
 
                 let leaders = NHLGamePresentation.leaders(players: snapshot?.players ?? [], game: snapshot?.game)

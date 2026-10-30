@@ -258,7 +258,12 @@ final class PlaybackController: ObservableObject {
     ///   behavior, unchanged).
     var onPlaybackRequested: (() -> Void)?
 
-    func load(_ channel: Channel, audioOnly: Bool = false) {
+    private(set) var isOnDemand = false
+    private var pendingResumePosition: Double = 0
+
+    func load(_ channel: Channel, audioOnly: Bool = false, onDemand: Bool = false, resumePosition: Double = 0) {
+        isOnDemand = onDemand
+        pendingResumePosition = resumePosition.isFinite ? max(0, resumePosition) : 0
         onPlaybackRequested?()
         state = .preparing
         isWaitingToReconnect = false
@@ -276,7 +281,7 @@ final class PlaybackController: ObservableObject {
         player.replaceCurrentItem(with: nil)
         currentItem = nil
         self.channel = channel
-        urlCandidates = PlaybackItemFactory.playbackURLCandidates(for: channel.streamURL)
+        urlCandidates = onDemand ? [channel.streamURL] : PlaybackItemFactory.playbackURLCandidates(for: channel.streamURL)
         urlIndex = 0
         reconnectAttempt = 0
         availableHeights = []
@@ -373,6 +378,7 @@ final class PlaybackController: ObservableObject {
 
     /// Jumps to the live point of a live stream.
     func seekToLiveEdge() {
+        guard !isOnDemand else { return }
         if usesEngine, let session = engineSession {
             // Hand the whole reserve to the player and rejoin near its newest programme: the native
             // player is handed it from there, AVPlayer needs a new item.
@@ -462,6 +468,10 @@ final class PlaybackController: ObservableObject {
 
     /// Rebuilds the item for the same URL after a mid-stream failure or long stall.
     private func reconnect(reason: String) {
+        if isOnDemand {
+            let position = player.currentTime().seconds
+            if position.isFinite, position > 0 { pendingResumePosition = position }
+        }
         guard reconnectAttempt < Self.maxReconnectAttempts else {
             fail("Lost connection to the stream.")
             return
@@ -671,6 +681,10 @@ final class PlaybackController: ObservableObject {
         guard currentItem != nil, !isWaitingToReconnect else { return }
         switch player.timeControlStatus {
         case .playing:
+            if isOnDemand { isUserPaused = false }
+            itemHasPlayed = true
+            stallTask?.cancel()
+            watchdogTask?.cancel()
             // An engine item is told to play immediately, so AVPlayer reports playing before it has
             // anything to show: it has started once it shows a picture (see the monitor).
             if !usesEngine { itemStarted() }
@@ -690,7 +704,13 @@ final class PlaybackController: ObservableObject {
             }
             setBuffering(true)
         case .paused:
-            if isUserPaused { state = .paused }
+            // Native AVKit controls operate the same player directly for on-demand media.
+            if isOnDemand, itemHasPlayed, state != .ended {
+                isUserPaused = true
+                stallTask?.cancel()
+                watchdogTask?.cancel()
+            }
+            if isUserPaused, state != .ended { state = .paused }
             setBuffering(false)
         @unknown default:
             break
@@ -817,6 +837,11 @@ final class PlaybackController: ObservableObject {
             if !isUserPaused { resumePlayback() }
             if !didNotifyItemReady {
                 didNotifyItemReady = true
+                if isOnDemand, pendingResumePosition > 0 {
+                    let target = pendingResumePosition
+                    pendingResumePosition = 0
+                    player.seek(to: CMTime(seconds: target, preferredTimescale: 600))
+                }
                 onItemReady?(item)
                 loadAvailableHeights(for: item)
             }

@@ -98,21 +98,38 @@ nonisolated extension BannerNewsArticle {
         let displayByline = authorByline ?? publisher ?? sourceName
         // Preserve article-level league metadata instead of relabelling every
         // result with the feed requested by the caller.
-        let articleLeague = leagueID.flatMap { id in
+        let classification = BannerNewsDeduplicator.classify(headline: headline, description: description)
+        let ambiguous = BannerNewsDeduplicator.hasAmbiguousLeagueEvidence(headline: headline, description: description)
+        let feedOnlyProviders: Set<SportsDataProviderID> = [.cbsRSS, .nbcSports, .foxRSS, .bbcSport, .skySports]
+        let requiresContentEvidence = provenance.map { feedOnlyProviders.contains($0.provider) } ?? false
+        let resolvedID = ambiguous ? nil : classification.leagueID ?? (requiresContentEvidence ? nil : leagueID)
+        let resolvedLeague = resolvedID.flatMap { id in
             League.all.first { SportsIdentityResolver.canonicalLeagueID(for: $0) == id }
-        } ?? league
+        }
+        // Explicit content from another sport must never retain the feed's label.
+        let conflicts = classification.sport.map { $0 != resolvedLeague?.group } ?? false
+        let articleLeague = classification.leagueID.flatMap { id in
+            League.all.first { SportsIdentityResolver.canonicalLeagueID(for: $0) == id }
+        } ?? resolvedLeague ?? league
+        let category = conflicts
+            ? classification.sport.map { String(localized: String.LocalizationValue($0.rawValue)) }
+            : resolvedLeague?.shortName ?? (classification.sport ?? (ambiguous ? nil : primarySport)).map { String(localized: String.LocalizationValue($0.rawValue)) }
+        let validatedDate = published.flatMap { $0 <= Date().addingTimeInterval(300) ? $0 : nil }
         return ESPNArticle(
             id: id.rawValue,
             headline: headline,
             description: description,
-            published: published,
+            published: validatedDate,
             url: url,
             imageURL: imageURL,
             league: articleLeague,
             byline: displayByline,
             type: articleType,
             isPremium: false,
-            categories: []
+            categories: [],
+            publisher: publisher ?? sourceName,
+            validatedCategory: category ?? String(localized: "Sports"),
+            relevantTeamIDs: teamIDs.map(\.rawValue)
         )
     }
 }

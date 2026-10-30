@@ -206,6 +206,8 @@ struct SavedMultiviewLayout: Codable, Equatable {
 }
 
 struct UserPreferences: Codable, Equatable {
+    var viewingExperience: ViewingExperience = .sports
+    var sportsIntegration: SportsIntegrationLevel = .compact
     var hasCompletedOnboarding = false
     var selectedLeagueIDs: Set<String> = []   // League.path values
     var favoriteTeams: [FavoriteTeam] = []
@@ -277,6 +279,7 @@ struct UserPreferences: Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
+        case viewingExperience, sportsIntegration
         case hasCompletedOnboarding, selectedLeagueIDs, favoriteTeams, favoritePlayers
         case matchNotificationsEnabled, matchReminderLeadTime, morningDigestEnabled, cloudSyncEnabled
         case morningDigestHour, liveAlertsEnabled, closeGameAlertsEnabled, scoreChangeAlertsEnabled, broadcastAlertsEnabled
@@ -295,6 +298,8 @@ struct UserPreferences: Codable, Equatable {
     /// (missing newly added keys) still load.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        viewingExperience = (try? container.decode(ViewingExperience.self, forKey: .viewingExperience)) ?? .sports
+        sportsIntegration = (try? container.decode(SportsIntegrationLevel.self, forKey: .sportsIntegration)) ?? .compact
         hasCompletedOnboarding = try container.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding) ?? false
         selectedLeagueIDs = try container.decodeIfPresent(Set<String>.self, forKey: .selectedLeagueIDs) ?? []
         favoriteTeams = try container.decodeIfPresent([FavoriteTeam].self, forKey: .favoriteTeams) ?? []
@@ -406,6 +411,12 @@ final class PreferencesStore: ObservableObject {
             UserDefaults.standard.set(data, forKey: defaultsKey)
         }
     }
+
+    var viewingExperience: ViewingExperience { prefs.viewingExperience }
+    var sportsIntegration: SportsIntegrationLevel { prefs.sportsIntegration }
+    var sportsFeaturesVisible: Bool { viewingExperience != .liveTV || sportsIntegration != .hidden }
+    func setViewingExperience(_ value: ViewingExperience) { prefs.viewingExperience = value; persist() }
+    func setSportsIntegration(_ value: SportsIntegrationLevel) { prefs.sportsIntegration = value; persist() }
 
     // MARK: Onboarding
 

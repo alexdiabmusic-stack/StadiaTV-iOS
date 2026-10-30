@@ -38,12 +38,14 @@ struct MatchesView: View {
 
     @State private var selectedPage: FollowingPage = .matches
     @State private var selectedSelection: FollowingSelection = .all
+    @AppStorage("following.selection.v1") private var savedSelectionID = "all"
     @State private var comingUpSportFilter: SportGroup? = nil
     @State private var showingTeamEditor = false
     @State private var hiddenMatchIDs: Set<String> = []
     @State private var remindedMatchIDs: Set<String> = []
     @State private var news: [ESPNArticle] = []
     @State private var newsLoading = false
+    @State private var newsUnavailable = false
     @State private var notificationAlertMessage = ""
     @State private var showingNotificationAlert = false
     @State private var openSignpost: OSSignpostIntervalState?
@@ -101,7 +103,16 @@ struct MatchesView: View {
                 openSignpost = nil
             }
         }
+        .onChange(of: selectedSelection) { _, selection in
+            savedSelectionID = selection.id
+            comingUpSportFilter = nil
+        }
         .onAppear {
+            if let team = prefs.favoriteTeams.first(where: { "team-\($0.id)" == savedSelectionID }) {
+                selectedSelection = .team(team)
+            } else if let league = leagueChips.first(where: { "league-\($0.id)" == savedSelectionID }) {
+                selectedSelection = .league(league)
+            }
             viewModel.startAutoRefresh()
             openSignpost = GuideMatchingSignposts.beginMatchesTabToFirstOption()
         }
@@ -156,8 +167,9 @@ struct MatchesView: View {
     private func loadNews() async {
         newsLoading = true
         var articles: [ESPNArticle] = []
-        await withTaskGroup(of: [ESPNArticle].self) { group in
-            for league in newsLeagues.prefix(3) {
+        var successes = 0
+        await withTaskGroup(of: [ESPNArticle]?.self) { group in
+            for league in newsLeagues {
                 group.addTask {
                     // 8-second per-league timeout so one slow response doesn't
                     // hold up the whole section.
@@ -166,10 +178,12 @@ struct MatchesView: View {
                         inner.addTask { try await Task.sleep(for: .seconds(8)); throw CancellationError() }
                         defer { inner.cancelAll() }
                         return try await inner.next() ?? []
-                    }) ?? []
+                    })
                 }
             }
-            for await batch in group { articles.append(contentsOf: batch) }
+            for await batch in group {
+                if let batch { successes += 1; articles.append(contentsOf: batch) }
+            }
         }
         var seenIDs: Set<String> = []
         var seenHeadlines: Set<String> = []
@@ -181,7 +195,8 @@ struct MatchesView: View {
                       seenHeadlines.insert(normalizedHeadline).inserted else { return false }
                 return true
             }
-        news = Array(deduped.prefix(8))
+        newsUnavailable = successes == 0 && !newsLeagues.isEmpty
+        if !newsUnavailable { news = deduped }
         newsLoading = false
     }
 
@@ -268,7 +283,7 @@ struct MatchesView: View {
                     .padding(.bottom, Theme.isMac ? 20 : 28)
 
                     FollowingComingUpSection(
-                        matches: Array(comingUpVisible.prefix(6)),
+                        matches: Array(comingUpVisible.filter { !liveList.isEmpty || $0.id != nextUp?.id }.prefix(6)),
                         fullScheduleMatches: comingUpVisible,
                         sportFilter: $comingUpSportFilter,
                         availableSports: availableSports,
@@ -278,9 +293,19 @@ struct MatchesView: View {
                     .padding(.bottom, Theme.isMac ? 20 : 28)
 
                 } secondary: {
-                    if !news.isEmpty || newsLoading {
-                        FollowingNewsSection(articles: news, isLoading: newsLoading)
+                    if !selectedNews.isEmpty || newsLoading {
+                        FollowingNewsSection(articles: selectedNews, isLoading: newsLoading)
                             .padding(.bottom, Theme.isMac ? 20 : 28)
+                    }
+
+                    if newsUnavailable {
+                        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                            Text("Team news is temporarily unavailable.")
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(Theme.textSecondary)
+                            Button("Retry") { Task { await loadNews() } }
+                                .frame(minHeight: 44)
+                        }.padding(.horizontal, 20)
                     }
 
                     FollowingStandingsSnapshot(
@@ -290,7 +315,7 @@ struct MatchesView: View {
                     .padding(.horizontal, 20)
                 }
 
-                Spacer(minLength: 120)
+                Spacer(minLength: Theme.Spacing.section)
             }
             .macContentWidth()
         }
@@ -391,6 +416,19 @@ struct MatchesView: View {
         selectedMatches.filter { !hiddenMatchIDs.contains($0.id) }
     }
 
+    private var selectedNews: [ESPNArticle] {
+        let filtered = news.filter { article in
+            switch selectedSelection {
+            case .team(let team): return article.matchesFavoriteTeam(team)
+            case .league(let league): return article.league == league && article.categoryLabel == league.shortName
+            case .all:
+                return prefs.favoriteTeams.contains { article.matchesFavoriteTeam($0) }
+                    || prefs.explicitlyFollowedLeagues.contains { $0 == article.league && article.categoryLabel == $0.shortName }
+            }
+        }
+        return Array(filtered.prefix(8))
+    }
+
     private var newsLeagues: [League] {
         let favLeagueIDs = Set(prefs.favoriteTeams.flatMap { [$0.leaguePath, $0.leagueBannerKey] })
         let explicitIDs = Set(prefs.explicitlyFollowedLeagues.flatMap { [$0.id, $0.bannerKey] })
@@ -457,6 +495,7 @@ struct MatchesView: View {
 // MARK: - YOUR SPORTS summary
 
 private struct FollowingSportsSummary: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let liveCount: Int
     let todayCount: Int
     let thisWeekCount: Int
@@ -469,20 +508,23 @@ private struct FollowingSportsSummary: View {
                 .foregroundStyle(Theme.textSecondary)
                 .tracking(0.5)
 
-            HStack(spacing: 0) {
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
+                : AnyLayout(HStackLayout(spacing: 0))
+            layout {
                 statItem(
                     icon: liveCount > 0 ? "circle.fill" : "circle",
                     value: "\(liveCount)", label: "Live",
                     tint: liveCount > 0 ? Theme.live : Theme.textTertiary,
                     prominent: liveCount > 0
                 )
-                divider
+                if !dynamicTypeSize.isAccessibilitySize { divider }
                 statItem(icon: "calendar", value: "\(todayCount)", label: "Today",
                          tint: Theme.upcoming, prominent: false)
-                divider
+                if !dynamicTypeSize.isAccessibilitySize { divider }
                 statItem(icon: "calendar.badge.clock", value: "\(thisWeekCount)", label: "This Week",
                          tint: Theme.starting, prominent: false)
-                Spacer()
+                if !dynamicTypeSize.isAccessibilitySize { Spacer() }
             }
 
 
@@ -504,7 +546,7 @@ private struct FollowingSportsSummary: View {
                 .foregroundStyle(prominent ? tint : Theme.textTertiary)
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
-                    .font(.system(size: Theme.isMac ? 21 : 16, weight: .bold, design: .rounded).monospacedDigit())
+                    .font(.headline.monospacedDigit())
                     .foregroundStyle(prominent ? tint : Theme.textPrimary)
                 Text(label)
                     .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata, weight: .semibold) : .caption2.weight(.semibold))
@@ -549,7 +591,7 @@ private struct FollowingLiveHero: View {
                 if isRacing {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(match.name)
-                            .font(.system(size: 22, weight: .bold))
+                            .font(Theme.Typography.title)
                             .foregroundStyle(Theme.textPrimary)
                             .lineLimit(2)
                         Text(match.statusDetail)
@@ -661,7 +703,7 @@ private struct FollowingUpNextHero: View {
             if isRacing {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(match.name)
-                        .font(.system(size: 22, weight: .bold))
+                        .font(Theme.Typography.title)
                         .foregroundStyle(Theme.textPrimary)
                         .lineLimit(3)
                     if !match.statusDetail.isEmpty, !match.statusDetail.lowercased().contains("tbd") {
@@ -671,7 +713,7 @@ private struct FollowingUpNextHero: View {
                     }
                 }
             } else {
-                GameScoreRow(match: match, showsScore: false, logoSize: 64, showsFullNames: true)
+                GameScoreRow(match: match, showsScore: false, logoSize: 40, showsFullNames: true)
             }
 
             VStack(alignment: .leading, spacing: 3) {
@@ -684,9 +726,6 @@ private struct FollowingUpNextHero: View {
                         .foregroundStyle(Theme.textSecondary)
                         .lineLimit(1)
                 }
-                Text(countdown)
-                    .font(Theme.isMac ? .system(size: Theme.Mac.Typography.standardMetadata) : .caption)
-                    .foregroundStyle(Theme.textSecondary)
             }
 
             HStack(spacing: 10) {
@@ -751,13 +790,7 @@ private struct FollowingUpNextHero: View {
     }
 
     private var countdown: String {
-        let s = max(0, match.date.timeIntervalSinceNow)
-        let d = Int(s) / 86400, h = (Int(s) % 86400) / 3600, m = (Int(s) % 3600) / 60
-        if d > 1 { return "Starts in \(d) days" }
-        if d == 1 { return "Starts in 1 day" }
-        if h > 0 { return "Starts in \(h)h \(m)m" }
-        if m > 0 { return "Starts in \(m) min" }
-        return "Starting soon"
+        match.date.formatted(.relative(presentation: .named))
     }
 
     private var accessibilityLabel: String {
@@ -1273,7 +1306,7 @@ private struct FollowingNewsCard: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 4) {
-                    Text(article.league.shortName.uppercased())
+                    Text(article.categoryLabel)
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(Theme.accent)
                     if let pub = article.published {
@@ -1297,10 +1330,7 @@ private struct FollowingNewsCard: View {
     }
 
     private func relTime(_ date: Date) -> String {
-        let s = Date().timeIntervalSince(date)
-        if s < 3600 { return "\(max(1, Int(s / 60)))m" }
-        if s < 86400 { return "\(Int(s / 3600))h" }
-        return "\(Int(s / 86400))d"
+        date <= Date() ? date.formatted(.relative(presentation: .named)) : ""
     }
 }
 
@@ -1338,10 +1368,16 @@ private struct FollowingStandingsSnapshot: View {
 
     private func standingsBlock(league: League, highlightTeamID: String?) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("YOUR STANDINGS")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Theme.textSecondary)
-                .tracking(0.5)
+            HStack {
+                Text("Your Standings")
+                    .font(Theme.Typography.headline)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                NavigationLink("View All") { StandingsView(league: league) }
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.accessibleAccent)
+                    .frame(minHeight: 44)
+            }
             FollowingStandingsPanelView(league: league, highlightTeamID: highlightTeamID)
         }
     }

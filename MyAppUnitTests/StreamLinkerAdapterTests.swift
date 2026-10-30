@@ -35,7 +35,7 @@ struct StreamLinkerAdapterTests {
         return linker.link(StreamLinkerAdapters.event(match))
     }
 
-    private var eredivisie: League { League.all.first { $0.path == "soccer/ned.1" }! }
+    private var eredivisie: League { League(name: "Eredivisie", shortName: "Eredivisie", path: "soccer/ned.1", group: .soccer) }
     private var epl: League { League.all.first { $0.path == "soccer/eng.1" }! }
     private var nba: League { League.all.first { $0.path == "basketball/nba" }! }
 
@@ -102,7 +102,7 @@ struct StreamLinkerAdapterTests {
     func explicitTeamNamesLinkDespiteSharedCity() {
         let m = match(league: nba, home: "Los Angeles Lakers", homeAbbr: "LAL", away: "Los Angeles Clippers", awayAbbr: "LAC")
         let feeds = link(m, channels: [channel(name: "Lakers vs Clippers Live")])
-        #expect(feeds.contains { $0.confidence >= 0.7 },
-                "Explicit team names on both sides of a separator must produce a confident link")
+        #expect(feeds.contains { $0.tier == .eventChannel && $0.confidence == 0.5 },
+                "Explicit team names must link, but without timing evidence remain a possible broadcast")
     }
 }

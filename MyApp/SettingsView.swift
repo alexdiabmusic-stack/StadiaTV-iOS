@@ -468,7 +468,7 @@ struct SavedArticlesSettingsView: View {
                         Button { presentedArticle = article } label: {
                             HStack(alignment: .top, spacing: 12) {
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text(article.league.shortName)
+                                    Text(article.categoryLabel)
                                         .font(.caption.weight(.bold))
                                         .foregroundStyle(Theme.accent)
                                     Text(article.headline)
@@ -943,6 +943,11 @@ Please use the subject line "BannerTV Privacy Request."
 struct AboutBannerTVSettingsView: View {
     var body: some View {
         SettingsPage(title: "About BannerTV") {
+            SettingsPanel(title: "METADATA") {
+                Text("External movie and series metadata is disabled until an authorized provider configuration is supplied.")
+                Text("This product uses the TMDB API but is not endorsed or certified by TMDB.")
+                if let url = URL(string: "https://www.themoviedb.org") { Link("The Movie Database", destination: url) }
+            }
             SettingsPanel(title: "ABOUT BANNERTV") {
                 LegalDocumentText(Self.aboutText)
             }

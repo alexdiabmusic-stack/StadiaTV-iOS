@@ -30,7 +30,7 @@ final class TVGuideViewModel: ObservableObject {
 
     // Guide geometry constants (shared with UI)
     static let ptsPerMinute: CGFloat = 3.0
-    static let channelColumnWidth: CGFloat = 80
+    static let channelColumnWidth: CGFloat = 112
     static let rowHeight: CGFloat = 72
     static let timeRulerHeight: CGFloat = 44
     static let minProgramWidth: CGFloat = 20
@@ -38,8 +38,10 @@ final class TVGuideViewModel: ObservableObject {
     // Reused formatter — creating DateFormatter is expensive.
     nonisolated private static let rulerFmt: DateFormatter = {
         let f = DateFormatter()
-        f.dateFormat = "h:mm a"
-        f.timeZone = .current
+        f.dateStyle = .none
+        f.timeStyle = .short
+        f.locale = .autoupdatingCurrent
+        f.timeZone = .autoupdatingCurrent
         return f
     }()
 
@@ -129,7 +131,10 @@ final class TVGuideViewModel: ObservableObject {
             }
         }
         if !channelNameFilter.isEmpty {
-            result = result.filter { $0.name.localizedCaseInsensitiveContains(channelNameFilter) }
+            let query = GuideSearchQuery(channelNameFilter)
+            result = result.filter {
+                query.matches($0.name) || repository.hasCachedProgramme(for: $0.id, matching: query, from: guideWindowStart, to: guideWindowEnd)
+            }
         }
         visibleChannels = result
     }
@@ -241,19 +246,27 @@ final class TVGuideViewModel: ObservableObject {
         if let cached = rowLayoutCache[channel.id], cached.key == key { return cached.layout }
 
         let progs = programmes(for: channel, in: guideWindowStart...guideWindowEnd)
+            .filter { $0.start < $0.end && $0.start < guideWindowEnd && $0.end > guideWindowStart }
+            .sorted { $0.start < $1.start }
         var cells: [GuideCellLayout] = []
         cells.reserveCapacity(progs.count * 2)
         func addGap(_ from: Date, _ to: Date) {
-            let width = CGFloat(to.timeIntervalSince(from) / 60) * Self.ptsPerMinute
-            guard width > 4 else { return }
+            guard let frame = GuideProgrammeGeometry.frame(start: from, end: to,
+                windowStart: guideWindowStart, windowEnd: guideWindowEnd,
+                pointsPerMinute: Self.ptsPerMinute), frame.width > 4 else { return }
             cells.append(GuideCellLayout(id: "gap-\(from.timeIntervalSince1970)", programme: nil,
-                                         x: xOffset(for: from) + 1, width: width - 2, timeRangeLabel: ""))
+                                         x: frame.x + 1, width: frame.width - 2, timeRangeLabel: ""))
         }
         if let first = progs.first, first.start > guideWindowStart { addGap(guideWindowStart, first.start) }
         for (index, prog) in progs.enumerated() {
             let label = "\(Self.rulerFmt.string(from: prog.start)) – \(Self.rulerFmt.string(from: prog.end))"
-            cells.append(GuideCellLayout(id: prog.id, programme: prog, x: xOffset(for: prog.start),
-                                         width: width(for: prog), timeRangeLabel: label))
+            if let frame = GuideProgrammeGeometry.frame(start: prog.start, end: prog.end,
+                windowStart: guideWindowStart, windowEnd: guideWindowEnd,
+                pointsPerMinute: Self.ptsPerMinute) {
+                // Keep the true width: widening short programmes overlaps their neighbors.
+                cells.append(GuideCellLayout(id: prog.id, programme: prog, x: frame.x,
+                                             width: frame.width, timeRangeLabel: label))
+            }
             if index + 1 < progs.count, progs[index + 1].start > prog.end + 30 {
                 addGap(prog.end, progs[index + 1].start)
             }
@@ -352,7 +365,9 @@ final class TVGuideViewModel: ObservableObject {
     // Built once; this is read every time the guide header is evaluated.
     nonisolated private static let dayFmt: DateFormatter = {
         let f = DateFormatter()
-        f.dateFormat = "E, MMM d"
+        f.setLocalizedDateFormatFromTemplate("EEE MMM d")
+        f.locale = .autoupdatingCurrent
+        f.timeZone = .autoupdatingCurrent
         return f
     }()
 

@@ -22,7 +22,10 @@ struct AppOrchestration: ViewModifier {
                 if phase == .active { Task { await playlistStore.refreshAccountStatus() } }
             }
             .task { epgRepository.xtreamEPGFetcher = playlistStore.fetchXtreamEPG }
-            .task { await liveViewModel.load(favoriteTeams: prefs.favoriteTeams) }
+            .task(id: prefs.sportsFeaturesVisible) {
+                guard prefs.sportsFeaturesVisible else { liveViewModel.stopAutoRefresh(); return }
+                await liveViewModel.load(favoriteTeams: prefs.favoriteTeams)
+            }
             // Guide import: whenever the channel list or a playlist's own guide URL changes.
             .task(id: guideSetupKey) {
                 epgRepository.setupWithChannels(
@@ -31,6 +34,7 @@ struct AppOrchestration: ViewModifier {
                 )
             }
             .task(id: streamScanKey) {
+                guard prefs.sportsFeaturesVisible else { return }
                 await streamStore.scanDebounced(
                     matches: liveViewModel.allLive + liveViewModel.startingSoon,
                     channels: playlistStore.allChannels,
@@ -44,7 +48,10 @@ struct AppOrchestration: ViewModifier {
                     )
                 }
             }
-            .task { await keepEventChannelsCurrent() }
+            .task(id: prefs.sportsFeaturesVisible) {
+                guard prefs.sportsFeaturesVisible else { return }
+                await keepEventChannelsCurrent()
+            }
             .onChange(of: playlistStore.channelsRevision) {
                 Task { await refreshFantasyContexts(force: true) }
             }
@@ -56,7 +63,7 @@ struct AppOrchestration: ViewModifier {
     }
 
     private var streamScanKey: String {
-        "\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.channelsRevision)-\(epgRepository.programmeRevision)"
+        "\(prefs.sportsFeaturesVisible)-\(liveViewModel.allLive.count)-\(liveViewModel.startingSoon.count)-\(playlistStore.channelsRevision)-\(epgRepository.programmeRevision)"
     }
 
     /// Keeps event-slot channel names (which carry the fixture and change during the day)
@@ -82,6 +89,7 @@ struct AppOrchestration: ViewModifier {
     }
 
     private func refreshFantasyContexts(force: Bool) async {
+        guard prefs.sportsFeaturesVisible else { return }
         await bannerFantasyStore.load()
         await PlaybackPriority.waitForBackgroundSlot()
         async let espnRefresh: Void = fantasyStore.refresh(

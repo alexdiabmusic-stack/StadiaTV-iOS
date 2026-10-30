@@ -5,6 +5,7 @@ struct OnboardingView: View {
     @EnvironmentObject private var prefs: PreferencesStore
     @EnvironmentObject private var playlists: PlaylistStore
 
+    @State private var choosingExperience = false
     @State private var step: OnboardingStep = .welcome
     @State private var store = OnboardingStore()
     @State private var sportPendingDeselect: CatalogSport?
@@ -36,6 +37,19 @@ struct OnboardingView: View {
                 }
             }
         }
+        .sheet(isPresented: $choosingExperience) {
+            NavigationStack {
+                ViewingExperienceSettingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Continue") {
+                                choosingExperience = false
+                                step = prefs.viewingExperience == .liveTV ? .watch : .sports
+                            }
+                        }
+                    }
+            }
+        }
         .tint(Theme.accent)
         .providesAdaptiveLayoutContext()
         .alert("Remove \(sportPendingDeselect?.name ?? "")?",
@@ -62,7 +76,7 @@ struct OnboardingView: View {
         switch step {
         case .welcome:
             WelcomeView(
-                onGetStarted: { withAnimation(.easeInOut(duration: 0.3)) { step = .sports } },
+                onGetStarted: { choosingExperience = true },
                 onRestore: { if !prefs.restorePreferencesFromCloud() { showNothingToRestoreAlert = true } }
             )
         case .sports:
@@ -119,7 +133,8 @@ struct OnboardingView: View {
             case .favorites:
                 step = .sports
             case .watch:
-                step = store.hasFavoriteScreenContent ? .favorites : .sports
+                if prefs.viewingExperience == .liveTV { choosingExperience = true }
+                else { step = store.hasFavoriteScreenContent ? .favorites : .sports }
             case .welcome:
                 break
             }
@@ -127,6 +142,7 @@ struct OnboardingView: View {
     }
 
     private func commit() {
-        store.commit(to: prefs)
+        if prefs.viewingExperience == .liveTV { prefs.completeOnboarding() }
+        else { store.commit(to: prefs) }
     }
 }

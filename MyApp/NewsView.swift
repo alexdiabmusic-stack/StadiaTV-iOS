@@ -196,7 +196,9 @@ final class NewsViewModel: ObservableObject {
             allArticlesCache = result
             return result
         }
-        let pool = articlesByLeague[league.id] ?? []
+        let pool = (articlesByLeague[league.id] ?? []).filter {
+            $0.league == league && $0.categoryLabel == league.shortName
+        }
         let byID = Dictionary(grouping: pool, by: \.id).compactMap { $0.value.first }
         let unique = Dictionary(grouping: byID, by: { $0.headline.lowercased() }).compactMap { $0.value.first }
         return unique.sorted { ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
@@ -234,8 +236,10 @@ final class NewsViewModel: ObservableObject {
         loadingLeagueIDs.insert(league.id)
         defer { loadingLeagueIDs.remove(league.id) }
         let articles = await fetch(league: league, page: 1)
-        articlesByLeague[league.id] = articles
-        allArticlesCache = nil
+        if !articles.isEmpty || articlesByLeague[league.id] == nil {
+            articlesByLeague[league.id] = articles
+            allArticlesCache = nil
+        }
         pagesByLeague[league.id] = 1
         exhaustedLeagues.remove(league.id)
     }
@@ -316,7 +320,7 @@ struct NewsArticleCard: View {
 
                 VStack(alignment: .leading, spacing: 7) {
                     HStack(spacing: 6) {
-                        Text(article.league.shortName)
+                        Text(article.categoryLabel)
                             .font(.caption2.weight(.bold))
                             .foregroundStyle(Theme.accent)
                         if article.isPremium {

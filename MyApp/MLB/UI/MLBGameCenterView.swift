@@ -21,6 +21,14 @@ struct MLBGameCenterView<WatchContent: View, RelatedContent: View>: View {
     }
     private var snapshot: BaseballGameSnapshot? { model.snapshot?.gamePk == gamePk ? model.snapshot : nil }
     private var hideScore: Bool { preferences.spoilerFreeMode && (snapshot?.game?.status == .final || match.state == .final) && !revealed }
+    private var visibleTabs: [MLBGameTab] {
+        var tabs: [MLBGameTab] = [.overview]
+        if snapshot?.atBats.isEmpty == false { tabs.append(.plays) }
+        if snapshot?.box.isEmpty == false { tabs.append(.boxscore) }
+        if snapshot?.probabilities.isEmpty == false || snapshot?.line != nil { tabs.append(.stats) }
+        return tabs
+    }
+
     var body: some View {
         GeometryReader { geometry in
             GameCentreSplit {
@@ -36,7 +44,7 @@ struct MLBGameCenterView<WatchContent: View, RelatedContent: View>: View {
                 } rest: {
                 ScrollView(.horizontal) {
                     HStack {
-                        ForEach(MLBGameTab.allCases) { tab in
+                        ForEach(visibleTabs) { tab in
                             Button { fullRefresh = false; model.selectedTab = tab } label: {
                                 Text(tab.rawValue).font(.subheadline.bold()).padding(.horizontal, 12).frame(minHeight: 44)
                                     .background(model.selectedTab == tab ? Theme.surfaceElevated : .clear, in: RoundedRectangle(cornerRadius: Theme.Radius.sm))
@@ -67,6 +75,9 @@ struct MLBGameCenterView<WatchContent: View, RelatedContent: View>: View {
             #else
             PaywallView()
             #endif
+        }
+        .onChange(of: visibleTabs) { _, tabs in
+            if !tabs.contains(model.selectedTab) { model.selectedTab = .overview }
         }
         .onChange(of: scenePhase) { _, phase in if phase == .active { fullRefresh = true } }
         .task {

@@ -283,7 +283,7 @@ struct ArticleReaderView: View {
                 )
 
                 HStack(spacing: 6) {
-                    Text(article.league.shortName.uppercased())
+                    Text(article.categoryLabel)
                         .font(.caption.weight(.bold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
@@ -350,7 +350,7 @@ struct ArticleReaderView: View {
 
     private var metadataLine: some View {
         HStack(spacing: 4) {
-            Text(article.league.shortName)
+            Text(article.categoryLabel)
             if let published = article.published {
                 Text("·")
                 Text(published, format: .dateTime.month(.wide).day().year())
@@ -475,15 +475,7 @@ struct ArticleReaderView: View {
     }
 
     private func relativeDate(_ date: Date) -> String {
-        let diff = max(0, Int(Date().timeIntervalSince(date)))
-        if diff < 60 { return "Just now" }
-        let minutes = diff / 60
-        if minutes < 60 { return "\(minutes)m ago" }
-        let hours = minutes / 60
-        if hours < 24 { return "\(hours)h ago" }
-        let days = hours / 24
-        if days == 1 { return "Yesterday" }
-        return "\(days)d ago"
+        article.relativePublishedText
     }
 }
 
@@ -671,17 +663,7 @@ private struct ShimmerView: View {
     }
 }
 
-// MARK: - Article badge helper
-
-private extension ESPNArticle {
-    var badgeText: String? {
-        let text = "\(type ?? "") \(headline) \(categories.joined(separator: " "))".lowercased()
-        if text.contains("breaking") || text.contains("injury") || text.contains("trade") { return "BREAKING" }
-        if text.contains("analysis") { return "ANALYSIS" }
-        if text.contains("rumor") || text.contains("rumour") { return "RUMOUR" }
-        return nil
-    }
-}
+// Article metadata presentation is shared with Discover and Following.
 
 private extension Color {
     static var reader_systemBackground: Color {

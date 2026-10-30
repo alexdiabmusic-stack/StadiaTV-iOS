@@ -5,6 +5,8 @@ import SwiftUI
 /// Identifies what set of channels a ChannelBrowserView should display.
 enum ChannelBrowserScope {
     case favorites
+    case recent
+    case highDefinition
     case allChannels
     case customGroup(id: String, name: String)
     case providerGroup(providerID: UUID, groupTitle: String, providerName: String)
@@ -12,6 +14,8 @@ enum ChannelBrowserScope {
     var title: String {
         switch self {
         case .favorites:                               return "Favourites"
+        case .recent: return String(localized: "Recent Channels")
+        case .highDefinition: return String(localized: "HD / 4K")
         case .allChannels:                             return "All Channels"
         case .customGroup(_, let name):                return name
         case .providerGroup(_, let title, _):          return title
@@ -22,6 +26,8 @@ enum ChannelBrowserScope {
     var sortStorageKey: String {
         switch self {
         case .favorites:                               return "bannertv.sort.favorites"
+        case .recent: return "bannertv.sort.recent"
+        case .highDefinition: return "bannertv.sort.hd"
         case .allChannels:                             return "bannertv.sort.all"
         case .customGroup(let id, _):                  return "bannertv.sort.cg.\(id)"
         case .providerGroup(let pid, let g, _):        return "bannertv.sort.pg.\(pid).\(g)"
@@ -30,7 +36,7 @@ enum ChannelBrowserScope {
 
     var defaultSortOrder: ChannelSortOrder {
         switch self {
-        case .favorites:   return .favoritesFirst
+        case .favorites:   return .custom
         case .customGroup: return .custom
         default:           return .providerOrder
         }
@@ -39,6 +45,8 @@ enum ChannelBrowserScope {
     var emptyMessage: String {
         switch self {
         case .favorites:   return "No favourite channels yet.\nSwipe right on any channel to add one."
+        case .recent: return String(localized: "No recently watched channels yet.")
+        case .highDefinition: return String(localized: "No channels with HD or 4K provider labels.")
         case .allChannels: return "No channels loaded from your playlists."
         case .customGroup: return "This group has no channels yet.\nUse the context menu on any channel to add it."
         case .providerGroup: return "No channels in this group."
@@ -60,7 +68,9 @@ struct ChannelBrowserView: View {
     @EnvironmentObject private var channelPrefs: ChannelPreferencesStore
     @EnvironmentObject private var customGroups: CustomGroupStore
     @EnvironmentObject private var watchStore: WatchStore
+    @Environment(\.playerStores) private var playerStores
 
+    @AppStorage("banner.channels.grid.v1") private var showsGrid = false
     @State private var query = ""
     @State private var sortOrder: ChannelSortOrder
     private let sortStorageKey: String
@@ -105,11 +115,30 @@ struct ChannelBrowserView: View {
             source = .favorites
         case .allChannels:
             source = .all
+        case .recent:
+            source = .ids(watchStore.recents.map(\.id))
+        case .highDefinition:
+            source = .ids(store.allChannels.filter { channel in
+                guard let quality = ChannelFilterEngine.quality(of: channel) else { return false }
+                return quality != .sd
+            }.map(\.id))
         case .customGroup(let id, _):
             source = .ids(customGroups.groups.first(where: { $0.id == id })?.channelIDs ?? [])
         case .providerGroup(let providerID, let groupTitle, _):
             source = .playlistGroup(providerID, groupTitle)
             byPlaylist = store.channelsByPlaylist[providerID] ?? []
+        }
+        var searchTerms: [String: String] = [:]
+        if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            for group in customGroups.groups {
+                for id in group.channelIDs { searchTerms[id, default: ""] += " " + group.name }
+            }
+            if let epg = playerStores?.epgRepository {
+                let titles = epg.cachedCurrentTitles()
+                for (id, canonicalID) in epg.channelToCanonicalMap {
+                    if let title = titles[canonicalID] { searchTerms[id, default: ""] += " " + title }
+                }
+            }
         }
         return ChannelBrowserModel.Input(
             source: source,
@@ -120,7 +149,8 @@ struct ChannelBrowserView: View {
             favoriteIDs: channelPrefs.favoriteChannelIDs,
             customNames: channelPrefs.customNames,
             query: query,
-            sortOrder: sortOrder
+            sortOrder: sortOrder,
+            searchTerms: searchTerms
         )
     }
 
@@ -142,6 +172,27 @@ struct ChannelBrowserView: View {
                 .allowsHitTesting(false)
             } else if displayChannels.isEmpty {
                 emptyState
+            } else if showsGrid && !isPickingMultiscreen {
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140, maximum: 220), spacing: 12)], spacing: 12) {
+                        ForEach(displayChannels) { channel in
+                            Button { handleTap(channel) } label: {
+                                VStack(spacing: 10) {
+                                    ChannelLogo(url: channel.logoURL, name: channel.name, size: 64)
+                                    Text(channelPrefs.customName(for: channel.id) ?? channel.name)
+                                        .font(.headline).multilineTextAlignment(.center).lineLimit(3)
+                                    if channelPrefs.isFavorite(channel.id) {
+                                        Image(systemName: "star.fill").foregroundStyle(Theme.accent)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 140).padding(12)
+                                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 14))
+                            }
+                            .buttonStyle(.plain)
+                            .contextMenu { contextMenu(for: channel) }
+                        }
+                    }.padding()
+                }
             } else {
                 List {
                     ForEach(displayChannels) { channel in
@@ -249,7 +300,33 @@ struct ChannelBrowserView: View {
 
     @ViewBuilder
     private func contextMenu(for channel: Channel) -> some View {
+        if case .customGroup(let id, _) = scope,
+           let group = customGroups.groups.first(where: { $0.id == id }),
+           let index = group.channelIDs.firstIndex(of: channel.id) {
+            if index > 0 {
+                Button("Move Earlier") {
+                    customGroups.moveChannels(in: id, from: IndexSet(integer: index), to: index - 1)
+                    sortOrder = .custom
+                }
+            }
+            if index + 1 < group.channelIDs.count {
+                Button("Move Later") {
+                    customGroups.moveChannels(in: id, from: IndexSet(integer: index), to: index + 2)
+                    sortOrder = .custom
+                }
+            }
+        }
         let isFav = channelPrefs.isFavorite(channel.id)
+        if isFav {
+            Button("Move Favourite Earlier") {
+                channelPrefs.moveFavorite(channel.id, offset: -1)
+                if case .favorites = scope { sortOrder = .custom }
+            }
+            Button("Move Favourite Later") {
+                channelPrefs.moveFavorite(channel.id, offset: 1)
+                if case .favorites = scope { sortOrder = .custom }
+            }
+        }
         Button {
             channelPrefs.toggleFavorite(channelID: channel.id)
         } label: {
@@ -301,6 +378,8 @@ struct ChannelBrowserView: View {
     private var sortMenu: some ToolbarContent {
         ToolbarItem(placement: .compatTopBarTrailing) {
             Menu {
+                Toggle("Grid View", isOn: $showsGrid)
+                NavigationLink("Restore Hidden Channels") { HiddenChannelsView() }
                 Picker("Sort", selection: $sortOrder) {
                     ForEach(ChannelSortOrder.allCases) { order in
                         Text(order.rawValue).tag(order)
@@ -316,11 +395,21 @@ struct ChannelBrowserView: View {
     // MARK: - Empty state
 
     private var emptyState: some View {
-        EmptyStateView(
-            systemImage: query.isEmpty ? "play.tv" : "magnifyingglass",
-            title: query.isEmpty ? scope.title : "No Results",
-            message: query.isEmpty ? scope.emptyMessage : "No channels match \"\(query)\"."
-        )
+        VStack(spacing: Theme.Spacing.md) {
+            EmptyStateView(
+                systemImage: query.isEmpty ? "play.tv" : "magnifyingglass",
+                title: query.isEmpty ? scope.title : "No Results",
+                message: query.isEmpty ? scope.emptyMessage : "No channels match \"\(query)\"."
+            )
+            if query.isEmpty {
+                NavigationLink("Manage Playlists") { PlaylistsView() }
+                    .buttonStyle(.borderedProminent)
+                    .frame(minHeight: 44)
+            } else {
+                Button("Clear Search") { query = "" }
+                    .frame(minHeight: 44)
+            }
+        }
     }
 
     // MARK: - Helpers

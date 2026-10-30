@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import Combine
 import OSLog
 
@@ -54,15 +55,22 @@ final class EPGRepository: ObservableObject {
     /// move for the on-demand top-up of a single row; see `guideRevision(for:)`.
     private(set) var programmeRevision = 0
     /// Per-channel count of on-demand top-ups (a row scrolled into view fetching its own schedule).
-    private var channelTopUpRevisions: [String: Int] = [:]
+    private var channelTopUpRevisions: [String: GuideChannelRevision] = [:]
     private var persistDebounceTask: Task<Void, Never>?
 
     /// Changes whenever anything shown for `channelId` could have: a wholesale replace, or that
     /// channel's own top-up. Guide rows key their cached layout on this, so one row arriving
     /// doesn't invalidate every other row.
     func guideRevision(for channelId: String) -> Int {
-        programmeRevision &+ (channelTopUpRevisions[channelId] ?? 0)
+        programmeRevision &+ channelRevision(for: channelId).value
     }
+    private func channelRevision(for channelId: String) -> GuideChannelRevision {
+        if let revision = channelTopUpRevisions[channelId] { return revision }
+        let revision = GuideChannelRevision()
+        channelTopUpRevisions[channelId] = revision
+        return revision
+    }
+
     // EPG channel id -> canonical channel id
     private var epgToCanonical: [String: String] = [:]
     // Coverage range per canonical channel, rebuilt on every finalizeProgrammeIndex call
@@ -1034,7 +1042,7 @@ final class EPGRepository: ObservableObject {
         let merged = GuideProgrammeIndexing.merged(programmeIndex[channelId] ?? [], adding: programmes)
         programmeIndex[channelId] = merged
         coverageIndex[channelId] = GuideProgrammeIndexing.coverage(of: merged, channelId: channelId)
-        channelTopUpRevisions[channelId, default: 0] &+= 1
+        channelRevision(for: channelId).value &+= 1
         schedulePersist()
     }
 
@@ -1070,19 +1078,33 @@ final class EPGRepository: ObservableObject {
         return programmeIndex[channelId]?.first { $0.isOnNow(at: date) }
     }
 
-    func nextProgramme(for channelId: String, after date: Date = Date()) -> EPGProgramme? {
+    func nextProgramme(for channelId: String, after date: Date = Date(), includingBoundary: Bool = false) -> EPGProgramme? {
         requestEPGPWIfNeeded(channelId: channelId, from: date, to: date.addingTimeInterval(12 * 3600))
         requestXtreamEPGIfNeeded(channelId: channelId, from: date, to: date.addingTimeInterval(12 * 3600), fullSchedule: false)
-        return programmeIndex[channelId]?.first { $0.start > date }
+        return programmeIndex[channelId]?.first { includingBoundary ? $0.start >= date : $0.start > date }
     }
 
     func programmes(for channelId: String, from: Date, to: Date) -> [EPGProgramme] {
+        // Establish a row-local Observation dependency when queried from SwiftUI.
+        _ = channelRevision(for: channelId).value
         requestEPGPWIfNeeded(channelId: channelId, from: from, to: to)
         // A full day, so `get_simple_data_table` — this is only reached for rows the
         // guide actually renders (TVGuideViewModel.rowLayout / the vertically- and
         // horizontally-virtualized grid), not the whole channel list.
         requestXtreamEPGIfNeeded(channelId: channelId, from: from, to: to, fullSchedule: true)
         return programmeIndex[channelId]?.filter { $0.end > from && $0.start < to } ?? []
+    }
+
+    /// Snapshot of loaded current titles for local channel search; never initiates network work.
+    func cachedCurrentTitles(at date: Date = Date()) -> [String: String] {
+        programmeIndex.compactMapValues { programmes in
+            programmes.first { $0.isOnNow(at: date) }?.title
+        }
+    }
+
+    /// Searches already-loaded programmes only; typing must not fetch every channel.
+    func hasCachedProgramme(for channelID: String, matching query: GuideSearchQuery, from: Date, to: Date) -> Bool {
+        programmeIndex[channelID]?.contains { $0.end > from && $0.start < to && query.matches($0.title) } ?? false
     }
 
     // MARK: - Coverage API
@@ -1296,4 +1318,10 @@ final class EPGRepository: ObservableObject {
         Last updated: \(lastUpdated?.formatted() ?? "never")
         """
     }
+}
+
+/// A fetched channel invalidates only views reading its schedule, not every guide row.
+@MainActor @Observable
+private final class GuideChannelRevision {
+    var value = 0
 }

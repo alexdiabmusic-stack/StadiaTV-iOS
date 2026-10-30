@@ -14,7 +14,7 @@ struct DiscoverView: View {
     private var targetLeagues: [League] {
         switch selectedSport {
         case .forYou:
-            return prefs.followedLeagues
+            return prefs.followedLeagues.isEmpty ? League.all : prefs.followedLeagues
         case .all:
             return League.all
         case .league(let shortName):
@@ -28,7 +28,11 @@ struct DiscoverView: View {
 
     private var displayedArticles: [ESPNArticle] {
         let articles = viewModel.articles(for: nil)
-            .filter { targetLeagues.contains($0.league) && !$0.isHighlight }
+            .filter { article in
+                let broadFeed = selectedSport == .all || selectedSport == .forYou
+                return (broadFeed || (targetLeagues.contains(article.league) && article.categoryLabel == article.league.shortName))
+                    && !article.isHighlight
+            }
             .filter { !articleLibrary.isHidden($0) && !articleLibrary.isMuted($0) }
         guard selectedSport == .forYou, !prefs.favoriteTeams.isEmpty else { return articles }
         // Stable partition keeps the provider's editorial order within each group.
@@ -116,7 +120,7 @@ struct DiscoverView: View {
                 HStack(spacing: 8) {
                     ForEach(DiscoverSportFilter.allCases) { filter in
                         filterChip(title: filter.title, isSelected: selectedSport == filter) {
-                            withAnimation(.snappy) { selectedSport = filter }
+                            withAnimation(Theme.Motion.snappy) { selectedSport = filter }
                         }
                     }
                 }
@@ -265,7 +269,7 @@ struct DiscoverView: View {
             Label("No stories yet", systemImage: "newspaper")
                 .font(.headline)
                 .foregroundStyle(Theme.textPrimary)
-            Text("Try another sport or refresh the feed.")
+            Text(viewModel.lastError ?? String(localized: "Try another sport or refresh the feed."))
                 .font(.callout)
                 .foregroundStyle(Theme.textSecondary)
         }
@@ -284,7 +288,7 @@ struct DiscoverView: View {
             Text("No stories yet")
                 .font(.headline)
                 .foregroundStyle(Theme.textPrimary)
-            Text("Try another sport or refresh the feed.")
+            Text(viewModel.lastError ?? String(localized: "Try another sport or refresh the feed."))
                 .font(.callout)
                 .foregroundStyle(Theme.textSecondary)
             Button("Try Again") {
@@ -383,12 +387,12 @@ private struct HeroArticleCard: View {
             )
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Text(article.league.shortName)
+                    Text(article.categoryLabel)
                     if let badge = article.badgeText {
                         Text(badge)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
-                            .background(badge == "BREAKING" ? Theme.live : Theme.accent, in: Capsule())
+                            .background(article.type?.lowercased() == "breaking" ? Theme.live : Theme.accent, in: Capsule())
                     }
                 }
                 .font(Theme.isMac ? .system(size: Theme.Mac.Typography.smallMetadata, weight: .bold) : .caption.weight(.bold))
@@ -553,110 +557,5 @@ private struct ArticleContextActions: View {
         #endif
         Button(action: onHide) { Label("Hide stories like this", systemImage: "eye.slash") }
         Button(action: onMute) { Label("Mute this source", systemImage: "speaker.slash") }
-    }
-}
-
-private extension ESPNArticle {
-    var sourceName: String {
-        guard let byline, !byline.isEmpty else { return "ESPN" }
-        return byline.replacingOccurrences(of: "ESPN", with: "ESPN")
-    }
-
-    var isHighlight: Bool {
-        let text = "\(type ?? "") \(headline) \(categories.joined(separator: " "))".lowercased()
-        return text.contains("highlight") || text.contains("video") || text.contains("media") || text.contains("play")
-    }
-
-    var badgeText: String? {
-        let text = "\(type ?? "") \(headline) \(categories.joined(separator: " "))".lowercased()
-        if text.contains("breaking") || text.contains("injury") || text.contains("trade") { return "BREAKING" }
-        if text.contains("analysis") { return "ANALYSIS" }
-        if text.contains("rumor") || text.contains("rumour") { return "RUMOUR" }
-        if isHighlight { return "HIGHLIGHT" }
-        return nil
-    }
-
-
-    var relativePublishedText: String {
-        guard let published else { return "Just now" }
-        let seconds = max(0, Int(Date().timeIntervalSince(published)))
-        if seconds < 60 { return "Just now" }
-        let minutes = seconds / 60
-        if minutes < 60 { return "\(minutes) min ago" }
-        let hours = minutes / 60
-        if hours < 24 { return "\(hours) hr ago" }
-        if hours < 48 { return "Yesterday" }
-        let days = hours / 24
-        return "\(days) days ago"
-    }
-
-    func metadataLine(includeSource: Bool) -> String {
-        if includeSource {
-            return "\(sourceName) · \(league.shortName) · \(relativePublishedText)"
-        }
-        return "\(league.shortName) · \(relativePublishedText)"
-    }
-
-    func matchesFavoriteTeam(_ team: FavoriteTeam) -> Bool {
-        guard league.path == team.leaguePath || league.bannerKey == team.leagueBannerKey else { return false }
-
-        let taggedText = categories.joined(separator: " ").normalizedForTeamMatching
-        let articleText = "\(headline) \(description)".normalizedForTeamMatching
-        let abbreviation = team.abbreviation.normalizedForTeamMatching
-
-        if team.discoverMatchPhrases.contains(where: { phrase in
-            taggedText.containsBoundedPhrase(phrase) || articleText.containsBoundedPhrase(phrase)
-        }) {
-            return true
-        }
-
-        if abbreviation.count >= 3 {
-            let articleTokens = Set(articleText.split(separator: " ").map(String.init))
-            let tagTokens = Set(taggedText.split(separator: " ").map(String.init))
-            return articleTokens.contains(abbreviation) || tagTokens.contains(abbreviation)
-        }
-
-        return false
-    }
-}
-
-private extension FavoriteTeam {
-    var discoverMatchPhrases: [String] {
-        let normalizedWords = displayName.normalizedForTeamMatching.split(separator: " ").map(String.init)
-        var phrases = [displayName.normalizedForTeamMatching]
-
-        if normalizedWords.count >= 3 {
-            phrases.append(normalizedWords.suffix(2).joined(separator: " "))
-        }
-
-        if let nickname = normalizedWords.last,
-           nickname.count >= 4,
-           !Self.genericTeamNameWords.contains(nickname) {
-            phrases.append(nickname)
-        }
-
-        var seen = Set<String>()
-        return phrases.filter { !$0.isEmpty && seen.insert($0).inserted }
-    }
-
-    private static let genericTeamNameWords: Set<String> = [
-        "city", "club", "fc", "sc", "united", "state", "college"
-    ]
-}
-
-private extension String {
-    var normalizedForTeamMatching: String {
-        let folded = folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
-        let scalars = folded.unicodeScalars.map { scalar in
-            CharacterSet.alphanumerics.contains(scalar) ? Character(scalar) : " "
-        }
-        return String(scalars)
-            .split(separator: " ")
-            .joined(separator: " ")
-    }
-
-    func containsBoundedPhrase(_ phrase: String) -> Bool {
-        guard !phrase.isEmpty else { return false }
-        return " \(self) ".contains(" \(phrase) ")
     }
 }

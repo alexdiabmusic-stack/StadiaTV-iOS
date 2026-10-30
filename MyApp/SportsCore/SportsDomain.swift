@@ -15,6 +15,7 @@ nonisolated enum SportsDataProviderID: String, Codable, CaseIterable, Hashable, 
     case epl
     case mls
     case laliga
+    case fotmob
     case pga
     case cbsSports
     case yahooSports
@@ -566,6 +567,8 @@ nonisolated struct BannerNewsArticle: Identifiable, Codable, Hashable, Sendable 
     var articleType: String? = nil
     /// Author byline when available; used in place of publisher in reader view.
     var authorByline: String? = nil
+    /// Broad sport from the source when no reliable competition metadata exists.
+    var primarySport: SportGroup? = nil
 }
 
 nonisolated struct BannerOdds: Identifiable, Codable, Hashable, Sendable {

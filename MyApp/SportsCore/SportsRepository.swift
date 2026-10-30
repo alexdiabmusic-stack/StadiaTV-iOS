@@ -10,7 +10,7 @@ nonisolated struct SportsLiveMatchSnapshot: Sendable {
 nonisolated struct SportsRepository: Sendable {
     static let shared = SportsRepository()
     private let providers: [String: any NativeSportsProvider]
-    init(providers: [any NativeSportsProvider] = [NHLProvider(), MLBProvider(), F1Provider(), NFLProvider(), NBAProvider(), WNBAProvider(), EPLProvider(), MLSProvider(), LaLigaProvider(), PGAProvider()]) {
+    init(providers: [any NativeSportsProvider] = [NHLProvider(), MLBProvider(), F1Provider(), NFLProvider(), NBAProvider(), WNBAProvider(), EPLProvider(), MLSProvider(), LaLigaProvider(), ChampionsLeagueProvider.shared, PGAProvider()]) {
         self.providers = Dictionary(providers.map { ($0.leaguePath, $0) }, uniquingKeysWith: { _, new in new })
     }
     private func provider(_ league: League, _ capability: SportsDataCapability) throws -> any NativeSportsProvider {
@@ -25,7 +25,7 @@ nonisolated struct SportsRepository: Sendable {
         try await provider(league, .liveScores).scores(on: date)
     }
     func legacyScoreboards(for league: League, starting start: Date, days: Int) async throws -> [Match] {
-        try await provider(league, .schedule).schedule(start: start, days: days)
+        try await cachedLegacyScoreboards(for: league, starting: start, days: days, maxAge: 300)
     }
     /// `legacyScoreboard(for:)` with a short shared cache, so zapping between channels in the
     /// player doesn't refetch the same scoreboards. Other callers keep uncached results.
@@ -35,9 +35,11 @@ nonisolated struct SportsRepository: Sendable {
         }
     }
     func cachedLegacyScoreboards(for league: League, starting start: Date, days: Int, maxAge: TimeInterval = 30) async throws -> [Match] {
-        let key = "schedule|\(league.path)|\(Int(start.timeIntervalSince1970))|\(days)"
+        guard days > 0 else { return [] }
+        let day = Calendar.current.startOfDay(for: start)
+        let key = "schedule|\(league.path)|\(Int(day.timeIntervalSince1970))|\(days)"
         return try await ScoreboardCache.shared.value(for: key, maxAge: maxAge) {
-            try await legacyScoreboards(for: league, starting: start, days: days)
+            try await provider(league, .schedule).schedule(start: day, days: days)
         }
     }
     func legacyTeams(for league: League) async throws -> [Team] { try await provider(league, .teams).teams() }
@@ -50,7 +52,7 @@ nonisolated struct SportsRepository: Sendable {
         await withTaskGroup(of: ([Match], String?).self) { group in
             for league in leagues where providers[league.path] != nil {
                 group.addTask {
-                    do { return (try await legacyScoreboard(for: league), nil) }
+                    do { return (try await cachedLegacyScoreboard(for: league), nil) }
                     catch { return ([], "\(league.shortName): \(error.localizedDescription)") }
                 }
             }
@@ -137,13 +139,23 @@ nonisolated struct SportsRepository: Sendable {
     func legacyNews(for league: League, limit: Int = 10, page: Int = 1) async throws -> [ESPNArticle] {
         let providers: [any SportsNewsProvider] = [BBCSportNewsProvider(), CBSRSSNewsProvider(), NBCSportsNewsProvider(), SkySportsNewsProvider(), FOXRSSNewsProvider()]
         var articles: [BannerNewsArticle] = []
-        await withTaskGroup(of: [BannerNewsArticle].self) { group in
+        var receivedResponse = false
+        await withTaskGroup(of: [BannerNewsArticle]?.self) { group in
             for provider in providers where provider.metadata.isEnabled {
-                group.addTask { (try? await provider.newsMetadata(for: league, limit: limit, page: page)) ?? [] }
+                group.addTask { try? await provider.newsMetadata(for: league, limit: limit, page: page) }
             }
-            for await result in group { articles += result }
+            for await result in group {
+                guard let result else { continue }
+                receivedResponse = true
+                articles += result
+            }
         }
-        return Array(BannerNewsDeduplicator.deduplicate(articles).prefix(limit)).map { $0.toLegacyArticle(league: league) }
+        guard receivedResponse else { throw SportsDataError.unavailable }
+        let sorted = articles.sorted {
+            if $0.published != $1.published { return ($0.published ?? .distantPast) > ($1.published ?? .distantPast) }
+            return $0.id.rawValue < $1.id.rawValue
+        }
+        return Array(BannerNewsDeduplicator.deduplicate(sorted).prefix(limit)).map { $0.toLegacyArticle(league: league) }
     }
     func prefetchNews(for leagues: [League]) async {
         for league in leagues { _ = try? await legacyNews(for: league) }

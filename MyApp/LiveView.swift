@@ -261,11 +261,16 @@ struct LiveView: View {
         let base: [Match]
         switch filter {
         case .forYou:
-            // Strictly only matches involving the user's favourite teams — no fantasy blending,
-            // no fallback to all-live. An empty result means none of your teams are currently live.
-            let favIDs = Set(prefs.favoriteTeams.map(\.id) + prefs.favoriteTeams.map(\.canonicalTeamID))
-            let favNames = Set(prefs.favoriteTeams.map { $0.displayName.lowercased() })
-            base = viewModel.allLive.filter { involvesFavorite($0, favIDs: favIDs, favNames: favNames) }
+            // Personalize the order while keeping sports discovery useful for new users.
+            base = viewModel.allLive.sorted { lhs, rhs in
+                let left = prefs.isFavoriteMatch(lhs)
+                let right = prefs.isFavoriteMatch(rhs)
+                if left != right { return left }
+                let leftFollowed = prefs.followedLeagues.contains(lhs.league)
+                let rightFollowed = prefs.followedLeagues.contains(rhs.league)
+                if leftFollowed != rightFollowed { return leftFollowed }
+                return lhs.date == rhs.date ? lhs.id < rhs.id : lhs.date < rhs.date
+            }
         case .all:
             base = viewModel.allLive
         case .guide:
@@ -587,7 +592,9 @@ struct LiveMatchCard: View {
         if streamStore.confirmedCount(for: match.id) > 0 {
             Button {
                 let sources = streamStore.topRanked(for: match.id, limit: 100).filter(\.isConfirmed)
-                if let source = sources.first(where: { BroadcastPresentation.isHD($0.channel.name) }) ?? sources.first {
+                if sources.count > 1 {
+                    showingQuickStream = true
+                } else if let source = sources.first {
                     PlaybackTapClock.record()
                     playbackContext = MatchPlaybackContext(match: match, channel: source.channel, rankedSources: sources)
                 }
@@ -608,7 +615,7 @@ struct LiveMatchCard: View {
                 .frame(minHeight: 44)
                 .buttonStyle(.plain)
         } else {
-            Text("No verified stream")
+            Text("No matched stream")
                 .font(Theme.Typography.caption)
                 .foregroundStyle(Theme.textSecondary)
         }
@@ -682,10 +689,16 @@ private struct CompactSoonCard: View {
             let h = secs / 3600; let m = (secs % 3600) / 60
 
             VStack(spacing: 8) {
-                HStack(spacing: 4) {
-                    TeamLogo(url: match.leadingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 10 : 26)
-                    Text("vs").font(.caption2.weight(.bold)).foregroundStyle(Theme.textSecondary)
-                    TeamLogo(url: match.trailingSide.logoURL, size: Theme.isMac ? Theme.Mac.LogoSize.card - 10 : 26)
+                if GameCentreArchetype(match: match).usesHeadToHeadParticipantUI {
+                    HStack(spacing: 4) {
+                        TeamLogo(url: match.leadingSide.logoURL, size: 26)
+                        Text("vs").font(.caption2).foregroundStyle(Theme.textSecondary)
+                        TeamLogo(url: match.trailingSide.logoURL, size: 26)
+                    }
+                } else {
+                    Image(systemName: match.league.group.systemImage)
+                        .font(.title2)
+                        .foregroundStyle(Theme.accessibleAccent)
                 }
                 Text(match.shortName)
                     .font(Theme.isMac ? .system(size: Theme.Mac.Typography.body, weight: .semibold) : .caption.weight(.semibold))

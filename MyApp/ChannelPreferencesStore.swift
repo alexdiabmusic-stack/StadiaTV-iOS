@@ -165,6 +165,14 @@ final class ChannelPreferencesStore: ObservableObject {
         }
     }
 
+    func moveFavorite(_ id: String, offset: Int) {
+        var ids = favoriteChannelIDs
+        guard let index = ids.firstIndex(of: id), ids.indices.contains(index + offset) else { return }
+        ids.swapAt(index, index + offset)
+        replaceFavorites(with: ids)
+        pushFavoritesToCloudIfChanged()
+    }
+
     // MARK: - Legacy favourites
 
     /// Folds in favourites saved by older builds — `WatchStore` kept its own list of channel

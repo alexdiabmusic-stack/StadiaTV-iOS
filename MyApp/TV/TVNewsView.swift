@@ -125,7 +125,7 @@ private struct TVArticleDetailView: View {
                         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg, style: .continuous))
                     }
 
-                    Text(article.league.name.uppercased())
+                    Text(article.categoryLabel)
                         .font(.headline.weight(.bold))
                         .foregroundStyle(Theme.accent)
 

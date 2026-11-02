@@ -716,6 +716,13 @@ struct PlayerView: View {
     var body: some View {
         accessiblePlayer
         .onAppear {
+            // Streams open full screen in landscape on iPhone; the orientation button still switches back.
+            #if os(iOS)
+            if UIDevice.current.userInterfaceIdiom == .phone {
+                preferredOrientation = .landscape
+                requestOrientation(.landscape)
+            }
+            #endif
             startPlayback()
             watchStore.recordWatch(channel)
             startDwellTimer()
@@ -1722,6 +1729,9 @@ private struct MatchPlayerScreen<VideoContent: View, ChannelPage: View>: View {
         self.channelPage = channelPage()
     }
 
+    /// Full-screen video, which collapses the side-by-side / tabletop game centre.
+    @State private var isFullScreen = true
+
     private var sport: BannerSport { BannerSport(league: match?.league) }
     private var effectiveTab: SportPlayerTab { sport.tabs.contains(selectedTab) ? selectedTab : sport.tabs.first ?? .game }
 
@@ -1732,10 +1742,11 @@ private struct MatchPlayerScreen<VideoContent: View, ChannelPage: View>: View {
 
     private var arrangement: Arrangement {
         guard match != nil else { return .classic }
+        if isFullScreen { return .classic }
         switch adaptiveLayout.foldAxis {
         case .vertical: return .sideBySide
         case .horizontal: return .tabletop
-        case nil: return adaptiveLayout.prefersTwoPane ? .sideBySide : .classic
+        case nil: return adaptiveLayout.prefersTwoPane && !isFullScreen ? .sideBySide : .classic
         }
     }
 
@@ -1775,6 +1786,10 @@ private struct MatchPlayerScreen<VideoContent: View, ChannelPage: View>: View {
                         onCycleSource: onCycleSource,
                         onToggleOrientation: onToggleOrientation,
                         onPiP: onPiP,
+                        isFullScreen: isFullScreen,
+                        onToggleFullScreen: (arrangement != .classic || isFullScreen) && match != nil
+                            ? { withAnimation(.easeInOut(duration: 0.25)) { isFullScreen.toggle() } }
+                            : nil,
                         topSafeArea: fullBleed ? max(proxy.safeAreaInsets.top, Theme.Spacing.xs) : proxy.safeAreaInsets.top,
                         horizontalSafeArea: fullBleed ? max(proxy.safeAreaInsets.leading, proxy.safeAreaInsets.trailing) : 0,
                         videoContent: { videoContent }
@@ -1920,6 +1935,8 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
     let onCycleSource: (Int) -> Void
     let onToggleOrientation: () -> Void
     var onPiP: (() -> Void)? = nil
+    var isFullScreen = false
+    var onToggleFullScreen: (() -> Void)? = nil
     let topSafeArea: CGFloat
     let horizontalSafeArea: CGFloat
     let videoContent: VideoContent
@@ -1947,6 +1964,8 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
         onCycleSource: @escaping (Int) -> Void,
         onToggleOrientation: @escaping () -> Void,
         onPiP: (() -> Void)? = nil,
+        isFullScreen: Bool = false,
+        onToggleFullScreen: (() -> Void)? = nil,
         topSafeArea: CGFloat = 0,
         horizontalSafeArea: CGFloat = 0,
         @ViewBuilder videoContent: () -> VideoContent
@@ -1973,6 +1992,8 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
         self.onCycleSource = onCycleSource
         self.onToggleOrientation = onToggleOrientation
         self.onPiP = onPiP
+        self.isFullScreen = isFullScreen
+        self.onToggleFullScreen = onToggleFullScreen
         self.topSafeArea = topSafeArea
         self.horizontalSafeArea = horizontalSafeArea
         self.videoContent = videoContent()
@@ -2019,7 +2040,9 @@ private struct PlayerVideoContainer<VideoContent: View>: View {
                             onDismiss: onDismiss,
                             onMore: onMore,
                             onToggleOrientation: onToggleOrientation,
-                            onPiP: onPiP
+                            onPiP: onPiP,
+                            isFullScreen: isFullScreen,
+                            onToggleFullScreen: onToggleFullScreen
                         )
                         .padding(.horizontal, Theme.Spacing.sm + horizontalSafeArea)
                         .padding(.top, max(topSafeArea, Theme.Spacing.xs) + Theme.Spacing.xs)
@@ -2071,6 +2094,8 @@ private struct PlayerTopOverlay: View {
     let onMore: () -> Void
     let onToggleOrientation: () -> Void
     var onPiP: (() -> Void)? = nil
+    var isFullScreen = false
+    var onToggleFullScreen: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: Theme.Spacing.xs) {
@@ -2103,6 +2128,13 @@ private struct PlayerTopOverlay: View {
             }
             #endif
 
+            if let onToggleFullScreen {
+                PlayerChromeButton(
+                    systemImage: isFullScreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                    accessibilityLabel: isFullScreen ? "Exit Full Screen" : "Full Screen",
+                    action: onToggleFullScreen
+                )
+            }
             PlayerChromeButton(systemImage: orientation.systemImage, accessibilityLabel: orientation.accessibilityLabel, action: onToggleOrientation)
             PlayerChromeButton(systemImage: "ellipsis", accessibilityLabel: "Options", action: onMore)
         }

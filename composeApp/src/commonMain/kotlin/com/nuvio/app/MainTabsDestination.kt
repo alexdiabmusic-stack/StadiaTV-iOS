@@ -1,5 +1,6 @@
 package com.nuvio.app
 
+import com.nuvio.app.isIos
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import com.nuvio.app.core.ui.LocalIsTv
@@ -110,7 +111,9 @@ internal fun MainTabsDestination(
     onProfileSelected: (NuvioProfile) -> Unit,
     onAddProfileRequested: () -> Unit,
 ) {
-    PlatformBackHandler(enabled = true, onBack = onBack)
+    // Android's back button goes to Home, then asks to exit. iPhone has no such button, and a left-edge swipe on a tab
+    // with nothing open must stay a no-op rather than jump to Home or ask to quit.
+    PlatformBackHandler(enabled = !isIos, onBack = onBack)
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isTabletLayout = useTabletFloatingTabBar || maxWidth >= 768.dp

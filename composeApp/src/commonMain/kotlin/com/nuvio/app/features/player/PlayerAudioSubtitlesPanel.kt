@@ -1,5 +1,7 @@
 package com.nuvio.app.features.player
 
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -202,7 +204,7 @@ internal fun PlayerAudioSubtitlesPanel(
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.95f))
                 // Taps on the empty dark area don't fall through to the player underneath.
-                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
+                .pointerInput(Unit) { detectTapGestures { } }
                 .windowInsetsPadding(WindowInsets.safeDrawing),
         ) {
             AnimatedContent(

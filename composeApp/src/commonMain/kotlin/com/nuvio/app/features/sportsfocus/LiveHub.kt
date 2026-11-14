@@ -1,5 +1,6 @@
 package com.nuvio.app.features.sportsfocus
 
+import com.nuvio.app.core.ui.tvFocusIndication
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.material.icons.rounded.Star
@@ -128,7 +129,7 @@ internal fun LiveSegmentedControl(selected: LiveSegment, onSelect: (LiveSegment)
                     Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(50))
                         .clickable(
                             interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                            indication = null,
+                            indication = tvFocusIndication(),
                         ) { onSelect(segment) },
                     contentAlignment = Alignment.Center,
                 ) {

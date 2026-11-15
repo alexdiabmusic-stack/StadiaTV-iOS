@@ -55,6 +55,10 @@ object HomeTrendingRepository {
     private const val MAX_AGE_MS = 3L * 60 * 60 * 1000
     private const val EMPTY_RETRY_MS = 60L * 1000
     private val TALK_AND_NEWS = setOf(10767, 10763)
+    private const val MIN_ROW = 14
+    private const val MIN_ROW_SHOWN = 10
+    /** TMDB lists come 20 to a page; a page is rarely enough once titles that can't be watched yet are dropped. */
+    private const val PAGES = 3
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -102,8 +106,9 @@ object HomeTrendingRepository {
             mapOf("with_genres" to genres, "sort_by" to "popularity.desc", "vote_count.gte" to "300", "include_adult" to "false") + extra
         fun series(extra: Map<String, String>) =
             mapOf("sort_by" to "popularity.desc", "vote_count.gte" to "300", "without_genres" to "10767,10763") + extra
-        val wanted = 14
-        val fill = wanted + 6
+        // Every row aims for a full shelf: up to 18 titles, never fewer than 12 (see the backfill below).
+        val wanted = 18
+        val fill = wanted + 4
         class Spec(val key: String, val title: String, val fetch: suspend () -> List<MetaPreview>)
         fun m(key: String, title: String, endpoint: String, q: Map<String, String> = emptyMap()) =
             Spec(key, title) { available(endpoint, q, "movie", fill) }
@@ -138,20 +143,32 @@ object HomeTrendingRepository {
             val fetched = batch.map { spec -> async { spec to runCatching { spec.fetch() }.getOrDefault(emptyList()) } }.awaitAll()
             fetched.forEach { (spec, items) ->
                 val fresh = items.filter { seen.add(it.id) }.take(wanted)
-                if (fresh.size >= 4) rows += CuratedRow(spec.key, spec.title, fresh)
+                // Fresh titles lead; when a row has run short, titles already shown elsewhere top it up so no
+                // shelf is thin (Netflix repeats titles across rows too).
+                val topUp = items.filter { a -> fresh.none { it.id == a.id } }
+                val row = (fresh + topUp).take(maxOf(fresh.size, MIN_ROW))
+                if (row.size >= MIN_ROW_SHOWN) rows += CuratedRow(spec.key, spec.title, row)
             }
             _state.value = _state.value.copy(rows = rows.toList())
         }
         loadedAtMs = LiveTvClock.nowMs()
     }
 
-    private suspend fun results(endpoint: String, query: Map<String, String>): List<JsonObject> {
+    private suspend fun results(endpoint: String, query: Map<String, String>, pages: Int = PAGES): List<JsonObject> {
         val key = TmdbSettingsRepository.effectiveApiKey()
         if (key.isBlank()) return emptyList()
-        val q = mapOf("language" to TmdbSettingsRepository.snapshot().language) + query
-        val text = httpGetText(buildTmdbUrl(endpoint = endpoint, apiKey = key, query = q))
-        val arr = json.parseToJsonElement(text).jsonObject["results"] as? JsonArray ?: return emptyList()
-        return arr.mapNotNull { it as? JsonObject }
+        val language = TmdbSettingsRepository.snapshot().language
+        return coroutineScope {
+            (1..pages).map { page ->
+                async {
+                    runCatching {
+                        val q = mapOf("language" to language, "page" to page.toString()) + query
+                        val text = httpGetText(buildTmdbUrl(endpoint = endpoint, apiKey = key, query = q))
+                        (json.parseToJsonElement(text).jsonObject["results"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }
+                    }.getOrDefault(emptyList())
+                }
+            }.awaitAll().flatten().distinctBy { (it["id"] as? JsonPrimitive)?.intOrNull }
+        }
     }
 
     /**
@@ -191,7 +208,7 @@ object HomeTrendingRepository {
                 "release_date.gte" to today.plusDays(1), "release_date.lte" to today.plusDays(90),
                 "sort_by" to "popularity.desc", "include_adult" to "false",
             ),
-        ).filter { it.str("backdrop_path") != null && it.str("overview") != null }.take(18)
+        ).filter { it.str("backdrop_path") != null && it.str("overview") != null }.take(36)
         return coroutineScope {
             picks.map { o ->
                 async {
@@ -201,7 +218,7 @@ object HomeTrendingRepository {
                     if (date <= today) return@async null
                     o.toPreview(id = "tmdb:$id", tv = false)?.copy(rawReleaseDate = date)
                 }
-            }.awaitAll().filterNotNull().sortedBy { it.rawReleaseDate }.take(14)
+            }.awaitAll().filterNotNull().sortedBy { it.rawReleaseDate }.take(18)
         }
     }
 

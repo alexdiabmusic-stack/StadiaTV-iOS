@@ -30,7 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.nuvio.app.core.ui.PlatformBackHandler
+import com.nuvio.app.core.ui.InteractiveBackLayer
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.features.discover.DiscoverScreen
 import com.nuvio.app.features.news.NewsArticle
@@ -56,9 +56,10 @@ fun BalancedSportsTab(
     var viewName by rememberSaveable { mutableStateOf(BalancedSportsView.Home.name) }
     val view = BalancedSportsView.entries.firstOrNull { it.name == viewName } ?: BalancedSportsView.Home
     val goHome = { viewName = BalancedSportsView.Home.name }
-    PlatformBackHandler(enabled = view != BalancedSportsView.Home, onBack = goHome)
 
-    when (view) {
+    // Following, Discover and Pick Your Teams open over the Sports page; the back swipe drags them away with the
+    // finger and shows the Sports page underneath, like a pushed screen.
+    val page: @Composable (BalancedSportsView) -> Unit = { shown -> when (shown) {
         BalancedSportsView.Home -> SportsShowcaseHome(
             actions = actions,
             onOpenNews = { viewName = BalancedSportsView.Discover.name },
@@ -77,7 +78,7 @@ fun BalancedSportsTab(
             ) {
                 Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = tokens.colors.textPrimary)
                 Text(
-                    if (view == BalancedSportsView.Teams) view.title else "Sports",
+                    if (shown == BalancedSportsView.Teams) shown.title else "Sports",
                     color = tokens.colors.textPrimary,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(start = 12.dp),
@@ -85,7 +86,7 @@ fun BalancedSportsTab(
             }
             // The bar above already clears the status bar, so the page under it must not add that gap again.
             Box(Modifier.weight(1f).consumeWindowInsets(WindowInsets.statusBars)) {
-                when (view) {
+                when (shown) {
                     BalancedSportsView.Following -> SportsFocusFollowing(actions, onOpenArticle, Modifier.fillMaxSize())
                     BalancedSportsView.Teams -> {
                         // Search for a team or league, or browse by sport; the star follows or unfollows.
@@ -102,5 +103,7 @@ fun BalancedSportsTab(
                 }
             }
         }
-    }
+    } }
+    if (view == BalancedSportsView.Home) page(view)
+    else InteractiveBackLayer(onBack = goHome, behind = { page(BalancedSportsView.Home) }) { page(view) }
 }

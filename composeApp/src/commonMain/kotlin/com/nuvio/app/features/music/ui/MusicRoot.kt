@@ -19,7 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.nuvio.app.core.ui.PlatformBackHandler
+import com.nuvio.app.core.ui.InteractiveBackLayer
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.features.music.playback.MusicPlayer
 
@@ -56,13 +56,21 @@ internal fun MusicHost(modifier: Modifier = Modifier, content: @Composable (push
     val contentPad = barPad + if (state.hasSong) 72.dp else 0.dp
     val push: (MusicDest) -> Unit = { stack = stack + it }
 
-    PlatformBackHandler(enabled = stack.isNotEmpty() && !showPlayer, onBack = { stack = stack.dropLast(1) })
-
     CompositionLocalProvider(LocalMusicBottomPad provides contentPad) {
         Box(modifier.fillMaxSize().background(Sp.bg)) {
             val top = stack.lastOrNull()
             if (top != null) {
-                MusicDestScreen(top, onBack = { stack = stack.dropLast(1) }, onOpen = push)
+                // Pages open over the one before; the back swipe drags the page away and reveals what is under it.
+                InteractiveBackLayer(
+                    enabled = !showPlayer,
+                    onBack = { stack = stack.dropLast(1) },
+                    behind = {
+                        val below = stack.getOrNull(stack.size - 2)
+                        if (below != null) MusicDestScreen(below, onBack = {}, onOpen = push) else content(push)
+                    },
+                ) {
+                    MusicDestScreen(top, onBack = { stack = stack.dropLast(1) }, onOpen = push)
+                }
             } else {
                 content(push)
             }

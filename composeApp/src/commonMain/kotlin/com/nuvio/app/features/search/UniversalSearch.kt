@@ -50,6 +50,7 @@ import coil3.compose.AsyncImage
 import com.nuvio.app.core.network.NetworkStatusRepository
 import com.nuvio.app.core.ui.NativeNavigationTab
 import com.nuvio.app.core.ui.PlatformBackHandler
+import com.nuvio.app.core.ui.InteractiveBackLayer
 import com.nuvio.app.core.ui.openNativeTab
 import com.nuvio.app.core.ui.NuvioInputField
 import com.nuvio.app.core.ui.NuvioScreen
@@ -406,11 +407,11 @@ private fun UniversalSearchScreen(
         val limit = { all: Int, one: Int -> if (scope == UniversalScope.All) all else one }
         val seeAll = { s: UniversalScope -> if (scope == UniversalScope.All) ({ model.scope = s }) else null }
 
-        PlatformBackHandler(enabled = model.pages.isNotEmpty() && q.isBlank()) { model.pages.removeLastOrNull() }
-        val openPage = model.pages.lastOrNull()?.takeIf { q.isBlank() }
-        if (openPage != null) {
+        // Genres, Decades and the like open as pages over the search page; the back swipe drags the page away with
+        // the finger and shows what it came from (the page below it, or the search page itself).
+        val browse: @Composable (SearchPage) -> Unit = { page ->
             SearchBrowsePage(
-                page = openPage,
+                page = page,
                 onBack = { model.pages.removeLastOrNull() },
                 onOpen = { model.pages.add(it) },
                 watchedKeys = watchedUiState.watchedKeys,
@@ -419,7 +420,8 @@ private fun UniversalSearchScreen(
                 onPosterLongClick = onPosterLongClick,
                 onPersonClick = onPersonClick,
             )
-        } else Column(Modifier.fillMaxSize().nestedScroll(titleCollapse.connection)) {
+        }
+        val root: @Composable () -> Unit = { Column(Modifier.fillMaxSize().nestedScroll(titleCollapse.connection)) {
             Box(Modifier.fillMaxWidth().appBackgroundCover(MaterialTheme.colorScheme.background)) {
                 Column(Modifier.fillMaxWidth()) {
                     Spacer(Modifier.windowInsetsTopHeight(WindowInsets.statusBars))
@@ -631,7 +633,15 @@ private fun UniversalSearchScreen(
                     }
                 }
             }
-        }
+        } }
+        val openPages = if (q.isBlank()) model.pages.toList() else emptyList()
+        val openPage = openPages.lastOrNull()
+        if (openPage != null) {
+            InteractiveBackLayer(
+                onBack = { model.pages.removeLastOrNull() },
+                behind = { val below = openPages.getOrNull(openPages.size - 2); if (below != null) browse(below) else root() },
+            ) { browse(openPage) }
+        } else root()
     }
     teamSheet?.let { t -> TeamSheet(t, sportsActions, onDismiss = { teamSheet = null }) }
 }

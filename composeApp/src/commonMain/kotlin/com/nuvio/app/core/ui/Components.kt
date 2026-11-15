@@ -1,5 +1,6 @@
 package com.nuvio.app.core.ui
 
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.layout.layout
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.CompositionLocalProvider
@@ -134,7 +135,10 @@ fun NuvioScreen(
             state = listState,
             modifier = modifier
                 .fillMaxSize()
-                .background(screenBackground),
+                .background(screenBackground)
+                // On a TV the list itself must not be a stop for the remote: it would take focus with nothing to show
+                // for it and swallow every key, instead of letting focus reach the buttons and cards inside.
+                .focusProperties { canFocus = false },
             contentPadding = PaddingValues(
                 start = horizontalPadding,
                 top = resolvedTopPadding,

@@ -1,5 +1,6 @@
 package com.nuvio.app.features.sportsfocus
 
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -298,7 +299,7 @@ private fun SportsHeroCarousel(
         }
     }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        HorizontalPager(state = pager, modifier = Modifier.fillMaxWidth(), key = { games[it].id }) { page ->
+        HorizontalPager(state = pager, modifier = Modifier.fillMaxWidth().focusProperties { canFocus = false }, key = { games[it].id }) { page ->
             val ev = games[page]
             SportsHeroPage(ev, ev.id in finding, hideScores, use24h, now, onWatch = { onWatch(ev) }, onDetails = { onDetails(ev) })
         }

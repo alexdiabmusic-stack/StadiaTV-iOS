@@ -1,5 +1,8 @@
 package com.nuvio.app.features.home.components
 
+import com.nuvio.app.core.ui.tvContentEntry
+import androidx.compose.ui.focus.focusProperties
+import com.nuvio.app.core.ui.touchOnlyClickable
 import com.nuvio.app.features.library.toLibraryItem
 import com.nuvio.app.features.library.LibraryClock
 import com.nuvio.app.features.library.LibraryRepository
@@ -444,6 +447,8 @@ internal fun HomeHeroSection(
                     userScrollEnabled = false,
                     modifier = Modifier
                         .fillMaxSize()
+                        // A paging state holder with no content of its own: never somewhere the remote can stop.
+                        .focusProperties { canFocus = false }
                         .graphicsLayer { alpha = 0.01f },
                 ) {
                     Box(modifier = Modifier.fillMaxSize())
@@ -578,7 +583,7 @@ internal fun HomeHeroSection(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .clickable(enabled = onItemClick != null) {
+                                .touchOnlyClickable(enabled = onItemClick != null) {
                                     onItemClick?.invoke(currentItem)
                                 },
                         )
@@ -586,7 +591,7 @@ internal fun HomeHeroSection(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .clickable(enabled = onItemClick != null) {
+                                .touchOnlyClickable(enabled = onItemClick != null) {
                                     onItemClick?.invoke(currentItem)
                                 },
                         )
@@ -830,7 +835,7 @@ private fun HeroContentBlock(
                 modifier = Modifier
                     .fillMaxWidth(layout.logoWidthFraction)
                     .aspectRatio(2.6f)
-                    .clickable(enabled = onItemClick != null) {
+                    .touchOnlyClickable(enabled = onItemClick != null) {
                         onItemClick?.invoke(item)
                     },
                 alignment = if (layout.isTablet) Alignment.CenterStart else Alignment.Center,
@@ -842,7 +847,7 @@ private fun HeroContentBlock(
                 text = item.name,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = onItemClick != null) {
+                    .touchOnlyClickable(enabled = onItemClick != null) {
                         onItemClick?.invoke(item)
                     },
                 style = if (layout.isTablet) {
@@ -950,6 +955,7 @@ private fun HeroActionButtons(item: MetaPreview, isTablet: Boolean, onPlay: () -
                 .clip(pill)
                 .background(Color.White)
                 .clickable(onClick = onPlay)
+                .tvContentEntry()
                 .padding(horizontal = 26.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),

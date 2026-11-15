@@ -1,5 +1,6 @@
 package com.nuvio.app.features.library
 
+import com.nuvio.app.core.ui.TvDevice
 import androidx.compose.material.icons.rounded.CalendarMonth
 import com.nuvio.app.core.ui.background.isGlassUiActive
 import com.nuvio.app.core.ui.background.appGlassBackdrop
@@ -586,7 +587,7 @@ fun LibraryScreen(
                 // Downloads and the release calendar lead the page, as large cards rather than small header icons.
                 item(key = "library-quick-access") {
                     LibraryQuickAccess(
-                        onDownloadsClick = onDownloadsClick,
+                        onDownloadsClick = onDownloadsClick.takeUnless { TvDevice.isTelevision },
                         onCalendarClick = { showReleaseCalendar = true },
                         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 14.dp),
                     )

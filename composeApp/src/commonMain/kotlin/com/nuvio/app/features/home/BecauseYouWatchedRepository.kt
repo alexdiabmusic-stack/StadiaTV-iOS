@@ -31,8 +31,8 @@ data class BecauseYouWatched(val title: String, val items: List<MetaPreview>)
 object BecauseYouWatchedRepository {
     private const val MAX_ROWS = 2
     private const val CANDIDATES = 6
-    private const val PICKS = 14
-    private const val MIN_PICKS = 4
+    private const val PICKS = 18
+    private const val MIN_PICKS = 8
     private const val REFRESH_MS = 3L * 60 * 60 * 1000
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -92,7 +92,7 @@ object BecauseYouWatchedRepository {
             .filterNot { it.id == title.id || it.id in alreadyUsed }
             .filterNot { WatchingState.isPosterWatched(watchedKeys, it, fullyWatchedSeriesKeys) }
             .filterNot { LibraryRepository.isSaved(it.id, it.type) }
-            .take(PICKS + 10)
+            .take(PICKS + 12)
         val watchable = coroutineScope {
             candidates.map { pick ->
                 async {

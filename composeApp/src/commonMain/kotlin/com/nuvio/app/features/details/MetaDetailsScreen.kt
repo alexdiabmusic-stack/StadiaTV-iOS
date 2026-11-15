@@ -1,5 +1,6 @@
 package com.nuvio.app.features.details
 
+import com.nuvio.app.core.ui.TvDevice
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -947,7 +948,7 @@ fun MetaDetailsScreen(
                     DownloadsSettingsRepository.showDownloadButton
                 }.collectAsStateWithLifecycle()
                 val downloadHandler = onDownload
-                val onDownloadClick: (() -> Unit)? = if (showDownloadButton && downloadHandler != null) {
+                val onDownloadClick: (() -> Unit)? = if (showDownloadButton && downloadHandler != null && !TvDevice.isTelevision) {
                     {
                         stopHeroTrailerForNavigation()
                         if ((meta.type == "series" || hasEpisodes) && seriesAction != null) {

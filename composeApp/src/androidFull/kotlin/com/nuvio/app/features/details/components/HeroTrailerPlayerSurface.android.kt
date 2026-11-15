@@ -225,6 +225,10 @@ actual fun HeroTrailerPlayerSurface(
         factory = { viewContext ->
             HeroTrailerTextureContainer(viewContext).apply {
                 layoutParams = android.view.ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT)
+                // A silent background video: the remote must never be able to stop on it (it would swallow the keys).
+                isFocusable = false
+                isFocusableInTouchMode = false
+                descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
                 attachPlayer(exoPlayer)
                 playerContainer = this
             }

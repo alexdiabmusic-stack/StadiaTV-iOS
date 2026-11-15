@@ -84,6 +84,8 @@ internal fun TvSideRail(items: List<FloatingNavigationItem>, modifier: Modifier 
                 .onFocusChanged { expanded = it.hasFocus }
                 .focusProperties { enter = { if (selectedIndex >= 0) requesters[selectedIndex] else FocusRequester.Default } }
                 .focusGroup()
+                // After the group, so each rail item inherits it: Right leaves for the screen's chosen entry control.
+                .focusProperties { right = TvContentEntry.requester ?: FocusRequester.Default }
                 .padding(start = 10.dp, end = if (expanded) 36.dp else 10.dp, top = 24.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
         ) {

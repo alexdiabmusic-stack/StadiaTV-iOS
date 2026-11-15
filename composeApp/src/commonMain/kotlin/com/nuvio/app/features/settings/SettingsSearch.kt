@@ -1,5 +1,6 @@
 package com.nuvio.app.features.settings
 
+import com.nuvio.app.core.ui.TvDevice
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
@@ -274,14 +275,16 @@ internal fun settingsSearchEntries(
         pageLabel = contentDiscoveryPage,
         section = stringResource(Res.string.settings_content_discovery_section_search),
     )
-    addRow(
-        page = SettingsPage.Downloads,
-        key = "download-location",
-        title = stringResource(Res.string.settings_downloads_location_title),
-        description = stringResource(Res.string.compose_settings_root_downloads_description),
-        pageLabel = downloadsPage,
-        section = downloadsPage,
-    )
+    if (!TvDevice.isTelevision) {
+        addRow(
+            page = SettingsPage.Downloads,
+            key = "download-location",
+            title = stringResource(Res.string.settings_downloads_location_title),
+            description = stringResource(Res.string.compose_settings_root_downloads_description),
+            pageLabel = downloadsPage,
+            section = downloadsPage,
+        )
+    }
     addPage(
         page = SettingsPage.Playback,
         key = "playback",

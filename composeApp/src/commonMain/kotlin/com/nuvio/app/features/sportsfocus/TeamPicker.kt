@@ -62,6 +62,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioInputField
 import com.nuvio.app.core.ui.NuvioTokens
 import com.nuvio.app.core.ui.PillChip
+import com.nuvio.app.core.ui.InteractiveBackLayer
 import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.nuvioSafeBottomPadding
 import com.nuvio.app.features.sports.FollowedTeam
@@ -126,23 +127,7 @@ internal fun TeamPickerScreen(actions: SportsActions, onDone: () -> Unit, modifi
         repo.toggleTeam(t)
     }
 
-    if (browsingAll) {
-        AllLeaguesPage(
-            onBack = { browsingAll = false },
-            onPick = { l ->
-                browsingAll = false
-                if (l.kind == LeagueKind.TEAMS && !l.guideOnly) {
-                    if (featured.none { it.id == l.id }) extraLeague = l.id
-                    leagueId = l.id
-                } else actions.onOpenLeague(l)
-            },
-            followed = { it.id in follows.pins || it.id in follows.leagues },
-            onToggleLeague = { repo.togglePin(it.id) },
-            modifier = modifier,
-        )
-        return
-    }
-
+    val main: @Composable () -> Unit = {
     Column(modifier.fillMaxSize().background(tokens.colors.background).statusBarsPadding()) {
         // Header: back, the title, and Done.
         Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 16.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -257,6 +242,25 @@ internal fun TeamPickerScreen(actions: SportsActions, onDone: () -> Unit, modifi
             }
         }
     }
+    }
+    // "All Leagues" opens over the picker; the back swipe drags it away and shows the picker underneath.
+    if (browsingAll) {
+        InteractiveBackLayer(onBack = { browsingAll = false }, behind = main) {
+            AllLeaguesPage(
+                onBack = { browsingAll = false },
+                onPick = { l ->
+                    browsingAll = false
+                    if (l.kind == LeagueKind.TEAMS && !l.guideOnly) {
+                        if (featured.none { it.id == l.id }) extraLeague = l.id
+                        leagueId = l.id
+                    } else actions.onOpenLeague(l)
+                },
+                followed = { it.id in follows.pins || it.id in follows.leagues },
+                onToggleLeague = { repo.togglePin(it.id) },
+                modifier = modifier,
+            )
+        }
+    } else main()
 }
 
 private fun androidx.compose.foundation.lazy.LazyListScope.teamGrid(
@@ -365,8 +369,7 @@ private fun AllLeaguesPage(
     modifier: Modifier = Modifier,
 ) {
     val tokens = MaterialTheme.nuvio
-    com.nuvio.app.core.ui.PlatformBackHandler(enabled = true, onBack = onBack)
-    Column(modifier.fillMaxSize().background(tokens.colors.background).statusBarsPadding()) {
+        Column(modifier.fillMaxSize().background(tokens.colors.background).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = tokens.colors.textPrimary) }
             Text("All Leagues", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = tokens.colors.textPrimary)

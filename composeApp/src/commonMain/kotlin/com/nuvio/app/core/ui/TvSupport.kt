@@ -1,5 +1,13 @@
 package com.nuvio.app.core.ui
 
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -38,6 +46,14 @@ import kotlinx.coroutines.launch
 
 /** True on Android TV and Fire TV, where the app is driven with a remote's D-pad instead of touch. */
 val LocalIsTv = staticCompositionLocalOf { false }
+
+/**
+ * The same fact for code that is not a composable (which settings pages exist, say). Set before any content composes,
+ * so a page that does not belong on a TV is never offered, rather than offered and then hidden.
+ */
+internal object TvDevice {
+    var isTelevision: Boolean = false
+}
 
 /** The focus-ring indication on a TV, for controls that otherwise turn the touch ripple off. */
 @Composable
@@ -124,22 +140,25 @@ internal fun ProvideTvSupport(content: @Composable () -> Unit) {
         content()
         return
     }
+    TvDevice.isTelevision = true
     val focusManager = LocalFocusManager.current
     var hasFocus by remember { mutableStateOf(false) }
     val windowFocused = LocalWindowInfo.current.isWindowFocused
     val requestPlatformFocus = rememberRequestPlatformFocus()
     val initialFocus = remember { FocusRequester() }
-    LaunchedEffect(hasFocus, windowFocused) {
-        if (hasFocus || !windowFocused) return@LaunchedEffect
-        // Keep trying until it takes: early attempts can land before the window or the screen is ready.
+    // A watchdog, not a one-shot: a screen change can take focus away again after a request seemed to succeed, so it keeps
+    // watching and re-claims focus whenever nothing holds it, however many times that happens.
+    LaunchedEffect(windowFocused) {
+        if (!windowFocused) return@LaunchedEffect
         var first = true
         while (true) {
-            delay(if (first) 400 else 700)
+            delay(if (first) 400 else 500)
             first = false
+            if (hasFocus) continue
             requestPlatformFocus()
             // Prefer the control that asked to hold the first focus (the selected tab in the rail).
-            if (runCatching { initialFocus.requestFocus() }.getOrDefault(false)) break
-            if (focusManager.moveFocus(FocusDirection.Next)) break
+            if (runCatching { initialFocus.requestFocus() }.getOrDefault(false)) continue
+            focusManager.moveFocus(FocusDirection.Next)
         }
     }
     CompositionLocalProvider(
@@ -156,4 +175,36 @@ internal fun ProvideTvSupport(content: @Composable () -> Unit) {
             content()
         }
     }
+}
+
+
+/**
+ * A tap target for touch only. On a TV a big invisible "tap anywhere" layer (a hero banner that opens its title) would
+ * otherwise be the remote's first stop, with a focus ring around the whole screen and the real buttons unreachable;
+ * the real buttons already do the same job there.
+ */
+@Composable
+internal fun Modifier.touchOnlyClickable(enabled: Boolean = true, onClick: () -> Unit): Modifier =
+    if (LocalIsTv.current) this else this.clickable(enabled = enabled, onClick = onClick)
+
+
+/**
+ * Where the remote goes when it moves right out of the side rail. Left to a geometric "nearest thing to the right"
+ * search, focus can land on an invisible element (or nothing) and every key after that is dead; so each screen names
+ * its entry point, the way a TV app's rails and rows hand focus to a chosen control.
+ */
+internal object TvContentEntry {
+    var requester by mutableStateOf<FocusRequester?>(null)
+}
+
+/** Marks this control as the one the remote enters when it leaves the side rail to the right. No-op off TV. */
+@Composable
+internal fun Modifier.tvContentEntry(): Modifier {
+    if (!LocalIsTv.current) return this
+    val requester = remember { FocusRequester() }
+    DisposableEffect(requester) {
+        TvContentEntry.requester = requester
+        onDispose { if (TvContentEntry.requester === requester) TvContentEntry.requester = null }
+    }
+    return this.focusRequester(requester)
 }

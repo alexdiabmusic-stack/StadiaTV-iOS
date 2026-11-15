@@ -1,5 +1,6 @@
 package com.nuvio.app.features.settings
 
+import com.nuvio.app.core.ui.TvDevice
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -105,24 +106,26 @@ internal fun LazyListScope.appearanceSettingsContent(
                         onCheckedChange = ThemeSettingsRepository::setLiquidGlassEffectsEnabled,
                     )
                 }
-                SettingsGroupDivider(isTablet = isTablet)
-                SettingsNavigationRow(
-                    title = stringResource(Res.string.settings_appearance_app_icon),
-                    description = stringResource(appIconState.selected.labelResource),
-                    enabled = appIconState.pending == null,
-                    isTablet = isTablet,
-                    trailingContent = {
-                        AppIconThumbnail(
-                            icon = appIconState.selected,
-                            modifier = Modifier.size(if (isTablet) 44.dp else 40.dp),
-                            cornerRadius = if (isTablet) 11.dp else 10.dp,
-                        )
-                    },
-                    onClick = {
-                        onAppIconFailureDismissed()
-                        showAppIconPicker = true
-                    },
-                )
+                if (!TvDevice.isTelevision) {
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsNavigationRow(
+                        title = stringResource(Res.string.settings_appearance_app_icon),
+                        description = stringResource(appIconState.selected.labelResource),
+                        enabled = appIconState.pending == null,
+                        isTablet = isTablet,
+                        trailingContent = {
+                            AppIconThumbnail(
+                                icon = appIconState.selected,
+                                modifier = Modifier.size(if (isTablet) 44.dp else 40.dp),
+                                cornerRadius = if (isTablet) 11.dp else 10.dp,
+                            )
+                        },
+                        onClick = {
+                            onAppIconFailureDismissed()
+                            showAppIconPicker = true
+                        },
+                    )
+                }
                 SettingsGroupDivider(isTablet = isTablet)
                 SettingsNavigationRow(
                     title = stringResource(Res.string.settings_appearance_app_language),

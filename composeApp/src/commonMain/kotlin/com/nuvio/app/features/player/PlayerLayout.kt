@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nuvio.app.core.ui.LocalCameraBand
 import com.nuvio.app.isIos
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.compose_player_resize_fill
@@ -139,6 +140,9 @@ internal data class PlayerLayoutMetrics(
 
 @Composable
 internal fun playerHorizontalSafePadding(): Dp {
+    // iPhone Duo sideways: the camera is in a band along the top or bottom edge, so the sides are clear. Side insets
+    // still left over from portrait would otherwise shorten the seek bar.
+    if (LocalCameraBand.current != null) return 0.dp
     val layoutDirection = LocalLayoutDirection.current
     val safePadding = WindowInsets.safeContent.asPaddingValues()
     val left = safePadding.calculateLeftPadding(layoutDirection)
@@ -158,6 +162,16 @@ internal fun playerTextCutoutPadding(metrics: PlayerLayoutMetrics): Dp {
 
 @Composable
 internal fun playerToolbarTopInsets(metrics: PlayerLayoutMetrics): WindowInsets {
+    val band = LocalCameraBand.current
+    if (band != null) {
+        // iPhone Duo sideways: the toolbar sits inside the camera band, beside the camera, so the picture underneath
+        // stays clear. Both sides are inset by the camera's corner to keep the title centred.
+        val base = metrics.sliderBottomOffset / 2
+        if (band.top <= 0.dp) return WindowInsets(top = base)
+        val side = maxOf(band.cameraStart, band.cameraEnd)
+        val height = metrics.headerIconSize + 28.dp
+        return WindowInsets(left = side, top = maxOf(base, (band.top - height) / 2), right = side)
+    }
     val safeInsets = WindowInsets.displayCutout.union(WindowInsets.statusBars).only(WindowInsetsSides.Top)
     val contentInsets = WindowInsets(top = metrics.sliderBottomOffset / 2)
     return if (isIos) safeInsets.union(contentInsets) else safeInsets.add(contentInsets)

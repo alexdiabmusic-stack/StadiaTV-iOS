@@ -1,0 +1,24 @@
+{
+  "collection": "christmas-episodes",
+  "title": "Christmas Episodes",
+  "entries": {
+    "The Office (US)": [[2,10,"Christmas Party"],[3,10,"A Benihana Christmas"],[3,11,"A Benihana Christmas"],[5,11,"Moroccan Christmas"],[6,13,"Secret Santa"],[7,11,"Classy Christmas"],[7,12,"Classy Christmas"],[8,10,"Christmas Wishes"],[9,9,"Dwight Christmas"]],
+    "Friends": [[2,9,"The One with Phoebe's Dad"],[3,10,"The One Where Rachel Quits"],[4,10,"The One with the Girl from Poughkeepsie"],[7,10,"The One with the Holiday Armadillo"],[8,11,"The One with Ross' Step Forward"],[9,10,"The One with Christmas in Tulsa"]],
+    "Modern Family": [[1,10,"Undeck the Halls"],[3,10,"Express Christmas"],[5,10,"The Old Man and the Tree"],[7,9,"White Christmas"],[10,10,"Stuck in a Moment"],[11,9,"The Last Christmas"]],
+    "Brooklyn Nine-Nine": [[1,11,"Christmas"],[2,10,"The Pontiac Bandit Returns"],[3,10,"Yippie Kayak"],[4,10,"Captain Latvia"]],
+    "Community": [[1,12,"Comparative Religion"],[2,11,"Abed's Uncontrollable Christmas"],[3,10,"Regional Holiday Music"]],
+    "Parks and Recreation": [[2,12,"Christmas Scandal"],[4,10,"Citizen Knope"],[5,9,"Ron and Diane"]],
+    "New Girl": [[1,9,"The 23rd"],[2,11,"Santa"],[4,11,"LAXmas"],[6,10,"Christmas Eve Eve"]],
+    "30 Rock": [[2,9,"Ludachristmas"],[3,6,"Christmas Special"],[4,8,"Secret Santa"],[5,10,"Christmas Attack Zone"],[7,8,"My Whole Life Is Thunder"]],
+    "The Big Bang Theory": [[2,11,"The Bath Item Gift Hypothesis"],[3,11,"The Maternal Congruence"],[6,11,"The Santa Simulation"],[7,11,"The Cooper Extraction"],[8,11,"The Clean Room Infiltration"]],
+    "Bob's Burgers": [[3,9,"God Rest Ye Merry Gentle-Mannequins"],[4,8,"Christmas in the Car"],[5,6,"Father of the Bob"],[6,5,"Nice-Capades"],[7,7,"The Last Gingerbread House on the Left"],[8,6,"The Bleakening, Part 1"],[8,7,"The Bleakening, Part 2"],[9,10,"Better Off Sled"],[10,10,"Have Yourself a Maily Linda Christmas"],[11,10,"Yachty or Nice"],[12,10,"Gene's Christmas Break"],[13,10,"The Plight Before Christmas"],[14,10,"The Nightmare 2 Days Before Christmas"],[15,9,"Dog Christmas Day After Afternoon"],[16,9,"It's a Stunterful Life"]],
+    "The Simpsons": [[1,1,"Simpsons Roasting on an Open Fire"],[7,11,"Marge Be Not Proud"],[9,10,"Miracle on Evergreen Terrace"],[11,9,"Grift of the Magi"],[13,6,"She of Little Faith"],[15,7,"'Tis the Fifteenth Season"],[17,9,"Simpsons Christmas Stories"],[18,9,"Kill Gil, Volumes I & II"],[22,8,"The Fight Before Christmas"],[23,9,"Holidays of Future Passed"],[25,8,"White Christmas Blue"],[26,9,"I Won't Be Home for Christmas"],[28,10,"The Nightmare After Krustmas"],[30,10,"'Tis the 30th Season"],[31,10,"Bobby, It's Cold Outside"],[32,10,"A Springfield Summer Christmas for Christmas"]],
+    "Abbott Elementary": [[2,10,"Holiday Hookah"],[4,7,"Winter Show"],[4,8,"Winter Break"]],
+    "Ted Lasso": [[2,4,"Carol of the Bells"]],
+    "Frasier (1993)": [[1,12,"Miracle on Third or Fourth Street"],[3,9,"Frasier Grinch"],[5,9,"Perspectives on Christmas"],[6,10,"Merry Christmas, Mrs. Moskowitz"],[7,11,"The Fight Before Christmas"],[10,10,"We Two Kings"],[11,11,"High Holidays"]],
+    "The Fresh Prince of Bel-Air": [[1,15,"Deck the Halls"],[2,13,"Will's Christmas Show"],[4,13,"'Twas the Night Before Christening"]],
+    "Family Guy": [[3,16,"A Very Special Family Guy Freakin' Christmas"],[9,7,"Road to the North Pole"],[11,8,"Jesus, Mary and Joseph!"],[12,8,"Christmas Guy"],[15,9,"How the Griffin Stole Christmas"],[16,9,"Don't Be a Dickens at Christmas"],[20,10,"Christmas Crime"]],
+    "How I Met Your Mother": [[2,11,"How Lily Stole Christmas"],[6,12,"False Positive"],[8,11,"The Final Page"],[8,12,"The Final Page"]],
+    "South Park": [[1,9,"Mr. Hankey, the Christmas Poo"],[2,16,"Merry Christmas, Charlie Manson!"],[3,15,"Mr. Hankey's Christmas Classics"],[4,17,"A Very Crappy Christmas"],[6,17,"Red Sleigh Down"],[7,15,"It's Christmas in Canada"],[8,14,"Woodland Critter Christmas"],[23,10,"Christmas Snow"]]
+  }
+}

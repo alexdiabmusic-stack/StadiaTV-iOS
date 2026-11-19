@@ -70,14 +70,38 @@ private fun genreColor(name: String): Color = when (name) {
     else -> Color(0xFF3E7BFA)
 }
 
+/**
+ * Each genre's cover, chosen by hand: a TMDB backdrop that says the genre at a glance. The most popular
+ * title in a genre isn't safe to show (Music's turned out to be an explicit film), so these never change.
+ */
+private fun genreCover(name: String): String? = when (name) {
+    "Action & Adventure" -> "/gqrnQA6Xppdl8vIb2eJc58VC1tW.jpg" // Mad Max: Fury Road
+    "Animation" -> "/kVd3a9YeLGkoeR50jGEXM6EqseS.jpg" // Spider-Man: Across the Spider-Verse
+    "Comedy" -> "/jK65srQczOKTpW62wPxwwKztGgE.jpg" // The Grand Budapest Hotel
+    "Crime" -> "/tSPT36ZKlP2WVHJLM4cQPLSzv3b.jpg" // The Godfather
+    "Documentary" -> "/z2uuQasY4gQJ8VDAFki746JWeQJ.jpg" // Free Solo
+    "Drama" -> "/pNjh59JSxChQktamG3LMp9ZoQzp.jpg" // The Shawshank Redemption
+    "Family" -> "/iJgNOTSBNrC90U2xyYq9ln0b35o.jpg" // Paddington 2
+    "Fantasy & Sci-Fi" -> "/8sNiAPPYU14PUepFNeSNGUTiHW.jpg" // Interstellar
+    "History" -> "/neeNHeXjMF5fXoCJRsOmkNGC7q.jpg" // Oppenheimer
+    "Horror" -> "/nHRUtBwFNnNN70vcQ7lAsjc2T6S.jpg" // A Quiet Place
+    "Kids" -> "/tWdNZ3xuFBhJ2ZoQ9vShNGHTb85.jpg" // Bluey
+    "Music" -> "/dcvbs8z0GEXslC1kCT77x19XDeR.jpg" // Bohemian Rhapsody: Freddie Mercury on stage
+    "Mystery" -> "/4HWAQu28e2yaWrtupFPGFkdNU7V.jpg" // Knives Out
+    "Reality" -> "/nchu3aEyE8gsHbUyeRqRGMRUTKv.jpg" // The Great British Bake Off
+    "Romance" -> "/1Onam6oWyFAUCcoxtdWkACtEiNr.jpg" // Pride & Prejudice
+    "Thriller" -> "/3RFmTz5h2UuFWEV4oH00XICBR9y.jpg" // Prisoners
+    "War" -> "/2lBOQK06tltt8SQaswgb8d657Mv.jpg" // 1917
+    "Western" -> "/x4biAVdPVCghBlsVIzB6NmbghIz.jpg" // The Good, the Bad and the Ugly
+    else -> null
+}?.let { "https://image.tmdb.org/t/p/w780$it" }
+
 /** A genre's main kind: films, unless it only exists for series (Kids, Reality). */
 private fun SearchGenre.prefersSeries(): Boolean = movieId == null
 
 /** The Genres page: a grid of artwork tiles, each in its genre's colour. */
 @Composable
 internal fun GenresIndexContent(onOpen: (SearchPage) -> Unit) {
-    // Titles already shown on another tile, so Animation, Family and Music don't all show the same film.
-    val usedCovers = androidx.compose.runtime.remember { HashSet<String>() }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val columns = when {
             maxWidth >= 900.dp -> 4
@@ -93,7 +117,7 @@ internal fun GenresIndexContent(onOpen: (SearchPage) -> Unit) {
             items(rows.size, key = { "genre-row-$it" }) { rowIndex ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     rows[rowIndex].forEach { index ->
-                        GenreTile(SEARCH_GENRES[index], usedCovers, Modifier.weight(1f)) { onOpen(SearchPage.Genre(index)) }
+                        GenreTile(SEARCH_GENRES[index], Modifier.weight(1f)) { onOpen(SearchPage.Genre(index)) }
                     }
                     repeat(columns - rows[rowIndex].size) { Spacer(Modifier.weight(1f)) }
                 }
@@ -103,17 +127,10 @@ internal fun GenresIndexContent(onOpen: (SearchPage) -> Unit) {
 }
 
 @Composable
-private fun GenreTile(genre: SearchGenre, usedCovers: MutableSet<String>, modifier: Modifier, onClick: () -> Unit) {
+private fun GenreTile(genre: SearchGenre, modifier: Modifier, onClick: () -> Unit) {
     val tokens = MaterialTheme.nuvio
     val tint = genreColor(genre.name)
-    // The genre's most popular title lends the tile its picture.
-    val cover by produceState<String?>(null, genre.name) {
-        val spec = genreSpec(genre, tv = genre.prefersSeries()) ?: return@produceState
-        val candidates = SearchBrowseData.list(spec.copy(key = spec.key + "-cover"), limit = 20).filter { it.banner != null }
-        val pick = candidates.firstOrNull { it.id !in usedCovers } ?: candidates.firstOrNull()
-        pick?.let { usedCovers += it.id }
-        value = pick?.banner
-    }
+    val cover = genreCover(genre.name)
     Box(
         modifier
             .aspectRatio(16f / 10f)
@@ -139,7 +156,7 @@ private fun GenreTile(genre: SearchGenre, usedCovers: MutableSet<String>, modifi
     }
 }
 
-private class GenreShelf(val title: String, val spec: BrowseSpec)
+internal class GenreShelf(val title: String, val spec: BrowseSpec)
 
 private fun genreShelves(genre: SearchGenre, tv: Boolean): List<GenreShelf> {
     val popular = genreSpec(genre, tv) ?: return emptyList()
@@ -271,7 +288,7 @@ private fun GenreHero(genre: SearchGenre, hero: MetaPreview?, onClick: () -> Uni
 }
 
 @Composable
-private fun GenreShelfRow(
+internal fun GenreShelfRow(
     shelf: GenreShelf,
     onOpen: (SearchPage) -> Unit,
     onPosterClick: ((MetaPreview) -> Unit)?,

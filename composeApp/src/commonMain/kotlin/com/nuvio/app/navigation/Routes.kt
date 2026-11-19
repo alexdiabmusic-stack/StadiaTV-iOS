@@ -66,6 +66,20 @@ data class EntityBrowseRoute(
         get() = entityName
 }
 
+/** One Explore collection's page (see features/explore). The page draws its own title over the artwork. */
+@Serializable
+data class ExploreCollectionRoute(val collectionId: String) : AppRoute {
+    override val title: String
+        get() = ""
+}
+
+/** Every Explore collection, by family. */
+@Serializable
+data class ExploreBrowserRoute(val placeholder: String = "") : AppRoute {
+    override val title: String
+        get() = ""
+}
+
 /** A settings leaf promoted from the former in-screen page state machine. */
 @Serializable
 data class SettingsPageRoute(

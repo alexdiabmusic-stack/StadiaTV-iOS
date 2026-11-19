@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -182,7 +184,9 @@ internal fun SportsSearchTab(known: List<SportsEvent>, follows: SportsFollows, a
                             modifier = Modifier.fillMaxWidth().clip(tokens.shapes.compactCard).clickable { open = !open }.padding(vertical = NuvioTokens.Space.s8),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(sport.icon + "  " + sport.label, style = MaterialTheme.typography.bodyLarge, color = tokens.colors.textPrimary, modifier = Modifier.weight(1f))
+                            Icon(sport.vector, contentDescription = null, tint = tokens.colors.textMuted, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text(sport.label, style = MaterialTheme.typography.bodyLarge, color = tokens.colors.textPrimary, modifier = Modifier.weight(1f))
                             Text(SportsCatalog.all.count { it.sport == sport }.toString(), style = MaterialTheme.typography.labelMedium, color = tokens.colors.textMuted)
                         }
                         if (open) {

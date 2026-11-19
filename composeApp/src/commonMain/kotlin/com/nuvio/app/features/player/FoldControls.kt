@@ -7,6 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -177,8 +178,13 @@ internal fun FoldControls(
         }
     }
 
+    // The bottom half is short on a phone-sized screen: tighten rows and padding so the play / seek row keeps its size.
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+    val compact = maxHeight < 380.dp
+    val rowHeight = if (compact) 52.dp else RowHeight
+    val tileGap = if (compact) 8.dp else TileGap
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
             .pointerInput(dimmed) {
@@ -196,17 +202,18 @@ internal fun FoldControls(
             }
             .graphicsLayer { alpha = contentAlpha }
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
-            .padding(horizontal = 16.dp + horizontalSafePadding, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(TileGap, Alignment.CenterVertically),
+            .padding(horizontal = 16.dp + horizontalSafePadding, vertical = if (compact) 8.dp else 14.dp),
+        verticalArrangement = Arrangement.spacedBy(tileGap, Alignment.CenterVertically),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().height(RowHeight),
-            horizontalArrangement = Arrangement.spacedBy(TileGap),
+            modifier = Modifier.fillMaxWidth().height(rowHeight),
+            horizontalArrangement = Arrangement.spacedBy(tileGap),
         ) {
             IconTile(
                 icon = Icons.AutoMirrored.Rounded.ArrowBack,
                 description = stringResource(Res.string.compose_player_close),
                 onClick = onBack,
+                size = rowHeight,
             )
             NowPlayingTile(
                 title = title,
@@ -222,6 +229,7 @@ internal fun FoldControls(
                 icon = Icons.Rounded.Lock,
                 description = stringResource(Res.string.compose_player_lock_controls),
                 onClick = onLockToggle,
+                size = rowHeight,
             )
             if (onPartyClick != null) {
                 IconTile(
@@ -229,13 +237,14 @@ internal fun FoldControls(
                     description = stringResource(Res.string.party_title),
                     onClick = interact(onPartyClick),
                     tint = if (partyActive) MaterialTheme.colorScheme.primary else Color.White,
+                    size = rowHeight,
                 )
             }
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = 72.dp, max = 132.dp),
-            horizontalArrangement = Arrangement.spacedBy(TileGap),
+            modifier = Modifier.fillMaxWidth().weight(1f, fill = false).heightIn(min = if (compact) 64.dp else 72.dp, max = 132.dp),
+            horizontalArrangement = Arrangement.spacedBy(tileGap),
         ) {
             if (gestureController != null) {
                 LevelTile(
@@ -293,8 +302,8 @@ internal fun FoldControls(
             }
         }
 
-        Tile(onClick = null, modifier = Modifier.fillMaxWidth().heightIn(min = RowHeight)) {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Tile(onClick = null, modifier = Modifier.fillMaxWidth().heightIn(min = rowHeight)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (compact) 8.dp else 12.dp)) {
                 if (badges.isNotEmpty()) {
                     PlayerBadges(badges = badges, modifier = Modifier.padding(bottom = 10.dp))
                 }
@@ -317,12 +326,13 @@ internal fun FoldControls(
 
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(TileGap),
+            horizontalArrangement = Arrangement.spacedBy(tileGap),
         ) {
             actions.forEach { action ->
-                ActionTile(action = action, onClick = interact(action.onClick))
+                ActionTile(action = action, onClick = interact(action.onClick), height = if (compact) 64.dp else 76.dp)
             }
         }
+    }
     }
 }
 
@@ -350,8 +360,9 @@ private fun IconTile(
     description: String,
     onClick: () -> Unit,
     tint: Color = Color.White,
+    size: Dp = RowHeight,
 ) {
-    Tile(onClick = onClick, modifier = Modifier.size(RowHeight)) {
+    Tile(onClick = onClick, modifier = Modifier.size(size)) {
         Icon(icon, description, tint = tint, modifier = Modifier.size(NuvioTokens.Icon.lg))
     }
 }
@@ -415,8 +426,8 @@ private fun NowPlayingTile(
 }
 
 @Composable
-private fun ActionTile(action: PlayerControlAction, onClick: () -> Unit) {
-    Tile(onClick = onClick, modifier = Modifier.width(92.dp).height(76.dp)) {
+private fun ActionTile(action: PlayerControlAction, onClick: () -> Unit, height: Dp = 76.dp) {
+    Tile(onClick = onClick, modifier = Modifier.width(92.dp).height(height)) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             if (action.painter != null) {
                 Icon(action.painter, null, tint = Color.White, modifier = Modifier.size(NuvioTokens.Icon.md))
@@ -444,6 +455,7 @@ private fun TimeLabel(text: String, modifier: Modifier = Modifier) {
         style = MaterialTheme.nuvioTypeScale.labelSm,
         color = Color.White.copy(alpha = 0.85f),
         maxLines = 1,
+        softWrap = false,
         modifier = modifier,
     )
 }
@@ -490,14 +502,17 @@ private fun TimelineRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TimeLabel(formatPlaybackTime(displayedPositionMs))
-        PlayerTimeline(
-            chapters = chapters,
-            snapshot = playbackSnapshot,
-            displayedPositionMs = displayedPositionMs,
-            onScrubChange = onScrubChange,
-            onScrubFinished = onScrubFinished,
-            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-        )
+        // PlayerTimeline lays its slider out inside its own Box, so the weight has to sit on a wrapper. Passed straight
+        // in, it did nothing and the slider took the whole row, squeezing the end time to nothing.
+        Box(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            PlayerTimeline(
+                chapters = chapters,
+                snapshot = playbackSnapshot,
+                displayedPositionMs = displayedPositionMs,
+                onScrubChange = onScrubChange,
+                onScrubFinished = onScrubFinished,
+            )
+        }
         TimeLabel(
             text = if (showRemainingTime) {
                 formatPlaybackRuntime(displayedPositionMs, playbackSnapshot.durationMs, true)

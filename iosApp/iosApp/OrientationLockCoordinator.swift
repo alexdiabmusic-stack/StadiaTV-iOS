@@ -1,3 +1,4 @@
+import Combine
 import UIKit
 import UserNotifications
 import ComposeApp
@@ -65,6 +66,7 @@ final class OrientationLockCoordinator {
 
     private(set) var supportedOrientations: UIInterfaceOrientationMask = .allButUpsideDown
     private var observers: [NSObjectProtocol] = []
+    private var postureObserver: AnyCancellable?
     private var landscapeLockRequested = false
     private var parkedPlayerSuspension = false
     private var playerPrefersPortrait = false
@@ -73,6 +75,13 @@ final class OrientationLockCoordinator {
 
     func start() {
         guard observers.isEmpty else { return }
+
+        // iPhone Duo half-open (tabletop): the player stays upright so the fold runs across the screen, with the
+        // picture on the top half and the controls on the bottom half. Landscape would turn the fold vertical.
+        postureObserver = NuvioFoldPosture.shared.$isHalfOpen
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.applyLandscapeLock() }
 
         let center = NotificationCenter.default
         observers.append(
@@ -120,7 +129,8 @@ final class OrientationLockCoordinator {
 
     private func applyLandscapeLock() {
         let locked = landscapeLockRequested && !parkedPlayerSuspension
-        let lockedOrientations: UIInterfaceOrientationMask = playerPrefersPortrait ? .portrait : .landscape
+        let lockedOrientations: UIInterfaceOrientationMask =
+            (playerPrefersPortrait || NuvioFoldPosture.shared.isHalfOpen) ? .portrait : .landscape
         let nextOrientations: UIInterfaceOrientationMask = locked ? lockedOrientations : .allButUpsideDown
         guard nextOrientations != supportedOrientations else { return }
         supportedOrientations = nextOrientations

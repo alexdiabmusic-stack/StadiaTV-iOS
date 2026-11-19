@@ -287,6 +287,14 @@ private fun UniversalSearchScreen(
     var teamSheet by remember { mutableStateOf<TeamInfo?>(null) }
     var searchFocused by remember { mutableStateOf(false) }
     val titleCollapse = com.nuvio.app.core.ui.rememberNuvioCollapsingTitleState()
+    // Scrolling the results puts the keyboard away, as in other iOS search screens. It covers close to half of a
+    // short screen (iPhone Duo), which otherwise leaves one row of results visible.
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
+            if (scrolling && searchFocused) focusManager.clearFocus()
+        }
+    }
 
     LaunchedEffect(Unit) {
         AddonRepository.initialize()

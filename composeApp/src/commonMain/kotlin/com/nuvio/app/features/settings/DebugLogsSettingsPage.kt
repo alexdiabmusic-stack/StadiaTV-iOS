@@ -56,6 +56,9 @@ private const val MAX_DISPLAYED_LOG_LINES = 500
 internal fun LazyListScope.debugLogsSettingsContent(
     isTablet: Boolean,
 ) {
+    if (com.nuvio.app.isDebugBuild) {
+        item { RecommendationDiagnosticsSection() }
+    }
     item {
         DebugLogsSection(isTablet = isTablet)
     }
@@ -296,3 +299,33 @@ private fun String.toFilterLabel(): String =
     } else {
         this
     }
+
+/** Development builds only: what the last recommendation build saw and decided, for the active profile. */
+@Composable
+private fun RecommendationDiagnosticsSection() {
+    val state by com.nuvio.app.features.recommendations.RecommendationEngine.state.collectAsState()
+    val diagnostics = state.diagnostics
+    androidx.compose.foundation.layout.Column(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(10.dp),
+    ) {
+        val textColor = MaterialTheme.colorScheme.onBackground
+        Text("Recommendation diagnostics", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = textColor)
+        Text(
+            "Profile ${state.profileId ?: "-"} · ${if (state.isPersonal) "personal" else "fallback"} · ${state.items.size} recommended · " +
+                state.rows.joinToString { "${it.title} (${it.items.size})" }.ifBlank { "no personal rows" },
+            style = MaterialTheme.typography.bodySmall,
+            color = textColor,
+        )
+        if (diagnostics == null) {
+            Text("Not built yet. Open Home to build.", style = MaterialTheme.typography.bodySmall, color = textColor)
+        } else {
+            diagnostics.sections.forEach { (title, lines) ->
+                Text(title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, color = textColor)
+                lines.forEach { line ->
+                    Text(line, style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace), color = textColor.copy(alpha = 0.8f))
+                }
+            }
+        }
+    }
+}

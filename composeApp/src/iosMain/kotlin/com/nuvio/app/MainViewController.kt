@@ -4,6 +4,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.uikit.OnFocusBehavior
 import androidx.compose.ui.window.ComposeUIViewController
+import com.nuvio.app.core.ui.LocalCameraBand
 import com.nuvio.app.core.ui.LocalFold
 import com.nuvio.app.core.ui.LocalFoldRailPadding
 import com.nuvio.app.core.ui.LocalVerticalBarPadding
@@ -129,6 +130,7 @@ private fun nuvioComposeViewController(
                 LocalVerticalBarPadding provides verticalBar.padding,
                 LocalFoldRailPadding provides verticalBar.rail,
                 LocalFold provides hinge.fold,
+                LocalCameraBand provides hinge.cameraBand,
                 content = content,
             )
         },

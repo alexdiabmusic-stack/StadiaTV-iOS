@@ -1,0 +1,2690 @@
+{
+ "christmas-episodes": [
+  {
+   "series": "The Office (US)",
+   "season": 2,
+   "episode": 10,
+   "title": "Christmas Party",
+   "tmdb_series_id": 2316,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Christmas Party",
+   "resolved_as": "S02E10"
+  },
+  {
+   "series": "The Office (US)",
+   "season": 3,
+   "episode": 10,
+   "title": "A Benihana Christmas",
+   "tmdb_series_id": 2316,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "A Benihana Christmas",
+   "resolved_as": "S03E10"
+  },
+  {
+   "series": "The Office (US)",
+   "season": 3,
+   "episode": 11,
+   "title": "A Benihana Christmas",
+   "tmdb_series_id": 2316,
+   "status": "duplicate",
+   "note": "same TMDB episode as S03E10 \"A Benihana Christmas\" (listed once on TMDB)",
+   "tmdb_title": "A Benihana Christmas",
+   "resolved_as": "S03E10"
+  },
+  {
+   "series": "The Office (US)",
+   "season": 5,
+   "episode": 11,
+   "title": "Moroccan Christmas",
+   "tmdb_series_id": 2316,
+   "status": "remapped",
+   "note": "title found at S05E10 on TMDB",
+   "tmdb_title": "Moroccan Christmas",
+   "resolved_as": "S05E10"
+  },
+  {
+   "series": "The Office (US)",
+   "season": 6,
+   "episode": 13,
+   "title": "Secret Santa",
+   "tmdb_series_id": 2316,
+   "status": "remapped",
+   "note": "title found at S06E12 on TMDB",
+   "tmdb_title": "Secret Santa",
+   "resolved_as": "S06E12"
+  },
+  {
+   "series": "The Office (US)",
+   "season": 7,
+   "episode": 11,
+   "title": "Classy Christmas",
+   "tmdb_series_id": 2316,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Classy Christmas",
+   "resolved_as": "S07E11"
+  },
+  {
+   "series": "The Office (US)",
+   "season": 7,
+   "episode": 12,
+   "title": "Classy Christmas",
+   "tmdb_series_id": 2316,
+   "status": "duplicate",
+   "note": "same TMDB episode as S07E11 \"Classy Christmas\" (listed once on TMDB)",
+   "tmdb_title": "Classy Christmas",
+   "resolved_as": "S07E11"
+  },
+  {
+   "series": "The Office (US)",
+   "season": 8,
+   "episode": 10,
+   "title": "Christmas Wishes",
+   "tmdb_series_id": 2316,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Christmas Wishes",
+   "resolved_as": "S08E10"
+  },
+  {
+   "series": "The Office (US)",
+   "season": 9,
+   "episode": 9,
+   "title": "Dwight Christmas",
+   "tmdb_series_id": 2316,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Dwight Christmas",
+   "resolved_as": "S09E09"
+  },
+  {
+   "series": "The Office (US)",
+   "series_resolution": true,
+   "tmdb_series_id": 2316,
+   "tmdb_name": "The Office",
+   "first_air_date": "2005-03-24",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0386676"
+  },
+  {
+   "series": "Friends",
+   "season": 2,
+   "episode": 9,
+   "title": "The One with Phoebe's Dad",
+   "tmdb_series_id": 1668,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The One with Phoebe's Dad",
+   "resolved_as": "S02E09"
+  },
+  {
+   "series": "Friends",
+   "season": 3,
+   "episode": 10,
+   "title": "The One Where Rachel Quits",
+   "tmdb_series_id": 1668,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The One Where Rachel Quits",
+   "resolved_as": "S03E10"
+  },
+  {
+   "series": "Friends",
+   "season": 4,
+   "episode": 10,
+   "title": "The One with the Girl from Poughkeepsie",
+   "tmdb_series_id": 1668,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The One with the Girl from Poughkeepsie",
+   "resolved_as": "S04E10"
+  },
+  {
+   "series": "Friends",
+   "season": 7,
+   "episode": 10,
+   "title": "The One with the Holiday Armadillo",
+   "tmdb_series_id": 1668,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The One with the Holiday Armadillo",
+   "resolved_as": "S07E10"
+  },
+  {
+   "series": "Friends",
+   "season": 8,
+   "episode": 11,
+   "title": "The One with Ross' Step Forward",
+   "tmdb_series_id": 1668,
+   "status": "variant",
+   "note": "TMDB title \"The One with Ross's Step Forward\"",
+   "tmdb_title": "The One with Ross's Step Forward",
+   "resolved_as": "S08E11"
+  },
+  {
+   "series": "Friends",
+   "season": 9,
+   "episode": 10,
+   "title": "The One with Christmas in Tulsa",
+   "tmdb_series_id": 1668,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The One with Christmas in Tulsa",
+   "resolved_as": "S09E10"
+  },
+  {
+   "series": "Friends",
+   "series_resolution": true,
+   "tmdb_series_id": 1668,
+   "tmdb_name": "Friends",
+   "first_air_date": "1994-09-22",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0108778"
+  },
+  {
+   "series": "Modern Family",
+   "season": 1,
+   "episode": 10,
+   "title": "Undeck the Halls",
+   "tmdb_series_id": 1421,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Undeck the Halls",
+   "resolved_as": "S01E10"
+  },
+  {
+   "series": "Modern Family",
+   "season": 3,
+   "episode": 10,
+   "title": "Express Christmas",
+   "tmdb_series_id": 1421,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Express Christmas",
+   "resolved_as": "S03E10"
+  },
+  {
+   "series": "Modern Family",
+   "season": 5,
+   "episode": 10,
+   "title": "The Old Man and the Tree",
+   "tmdb_series_id": 1421,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Old Man & the Tree",
+   "resolved_as": "S05E10"
+  },
+  {
+   "series": "Modern Family",
+   "season": 7,
+   "episode": 9,
+   "title": "White Christmas",
+   "tmdb_series_id": 1421,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "White Christmas",
+   "resolved_as": "S07E09"
+  },
+  {
+   "series": "Modern Family",
+   "season": 10,
+   "episode": 10,
+   "title": "Stuck in a Moment",
+   "tmdb_series_id": 1421,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Stuck in a Moment",
+   "resolved_as": "S10E10"
+  },
+  {
+   "series": "Modern Family",
+   "season": 11,
+   "episode": 9,
+   "title": "The Last Christmas",
+   "tmdb_series_id": 1421,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Last Christmas",
+   "resolved_as": "S11E09"
+  },
+  {
+   "series": "Modern Family",
+   "series_resolution": true,
+   "tmdb_series_id": 1421,
+   "tmdb_name": "Modern Family",
+   "first_air_date": "2009-09-23",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt1442437"
+  },
+  {
+   "series": "Brooklyn Nine-Nine",
+   "season": 1,
+   "episode": 11,
+   "title": "Christmas",
+   "tmdb_series_id": 48891,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Christmas",
+   "resolved_as": "S01E11"
+  },
+  {
+   "series": "Brooklyn Nine-Nine",
+   "season": 2,
+   "episode": 10,
+   "title": "The Pontiac Bandit Returns",
+   "tmdb_series_id": 48891,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Pontiac Bandit Returns",
+   "resolved_as": "S02E10"
+  },
+  {
+   "series": "Brooklyn Nine-Nine",
+   "season": 3,
+   "episode": 10,
+   "title": "Yippie Kayak",
+   "tmdb_series_id": 48891,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Yippie Kayak",
+   "resolved_as": "S03E10"
+  },
+  {
+   "series": "Brooklyn Nine-Nine",
+   "season": 4,
+   "episode": 10,
+   "title": "Captain Latvia",
+   "tmdb_series_id": 48891,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Captain Latvia",
+   "resolved_as": "S04E10"
+  },
+  {
+   "series": "Brooklyn Nine-Nine",
+   "series_resolution": true,
+   "tmdb_series_id": 48891,
+   "tmdb_name": "Brooklyn Nine-Nine",
+   "first_air_date": "2013-09-17",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt2467372"
+  },
+  {
+   "series": "Community",
+   "season": 1,
+   "episode": 12,
+   "title": "Comparative Religion",
+   "tmdb_series_id": 18347,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Comparative Religion",
+   "resolved_as": "S01E12"
+  },
+  {
+   "series": "Community",
+   "season": 2,
+   "episode": 11,
+   "title": "Abed's Uncontrollable Christmas",
+   "tmdb_series_id": 18347,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Abed's Uncontrollable Christmas",
+   "resolved_as": "S02E11"
+  },
+  {
+   "series": "Community",
+   "season": 3,
+   "episode": 10,
+   "title": "Regional Holiday Music",
+   "tmdb_series_id": 18347,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Regional Holiday Music",
+   "resolved_as": "S03E10"
+  },
+  {
+   "series": "Community",
+   "series_resolution": true,
+   "tmdb_series_id": 18347,
+   "tmdb_name": "Community",
+   "first_air_date": "2009-09-17",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt1439629"
+  },
+  {
+   "series": "Parks and Recreation",
+   "season": 2,
+   "episode": 12,
+   "title": "Christmas Scandal",
+   "tmdb_series_id": 8592,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Christmas Scandal",
+   "resolved_as": "S02E12"
+  },
+  {
+   "series": "Parks and Recreation",
+   "season": 4,
+   "episode": 10,
+   "title": "Citizen Knope",
+   "tmdb_series_id": 8592,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Citizen Knope",
+   "resolved_as": "S04E10"
+  },
+  {
+   "series": "Parks and Recreation",
+   "season": 5,
+   "episode": 9,
+   "title": "Ron and Diane",
+   "tmdb_series_id": 8592,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Ron and Diane",
+   "resolved_as": "S05E09"
+  },
+  {
+   "series": "Parks and Recreation",
+   "series_resolution": true,
+   "tmdb_series_id": 8592,
+   "tmdb_name": "Parks and Recreation",
+   "first_air_date": "2009-04-09",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt1266020"
+  },
+  {
+   "series": "New Girl",
+   "season": 1,
+   "episode": 9,
+   "title": "The 23rd",
+   "tmdb_series_id": 1420,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The 23rd",
+   "resolved_as": "S01E09"
+  },
+  {
+   "series": "New Girl",
+   "season": 2,
+   "episode": 11,
+   "title": "Santa",
+   "tmdb_series_id": 1420,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Santa",
+   "resolved_as": "S02E11"
+  },
+  {
+   "series": "New Girl",
+   "season": 4,
+   "episode": 11,
+   "title": "LAXmas",
+   "tmdb_series_id": 1420,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "LAXmas",
+   "resolved_as": "S04E11"
+  },
+  {
+   "series": "New Girl",
+   "season": 6,
+   "episode": 10,
+   "title": "Christmas Eve Eve",
+   "tmdb_series_id": 1420,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Christmas Eve Eve",
+   "resolved_as": "S06E10"
+  },
+  {
+   "series": "New Girl",
+   "series_resolution": true,
+   "tmdb_series_id": 1420,
+   "tmdb_name": "New Girl",
+   "first_air_date": "2011-09-20",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt1826940"
+  },
+  {
+   "series": "30 Rock",
+   "season": 2,
+   "episode": 9,
+   "title": "Ludachristmas",
+   "tmdb_series_id": 4608,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Ludachristmas",
+   "resolved_as": "S02E09"
+  },
+  {
+   "series": "30 Rock",
+   "season": 3,
+   "episode": 6,
+   "title": "Christmas Special",
+   "tmdb_series_id": 4608,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Christmas Special",
+   "resolved_as": "S03E06"
+  },
+  {
+   "series": "30 Rock",
+   "season": 4,
+   "episode": 8,
+   "title": "Secret Santa",
+   "tmdb_series_id": 4608,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Secret Santa",
+   "resolved_as": "S04E08"
+  },
+  {
+   "series": "30 Rock",
+   "season": 5,
+   "episode": 10,
+   "title": "Christmas Attack Zone",
+   "tmdb_series_id": 4608,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Christmas Attack Zone",
+   "resolved_as": "S05E10"
+  },
+  {
+   "series": "30 Rock",
+   "season": 7,
+   "episode": 8,
+   "title": "My Whole Life Is Thunder",
+   "tmdb_series_id": 4608,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "My Whole Life Is Thunder",
+   "resolved_as": "S07E08"
+  },
+  {
+   "series": "30 Rock",
+   "series_resolution": true,
+   "tmdb_series_id": 4608,
+   "tmdb_name": "30 Rock",
+   "first_air_date": "2006-10-11",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0496424"
+  },
+  {
+   "series": "The Big Bang Theory",
+   "season": 2,
+   "episode": 11,
+   "title": "The Bath Item Gift Hypothesis",
+   "tmdb_series_id": 1418,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Bath Item Gift Hypothesis",
+   "resolved_as": "S02E11"
+  },
+  {
+   "series": "The Big Bang Theory",
+   "season": 3,
+   "episode": 11,
+   "title": "The Maternal Congruence",
+   "tmdb_series_id": 1418,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Maternal Congruence",
+   "resolved_as": "S03E11"
+  },
+  {
+   "series": "The Big Bang Theory",
+   "season": 6,
+   "episode": 11,
+   "title": "The Santa Simulation",
+   "tmdb_series_id": 1418,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Santa Simulation",
+   "resolved_as": "S06E11"
+  },
+  {
+   "series": "The Big Bang Theory",
+   "season": 7,
+   "episode": 11,
+   "title": "The Cooper Extraction",
+   "tmdb_series_id": 1418,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Cooper Extraction",
+   "resolved_as": "S07E11"
+  },
+  {
+   "series": "The Big Bang Theory",
+   "season": 8,
+   "episode": 11,
+   "title": "The Clean Room Infiltration",
+   "tmdb_series_id": 1418,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Clean Room Infiltration",
+   "resolved_as": "S08E11"
+  },
+  {
+   "series": "The Big Bang Theory",
+   "series_resolution": true,
+   "tmdb_series_id": 1418,
+   "tmdb_name": "The Big Bang Theory",
+   "first_air_date": "2007-09-24",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0898266"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 3,
+   "episode": 9,
+   "title": "God Rest Ye Merry Gentle-Mannequins",
+   "tmdb_series_id": 32726,
+   "status": "variant",
+   "note": "TMDB title \"Bob Rest Ye Merry Gentle-Mannequins\"",
+   "tmdb_title": "Bob Rest Ye Merry Gentle-Mannequins",
+   "resolved_as": "S03E09"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 4,
+   "episode": 8,
+   "title": "Christmas in the Car",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Christmas in the Car",
+   "resolved_as": "S04E08"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 5,
+   "episode": 6,
+   "title": "Father of the Bob",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Father of the Bob",
+   "resolved_as": "S05E06"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 6,
+   "episode": 5,
+   "title": "Nice-Capades",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Nice-Capades",
+   "resolved_as": "S06E05"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 7,
+   "episode": 7,
+   "title": "The Last Gingerbread House on the Left",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Last Gingerbread House on the Left",
+   "resolved_as": "S07E07"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 8,
+   "episode": 6,
+   "title": "The Bleakening, Part 1",
+   "tmdb_series_id": 32726,
+   "status": "variant",
+   "note": "TMDB title \"The Bleakening (1)\" (tags, \"the\" or \"part\" differ)",
+   "tmdb_title": "The Bleakening (1)",
+   "resolved_as": "S08E06"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 8,
+   "episode": 7,
+   "title": "The Bleakening, Part 2",
+   "tmdb_series_id": 32726,
+   "status": "variant",
+   "note": "TMDB title \"The Bleakening (2)\" (tags, \"the\" or \"part\" differ)",
+   "tmdb_title": "The Bleakening (2)",
+   "resolved_as": "S08E07"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 9,
+   "episode": 10,
+   "title": "Better Off Sled",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Better Off Sled",
+   "resolved_as": "S09E10"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 10,
+   "episode": 10,
+   "title": "Have Yourself a Maily Linda Christmas",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Have Yourself a Maily Linda Christmas",
+   "resolved_as": "S10E10"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 11,
+   "episode": 10,
+   "title": "Yachty or Nice",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Yachty or Nice",
+   "resolved_as": "S11E10"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 12,
+   "episode": 10,
+   "title": "Gene's Christmas Break",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Gene's Christmas Break",
+   "resolved_as": "S12E10"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 13,
+   "episode": 10,
+   "title": "The Plight Before Christmas",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Plight Before Christmas",
+   "resolved_as": "S13E10"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 14,
+   "episode": 10,
+   "title": "The Nightmare 2 Days Before Christmas",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Nightmare 2 Days Before Christmas",
+   "resolved_as": "S14E10"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 15,
+   "episode": 9,
+   "title": "Dog Christmas Day After Afternoon",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Dog Christmas Day After Afternoon",
+   "resolved_as": "S15E09"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 16,
+   "episode": 9,
+   "title": "It's a Stunterful Life",
+   "tmdb_series_id": 32726,
+   "status": "variant",
+   "note": "TMDB title \"It's a Stunterful Life [Christmas]\" (tags, \"the\" or \"part\" differ)",
+   "tmdb_title": "It's a Stunterful Life [Christmas]",
+   "resolved_as": "S16E09"
+  },
+  {
+   "series": "Bob's Burgers",
+   "series_resolution": true,
+   "tmdb_series_id": 32726,
+   "tmdb_name": "Bob's Burgers",
+   "first_air_date": "2011-01-09",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt1561755"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 1,
+   "episode": 1,
+   "title": "Simpsons Roasting on an Open Fire",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Simpsons Roasting on an Open Fire",
+   "resolved_as": "S01E01"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 7,
+   "episode": 11,
+   "title": "Marge Be Not Proud",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Marge Be Not Proud",
+   "resolved_as": "S07E11"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 9,
+   "episode": 10,
+   "title": "Miracle on Evergreen Terrace",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Miracle on Evergreen Terrace",
+   "resolved_as": "S09E10"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 11,
+   "episode": 9,
+   "title": "Grift of the Magi",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Grift of the Magi",
+   "resolved_as": "S11E09"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 13,
+   "episode": 6,
+   "title": "She of Little Faith",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "She of Little Faith",
+   "resolved_as": "S13E06"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 15,
+   "episode": 7,
+   "title": "'Tis the Fifteenth Season",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "'Tis the Fifteenth Season",
+   "resolved_as": "S15E07"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 17,
+   "episode": 9,
+   "title": "Simpsons Christmas Stories",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Simpsons Christmas Stories",
+   "resolved_as": "S17E09"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 18,
+   "episode": 9,
+   "title": "Kill Gil, Volumes I & II",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Kill Gil, Volumes I & II",
+   "resolved_as": "S18E09"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 22,
+   "episode": 8,
+   "title": "The Fight Before Christmas",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Fight Before Christmas",
+   "resolved_as": "S22E08"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 23,
+   "episode": 9,
+   "title": "Holidays of Future Passed",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Holidays of Future Passed",
+   "resolved_as": "S23E09"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 25,
+   "episode": 8,
+   "title": "White Christmas Blue",
+   "tmdb_series_id": 456,
+   "status": "variant",
+   "note": "TMDB title \"White Christmas Blues\"",
+   "tmdb_title": "White Christmas Blues",
+   "resolved_as": "S25E08"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 26,
+   "episode": 9,
+   "title": "I Won't Be Home for Christmas",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "I Won't Be Home for Christmas",
+   "resolved_as": "S26E09"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 28,
+   "episode": 10,
+   "title": "The Nightmare After Krustmas",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Nightmare After Krustmas",
+   "resolved_as": "S28E10"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 30,
+   "episode": 10,
+   "title": "'Tis the 30th Season",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "'Tis the 30th Season",
+   "resolved_as": "S30E10"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 31,
+   "episode": 10,
+   "title": "Bobby, It's Cold Outside",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Bobby: It's Cold Outside",
+   "resolved_as": "S31E10"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 32,
+   "episode": 10,
+   "title": "A Springfield Summer Christmas for Christmas",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "A Springfield Summer Christmas for Christmas",
+   "resolved_as": "S32E10"
+  },
+  {
+   "series": "The Simpsons",
+   "series_resolution": true,
+   "tmdb_series_id": 456,
+   "tmdb_name": "The Simpsons",
+   "first_air_date": "1989-12-17",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0096697"
+  },
+  {
+   "series": "Abbott Elementary",
+   "season": 2,
+   "episode": 10,
+   "title": "Holiday Hookah",
+   "tmdb_series_id": 125935,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Holiday Hookah",
+   "resolved_as": "S02E10"
+  },
+  {
+   "series": "Abbott Elementary",
+   "season": 4,
+   "episode": 7,
+   "title": "Winter Show",
+   "tmdb_series_id": 125935,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Winter Show",
+   "resolved_as": "S04E07"
+  },
+  {
+   "series": "Abbott Elementary",
+   "season": 4,
+   "episode": 8,
+   "title": "Winter Break",
+   "tmdb_series_id": 125935,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Winter Break",
+   "resolved_as": "S04E08"
+  },
+  {
+   "series": "Abbott Elementary",
+   "series_resolution": true,
+   "tmdb_series_id": 125935,
+   "tmdb_name": "Abbott Elementary",
+   "first_air_date": "2021-12-07",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt14218830"
+  },
+  {
+   "series": "Ted Lasso",
+   "season": 2,
+   "episode": 4,
+   "title": "Carol of the Bells",
+   "tmdb_series_id": 97546,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Carol of the Bells",
+   "resolved_as": "S02E04"
+  },
+  {
+   "series": "Ted Lasso",
+   "series_resolution": true,
+   "tmdb_series_id": 97546,
+   "tmdb_name": "Ted Lasso",
+   "first_air_date": "2020-08-14",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt10986410"
+  },
+  {
+   "series": "Frasier (1993)",
+   "season": 1,
+   "episode": 12,
+   "title": "Miracle on Third or Fourth Street",
+   "tmdb_series_id": 3452,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Miracle on Third or Fourth Street",
+   "resolved_as": "S01E12"
+  },
+  {
+   "series": "Frasier (1993)",
+   "season": 3,
+   "episode": 9,
+   "title": "Frasier Grinch",
+   "tmdb_series_id": 3452,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Frasier Grinch",
+   "resolved_as": "S03E09"
+  },
+  {
+   "series": "Frasier (1993)",
+   "season": 5,
+   "episode": 9,
+   "title": "Perspectives on Christmas",
+   "tmdb_series_id": 3452,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Perspectives on Christmas",
+   "resolved_as": "S05E09"
+  },
+  {
+   "series": "Frasier (1993)",
+   "season": 6,
+   "episode": 10,
+   "title": "Merry Christmas, Mrs. Moskowitz",
+   "tmdb_series_id": 3452,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Merry Christmas, Mrs. Moskowitz",
+   "resolved_as": "S06E10"
+  },
+  {
+   "series": "Frasier (1993)",
+   "season": 7,
+   "episode": 11,
+   "title": "The Fight Before Christmas",
+   "tmdb_series_id": 3452,
+   "status": "variant",
+   "note": "TMDB title \"The Fight Before Christmas (2)\"",
+   "tmdb_title": "The Fight Before Christmas (2)",
+   "resolved_as": "S07E11"
+  },
+  {
+   "series": "Frasier (1993)",
+   "season": 10,
+   "episode": 10,
+   "title": "We Two Kings",
+   "tmdb_series_id": 3452,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "We Two Kings",
+   "resolved_as": "S10E10"
+  },
+  {
+   "series": "Frasier (1993)",
+   "season": 11,
+   "episode": 11,
+   "title": "High Holidays",
+   "tmdb_series_id": 3452,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "High Holidays",
+   "resolved_as": "S11E11"
+  },
+  {
+   "series": "Frasier (1993)",
+   "series_resolution": true,
+   "tmdb_series_id": 3452,
+   "tmdb_name": "Frasier",
+   "first_air_date": "1993-09-16",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0106004"
+  },
+  {
+   "series": "The Fresh Prince of Bel-Air",
+   "season": 1,
+   "episode": 15,
+   "title": "Deck the Halls",
+   "tmdb_series_id": 1892,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Deck the Halls",
+   "resolved_as": "S01E15"
+  },
+  {
+   "series": "The Fresh Prince of Bel-Air",
+   "season": 2,
+   "episode": 13,
+   "title": "Will's Christmas Show",
+   "tmdb_series_id": 1892,
+   "status": "variant",
+   "note": "TMDB title \"Christmas Show\" (one title adds a prefix; please confirm)",
+   "tmdb_title": "Christmas Show",
+   "resolved_as": "S02E13"
+  },
+  {
+   "series": "The Fresh Prince of Bel-Air",
+   "season": 4,
+   "episode": 13,
+   "title": "'Twas the Night Before Christening",
+   "tmdb_series_id": 1892,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "'Twas the Night Before Christening",
+   "resolved_as": "S04E13"
+  },
+  {
+   "series": "The Fresh Prince of Bel-Air",
+   "series_resolution": true,
+   "tmdb_series_id": 1892,
+   "tmdb_name": "The Fresh Prince of Bel-Air",
+   "first_air_date": "1990-09-10",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0098800"
+  },
+  {
+   "series": "Family Guy",
+   "season": 3,
+   "episode": 16,
+   "title": "A Very Special Family Guy Freakin' Christmas",
+   "tmdb_series_id": 1434,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "A Very Special Family Guy Freakin' Christmas",
+   "resolved_as": "S03E16"
+  },
+  {
+   "series": "Family Guy",
+   "season": 9,
+   "episode": 7,
+   "title": "Road to the North Pole",
+   "tmdb_series_id": 1434,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Road to the North Pole",
+   "resolved_as": "S09E07"
+  },
+  {
+   "series": "Family Guy",
+   "season": 11,
+   "episode": 8,
+   "title": "Jesus, Mary and Joseph!",
+   "tmdb_series_id": 1434,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Jesus, Mary and Joseph!",
+   "resolved_as": "S11E08"
+  },
+  {
+   "series": "Family Guy",
+   "season": 12,
+   "episode": 8,
+   "title": "Christmas Guy",
+   "tmdb_series_id": 1434,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Christmas Guy",
+   "resolved_as": "S12E08"
+  },
+  {
+   "series": "Family Guy",
+   "season": 15,
+   "episode": 9,
+   "title": "How the Griffin Stole Christmas",
+   "tmdb_series_id": 1434,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "How the Griffin Stole Christmas",
+   "resolved_as": "S15E09"
+  },
+  {
+   "series": "Family Guy",
+   "season": 16,
+   "episode": 9,
+   "title": "Don't Be a Dickens at Christmas",
+   "tmdb_series_id": 1434,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Don't Be a Dickens at Christmas",
+   "resolved_as": "S16E09"
+  },
+  {
+   "series": "Family Guy",
+   "season": 20,
+   "episode": 10,
+   "title": "Christmas Crime",
+   "tmdb_series_id": 1434,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Christmas Crime",
+   "resolved_as": "S20E10"
+  },
+  {
+   "series": "Family Guy",
+   "series_resolution": true,
+   "tmdb_series_id": 1434,
+   "tmdb_name": "Family Guy",
+   "first_air_date": "1999-01-31",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0182576"
+  },
+  {
+   "series": "How I Met Your Mother",
+   "season": 2,
+   "episode": 11,
+   "title": "How Lily Stole Christmas",
+   "tmdb_series_id": 1100,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "How Lily Stole Christmas",
+   "resolved_as": "S02E11"
+  },
+  {
+   "series": "How I Met Your Mother",
+   "season": 6,
+   "episode": 12,
+   "title": "False Positive",
+   "tmdb_series_id": 1100,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "False Positive",
+   "resolved_as": "S06E12"
+  },
+  {
+   "series": "How I Met Your Mother",
+   "season": 8,
+   "episode": 11,
+   "title": "The Final Page",
+   "tmdb_series_id": 1100,
+   "status": "variant",
+   "note": "TMDB title \"The Final Page (1)\"",
+   "tmdb_title": "The Final Page (1)",
+   "resolved_as": "S08E11"
+  },
+  {
+   "series": "How I Met Your Mother",
+   "season": 8,
+   "episode": 12,
+   "title": "The Final Page",
+   "tmdb_series_id": 1100,
+   "status": "variant",
+   "note": "TMDB title \"The Final Page (2)\"",
+   "tmdb_title": "The Final Page (2)",
+   "resolved_as": "S08E12"
+  },
+  {
+   "series": "How I Met Your Mother",
+   "series_resolution": true,
+   "tmdb_series_id": 1100,
+   "tmdb_name": "How I Met Your Mother",
+   "first_air_date": "2005-09-19",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0460649"
+  },
+  {
+   "series": "South Park",
+   "season": 1,
+   "episode": 9,
+   "title": "Mr. Hankey, the Christmas Poo",
+   "tmdb_series_id": 2190,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Mr. Hankey, the Christmas Poo",
+   "resolved_as": "S01E09"
+  },
+  {
+   "series": "South Park",
+   "season": 2,
+   "episode": 16,
+   "title": "Merry Christmas, Charlie Manson!",
+   "tmdb_series_id": 2190,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Merry Christmas Charlie Manson!",
+   "resolved_as": "S02E16"
+  },
+  {
+   "series": "South Park",
+   "season": 3,
+   "episode": 15,
+   "title": "Mr. Hankey's Christmas Classics",
+   "tmdb_series_id": 2190,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Mr. Hankey's Christmas Classics",
+   "resolved_as": "S03E15"
+  },
+  {
+   "series": "South Park",
+   "season": 4,
+   "episode": 17,
+   "title": "A Very Crappy Christmas",
+   "tmdb_series_id": 2190,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "A Very Crappy Christmas",
+   "resolved_as": "S04E17"
+  },
+  {
+   "series": "South Park",
+   "season": 6,
+   "episode": 17,
+   "title": "Red Sleigh Down",
+   "tmdb_series_id": 2190,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Red Sleigh Down",
+   "resolved_as": "S06E17"
+  },
+  {
+   "series": "South Park",
+   "season": 7,
+   "episode": 15,
+   "title": "It's Christmas in Canada",
+   "tmdb_series_id": 2190,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "It's Christmas in Canada",
+   "resolved_as": "S07E15"
+  },
+  {
+   "series": "South Park",
+   "season": 8,
+   "episode": 14,
+   "title": "Woodland Critter Christmas",
+   "tmdb_series_id": 2190,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Woodland Critter Christmas",
+   "resolved_as": "S08E14"
+  },
+  {
+   "series": "South Park",
+   "season": 23,
+   "episode": 10,
+   "title": "Christmas Snow",
+   "tmdb_series_id": 2190,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Christmas Snow",
+   "resolved_as": "S23E10"
+  },
+  {
+   "series": "South Park",
+   "series_resolution": true,
+   "tmdb_series_id": 2190,
+   "tmdb_name": "South Park",
+   "first_air_date": "1997-08-13",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0121955"
+  }
+ ],
+ "halloween-episodes": [
+  {
+   "series": "The Simpsons",
+   "season": 2,
+   "episode": 3,
+   "title": "Treehouse of Horror",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror",
+   "resolved_as": "S02E03"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 3,
+   "episode": 7,
+   "title": "Treehouse of Horror II",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror II",
+   "resolved_as": "S03E07"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 4,
+   "episode": 5,
+   "title": "Treehouse of Horror III",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror III",
+   "resolved_as": "S04E05"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 5,
+   "episode": 5,
+   "title": "Treehouse of Horror IV",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror IV",
+   "resolved_as": "S05E05"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 6,
+   "episode": 6,
+   "title": "Treehouse of Horror V",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror V",
+   "resolved_as": "S06E06"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 7,
+   "episode": 6,
+   "title": "Treehouse of Horror VI",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror VI",
+   "resolved_as": "S07E06"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 8,
+   "episode": 1,
+   "title": "Treehouse of Horror VII",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror VII",
+   "resolved_as": "S08E01"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 9,
+   "episode": 5,
+   "title": "Treehouse of Horror VIII",
+   "tmdb_series_id": 456,
+   "status": "remapped",
+   "note": "title found at S09E04 on TMDB",
+   "tmdb_title": "Treehouse of Horror VIII",
+   "resolved_as": "S09E04"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 10,
+   "episode": 4,
+   "title": "Treehouse of Horror IX",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror IX",
+   "resolved_as": "S10E04"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 11,
+   "episode": 4,
+   "title": "Treehouse of Horror X",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror X",
+   "resolved_as": "S11E04"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 12,
+   "episode": 1,
+   "title": "Treehouse of Horror XI",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XI",
+   "resolved_as": "S12E01"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 13,
+   "episode": 1,
+   "title": "Treehouse of Horror XII",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XII",
+   "resolved_as": "S13E01"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 14,
+   "episode": 1,
+   "title": "Treehouse of Horror XIII",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XIII",
+   "resolved_as": "S14E01"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 15,
+   "episode": 1,
+   "title": "Treehouse of Horror XIV",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XIV",
+   "resolved_as": "S15E01"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 16,
+   "episode": 1,
+   "title": "Treehouse of Horror XV",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XV",
+   "resolved_as": "S16E01"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 17,
+   "episode": 4,
+   "title": "Treehouse of Horror XVI",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XVI",
+   "resolved_as": "S17E04"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 18,
+   "episode": 4,
+   "title": "Treehouse of Horror XVII",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XVII",
+   "resolved_as": "S18E04"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 19,
+   "episode": 5,
+   "title": "Treehouse of Horror XVIII",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XVIII",
+   "resolved_as": "S19E05"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 20,
+   "episode": 4,
+   "title": "Treehouse of Horror XIX",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XIX",
+   "resolved_as": "S20E04"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 21,
+   "episode": 4,
+   "title": "Treehouse of Horror XX",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XX",
+   "resolved_as": "S21E04"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 22,
+   "episode": 4,
+   "title": "Treehouse of Horror XXI",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXI",
+   "resolved_as": "S22E04"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 23,
+   "episode": 3,
+   "title": "Treehouse of Horror XXII",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXII",
+   "resolved_as": "S23E03"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 24,
+   "episode": 2,
+   "title": "Treehouse of Horror XXIII",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXIII",
+   "resolved_as": "S24E02"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 25,
+   "episode": 2,
+   "title": "Treehouse of Horror XXIV",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXIV",
+   "resolved_as": "S25E02"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 26,
+   "episode": 4,
+   "title": "Treehouse of Horror XXV",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXV",
+   "resolved_as": "S26E04"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 27,
+   "episode": 5,
+   "title": "Treehouse of Horror XXVI",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXVI",
+   "resolved_as": "S27E05"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 27,
+   "episode": 4,
+   "title": "Halloween of Horror",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Halloween of Horror",
+   "resolved_as": "S27E04"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 28,
+   "episode": 4,
+   "title": "Treehouse of Horror XXVII",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXVII",
+   "resolved_as": "S28E04"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 29,
+   "episode": 4,
+   "title": "Treehouse of Horror XXVIII",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXVIII",
+   "resolved_as": "S29E04"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 30,
+   "episode": 4,
+   "title": "Treehouse of Horror XXIX",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXIX",
+   "resolved_as": "S30E04"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 31,
+   "episode": 4,
+   "title": "Treehouse of Horror XXX",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXX",
+   "resolved_as": "S31E04"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 32,
+   "episode": 4,
+   "title": "Treehouse of Horror XXXI",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXXI",
+   "resolved_as": "S32E04"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 33,
+   "episode": 3,
+   "title": "Treehouse of Horror XXXII",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXXII",
+   "resolved_as": "S33E03"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 34,
+   "episode": 5,
+   "title": "Treehouse of Horror Presents: Not It",
+   "tmdb_series_id": 456,
+   "status": "variant",
+   "note": "TMDB title \"Not It\" (one title adds a prefix; please confirm)",
+   "tmdb_title": "Not It",
+   "resolved_as": "S34E05"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 34,
+   "episode": 6,
+   "title": "Treehouse of Horror XXXIII",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXXIII",
+   "resolved_as": "S34E06"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 35,
+   "episode": 5,
+   "title": "Treehouse of Horror XXXIV",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXXIV",
+   "resolved_as": "S35E05"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 36,
+   "episode": 5,
+   "title": "Treehouse of Horror XXXV",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXXV",
+   "resolved_as": "S36E05"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 36,
+   "episode": 7,
+   "title": "Treehouse of Horror Presents: Simpsons Wicked This Way Comes",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror Presents: Simpsons Wicked This Way Comes",
+   "resolved_as": "S36E07"
+  },
+  {
+   "series": "The Simpsons",
+   "season": 37,
+   "episode": 3,
+   "title": "Treehouse of Horror XXXVI",
+   "tmdb_series_id": 456,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Treehouse of Horror XXXVI",
+   "resolved_as": "S37E03"
+  },
+  {
+   "series": "The Simpsons",
+   "series_resolution": true,
+   "tmdb_series_id": 456,
+   "tmdb_name": "The Simpsons",
+   "first_air_date": "1989-12-17",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0096697"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 3,
+   "episode": 2,
+   "title": "Full Bars",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Full Bars",
+   "resolved_as": "S03E02"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 4,
+   "episode": 2,
+   "title": "Fort Night",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Fort Night",
+   "resolved_as": "S04E02"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 5,
+   "episode": 2,
+   "title": "Tina and the Real Ghost",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Tina and the Real Ghost",
+   "resolved_as": "S05E02"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 6,
+   "episode": 3,
+   "title": "The Hauntening",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Hauntening",
+   "resolved_as": "S06E03"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 7,
+   "episode": 3,
+   "title": "Teen-a-Witch",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Teen-A-Witch",
+   "resolved_as": "S07E03"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 8,
+   "episode": 3,
+   "title": "The Wolf of Wharf Street",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Wolf of Wharf Street",
+   "resolved_as": "S08E03"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 9,
+   "episode": 4,
+   "title": "Nightmare on Ocean Avenue Street",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Nightmare on Ocean Avenue Street",
+   "resolved_as": "S09E04"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 10,
+   "episode": 4,
+   "title": "Pig Trouble in Little Tina",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Pig Trouble in Little Tina",
+   "resolved_as": "S10E04"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 11,
+   "episode": 4,
+   "title": "Heartbreak Hotel-oween",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Heartbreak Hotel-oween",
+   "resolved_as": "S11E04"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 12,
+   "episode": 3,
+   "title": "The Pumpkinening",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Pumpkinening",
+   "resolved_as": "S12E03"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 13,
+   "episode": 6,
+   "title": "Apple Gore-chard! (But Not Gory)",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Apple Gore-chard! (But Not Gory)",
+   "resolved_as": "S13E06"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 15,
+   "episode": 4,
+   "title": "For Whom the Doll Toes",
+   "tmdb_series_id": 32726,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "For Whom the Doll Toes",
+   "resolved_as": "S15E04"
+  },
+  {
+   "series": "Bob's Burgers",
+   "season": 16,
+   "episode": 3,
+   "title": "The Twinnening",
+   "tmdb_series_id": 32726,
+   "status": "variant",
+   "note": "TMDB title \"The Twinnening [Halloween]\" (tags, \"the\" or \"part\" differ)",
+   "tmdb_title": "The Twinnening [Halloween]",
+   "resolved_as": "S16E03"
+  },
+  {
+   "series": "Bob's Burgers",
+   "series_resolution": true,
+   "tmdb_series_id": 32726,
+   "tmdb_name": "Bob's Burgers",
+   "first_air_date": "2011-01-09",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt1561755"
+  },
+  {
+   "series": "Modern Family",
+   "season": 2,
+   "episode": 6,
+   "title": "Halloween",
+   "tmdb_series_id": 1421,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Halloween",
+   "resolved_as": "S02E06"
+  },
+  {
+   "series": "Modern Family",
+   "season": 4,
+   "episode": 5,
+   "title": "Open House of Horrors",
+   "tmdb_series_id": 1421,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Open House of Horrors",
+   "resolved_as": "S04E05"
+  },
+  {
+   "series": "Modern Family",
+   "season": 6,
+   "episode": 6,
+   "title": "Halloween 3: AwesomeLand",
+   "tmdb_series_id": 1421,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Halloween 3: AwesomeLand",
+   "resolved_as": "S06E06"
+  },
+  {
+   "series": "Modern Family",
+   "season": 8,
+   "episode": 5,
+   "title": "Halloween 4: The Revenge of Rod Skyhook",
+   "tmdb_series_id": 1421,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Halloween 4: The Revenge of Rod Skyhook",
+   "resolved_as": "S08E05"
+  },
+  {
+   "series": "Modern Family",
+   "season": 9,
+   "episode": 5,
+   "title": "It's the Great Pumpkin, Phil Dunphy",
+   "tmdb_series_id": 1421,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "It's the Great Pumpkin, Phil Dunphy",
+   "resolved_as": "S09E05"
+  },
+  {
+   "series": "Modern Family",
+   "season": 10,
+   "episode": 5,
+   "title": "Good Grief",
+   "tmdb_series_id": 1421,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Good Grief",
+   "resolved_as": "S10E05"
+  },
+  {
+   "series": "Modern Family",
+   "season": 11,
+   "episode": 5,
+   "title": "The Last Halloween",
+   "tmdb_series_id": 1421,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Last Halloween",
+   "resolved_as": "S11E05"
+  },
+  {
+   "series": "Modern Family",
+   "series_resolution": true,
+   "tmdb_series_id": 1421,
+   "tmdb_name": "Modern Family",
+   "first_air_date": "2009-09-23",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt1442437"
+  },
+  {
+   "series": "Brooklyn Nine-Nine",
+   "season": 1,
+   "episode": 6,
+   "title": "Halloween",
+   "tmdb_series_id": 48891,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Halloween",
+   "resolved_as": "S01E06"
+  },
+  {
+   "series": "Brooklyn Nine-Nine",
+   "season": 2,
+   "episode": 4,
+   "title": "Halloween II",
+   "tmdb_series_id": 48891,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Halloween II",
+   "resolved_as": "S02E04"
+  },
+  {
+   "series": "Brooklyn Nine-Nine",
+   "season": 3,
+   "episode": 5,
+   "title": "Halloween, Part III",
+   "tmdb_series_id": 48891,
+   "status": "variant",
+   "note": "TMDB title \"Halloween III\" (tags, \"the\" or \"part\" differ)",
+   "tmdb_title": "Halloween III",
+   "resolved_as": "S03E05"
+  },
+  {
+   "series": "Brooklyn Nine-Nine",
+   "season": 4,
+   "episode": 5,
+   "title": "Halloween IV",
+   "tmdb_series_id": 48891,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Halloween IV",
+   "resolved_as": "S04E05"
+  },
+  {
+   "series": "Brooklyn Nine-Nine",
+   "season": 5,
+   "episode": 4,
+   "title": "HalloVeen",
+   "tmdb_series_id": 48891,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "HalloVeen",
+   "resolved_as": "S05E04"
+  },
+  {
+   "series": "Brooklyn Nine-Nine",
+   "series_resolution": true,
+   "tmdb_series_id": 48891,
+   "tmdb_name": "Brooklyn Nine-Nine",
+   "first_air_date": "2013-09-17",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt2467372"
+  },
+  {
+   "series": "The Office (US)",
+   "season": 2,
+   "episode": 5,
+   "title": "Halloween",
+   "tmdb_series_id": 2316,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Halloween",
+   "resolved_as": "S02E05"
+  },
+  {
+   "series": "The Office (US)",
+   "season": 7,
+   "episode": 6,
+   "title": "Costume Contest",
+   "tmdb_series_id": 2316,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Costume Contest",
+   "resolved_as": "S07E06"
+  },
+  {
+   "series": "The Office (US)",
+   "season": 8,
+   "episode": 5,
+   "title": "Spooked",
+   "tmdb_series_id": 2316,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Spooked",
+   "resolved_as": "S08E05"
+  },
+  {
+   "series": "The Office (US)",
+   "season": 9,
+   "episode": 5,
+   "title": "Here Comes Treble",
+   "tmdb_series_id": 2316,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Here Comes Treble",
+   "resolved_as": "S09E05"
+  },
+  {
+   "series": "The Office (US)",
+   "series_resolution": true,
+   "tmdb_series_id": 2316,
+   "tmdb_name": "The Office",
+   "first_air_date": "2005-03-24",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0386676"
+  },
+  {
+   "series": "Community",
+   "season": 2,
+   "episode": 6,
+   "title": "Epidemiology",
+   "tmdb_series_id": 18347,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Epidemiology",
+   "resolved_as": "S02E06"
+  },
+  {
+   "series": "Community",
+   "season": 3,
+   "episode": 5,
+   "title": "Horror Fiction in Seven Spooky Steps",
+   "tmdb_series_id": 18347,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Horror Fiction in Seven Spooky Steps",
+   "resolved_as": "S03E05"
+  },
+  {
+   "series": "Community",
+   "season": 4,
+   "episode": 2,
+   "title": "Paranormal Parentage",
+   "tmdb_series_id": 18347,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Paranormal Parentage",
+   "resolved_as": "S04E02"
+  },
+  {
+   "series": "Community",
+   "series_resolution": true,
+   "tmdb_series_id": 18347,
+   "tmdb_name": "Community",
+   "first_air_date": "2009-09-17",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt1439629"
+  },
+  {
+   "series": "Parks and Recreation",
+   "season": 2,
+   "episode": 7,
+   "title": "Greg Pikitis",
+   "tmdb_series_id": 8592,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Greg Pikitis",
+   "resolved_as": "S02E07"
+  },
+  {
+   "series": "Parks and Recreation",
+   "season": 4,
+   "episode": 5,
+   "title": "Meet n Greet",
+   "tmdb_series_id": 8592,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Meet 'n' Greet",
+   "resolved_as": "S04E05"
+  },
+  {
+   "series": "Parks and Recreation",
+   "season": 5,
+   "episode": 5,
+   "title": "Halloween Surprise",
+   "tmdb_series_id": 8592,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Halloween Surprise",
+   "resolved_as": "S05E05"
+  },
+  {
+   "series": "Parks and Recreation",
+   "series_resolution": true,
+   "tmdb_series_id": 8592,
+   "tmdb_name": "Parks and Recreation",
+   "first_air_date": "2009-04-09",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt1266020"
+  },
+  {
+   "series": "How I Met Your Mother",
+   "season": 1,
+   "episode": 6,
+   "title": "Slutty Pumpkin",
+   "tmdb_series_id": 1100,
+   "status": "variant",
+   "note": "TMDB title \"The Slutty Pumpkin\" (tags, \"the\" or \"part\" differ)",
+   "tmdb_title": "The Slutty Pumpkin",
+   "resolved_as": "S01E06"
+  },
+  {
+   "series": "How I Met Your Mother",
+   "season": 6,
+   "episode": 7,
+   "title": "Canning Randy",
+   "tmdb_series_id": 1100,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Canning Randy",
+   "resolved_as": "S06E07"
+  },
+  {
+   "series": "How I Met Your Mother",
+   "season": 7,
+   "episode": 8,
+   "title": "The Slutty Pumpkin Returns",
+   "tmdb_series_id": 1100,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Slutty Pumpkin Returns",
+   "resolved_as": "S07E08"
+  },
+  {
+   "series": "How I Met Your Mother",
+   "series_resolution": true,
+   "tmdb_series_id": 1100,
+   "tmdb_name": "How I Met Your Mother",
+   "first_air_date": "2005-09-19",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0460649"
+  },
+  {
+   "series": "Friends",
+   "season": 8,
+   "episode": 6,
+   "title": "The One with the Halloween Party",
+   "tmdb_series_id": 1668,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The One with the Halloween Party",
+   "resolved_as": "S08E06"
+  },
+  {
+   "series": "Friends",
+   "series_resolution": true,
+   "tmdb_series_id": 1668,
+   "tmdb_name": "Friends",
+   "first_air_date": "1994-09-22",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0108778"
+  },
+  {
+   "series": "The Big Bang Theory",
+   "season": 1,
+   "episode": 6,
+   "title": "The Middle-Earth Paradigm",
+   "tmdb_series_id": 1418,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Middle-Earth Paradigm",
+   "resolved_as": "S01E06"
+  },
+  {
+   "series": "The Big Bang Theory",
+   "season": 5,
+   "episode": 7,
+   "title": "The Good Guy Fluctuation",
+   "tmdb_series_id": 1418,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Good Guy Fluctuation",
+   "resolved_as": "S05E07"
+  },
+  {
+   "series": "The Big Bang Theory",
+   "season": 6,
+   "episode": 5,
+   "title": "The Holographic Excitation",
+   "tmdb_series_id": 1418,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Holographic Excitation",
+   "resolved_as": "S06E05"
+  },
+  {
+   "series": "The Big Bang Theory",
+   "season": 12,
+   "episode": 6,
+   "title": "The Imitation Perturbation",
+   "tmdb_series_id": 1418,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Imitation Perturbation",
+   "resolved_as": "S12E06"
+  },
+  {
+   "series": "The Big Bang Theory",
+   "series_resolution": true,
+   "tmdb_series_id": 1418,
+   "tmdb_name": "The Big Bang Theory",
+   "first_air_date": "2007-09-24",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0898266"
+  },
+  {
+   "series": "New Girl",
+   "season": 2,
+   "episode": 6,
+   "title": "Halloween",
+   "tmdb_series_id": 1420,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Halloween",
+   "resolved_as": "S02E06"
+  },
+  {
+   "series": "New Girl",
+   "season": 3,
+   "episode": 6,
+   "title": "Keaton",
+   "tmdb_series_id": 1420,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Keaton",
+   "resolved_as": "S03E06"
+  },
+  {
+   "series": "New Girl",
+   "series_resolution": true,
+   "tmdb_series_id": 1420,
+   "tmdb_name": "New Girl",
+   "first_air_date": "2011-09-20",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt1826940"
+  },
+  {
+   "series": "Superstore",
+   "season": 2,
+   "episode": 6,
+   "title": "Halloween Theft",
+   "tmdb_series_id": 62649,
+   "status": "remapped",
+   "note": "title found at S02E07 on TMDB",
+   "tmdb_title": "Halloween Theft",
+   "resolved_as": "S02E07"
+  },
+  {
+   "series": "Superstore",
+   "season": 3,
+   "episode": 5,
+   "title": "Sal's Dead",
+   "tmdb_series_id": 62649,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Sal's Dead",
+   "resolved_as": "S03E05"
+  },
+  {
+   "series": "Superstore",
+   "season": 4,
+   "episode": 4,
+   "title": "Costume Competition",
+   "tmdb_series_id": 62649,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Costume Competition",
+   "resolved_as": "S04E04"
+  },
+  {
+   "series": "Superstore",
+   "season": 5,
+   "episode": 6,
+   "title": "Trick-or-Treat",
+   "tmdb_series_id": 62649,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Trick-or-Treat",
+   "resolved_as": "S05E06"
+  },
+  {
+   "series": "Superstore",
+   "series_resolution": true,
+   "tmdb_series_id": 62649,
+   "tmdb_name": "Superstore",
+   "first_air_date": "2015-11-30",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt4477976"
+  },
+  {
+   "series": "Abbott Elementary",
+   "season": 2,
+   "episode": 6,
+   "title": "Candy Zombies",
+   "tmdb_series_id": 125935,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Candy Zombies",
+   "resolved_as": "S02E06"
+  },
+  {
+   "series": "Abbott Elementary",
+   "season": 4,
+   "episode": 4,
+   "title": "Costume Contest",
+   "tmdb_series_id": 125935,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Costume Contest",
+   "resolved_as": "S04E04"
+  },
+  {
+   "series": "Abbott Elementary",
+   "series_resolution": true,
+   "tmdb_series_id": 125935,
+   "tmdb_name": "Abbott Elementary",
+   "first_air_date": "2021-12-07",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt14218830"
+  },
+  {
+   "series": "South Park",
+   "season": 1,
+   "episode": 7,
+   "title": "Pinkeye",
+   "tmdb_series_id": 2190,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Pinkeye",
+   "resolved_as": "S01E07"
+  },
+  {
+   "series": "South Park",
+   "season": 2,
+   "episode": 15,
+   "title": "Spooky Fish",
+   "tmdb_series_id": 2190,
+   "status": "variant",
+   "note": "TMDB title \"Spookyfish\"",
+   "tmdb_title": "Spookyfish",
+   "resolved_as": "S02E15"
+  },
+  {
+   "series": "South Park",
+   "season": 3,
+   "episode": 10,
+   "title": "Korn's Groovy Pirate Ghost Mystery",
+   "tmdb_series_id": 2190,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Korn's Groovy Pirate Ghost Mystery",
+   "resolved_as": "S03E10"
+  },
+  {
+   "series": "South Park",
+   "season": 10,
+   "episode": 11,
+   "title": "Hell on Earth 2006",
+   "tmdb_series_id": 2190,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Hell on Earth 2006",
+   "resolved_as": "S10E11"
+  },
+  {
+   "series": "South Park",
+   "season": 21,
+   "episode": 6,
+   "title": "Sons a Witches",
+   "tmdb_series_id": 2190,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Sons a Witches",
+   "resolved_as": "S21E06"
+  },
+  {
+   "series": "South Park",
+   "season": 22,
+   "episode": 5,
+   "title": "The Scoots",
+   "tmdb_series_id": 2190,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "The Scoots",
+   "resolved_as": "S22E05"
+  },
+  {
+   "series": "South Park",
+   "season": 23,
+   "episode": 5,
+   "title": "Tegridy Farms Halloween Special",
+   "tmdb_series_id": 2190,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Tegridy Farms Halloween Special",
+   "resolved_as": "S23E05"
+  },
+  {
+   "series": "South Park",
+   "series_resolution": true,
+   "tmdb_series_id": 2190,
+   "tmdb_name": "South Park",
+   "first_air_date": "1997-08-13",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0121955"
+  },
+  {
+   "series": "Family Guy",
+   "season": 9,
+   "episode": 4,
+   "title": "Halloween on Spooner Street",
+   "tmdb_series_id": 1434,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Halloween on Spooner Street",
+   "resolved_as": "S09E04"
+  },
+  {
+   "series": "Family Guy",
+   "season": 11,
+   "episode": 2,
+   "title": "Ratings Guy",
+   "tmdb_series_id": 1434,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Ratings Guy",
+   "resolved_as": "S11E02"
+  },
+  {
+   "series": "Family Guy",
+   "season": 14,
+   "episode": 4,
+   "title": "Peternormal Activity",
+   "tmdb_series_id": 1434,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Peternormal Activity",
+   "resolved_as": "S14E04"
+  },
+  {
+   "series": "Family Guy",
+   "season": 20,
+   "episode": 3,
+   "title": "Must Love Dogs",
+   "tmdb_series_id": 1434,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Must Love Dogs",
+   "resolved_as": "S20E03"
+  },
+  {
+   "series": "Family Guy",
+   "season": 21,
+   "episode": 6,
+   "title": "Happy Holo-ween",
+   "tmdb_series_id": 1434,
+   "status": "matched",
+   "note": null,
+   "tmdb_title": "Happy Holo-ween",
+   "resolved_as": "S21E06"
+  },
+  {
+   "series": "Family Guy",
+   "series_resolution": true,
+   "tmdb_series_id": 1434,
+   "tmdb_name": "Family Guy",
+   "first_air_date": "1999-01-31",
+   "origin_country": [
+    "US"
+   ],
+   "imdb_id": "tt0182576"
+  }
+ ]
+}

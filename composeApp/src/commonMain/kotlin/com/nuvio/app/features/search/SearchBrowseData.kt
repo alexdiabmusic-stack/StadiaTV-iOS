@@ -31,22 +31,6 @@ internal data class BrowseSpec(
     val tv: Boolean = false,
 )
 
-/** The four collections on the Search home. Each opens its own curated page (see [COLLECTION_DEFS]); Movie Universes opens the list of franchises. */
-internal enum class SearchCollection(
-    val title: String,
-    /** The collection page it opens, or null for the franchise list. */
-    val defId: String?,
-    /** The title whose artwork is the card's cover: chosen by hand, so the cover always suits the collection. */
-    val coverTitle: String,
-    val coverYear: Int,
-    val coverIsSeries: Boolean = false,
-) {
-    Under90("90 Minutes or Less", "under90", "Toy Story", 1995),
-    HiddenGems("Hidden Gems", "gems", "Moon", 2009),
-    OneNightBinges("One-Night Binges", "binges", "Chernobyl", 2019, coverIsSeries = true),
-    MovieUniverses("Movie Universes", null, "Avengers: Endgame", 2019),
-}
-
 internal class SearchGenre(val name: String, val movieId: Int?, val tvId: Int?)
 
 internal val SEARCH_GENRES = listOf(
@@ -69,6 +53,9 @@ internal val SEARCH_GENRES = listOf(
     SearchGenre("War", 10752, 10768),
     SearchGenre("Western", 37, 37),
 )
+
+/** Explicit films TMDB doesn't mark as adult, kept out of the browse lists (9 Songs topped the Music genre). */
+private val EXPLICIT_MOVIE_IDS = setOf(27)
 
 internal val SEARCH_DECADES = listOf(2020, 2010, 2000, 1990, 1980, 1970, 1960, 1950)
 
@@ -151,6 +138,7 @@ internal object SearchBrowseData {
             val second = if (limit > 20) runCatching { results(spec.endpoint, filters + ("page" to "2")) }.getOrDefault(emptyList()) else emptyList()
             (first + second)
                 .filterNot { it["adult"]?.toString() == "true" }
+                .filterNot { !spec.tv && (it["id"] as? JsonPrimitive)?.intOrNull in EXPLICIT_MOVIE_IDS }
                 .mapNotNull { it.toPreview(spec.tv) }.distinctBy { it.id }
                 // A franchise fills a list with its sequels; one entry per title family keeps the picks varied.
                 .distinctBy { it.name.substringBefore(":").replace(Regex("""[\\s]+(Part\\s+)?[IVX0-9]+$"""), "").trim().lowercase() }
@@ -207,10 +195,6 @@ internal object SearchBrowseData {
         // A failed lookup (no network) is asked again next time; only a real answer is kept.
         if (found != null) lock.withLock { films[key] = found }
         return found
-    }
-
-    suspend fun films(entries: List<FranchiseFilm>): List<MetaPreview> = coroutineScope {
-        entries.map { async { film(it.title, it.year) } }.awaitAll().filterNotNull().distinctBy { it.id }
     }
 
     suspend fun popularActors(): List<PersonHit> = peopleByName("actors", ACTOR_NAMES, "Acting")

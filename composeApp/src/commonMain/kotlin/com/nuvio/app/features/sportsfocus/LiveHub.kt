@@ -58,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -348,7 +349,7 @@ private fun LiveGuideScreen(segment: LiveSegment, onSelect: (LiveSegment) -> Uni
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Black,
                             color = Color.White,
-                            modifier = Modifier.align(Alignment.BottomStart).offset(x = nowX - 16.dp)
+                            modifier = Modifier.align(Alignment.BottomStart).offset(x = (nowX - 16.dp).coerceAtLeast(0.dp))
                                 .clip(RoundedCornerShape(50)).background(com.nuvio.app.features.sports.ui.SportsLiveRed)
                                 .padding(horizontal = 6.dp, vertical = 1.dp),
                         )

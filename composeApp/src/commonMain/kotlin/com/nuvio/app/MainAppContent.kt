@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -1281,6 +1282,39 @@ internal fun MainAppContent(
             }
         }
 
+        // Explore's episode collections play an exact episode through the same playback path as every other screen.
+        SideEffect {
+            com.nuvio.app.features.explore.ExploreEpisodeActions.play = { ep ->
+                launchPlaybackWithDownloadPreference(
+                    type = "series",
+                    videoId = "${ep.seriesAppId}:${ep.season}:${ep.episode}",
+                    parentMetaId = ep.seriesAppId,
+                    parentMetaType = "series",
+                    title = ep.seriesName,
+                    logo = null,
+                    poster = ep.seriesPosterUrl(),
+                    background = ep.backdropUrl(),
+                    seasonNumber = ep.season,
+                    episodeNumber = ep.episode,
+                    episodeTitle = ep.title,
+                    episodeThumbnail = ep.artwork(),
+                    pauseDescription = null,
+                    resumePositionMs = null,
+                    resumeProgressFraction = null,
+                    manualSelection = false,
+                    startFromBeginning = false,
+                )
+            }
+            com.nuvio.app.features.explore.ExploreEpisodeActions.openDetails = { ep ->
+                navController.navigate(
+                    DetailRoute(
+                        type = "series", id = ep.seriesAppId, title = ep.seriesName,
+                        initialSeasonNumber = ep.season, initialEpisodeNumber = ep.episode,
+                    ),
+                )
+            }
+        }
+
         fun openPartyMedia(media: PartyMedia) {
             if (navController.currentRoute is PlayerRoute) navController.popBackStack()
             val resumePositionMs = PartyRepository.playback.value
@@ -1875,6 +1909,8 @@ internal fun MainAppContent(
                                 onDownloadsClick = { navController.navigate(DownloadsRoute(downloadsTitle)) },
                                 onContinueWatchingClick = onContinueWatchingClick,
                                 onContinueWatchingLongPress = onContinueWatchingLongPress,
+                                onExploreCollectionClick = { id -> navController.navigate(ExploreCollectionRoute(id)) },
+                                onExploreBrowseClick = { navController.navigate(ExploreBrowserRoute()) },
                                 onLiveTvChannelClick = onLiveTvChannelClick,
                                 onLiveTvVodClick = onLiveTvVodClick,
                                 onSwitchProfile = onSwitchProfile,
@@ -2135,6 +2171,29 @@ internal fun MainAppContent(
                 entry<SportsLeagueRoute> { route ->
                     val onBack = rememberGuardedPopBackStack(navController, route)
                     SportsLeagueScreen(leagueId = route.leagueId, onBack = onBack, actions = sportsActions, modifier = Modifier.fillMaxSize())
+                }
+                entry<ExploreCollectionRoute> { route ->
+                    val onBack = rememberGuardedPopBackStack(navController, route)
+                    OpaqueAppSurfaces {
+                        com.nuvio.app.features.explore.ExploreCollectionScreen(
+                            collectionId = route.collectionId,
+                            onCollectionClick = { navController.navigate(ExploreCollectionRoute(it.id)) },
+                            onPosterClick = navController::openPreview,
+                            onPosterLongClick = { meta -> openPosterActions(PosterActionTarget(preview = meta)) },
+                            onBack = onBack,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+                entry<ExploreBrowserRoute> { route ->
+                    val onBack = rememberGuardedPopBackStack(navController, route)
+                    OpaqueAppSurfaces {
+                        com.nuvio.app.features.explore.ExploreBrowserScreen(
+                            onCollectionClick = { navController.navigate(ExploreCollectionRoute(it.id)) },
+                            onBack = onBack,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
                 entry<PodcastsRoute> { route ->
                     val onBack = rememberGuardedPopBackStack(navController, route)
@@ -2727,7 +2786,7 @@ internal fun MainAppContent(
 
 private fun AppRoute?.drawsUnderVerticalBar(selectedTab: AppScreenTab): Boolean =
     when (this) {
-        is DetailRoute, is StreamRoute, is PlayerRoute -> true
+        is DetailRoute, is StreamRoute, is PlayerRoute, is ExploreCollectionRoute -> true
         is TabsRoute -> selectedTab == AppScreenTab.Home || selectedTab == AppScreenTab.Library
         else -> false
     }

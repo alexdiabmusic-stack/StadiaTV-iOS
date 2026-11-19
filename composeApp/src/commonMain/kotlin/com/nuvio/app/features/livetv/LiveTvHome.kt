@@ -177,6 +177,13 @@ private fun LiveTvHero(
     val current = programs.currentProgram(nowMillis)
     val next = programs.nextProgram(nowMillis)
     val shape = RoundedCornerShape(22.dp)
+    // Short screens (iPhone Duo cover screen, small iPhones): the card is about 40% of the screen at full size, so it
+    // tightens up to leave room for the rows underneath.
+    val compact = with(androidx.compose.ui.platform.LocalDensity.current) {
+        androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.height.toDp() < 720.dp
+    }
+    val pad = if (compact) 14.dp else 20.dp
+    val gap = if (compact) 10.dp else 18.dp
     Box(
         modifier
             .fillMaxWidth()
@@ -199,7 +206,7 @@ private fun LiveTvHero(
                 Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.15f), 0.55f to Color.Black.copy(alpha = 0.55f), 1f to Color.Black.copy(alpha = 0.85f)),
             ),
         )
-        Column(Modifier.fillMaxWidth().padding(20.dp)) {
+        Column(Modifier.fillMaxWidth().padding(pad)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     if (isResume) "CONTINUE WATCHING" else "ON NOW",
@@ -211,9 +218,13 @@ private fun LiveTvHero(
                 )
                 LiveTvLivePulse()
             }
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(gap))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                LiveTvLogoPlate(channel, Modifier.size(width = 104.dp, height = 64.dp), radius = 14.dp, glass = true, logoFraction = 0.72f)
+                LiveTvLogoPlate(
+                    channel,
+                    if (compact) Modifier.size(width = 84.dp, height = 52.dp) else Modifier.size(width = 104.dp, height = 64.dp),
+                    radius = 14.dp, glass = true, logoFraction = 0.72f,
+                )
                 if (current != null) Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
@@ -232,7 +243,7 @@ private fun LiveTvHero(
                     }
                 }
             }
-            Spacer(Modifier.height(18.dp))
+            Spacer(Modifier.height(gap))
             if (current != null) {
                 val (title, flag) = liveTvProgramTitle(current.title)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -295,7 +306,7 @@ private fun LiveTvHero(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(if (compact) 12.dp else 20.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Row(
                     Modifier.height(44.dp).clip(RoundedCornerShape(50)).background(Color.White).clickable(onClick = onWatch).padding(horizontal = 24.dp),

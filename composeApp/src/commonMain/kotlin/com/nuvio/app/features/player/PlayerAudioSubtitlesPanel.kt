@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -198,6 +199,9 @@ internal fun PlayerAudioSubtitlesPanel(
     }
     val hasAudioAdjustments = showAudioDelay || showAudioAmplification || showCenterMix
 
+    // Half-open: the panel already sits below the fold, so no status-bar inset and less top padding; it gets the whole
+    // bottom half.
+    val halfOpen = com.nuvio.app.core.ui.LocalFold.current != null
     AnimatedVisibility(visible = visible, enter = fadeIn(tween(220)), exit = fadeOut(tween(180))) {
         Box(
             Modifier
@@ -205,7 +209,10 @@ internal fun PlayerAudioSubtitlesPanel(
                 .background(Color.Black.copy(alpha = 0.95f))
                 // Taps on the empty dark area don't fall through to the player underneath.
                 .pointerInput(Unit) { detectTapGestures { } }
-                .windowInsetsPadding(WindowInsets.safeDrawing),
+                .windowInsetsPadding(
+                    if (halfOpen) WindowInsets.safeDrawing.only(androidx.compose.foundation.layout.WindowInsetsSides.Horizontal + androidx.compose.foundation.layout.WindowInsetsSides.Bottom)
+                    else WindowInsets.safeDrawing,
+                ),
         ) {
             AnimatedContent(
                 targetState = page,
@@ -214,7 +221,7 @@ internal fun PlayerAudioSubtitlesPanel(
                 modifier = Modifier.fillMaxSize(),
             ) { current ->
                 when (current) {
-                    AudioSubtitlesPage.Main -> BoxWithConstraints(Modifier.fillMaxSize().padding(top = 56.dp, start = 24.dp, end = 24.dp)) {
+                    AudioSubtitlesPage.Main -> BoxWithConstraints(Modifier.fillMaxSize().padding(top = if (halfOpen) 44.dp else 56.dp, start = 24.dp, end = 24.dp)) {
                         val sideBySide = maxWidth >= 520.dp && showSubtitles
                         val audio: LazyListScope.() -> Unit = {
                             audioColumn(audioTracks, selectedAudioIndex, onAudioTrackSelected, hasAudioAdjustments, withHeading = !sideBySide, showDetails = subtitleStyle.showAudioTrackDetails) {

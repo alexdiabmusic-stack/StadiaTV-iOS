@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nuvio.app.core.ui.NuvioStatusModal
 import com.nuvio.app.features.details.MetaDetailsRepository
+import com.nuvio.app.core.ui.LocalCameraBand
 import com.nuvio.app.core.ui.LocalFold
 import com.nuvio.app.features.p2p.P2pStreamingState
 import com.nuvio.app.features.party.PartyRepository
@@ -162,7 +163,16 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi(
     }
     val isInPip = rememberIsInPictureInPicture()
     val fold = LocalFold.current?.takeIf { !isInPip }
-    val videoModifier = if (fold != null) Modifier.fillMaxWidth().height(fold.top) else Modifier.fillMaxSize()
+    // iPhone Duo sideways, Fit: the picture goes beside the camera band (that space is almost exactly 16:9), so
+    // nothing is cropped and the camera never sits on it. Fill and Zoom still use the whole screen.
+    val cameraBand = LocalCameraBand.current?.takeIf {
+        fold == null && !isInPip && (partyPanelInset > 0.dp || resizeMode == PlayerResizeMode.Fit)
+    }
+    val videoModifier = when {
+        fold != null -> Modifier.fillMaxWidth().height(fold.top)
+        cameraBand != null -> Modifier.fillMaxSize().padding(top = cameraBand.top, bottom = cameraBand.bottom)
+        else -> Modifier.fillMaxSize()
+    }
     val panelModifier = if (fold != null) Modifier.fillMaxSize().padding(top = fold.bottom) else Modifier.fillMaxSize()
     val playbackGesturesEnabled = initialLoadCompleted && errorMessage == null
 

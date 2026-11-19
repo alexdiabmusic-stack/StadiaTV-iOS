@@ -1,6 +1,10 @@
 package com.nuvio.app.features.home.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,8 +37,8 @@ import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.stableKey
 
 /**
- * Netflix-style "Top 10 Today": each poster sits beside a huge outlined rank number, with the number
- * tucked slightly behind the poster's left edge.
+ * Netflix-style "Top 10 Today": films and series in one ranking (see HomeTrendingState.top10), each poster beside a
+ * huge outlined rank number tucked slightly behind its left edge, with a small FILM or SERIES tag on the poster.
  */
 @Composable
 fun HomeTop10Row(
@@ -76,14 +80,15 @@ private fun Top10Card(
     onLongClick: (() -> Unit)?,
 ) {
     val tokens = MaterialTheme.nuvio
-    val fontSize = (posterHeight.value * 0.74f).sp
-    // The number is allowed to slide under the poster by about a fifth of its width.
+    val fontSize = (posterHeight.value * 0.8f).sp
+    // The number slides under the poster by about a fifth of its width; "10" is drawn tighter so it isn't wider
+    // than the poster beside it.
     val digits = rank.toString().length
     val overlap = (fontSize.value * 0.56f * digits * 0.2f).dp
     val base = TextStyle(
-        fontSize = fontSize,
+        fontSize = if (digits > 1) fontSize * 0.92f else fontSize,
         fontWeight = FontWeight.Black,
-        letterSpacing = (-0.06).em,
+        letterSpacing = if (digits > 1) (-0.12).em else (-0.06).em,
         lineHeight = fontSize,
         textAlign = TextAlign.Center,
     )
@@ -106,24 +111,40 @@ private fun Top10Card(
                 layout((placeable.width - shrink).coerceAtLeast(0), placeable.height) { placeable.place(0, drop) }
             },
         ) {
-            // The fill is the page background, so only the outline reads as the number.
-            Text(text = rank.toString(), style = base, color = tokens.colors.background, maxLines = 1, softWrap = false)
+            // The outline goes down first at double width, then the fill (the page background) covers its inner half.
+            // Drawn the other way round, the strokes where a digit's own shapes overlap show through (a stray mark
+            // inside the 2).
             Text(
                 text = rank.toString(),
-                style = base.copy(drawStyle = Stroke(width = 7f, join = StrokeJoin.Round)),
-                color = Color.White.copy(alpha = 0.9f),
+                style = base.copy(drawStyle = Stroke(width = 12f, join = StrokeJoin.Round)),
+                color = Color.White.copy(alpha = 0.82f),
                 maxLines = 1,
                 softWrap = false,
             )
+            Text(text = rank.toString(), style = base, color = tokens.colors.background, maxLines = 1, softWrap = false)
         }
-        NuvioPosterCard(
-            title = item.name,
-            imageUrl = item.poster,
-            fallbackImageUrl = item.banner,
-            shape = NuvioPosterShape.Poster,
-            showTitleBelow = false,
-            onClick = onClick,
-            onLongClick = onLongClick,
-        )
+        Box {
+            NuvioPosterCard(
+                title = item.name,
+                imageUrl = item.poster,
+                fallbackImageUrl = item.banner,
+                shape = NuvioPosterShape.Poster,
+                showTitleBelow = false,
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
+            // Films and series share the chart, so each poster says which it is.
+            Text(
+                text = if (item.type.equals("series", true) || item.type.equals("tv", true)) "SERIES" else "FILM",
+                style = TextStyle(fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp),
+                color = Color.White.copy(alpha = 0.92f),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(horizontal = 5.dp, vertical = 2.dp),
+            )
+        }
     }
 }

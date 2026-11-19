@@ -1,0 +1,21 @@
+{
+  "collection": "halloween-episodes",
+  "title": "Halloween Episodes",
+  "entries": {
+    "The Simpsons": [[2,3,"Treehouse of Horror"],[3,7,"Treehouse of Horror II"],[4,5,"Treehouse of Horror III"],[5,5,"Treehouse of Horror IV"],[6,6,"Treehouse of Horror V"],[7,6,"Treehouse of Horror VI"],[8,1,"Treehouse of Horror VII"],[9,5,"Treehouse of Horror VIII"],[10,4,"Treehouse of Horror IX"],[11,4,"Treehouse of Horror X"],[12,1,"Treehouse of Horror XI"],[13,1,"Treehouse of Horror XII"],[14,1,"Treehouse of Horror XIII"],[15,1,"Treehouse of Horror XIV"],[16,1,"Treehouse of Horror XV"],[17,4,"Treehouse of Horror XVI"],[18,4,"Treehouse of Horror XVII"],[19,5,"Treehouse of Horror XVIII"],[20,4,"Treehouse of Horror XIX"],[21,4,"Treehouse of Horror XX"],[22,4,"Treehouse of Horror XXI"],[23,3,"Treehouse of Horror XXII"],[24,2,"Treehouse of Horror XXIII"],[25,2,"Treehouse of Horror XXIV"],[26,4,"Treehouse of Horror XXV"],[27,5,"Treehouse of Horror XXVI"],[27,4,"Halloween of Horror"],[28,4,"Treehouse of Horror XXVII"],[29,4,"Treehouse of Horror XXVIII"],[30,4,"Treehouse of Horror XXIX"],[31,4,"Treehouse of Horror XXX"],[32,4,"Treehouse of Horror XXXI"],[33,3,"Treehouse of Horror XXXII"],[34,5,"Treehouse of Horror Presents: Not It"],[34,6,"Treehouse of Horror XXXIII"],[35,5,"Treehouse of Horror XXXIV"],[36,5,"Treehouse of Horror XXXV"],[36,7,"Treehouse of Horror Presents: Simpsons Wicked This Way Comes"],[37,3,"Treehouse of Horror XXXVI"]],
+    "Bob's Burgers": [[3,2,"Full Bars"],[4,2,"Fort Night"],[5,2,"Tina and the Real Ghost"],[6,3,"The Hauntening"],[7,3,"Teen-a-Witch"],[8,3,"The Wolf of Wharf Street"],[9,4,"Nightmare on Ocean Avenue Street"],[10,4,"Pig Trouble in Little Tina"],[11,4,"Heartbreak Hotel-oween"],[12,3,"The Pumpkinening"],[13,6,"Apple Gore-chard! (But Not Gory)"],[15,4,"For Whom the Doll Toes"],[16,3,"The Twinnening"]],
+    "Modern Family": [[2,6,"Halloween"],[4,5,"Open House of Horrors"],[6,6,"Halloween 3: AwesomeLand"],[8,5,"Halloween 4: The Revenge of Rod Skyhook"],[9,5,"It's the Great Pumpkin, Phil Dunphy"],[10,5,"Good Grief"],[11,5,"The Last Halloween"]],
+    "Brooklyn Nine-Nine": [[1,6,"Halloween"],[2,4,"Halloween II"],[3,5,"Halloween, Part III"],[4,5,"Halloween IV"],[5,4,"HalloVeen"]],
+    "The Office (US)": [[2,5,"Halloween"],[7,6,"Costume Contest"],[8,5,"Spooked"],[9,5,"Here Comes Treble"]],
+    "Community": [[2,6,"Epidemiology"],[3,5,"Horror Fiction in Seven Spooky Steps"],[4,2,"Paranormal Parentage"]],
+    "Parks and Recreation": [[2,7,"Greg Pikitis"],[4,5,"Meet n Greet"],[5,5,"Halloween Surprise"]],
+    "How I Met Your Mother": [[1,6,"Slutty Pumpkin"],[6,7,"Canning Randy"],[7,8,"The Slutty Pumpkin Returns"]],
+    "Friends": [[8,6,"The One with the Halloween Party"]],
+    "The Big Bang Theory": [[1,6,"The Middle-Earth Paradigm"],[5,7,"The Good Guy Fluctuation"],[6,5,"The Holographic Excitation"],[12,6,"The Imitation Perturbation"]],
+    "New Girl": [[2,6,"Halloween"],[3,6,"Keaton"]],
+    "Superstore": [[2,6,"Halloween Theft"],[3,5,"Sal's Dead"],[4,4,"Costume Competition"],[5,6,"Trick-or-Treat"]],
+    "Abbott Elementary": [[2,6,"Candy Zombies"],[4,4,"Costume Contest"]],
+    "South Park": [[1,7,"Pinkeye"],[2,15,"Spooky Fish"],[3,10,"Korn's Groovy Pirate Ghost Mystery"],[10,11,"Hell on Earth 2006"],[21,6,"Sons a Witches"],[22,5,"The Scoots"],[23,5,"Tegridy Farms Halloween Special"]],
+    "Family Guy": [[9,4,"Halloween on Spooner Street"],[11,2,"Ratings Guy"],[14,4,"Peternormal Activity"],[20,3,"Must Love Dogs"],[21,6,"Happy Holo-ween"]]
+  }
+}

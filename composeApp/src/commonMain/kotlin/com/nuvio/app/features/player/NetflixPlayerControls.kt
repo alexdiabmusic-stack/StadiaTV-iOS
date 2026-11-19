@@ -60,6 +60,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -82,6 +83,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.nuvio.app.core.i18n.localizedEpisodeTitle
 import com.nuvio.app.core.ui.AppIconResource
+import com.nuvio.app.core.ui.LocalCameraBand
 import com.nuvio.app.core.ui.appIconPainter
 import com.nuvio.app.features.player.seekpreview.SeekPreviewController
 import nuvio.composeapp.generated.resources.*
@@ -324,13 +326,23 @@ internal fun NetflixPlayerControls(
                 isVisible = showParentalGuide,
                 onAnimationComplete = onParentalGuideAnimationComplete,
                 contentPadding = PaddingValues(top = 56.dp),
-                modifier = Modifier.align(Alignment.TopStart),
+                // Zero layout height: it floats under the bar. As a normal child it made this box ~150 dp tall while
+                // the warnings showed, so the back arrow, title and menu all dropped to the middle of it.
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints.copy(minHeight = 0))
+                        layout(placeable.width, 0) { placeable.place(0, 0) }
+                    },
             )
         }
 
-        // ---- Centre: skip back, play / pause, skip forward
+        // ---- Centre: skip back, play / pause, skip forward (centred on the picture, not the camera band, on the Duo)
+        val cameraBand = LocalCameraBand.current
         Row(
-            modifier = Modifier.align(Alignment.Center),
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(top = cameraBand?.top ?: 0.dp, bottom = cameraBand?.bottom ?: 0.dp),
             horizontalArrangement = Arrangement.spacedBy(if (compact) 44.dp else 84.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

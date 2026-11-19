@@ -190,6 +190,8 @@ fun ProfileSelectionScreen(
             .fillMaxSize(),
     ) {
         val isTabletLayout = maxWidth >= 768.dp
+        // Short phone screens (the iPhone Duo's cover screen): tighter spacing so three rows of profiles fit at once.
+        val isShortScreen = !isTabletLayout && maxHeight < 720.dp
         ProfileBackgroundBackdrop(
             profile = backgroundProfile,
             modifier = Modifier.fillMaxSize(),
@@ -207,11 +209,12 @@ fun ProfileSelectionScreen(
                             Modifier.verticalScroll(rememberScrollState())
                         },
                     )
+                    .padding(LocalVerticalBarPadding.current)
                     .padding(horizontal = 24.dp),
                 verticalArrangement = if (isTabletLayout) Arrangement.Center else Arrangement.Top,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Spacer(modifier = Modifier.height(if (isTabletLayout) 0.dp else 60.dp))
+                Spacer(modifier = Modifier.height(if (isTabletLayout) 0.dp else if (isShortScreen) 20.dp else 60.dp))
 
                 // Not wrapped in `contentFadeAlpha` like the rest of this screen below: the
                 // wordmark and the Supporter badge next to it both stay fully visible through the
@@ -256,7 +259,7 @@ fun ProfileSelectionScreen(
                     },
                 )
 
-                Spacer(modifier = Modifier.height(if (isTabletLayout) 28.dp else 48.dp))
+                Spacer(modifier = Modifier.height(if (isTabletLayout) 28.dp else if (isShortScreen) 24.dp else 48.dp))
 
                 val profiles = profileState.profiles
                 val items = profiles.size + if (isEditMode && profiles.size < MAX_PROFILES) 1 else 0
@@ -296,7 +299,7 @@ fun ProfileSelectionScreen(
                     }
                 } else {
                     Column(
-                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(if (isShortScreen) 8.dp else 20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxWidth(),
                     ) {

@@ -23,6 +23,9 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import com.nuvio.app.features.shuffle.ShuffleBadge
@@ -706,7 +709,6 @@ private fun ContinueWatchingCard(
     }
     val episodeTitle = localizedEpisodeTitle(item.episodeTitle, item.episodeNumber) ?: airDateText
     val badgeText = continueWatchingCardBadgeText(item = item, airDateText = airDateText)
-    val backgroundColor = MaterialTheme.colorScheme.background
     val badgeBackground = continueWatchingBadgeBackground(item)
 
     Box(
@@ -741,12 +743,12 @@ private fun ContinueWatchingCard(
                     .drawWithContent {
                         drawContent()
 
-                        val startY = size.height * 0.45f
+                        val startY = size.height * 0.4f
                         val gradient = Brush.verticalGradient(
                             colorStops = arrayOf(
                                 0.0f to Color.Transparent,
-                                0.60f to backgroundColor.copy(alpha = 0.70f),
-                                1.0f to backgroundColor.copy(alpha = 0.95f),
+                                0.55f to Color.Black.copy(alpha = 0.55f),
+                                1.0f to Color.Black.copy(alpha = 0.85f),
                             ),
                             startY = startY,
                             endY = size.height,
@@ -762,92 +764,112 @@ private fun ContinueWatchingCard(
             )
         }
         if (item.shufflePlayback) ShuffleBadge(Modifier.align(Alignment.TopStart).padding(8.dp))
+        val inProgress = item.progressFraction > 0f
+        // Netflix and Apple TV style: the title leads, one quiet line under it (episode and time left), a thin
+        // full-width progress bar on the bottom edge and a small play mark. The corner badge is kept only for
+        // states that need it (Up Next, a new episode, an air date), not for time left.
+        val metaLine = listOfNotNull(
+            episodeCode,
+            if (inProgress) badgeText else episodeTitle,
+        ).joinToString("  ·  ").ifBlank { null }
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(cardMetrics.contentPadding),
+                .padding(
+                    start = cardMetrics.contentPadding,
+                    end = cardMetrics.contentPadding + ContinueWatchingPlayMarkSize + 6.dp,
+                    bottom = cardMetrics.contentPadding + if (inProgress) cardMetrics.progressHeight else 0.dp,
+                ),
             verticalArrangement = Arrangement.spacedBy(cardMetrics.textGap),
         ) {
-            if (episodeCode != null) {
-                Text(
-                    text = episodeCode,
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontSize = cardMetrics.metaTextSize,
-                        fontWeight = FontWeight.SemiBold,
-                    ),
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
             Text(
                 text = item.title,
                 style = MaterialTheme.typography.titleSmall.copy(
-                    fontSize = cardMetrics.titleTextSize,
-                    fontWeight = FontWeight.SemiBold,
+                    fontSize = cardMetrics.titleTextSize * 1.06f,
+                    fontWeight = FontWeight.Bold,
                 ),
-                color = MaterialTheme.colorScheme.onBackground,
+                color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (episodeTitle != null) {
+            if (metaLine != null) {
                 Text(
-                    text = episodeTitle,
+                    text = metaLine,
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontSize = cardMetrics.metaTextSize,
                         fontWeight = FontWeight.Medium,
                     ),
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.72f),
+                    color = Color.White.copy(alpha = 0.74f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
+        // A small play mark: tapping the card resumes.
         Box(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(cardMetrics.badgeInset)
-                .clip(ContinueWatchingStatusBadgeShape)
-                .background(badgeBackground)
+                .align(Alignment.BottomEnd)
                 .padding(
-                    horizontal = cardMetrics.badgeHorizontalPadding,
-                    vertical = cardMetrics.badgeVerticalPadding,
-                ),
+                    end = cardMetrics.contentPadding,
+                    bottom = cardMetrics.contentPadding + if (inProgress) cardMetrics.progressHeight else 0.dp,
+                )
+                .size(ContinueWatchingPlayMarkSize)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.45f))
+                .border(1.dp, Color.White.copy(alpha = 0.35f), CircleShape),
+            contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = badgeText,
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = cardMetrics.badgeTextSize,
-                    fontWeight = FontWeight.SemiBold,
-                ),
-                color = Color.White,
-                maxLines = 1,
+            Icon(
+                imageVector = Icons.Rounded.PlayArrow,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(ContinueWatchingPlayMarkSize * 0.62f),
             )
         }
-        if (item.progressFraction > 0f) {
+        if (!inProgress) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(cardMetrics.badgeInset)
+                    .clip(ContinueWatchingStatusBadgeShape)
+                    .background(badgeBackground)
+                    .padding(
+                        horizontal = cardMetrics.badgeHorizontalPadding,
+                        vertical = cardMetrics.badgeVerticalPadding,
+                    ),
+            ) {
+                Text(
+                    text = badgeText,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = cardMetrics.badgeTextSize,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
+                    color = Color.White,
+                    maxLines = 1,
+                )
+            }
+        }
+        if (inProgress) {
+            // Full-bleed along the bottom edge, as on Netflix: the track is the card's own edge.
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(
-                        horizontal = cardMetrics.progressHorizontalPadding,
-                        vertical = cardMetrics.progressBottomPadding,
-                    )
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(999.dp))
                     .height(cardMetrics.progressHeight)
-                    .background(Color.Black.copy(alpha = 0.30f)),
+                    .background(Color.White.copy(alpha = 0.18f)),
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(item.progressFraction.coerceIn(0f, 1f))
                         .fillMaxHeight()
-                        .clip(RoundedCornerShape(999.dp))
                         .background(MaterialTheme.colorScheme.primary),
                 )
             }
         }
     }
 }
+
+private val ContinueWatchingPlayMarkSize = 26.dp
 
 @Composable
 private fun continueWatchingCardBadgeText(

@@ -336,7 +336,7 @@ private fun AllEventsTab(
                 horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s6),
             ) {
                 item { Chip("All", selected = sportFilter == null, onClick = { sportFilter = null }) }
-                items(sports, key = { it.name }) { s -> Chip(s.icon + " " + s.label, selected = sportFilter == s.name, onClick = { sportFilter = s.name }) }
+                items(sports, key = { it.name }) { s -> Chip(s.label, selected = sportFilter == s.name, onClick = { sportFilter = s.name }) }
             }
         }
         val empty = sections.live.isEmpty() && sections.upcoming.isEmpty() && sections.finished.isEmpty() && sections.weekLong.isEmpty()

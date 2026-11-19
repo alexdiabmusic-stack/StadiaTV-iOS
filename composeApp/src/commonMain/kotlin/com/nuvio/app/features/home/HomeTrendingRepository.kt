@@ -33,8 +33,14 @@ data class CuratedRow(val key: String, val title: String, val items: List<MetaPr
 data class HomeTrendingState(
     /** Films whose digital release is still ahead, soonest first. */
     val comingSoon: List<MetaPreview> = emptyList(),
-    val topMovies: List<MetaPreview> = emptyList(),
-    val topShows: List<MetaPreview> = emptyList(),
+    /**
+     * Top 10 Today: films and series in one ranking. The order is TMDB's daily trending chart for all media
+     * ("trending/all/day"), which scores films and series on the same activity measure, so the two are directly
+     * comparable; nothing is interleaved or mixed from separate lists. Titles that can't be watched at home and talk
+     * or news shows are skipped, so a rank here is the title's place among what can be watched, not an official
+     * viewing figure.
+     */
+    val top10: List<MetaPreview> = emptyList(),
     /** The rest of Home's curated lists, in the order they are shown. */
     val rows: List<CuratedRow> = emptyList(),
     /** True once the first load has finished, whether or not it found anything. */
@@ -46,7 +52,7 @@ data class HomeTrendingState(
  * person has installed. Everything in them can be watched at home today (see [DigitalAvailability]); the one
  * exception, Coming to Digital, is by definition what is about to be.
  *
- * The order follows how Netflix paces a page: the two Top 10s first, then new and trending titles, with movies and
+ * The order follows how Netflix paces a page: the Top 10 first, then new and trending titles, with movies and
  * series taking turns so neither runs on, then themed rows ("Feel-Good Comedies", "Binge-Worthy Series") that
  * each have a mood rather than a catalog name, and the broad popular and top-rated lists last. Personal
  * "Because you watched" rows are slotted in between by the Home screen. A title appears in only one row.
@@ -72,7 +78,7 @@ object HomeTrendingRepository {
         if (job?.isActive == true) return
         val s = _state.value
         // An empty result (offline, or TMDB had nothing) is retried soon, but not on every visit to Home.
-        val maxAge = if (s.topMovies.isNotEmpty()) MAX_AGE_MS else EMPTY_RETRY_MS
+        val maxAge = if (s.top10.isNotEmpty()) MAX_AGE_MS else EMPTY_RETRY_MS
         if (s.loadedOnce && LiveTvClock.nowMs() - loadedAtMs < maxAge) return
         job = scope.launch {
             runCatching { load() }
@@ -86,12 +92,10 @@ object HomeTrendingRepository {
         val region = DigitalAvailability.region()
 
         // First the rows at the top of the page, so they appear before the rest has finished.
-        val movies = async { available("trending/movie/day", emptyMap(), "movie", 10) }
-        val shows = async { available("trending/tv/day", emptyMap(), "tv", 10) }
+        val chart = async { available("trending/all/day", emptyMap(), mediaType = null, limit = 10) }
         val soon = async { comingToDigital(today, region) }
-        val topMovies = movies.await()
-        val topShows = shows.await()
-        _state.value = _state.value.copy(topMovies = topMovies, topShows = topShows)
+        val top10 = chart.await()
+        _state.value = _state.value.copy(top10 = top10)
         _state.value = _state.value.copy(comingSoon = soon.await())
 
         val digitalNow = mapOf(
@@ -137,7 +141,7 @@ object HomeTrendingRepository {
 
         // Fetched a few at a time and shown as each batch lands, so the top of the page doesn't wait for the bottom.
         // Each title shows once down the page: a later row skips anything an earlier one (or a Top 10) already has.
-        val seen = (topMovies + topShows).mapTo(HashSet()) { it.id }
+        val seen = top10.mapTo(HashSet()) { it.id }
         val rows = ArrayList<CuratedRow>()
         for (batch in specs.chunked(4)) {
             val fetched = batch.map { spec -> async { spec to runCatching { spec.fetch() }.getOrDefault(emptyList()) } }.awaitAll()
@@ -175,9 +179,11 @@ object HomeTrendingRepository {
      * A TMDB list narrowed to what can be watched at home, in the list's own order, with the ids the app opens
      * titles by. Candidates are checked ten at a time and the checking stops as soon as the row is full.
      */
-    private suspend fun available(endpoint: String, query: Map<String, String>, mediaType: String, limit: Int): List<MetaPreview> {
+    /** [mediaType] is "movie" or "tv", or null for a mixed list where each entry says what it is. */
+    private suspend fun available(endpoint: String, query: Map<String, String>, mediaType: String?, limit: Int): List<MetaPreview> {
         val candidates = results(endpoint, query)
             .filter { it.str("poster_path") != null }
+            .filter { mediaType != null || it.str("media_type") == "movie" || it.str("media_type") == "tv" }
             // Late-night and news shows chart every day and say nothing about what is worth watching.
             .filterNot { o -> (o["genre_ids"] as? JsonArray).orEmpty().any { (it as? JsonPrimitive)?.intOrNull in TALK_AND_NEWS } }
         val found = ArrayList<MetaPreview>()
@@ -187,8 +193,9 @@ object HomeTrendingRepository {
                 window.map { o ->
                     async {
                         val tmdbId = (o["id"] as? JsonPrimitive)?.intOrNull ?: return@async null
-                        val ok = permits.withPermit { DigitalAvailability.check(mediaType, tmdbId) } ?: return@async null
-                        o.toPreview(ok.imdbId, mediaType == "tv")
+                        val type = mediaType ?: o.str("media_type") ?: return@async null
+                        val ok = permits.withPermit { DigitalAvailability.check(type, tmdbId) } ?: return@async null
+                        o.toPreview(ok.imdbId, type == "tv")
                     }
                 }.awaitAll().filterNotNull()
             }.let { found += it }

@@ -45,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import com.nuvio.app.features.sports.ui.vector
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -383,7 +384,11 @@ private fun AllLeaguesPage(
                 val leagues = SportsCatalog.all.filter { it.sport == sport }
                 if (leagues.isEmpty()) return@forEach
                 item(key = "h-" + sport.name) {
-                    Text(sport.icon + "  " + sport.label, style = MaterialTheme.typography.titleMedium, color = tokens.colors.textPrimary, modifier = Modifier.padding(top = 14.dp, bottom = 4.dp))
+                    Row(Modifier.padding(top = 14.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(sport.vector, contentDescription = null, tint = tokens.colors.textPrimary, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(sport.label, style = MaterialTheme.typography.titleMedium, color = tokens.colors.textPrimary)
+                    }
                 }
                 items(leagues, key = { "l-" + it.id }) { l ->
                     val on = followed(l)

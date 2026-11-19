@@ -11,10 +11,15 @@ import com.nuvio.app.core.sync.encodeSyncInt
 import com.nuvio.app.core.sync.encodeSyncString
 import com.nuvio.app.core.sync.encodeSyncStringSet
 import com.nuvio.app.core.storage.ProfileScopedKey
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.useContents
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import platform.Foundation.NSUserDefaults
+import platform.UIKit.UIDevice
+import platform.UIKit.UIScreen
+import platform.UIKit.UIUserInterfaceIdiomPhone
 
 actual object PlayerSettingsStorage {
     private const val pendingExternalPlaybackKey = "pending_external_playback"
@@ -26,6 +31,7 @@ actual object PlayerSettingsStorage {
     private const val pauseOverlayEnabledKey = "pause_overlay_enabled"
     private const val showParentalGuideKey = "show_parental_guide"
     private const val resizeModeKey = "resize_mode"
+    private const val resizeModeDuoKey = "resize_mode_duo"
     private const val holdToSpeedEnabledKey = "hold_to_speed_enabled"
     private const val holdToSpeedValueKey = "hold_to_speed_value"
     private const val skipBackwardSecondsKey = "skip_backward_seconds"
@@ -342,13 +348,35 @@ actual object PlayerSettingsStorage {
         NSUserDefaults.standardUserDefaults.setBool(enabled, forKey = ProfileScopedKey.of(showParentalGuideKey))
     }
 
+    // The iPhone Duo keeps its own picture size. Zoom, the usual pick on a tall iPhone, would cut nearly a fifth off
+    // the sides of a 16:9 picture on the Duo's squarer screen, where Fit already fills the space beside the camera.
+    private fun deviceResizeModeKey(): String = if (isWideScreenPhone()) resizeModeDuoKey else resizeModeKey
+
+    @OptIn(ExperimentalForeignApi::class)
+    private fun isWideScreenPhone(): Boolean {
+        if (UIDevice.currentDevice.userInterfaceIdiom != UIUserInterfaceIdiomPhone) return false
+        return UIScreen.mainScreen.bounds.useContents {
+            val long = maxOf(size.width, size.height)
+            val short = minOf(size.width, size.height)
+            short > 0.0 && long / short < 1.6
+        }
+    }
+
     actual fun loadResizeMode(): String? {
         val defaults = NSUserDefaults.standardUserDefaults
-        val key = ProfileScopedKey.of(resizeModeKey)
+        val key = ProfileScopedKey.of(deviceResizeModeKey())
         return defaults.stringForKey(key)
     }
 
     actual fun saveResizeMode(mode: String) {
+        NSUserDefaults.standardUserDefaults.setObject(mode, forKey = ProfileScopedKey.of(deviceResizeModeKey()))
+    }
+
+    /** The picture size shared between devices by sync; the Duo's own choice stays on the Duo. */
+    private fun loadSyncedResizeMode(): String? =
+        NSUserDefaults.standardUserDefaults.stringForKey(ProfileScopedKey.of(resizeModeKey))
+
+    private fun saveSyncedResizeMode(mode: String) {
         NSUserDefaults.standardUserDefaults.setObject(mode, forKey = ProfileScopedKey.of(resizeModeKey))
     }
 
@@ -1430,7 +1458,7 @@ actual object PlayerSettingsStorage {
         loadShowPlayerLoadingStatus()?.let { put(showPlayerLoadingStatusKey, encodeSyncBoolean(it)) }
         loadPauseOverlayEnabled()?.let { put(pauseOverlayEnabledKey, encodeSyncBoolean(it)) }
         loadShowParentalGuide()?.let { put(showParentalGuideKey, encodeSyncBoolean(it)) }
-        loadResizeMode()?.let { put(resizeModeKey, encodeSyncString(it)) }
+        loadSyncedResizeMode()?.let { put(resizeModeKey, encodeSyncString(it)) }
         loadHoldToSpeedEnabled()?.let { put(holdToSpeedEnabledKey, encodeSyncBoolean(it)) }
         loadHoldToSpeedValue()?.let { put(holdToSpeedValueKey, encodeSyncFloat(it)) }
         loadTouchGesturesEnabled()?.let { put(touchGesturesEnabledKey, encodeSyncBoolean(it)) }
@@ -1532,7 +1560,7 @@ actual object PlayerSettingsStorage {
         payload.decodeSyncBoolean(showPlayerLoadingStatusKey)?.let(::saveShowPlayerLoadingStatus)
         payload.decodeSyncBoolean(pauseOverlayEnabledKey)?.let(::savePauseOverlayEnabled)
         payload.decodeSyncBoolean(showParentalGuideKey)?.let(::saveShowParentalGuide)
-        payload.decodeSyncString(resizeModeKey)?.let(::saveResizeMode)
+        payload.decodeSyncString(resizeModeKey)?.let(::saveSyncedResizeMode)
         payload.decodeSyncBoolean(holdToSpeedEnabledKey)?.let(::saveHoldToSpeedEnabled)
         payload.decodeSyncFloat(holdToSpeedValueKey)?.let(::saveHoldToSpeedValue)
         payload.decodeSyncBoolean(touchGesturesEnabledKey)?.let(::saveTouchGesturesEnabled)

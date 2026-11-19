@@ -155,14 +155,49 @@ final class RootComposeViewController: UIViewController {
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
         updateVerticalBar()
+        updateCameraBand()
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         enforceContainingTabBarVisibility()
+        updateCameraBand()
         guard view.bounds.size != foldBoundsSize else { return }
         foldBoundsSize = view.bounds.size
         updateFold()
+    }
+
+    /// iPhone Duo cover screen held sideways: reports the band along the top (or bottom) edge that holds the camera, so
+    /// the player can put the picture beside it and its toolbar inside it. Cleared on every other device and in portrait.
+    private func updateCameraBand() {
+        guard let hinge else { return }
+        let bounds = view.bounds
+        guard #available(iOS 27.1, *),
+              traitCollection.userInterfaceIdiom == .phone,
+              bounds.width > bounds.height,
+              let corner = view.reservedRegions(kind: .occlusion)
+                  .map(\.frame)
+                  .filter({ frame in
+                      let onTop = frame.minY <= 0.5
+                      let onBottom = frame.maxY >= bounds.height - 0.5
+                      let onSide = frame.minX <= 0.5 || frame.maxX >= bounds.width - 0.5
+                      return (onTop || onBottom) && onSide &&
+                          frame.height >= 44 && frame.height < bounds.height / 3 &&
+                          frame.width < bounds.width / 2
+                  })
+                  .max(by: { $0.width * $0.height < $1.width * $1.height })
+        else {
+            hinge.clearCameraBand()
+            return
+        }
+        let onTop = corner.minY <= 0.5
+        let onLeft = corner.minX <= 0.5
+        hinge.updateCameraBand(
+            top: onTop ? Double(corner.maxY) : 0,
+            bottom: onTop ? 0 : Double(bounds.height - corner.minY),
+            cameraStart: onLeft ? Double(corner.maxX) : 0,
+            cameraEnd: onLeft ? 0 : Double(bounds.width - corner.minX)
+        )
     }
 
     private func updateFold() {
@@ -2353,3 +2388,4 @@ private extension UIColor {
         )
     }
 }
+

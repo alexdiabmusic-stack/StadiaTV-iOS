@@ -2,6 +2,14 @@ package com.nuvio.app.features.search
 
 import androidx.compose.foundation.background
 import com.nuvio.app.features.home.components.HomeTop10Row
+import com.nuvio.app.features.explore.ExploreBrowserScreen
+import com.nuvio.app.features.explore.ExploreCatalog
+import com.nuvio.app.features.explore.ExploreCollectionCard
+import com.nuvio.app.features.explore.ExploreCollectionScreen
+import com.nuvio.app.features.explore.ExploreSelection
+import com.nuvio.app.features.recommendations.RecommendationEngine
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.animation.animateColorAsState
@@ -75,10 +83,10 @@ import com.nuvio.app.features.watching.application.WatchingState
 internal sealed interface SearchPage {
     /** A poster list; with more than one option (Movies / Series) it gets a chip for each. */
     data class Grid(val title: String, val options: List<Pair<String, BrowseSpec>>) : SearchPage
-    /** The list of franchises (Movie Universes). */
-    data object Franchises : SearchPage
-    /** One curated collection page: hero art, then titled sections of posters. */
-    data class Collection(val id: String) : SearchPage
+    /** One Explore collection (the same page Home opens). */
+    data class Explore(val id: String) : SearchPage
+    /** Every Explore collection, by family. */
+    data object ExploreAll : SearchPage
     data object Genres : SearchPage
     /** One genre's own page: a hero and rows of its titles. */
     data class Genre(val index: Int) : SearchPage
@@ -88,8 +96,8 @@ internal sealed interface SearchPage {
 
 internal fun SearchPage.title(): String = when (this) {
     is SearchPage.Grid -> title
-    SearchPage.Franchises -> "Movie Universes"
-    is SearchPage.Collection -> COLLECTION_DEFS[id]?.title.orEmpty()
+    is SearchPage.Explore -> ExploreCatalog[id]?.title.orEmpty()
+    SearchPage.ExploreAll -> "Explore Collections"
     SearchPage.Genres -> "Genres"
     is SearchPage.Genre -> SEARCH_GENRES.getOrNull(index)?.name.orEmpty()
     SearchPage.Decades -> "Decades"
@@ -124,26 +132,29 @@ internal fun LazyListScope.searchHomeSections(
         }
     }
     item(key = "sh-collections") {
+        // The same collections and cards as Home (this profile's selection for the week).
+        val taste = RecommendationEngine.state.collectAsState().value.taste
+        val picks = remember(taste.genres.keys) { ExploreSelection.forHomeToday(taste) }
         NuvioShelfSection(
             title = "Explore Collections",
-            entries = SearchCollection.entries,
+            entries = picks,
             modifier = Modifier.padding(bottom = SECTION_GAP),
             headerHorizontalPadding = 16.dp,
             rowContentPadding = PaddingValues(horizontal = 16.dp),
-            key = { it.name },
+            itemSpacing = 12.dp,
+            onViewAllClick = { onOpen(SearchPage.ExploreAll) },
+            key = { it.id },
         ) { collection ->
-            CollectionCard(collection) {
-                onOpen(collection.defId?.let { SearchPage.Collection(it) } ?: SearchPage.Franchises)
-            }
+            ExploreCollectionCard(collection, 250.dp, onClick = { onOpen(SearchPage.Explore(collection.id)) })
         }
     }
     item(key = "sh-browse") {
         val tiles = buildList {
-            add(BrowseEntry(Icons.Rounded.Theaters, "Genres", Color(0xFFE5484D)) { onOpen(SearchPage.Genres) })
-            add(BrowseEntry(Icons.Rounded.Groups, "Actors", Color(0xFF3E7BFA)) { onOpen(SearchPage.People(directors = false)) })
-            add(BrowseEntry(Icons.Rounded.Videocam, "Directors", Color(0xFF8E4EC6)) { onOpen(SearchPage.People(directors = true)) })
-            add(BrowseEntry(Icons.Rounded.CalendarMonth, "Decades", Color(0xFFE38A1C)) { onOpen(SearchPage.Decades) })
-            if (showLiveTv) add(BrowseEntry(Icons.Rounded.Sensors, "Live TV", Color(0xFF2EA66B), onOpenLiveTv))
+            add(BrowseEntry(BrowseArt.Genres, "Genres", Color(0xFFE5484D)) { onOpen(SearchPage.Genres) })
+            add(BrowseEntry(BrowseArt.Actors, "Actors", Color(0xFF3E7BFA)) { onOpen(SearchPage.People(directors = false)) })
+            add(BrowseEntry(BrowseArt.Directors, "Directors", Color(0xFF8E4EC6)) { onOpen(SearchPage.People(directors = true)) })
+            add(BrowseEntry(BrowseArt.Decades, "Decades", Color(0xFFE38A1C)) { onOpen(SearchPage.Decades) })
+            if (showLiveTv) add(BrowseEntry(BrowseArt.LiveTv, "Live TV", Color(0xFF2EA66B), onOpenLiveTv))
         }
         NuvioShelfSection(
             title = "Browse All",
@@ -195,63 +206,6 @@ private fun PopularChip(label: String, onClick: () -> Unit) {
     }
 }
 
-/** A collection card, sized and shaded like Home's wide cards, with the title over the collection's key art. */
-@Composable
-private fun CollectionCard(collection: SearchCollection, onClick: () -> Unit) {
-    val tokens = MaterialTheme.nuvio
-    val cover by produceState<String?>(null, collection) {
-        value = SearchBrowseData.backdrop(collection.coverTitle, collection.coverYear, collection.coverIsSeries)
-    }
-    Box(
-        modifier = Modifier
-            .width(250.dp)
-            .aspectRatio(16f / 9f)
-            .clip(RoundedCornerShape(12.dp))
-            .background(tokens.colors.surface)
-            .clickable(onClick = onClick),
-    ) {
-        cover?.let { AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.85f))))
-        Text(
-            collection.title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.align(Alignment.BottomStart).padding(12.dp),
-        )
-    }
-}
-
-private class BrowseEntry(val icon: ImageVector, val label: String, val tint: Color, val onClick: () -> Unit)
-
-/** A Browse All tile: a soft colour wash with its icon at the top and its name at the bottom. */
-@Composable
-private fun BrowseTile(entry: BrowseEntry) {
-    val tokens = MaterialTheme.nuvio
-    Box(
-        modifier = Modifier
-            .width(132.dp)
-            .height(84.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(tokens.colors.surface)
-            .background(Brush.linearGradient(listOf(entry.tint.copy(alpha = 0.55f), entry.tint.copy(alpha = 0.12f))))
-            .clickable(onClick = entry.onClick)
-            .padding(12.dp),
-    ) {
-        Icon(entry.icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
-        Text(
-            entry.label,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = Color.White,
-            maxLines = 1,
-            modifier = Modifier.align(Alignment.BottomStart),
-        )
-    }
-}
-
 /** The page a Search home tile opens, under a back arrow. */
 @Composable
 internal fun SearchBrowsePage(
@@ -267,8 +221,8 @@ internal fun SearchBrowsePage(
 ) {
     val tokens = MaterialTheme.nuvio
     Column(modifier.fillMaxSize().background(tokens.colors.background)) {
-        // A collection page opens with its own key art and a back button over it, so it has no bar of its own.
-        if (page !is SearchPage.Collection) {
+        // Explore pages open with their own artwork and back button, so they have no bar of their own.
+        if (page !is SearchPage.Explore && page !is SearchPage.ExploreAll) {
             Row(
                 Modifier.fillMaxWidth().statusBarsPadding().height(48.dp).clickable(onClick = onBack).padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -287,18 +241,24 @@ internal fun SearchBrowsePage(
         }
         when (page) {
             is SearchPage.Grid -> GridPageContent(page, watchedKeys, fullyWatchedSeriesKeys, onPosterClick, onPosterLongClick)
-            SearchPage.Franchises -> FranchiseListContent(onOpen)
-            is SearchPage.Collection -> COLLECTION_DEFS[page.id]?.let { def ->
-                CollectionPageContent(def, onBack, watchedKeys, fullyWatchedSeriesKeys, onPosterClick, onPosterLongClick)
-            }
+            is SearchPage.Explore -> ExploreCollectionScreen(
+                collectionId = page.id,
+                onCollectionClick = { onOpen(SearchPage.Explore(it.id)) },
+                onPosterClick = onPosterClick,
+                onPosterLongClick = onPosterLongClick,
+                onBack = onBack,
+                alwaysShowBack = true,
+            )
+            SearchPage.ExploreAll -> ExploreBrowserScreen(
+                onCollectionClick = { onOpen(SearchPage.Explore(it.id)) },
+                onBack = onBack,
+                alwaysShowBack = true,
+            )
             SearchPage.Genres -> GenresIndexContent(onOpen)
             is SearchPage.Genre -> SEARCH_GENRES.getOrNull(page.index)?.let { genre ->
                 GenreHubContent(genre, onOpen, onPosterClick, onPosterLongClick)
             }
-            SearchPage.Decades -> ListPage(SEARCH_DECADES.map { "${it}s" }) { index ->
-                val start = SEARCH_DECADES[index]
-                onOpen(movieAndSeries("${start}s", decadeSpec(start, tv = false), decadeSpec(start, tv = true)))
-            }
+            SearchPage.Decades -> DecadeHubContent(onOpen, onPosterClick, onPosterLongClick)
             is SearchPage.People -> PeopleContent(page.directors, onPersonClick)
         }
     }
@@ -357,26 +317,6 @@ private fun GridPageContent(
 }
 
 @Composable
-private fun ListPage(labels: List<String>, onClick: (Int) -> Unit) {
-    val tokens = MaterialTheme.nuvio
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = nuvioSafeBottomPadding(NuvioTokens.Space.s16)),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(labels.size, key = { "l-$it" }) { index ->
-            Row(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(tokens.colors.surface).clickable { onClick(index) }.padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(labels[index], style = MaterialTheme.typography.titleMedium, color = tokens.colors.textPrimary, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = null, tint = tokens.colors.textMuted)
-            }
-        }
-    }
-}
-
-@Composable
 private fun PeopleContent(directors: Boolean, onPersonClick: (id: Int, name: String, photo: String?) -> Unit) {
     val tokens = MaterialTheme.nuvio
     val people by produceState<List<PersonHit>?>(null, directors) {
@@ -413,164 +353,3 @@ private fun PeopleContent(directors: Boolean, onPersonClick: (id: Int, name: Str
     }
 }
 
-/** The Movie Universes page: one wide card per franchise, each opening its own page. */
-@Composable
-private fun FranchiseListContent(onOpen: (SearchPage) -> Unit) {
-    val tokens = MaterialTheme.nuvio
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = nuvioSafeBottomPadding(NuvioTokens.Space.s16)),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        items(FRANCHISES, key = { it.id }) { franchise ->
-            val cover by produceState<String?>(null, franchise.id) {
-                value = SearchBrowseData.backdrop(franchise.heroTitle, franchise.heroYear, franchise.heroIsSeries)
-            }
-            Box(
-                Modifier.fillMaxWidth().height(148.dp).clip(RoundedCornerShape(12.dp)).background(tokens.colors.surface)
-                    .clickable { onOpen(SearchPage.Collection(franchise.id)) },
-            ) {
-                cover?.let { AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.05f), Color.Black.copy(alpha = 0.78f)))))
-                Text(
-                    franchise.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.align(Alignment.BottomStart).padding(horizontal = 16.dp, vertical = 14.dp),
-                )
-            }
-        }
-    }
-}
-
-/**
- * A curated collection page: key art across the top with the title on it, then each section under its own heading
- * in a three-across poster grid. Franchises list their films by hand; the other collections fill their sections from
- * TMDB, with a title shown only once so the sections read as different picks.
- */
-@Composable
-private fun CollectionPageContent(
-    def: CollectionDef,
-    onBack: () -> Unit,
-    watchedKeys: Set<String>,
-    fullyWatchedSeriesKeys: Set<String>,
-    onPosterClick: ((MetaPreview) -> Unit)?,
-    onPosterLongClick: ((MetaPreview) -> Unit)?,
-) {
-    var chronological by rememberSaveable(def.id) { mutableStateOf(false) }
-    val hero by produceState<String?>(null, def.id) {
-        value = SearchBrowseData.backdrop(def.heroTitle, def.heroYear, def.heroIsSeries, size = "w1280")
-    }
-    val discovered by produceState<List<Pair<String, List<MetaPreview>>>>(emptyList(), def.id) {
-        if (def.discoverSections.isEmpty()) return@produceState
-        val seen = HashSet<String>()
-        val acc = ArrayList<Pair<String, List<MetaPreview>>>()
-        // In order, so a title shown in one section isn't repeated in the next; each appears as soon as it is ready.
-        for (spec in def.discoverSections) {
-            val picks = SearchBrowseData.list(spec, limit = 20).filter { seen.add(it.id) }.take(6)
-            if (picks.isNotEmpty()) {
-                acc += spec.title to picks
-                value = acc.toList()
-            }
-        }
-    }
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val columns = posterGridColumnCountForWidth(maxWidth)
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = nuvioSafeBottomPadding(NuvioTokens.Space.s16)),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
-            item(key = "hero") { CollectionHero(def.title, hero, onBack) }
-            if (def.chronological != null) {
-                item(key = "order") {
-                    Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SearchPill("Release order", selected = !chronological, onClick = { chronological = false })
-                        SearchPill("Chronological order", selected = chronological, onClick = { chronological = true })
-                    }
-                }
-            }
-            if (def.discoverSections.isNotEmpty()) {
-                if (discovered.isEmpty()) {
-                    item(key = "loading") { PosterGridSkeletonRow(columns = columns, modifier = Modifier.padding(horizontal = 16.dp)) }
-                }
-                items(discovered, key = { "d-" + it.first }) { (title, picks) ->
-                    PosterSection(title, picks, columns, watchedKeys, fullyWatchedSeriesKeys, onPosterClick, onPosterLongClick)
-                }
-            } else {
-                val sections = if (chronological && def.chronological != null) def.chronological else def.filmSections
-                itemsIndexed(sections, key = { index, section -> "f-$index-${section.title}" }) { _, section ->
-                    val films by produceState<List<MetaPreview>?>(null, def.id, section.title) { value = SearchBrowseData.films(section.films) }
-                    val list = films
-                    if (list == null) {
-                        PosterGridSkeletonRow(columns = columns, modifier = Modifier.padding(horizontal = 16.dp))
-                    } else if (list.isNotEmpty()) {
-                        PosterSection(section.title, list, columns, watchedKeys, fullyWatchedSeriesKeys, onPosterClick, onPosterLongClick)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CollectionHero(title: String, image: String?, onBack: () -> Unit) {
-    val tokens = MaterialTheme.nuvio
-    Box(Modifier.fillMaxWidth().height(330.dp).background(tokens.colors.surface)) {
-        image?.let { AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-        Box(
-            Modifier.fillMaxSize().background(
-                Brush.verticalGradient(
-                    0.0f to Color.Black.copy(alpha = 0.45f),
-                    0.35f to Color.Transparent,
-                    1.0f to tokens.colors.background,
-                ),
-            ),
-        )
-        Box(
-            Modifier.statusBarsPadding().padding(start = 12.dp, top = 8.dp).size(40.dp).clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.4f)).clickable(onClick = onBack),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = Color.White)
-        }
-        Text(
-            title.uppercase(),
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Black,
-            color = Color.White,
-            textAlign = TextAlign.Center,
-            maxLines = 3,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 24.dp, vertical = 16.dp),
-        )
-    }
-}
-
-/** A heading and its posters, three across, a row at a time. */
-@Composable
-private fun PosterSection(
-    title: String,
-    items: List<MetaPreview>,
-    columns: Int,
-    watchedKeys: Set<String>,
-    fullyWatchedSeriesKeys: Set<String>,
-    onPosterClick: ((MetaPreview) -> Unit)?,
-    onPosterLongClick: ((MetaPreview) -> Unit)?,
-) {
-    Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(title, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.nuvio.colors.textPrimary)
-        items.chunked(columns).forEach { row ->
-            PosterGridRow(
-                items = row,
-                columns = columns,
-                watchedKeys = watchedKeys,
-                fullyWatchedSeriesKeys = fullyWatchedSeriesKeys,
-                onPosterClick = onPosterClick,
-                onPosterLongClick = onPosterLongClick,
-            )
-        }
-    }
-}

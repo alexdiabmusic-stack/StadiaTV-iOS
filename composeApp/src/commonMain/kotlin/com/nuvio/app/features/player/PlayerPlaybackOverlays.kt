@@ -170,8 +170,16 @@ internal fun BoxScope.PlayerPlaybackOverlays(
 
     if (errorMessage != null) {
         ErrorModal(
-            message = errorMessage,
+            message = errorMessage.withoutStreamAddresses(),
             onDismiss = onDismissError,
         )
     }
 }
+
+private val AddressInText = Regex("""[a-zA-Z][a-zA-Z0-9+.-]*://\S+""")
+
+/**
+ * Error text from the player engine quotes the address it failed to open. An IPTV address carries the account's
+ * username and password, so it must never be put on screen.
+ */
+internal fun String.withoutStreamAddresses(): String = replace(AddressInText, "the stream")

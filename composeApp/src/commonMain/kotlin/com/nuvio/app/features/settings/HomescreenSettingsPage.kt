@@ -229,6 +229,7 @@ internal fun LazyListScope.homescreenSettingsContent(
             }
         }
     }
+    item { HomeRowOrderSection(isTablet = isTablet) }
     item {
         if (isCatalogLoading && items.isEmpty()) {
             Box(

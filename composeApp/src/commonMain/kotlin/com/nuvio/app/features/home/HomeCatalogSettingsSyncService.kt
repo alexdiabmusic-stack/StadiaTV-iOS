@@ -41,6 +41,8 @@ data class SyncCatalogItem(
 data class SyncHomeCatalogPayload(
     @SerialName("show_catalog_type") val showCatalogType: Boolean = true,
     @SerialName("hide_unreleased_content") val hideUnreleasedContent: Boolean = false,
+    /** The Home row order (see [HomeRowOrder]); null when the blob has none, so a device keeps its own. */
+    @SerialName("row_order") val rowOrder: List<String>? = emptyList(),
     val items: List<SyncCatalogItem> = emptyList(),
 )
 
@@ -219,6 +221,7 @@ object HomeCatalogSettingsSyncService {
             } else {
                 localPayload.hideUnreleasedContent
             },
+            rowOrder = if (settingsJson[HomeRowOrder.SYNC_KEY] is kotlinx.serialization.json.JsonArray) decoded.rowOrder else null,
         )
     }.getOrNull()
 

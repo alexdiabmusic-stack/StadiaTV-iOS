@@ -46,6 +46,8 @@ internal data class HomeCatalogSettingsUiState(
     val showAddonCatalogs: Boolean = false,
     /** Whether the Home hero shows its detail lines (type, year, runtime, ratings, synopsis) under the title. */
     val showHeroMetadata: Boolean = false,
+    /** The user's order for the Home rows below Continue Watching (see [HomeRowOrder]); empty means the default. */
+    val rowOrder: List<String> = emptyList(),
     val items: List<HomeCatalogSettingsItem> = emptyList(),
 ) {
     val signature: String
@@ -67,6 +69,8 @@ internal data class HomeCatalogSettingsUiState(
             append(showAddonCatalogs)
             append('|')
             append(showHeroMetadata)
+            append('|')
+            append(rowOrder.joinToString(","))
             append('|')
             append(
                 items.joinToString(separator = "|") { item ->
@@ -145,6 +149,7 @@ private data class StoredHomeCatalogSettingsPayload(
     val hideUnreleasedContent: Boolean = false,
     val showAddonCatalogs: Boolean = false,
     val showHeroMetadata: Boolean = false,
+    val rowOrder: List<String> = emptyList(),
     val items: List<StoredHomeCatalogPreference> = emptyList(),
 )
 
@@ -184,6 +189,7 @@ object HomeCatalogSettingsRepository {
     private var showAddonCatalogs = false
     private var showHeroMetadata = false
     private var hideUnreleasedContent = false
+    private var rowOrder: List<String> = emptyList()
 
     fun onProfileChanged() {
         hasLoaded = false
@@ -195,6 +201,7 @@ object HomeCatalogSettingsRepository {
         heroTrailerStartUnmuted = false
         showCatalogType = true
         hideUnreleasedContent = false
+        rowOrder = emptyList()
         definitions = emptyList()
         collectionDefinitions = emptyList()
         lastCatalogSync = null
@@ -216,6 +223,7 @@ object HomeCatalogSettingsRepository {
         heroTrailerStartUnmuted = false
         showCatalogType = true
         hideUnreleasedContent = false
+        rowOrder = emptyList()
         _uiState.value = HomeCatalogSettingsUiState()
     }
 
@@ -384,6 +392,17 @@ object HomeCatalogSettingsRepository {
         }
     }
 
+    /** The user's order for the Home rows (row ids, top to bottom); synced with the profile. Empty restores the default. */
+    fun setRowOrder(order: List<String>) {
+        ensureLoaded()
+        val clean = order.distinct()
+        if (clean == rowOrder) return
+        rowOrder = clean
+        publish()
+        persist()
+        HomeCatalogSettingsSyncService.triggerPush()
+    }
+
     fun resetToDefaults() {
         ensureLoaded()
         heroEnabled = true
@@ -394,6 +413,7 @@ object HomeCatalogSettingsRepository {
         showCatalogType = true
         hideUnreleasedContent = false
         preferences = emptyMap()
+        rowOrder = emptyList()
         normalizePreferences()
         publish()
         persist()
@@ -454,6 +474,7 @@ object HomeCatalogSettingsRepository {
             hideUnreleasedContent = parsedPayload.hideUnreleasedContent
             showAddonCatalogs = parsedPayload.showAddonCatalogs
             showHeroMetadata = parsedPayload.showHeroMetadata
+            rowOrder = parsedPayload.rowOrder
             preferences = parsedPayload.items.associateBy { it.key }
             // The hero plays a muted trailer a second after it settles, as Netflix's does. Applied once to existing settings.
             val migrated = com.nuvio.app.core.ui.UiDefaultsMigration.applyOnce("hero_trailer_home_v1") {
@@ -568,6 +589,7 @@ object HomeCatalogSettingsRepository {
             hideUnreleasedContent = hideUnreleasedContent,
             showAddonCatalogs = showAddonCatalogs,
             showHeroMetadata = showHeroMetadata,
+            rowOrder = rowOrder,
             items = items,
         )
     }
@@ -585,6 +607,7 @@ object HomeCatalogSettingsRepository {
                     hideUnreleasedContent = hideUnreleasedContent,
                     showAddonCatalogs = showAddonCatalogs,
                     showHeroMetadata = showHeroMetadata,
+                    rowOrder = rowOrder,
                     items = preferences.values.sortedBy { it.order },
                 ),
             ),
@@ -685,6 +708,7 @@ object HomeCatalogSettingsRepository {
         return SyncHomeCatalogPayload(
             showCatalogType = showCatalogType,
             hideUnreleasedContent = hideUnreleasedContent,
+            rowOrder = rowOrder,
             items = items,
         )
     }
@@ -693,6 +717,8 @@ object HomeCatalogSettingsRepository {
         ensureLoaded()
         showCatalogType = payload.showCatalogType
         hideUnreleasedContent = payload.hideUnreleasedContent
+        // A blob without the list (an older app wrote it) leaves this device's own order alone.
+        payload.rowOrder?.let { rowOrder = it }
         if (payload.items.isNotEmpty()) {
             val existingHeroState = preferences.mapValues { it.value.heroSourceEnabled }
             val remotePreferences = payload.items.associate { item ->

@@ -171,6 +171,11 @@ internal fun FoldControls(
             )
         },
     )
+    // Fit takes Lock's place in the top row (below), so Lock joins this grid and Fit leaves it.
+    val fitLabel = stringResource(resizeMode.labelRes)
+    val lockLabel = stringResource(Res.string.compose_player_lock_controls)
+    val gridActions = actions.filterNot { it.description == fitLabel } +
+        PlayerControlAction(lockLabel, onLockToggle, icon = Icons.Rounded.Lock)
     val interact: (() -> Unit) -> () -> Unit = { action ->
         {
             onInteraction()
@@ -225,10 +230,9 @@ internal fun FoldControls(
                 onNextEpisodeClick = onNextEpisodeClick?.let(interact),
                 modifier = Modifier.weight(1f),
             )
-            IconTile(
-                icon = Icons.Rounded.Lock,
-                description = stringResource(Res.string.compose_player_lock_controls),
-                onClick = onLockToggle,
+            FitTile(
+                label = fitLabel,
+                onClick = interact(onResizeModeClick),
                 size = rowHeight,
             )
             if (onPartyClick != null) {
@@ -328,7 +332,7 @@ internal fun FoldControls(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(tileGap),
         ) {
-            actions.forEach { action ->
+            gridActions.forEach { action ->
                 ActionTile(action = action, onClick = interact(action.onClick), height = if (compact) 64.dp else 76.dp)
             }
         }
@@ -364,6 +368,26 @@ private fun IconTile(
 ) {
     Tile(onClick = onClick, modifier = Modifier.size(size)) {
         Icon(icon, description, tint = tint, modifier = Modifier.size(NuvioTokens.Icon.lg))
+    }
+}
+
+/** The aspect ratio button: its icon over the current mode (Fit, Fill, Zoom). */
+@Composable
+private fun FitTile(
+    label: String,
+    onClick: () -> Unit,
+    size: Dp = RowHeight,
+) {
+    Tile(onClick = onClick, modifier = Modifier.size(size)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Icon(
+                appIconPainter(AppIconResource.PlayerAspectRatio),
+                contentDescription = label,
+                tint = Color.White,
+                modifier = Modifier.size(NuvioTokens.Icon.lg),
+            )
+            Text(label, color = Color.White, fontSize = 10.sp, maxLines = 1)
+        }
     }
 }
 

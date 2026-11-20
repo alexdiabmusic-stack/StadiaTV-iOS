@@ -130,9 +130,13 @@ internal fun netflixMenuItems(
     onVideoSettingsClick: (() -> Unit)?,
     onSwitchEngineClick: (() -> Unit)?,
     onSubmitIntroClick: (() -> Unit)?,
+    /** When the bar shows Fit where Lock was, Lock moves into this list and Fit comes out of it. */
+    aspectOnBar: Boolean = false,
+    onLockToggle: (() -> Unit)? = null,
 ): List<NetflixMenuItem> {
     val accent = MaterialTheme.colorScheme.primary
     return listOfNotNull(
+        if (aspectOnBar) onLockToggle?.let { NetflixMenuItem("Lock", it, icon = Icons.Rounded.Lock) } else null,
         onSourcesClick?.let {
             NetflixMenuItem(stringResource(Res.string.compose_player_sources), it, painter = appIconPainter(AppIconResource.PlayerSource))
         },
@@ -146,7 +150,7 @@ internal fun netflixMenuItems(
         onChaptersClick?.let {
             NetflixMenuItem(stringResource(Res.string.player_chapters), it, icon = Icons.AutoMirrored.Rounded.ListAlt)
         },
-        NetflixMenuItem(
+        if (aspectOnBar) null else NetflixMenuItem(
             stringResource(resizeMode.labelRes),
             onResizeModeClick,
             painter = appIconPainter(AppIconResource.PlayerAspectRatio),
@@ -232,6 +236,8 @@ internal fun NetflixPlayerControls(
     onMenuOpenChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onLockToggle: () -> Unit,
+    resizeMode: PlayerResizeMode,
+    onResizeModeClick: () -> Unit,
     onTogglePlayback: () -> Unit,
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
@@ -439,6 +445,8 @@ internal fun NetflixPlayerControls(
                 compact = compact,
                 onInteraction = onInteraction,
                 onLockToggle = onLockToggle,
+                resizeMode = resizeMode,
+                onResizeModeClick = onResizeModeClick,
                 onSpeedClick = onSpeedClick,
                 speedPickerVisible = speedPickerVisible,
                 onSpeedSelected = onSpeedSelected,
@@ -592,13 +600,18 @@ private fun NetflixMenuPanel(items: List<NetflixMenuItem>, onSelected: (NetflixM
     }
 }
 
-/** Speed, Lock, Episodes (or Channels on live TV), Audio & Subtitles and Next Episode, evenly spaced under the bar. */
+/**
+ * Speed, Fit (where Lock used to be; Lock is in the menu), Episodes (or Channels on live TV), Audio & Subtitles and Next Episode, evenly spaced
+ * under the bar.
+ */
 @Composable
 private fun NetflixBottomButtons(
     playbackSnapshot: PlayerPlaybackSnapshot,
     compact: Boolean,
     onInteraction: () -> Unit,
     onLockToggle: () -> Unit,
+    resizeMode: PlayerResizeMode,
+    onResizeModeClick: () -> Unit,
     onSpeedClick: (() -> Unit)?,
     speedPickerVisible: Boolean,
     onSpeedSelected: (Float) -> Unit,
@@ -635,11 +648,12 @@ private fun NetflixBottomButtons(
                 )
             }
         }
+        // Fit (the aspect ratio, showing the current mode) takes Lock's place; Lock is in the menu.
         NetflixTextButton(
-            icon = Icons.Rounded.Lock,
-            label = "Lock",
+            painter = appIconPainter(AppIconResource.PlayerAspectRatio),
+            label = stringResource(resizeMode.labelRes),
             compact = compact,
-            onClick = { onInteraction(); onLockToggle() },
+            onClick = { onInteraction(); onResizeModeClick() },
         )
         onEpisodesClick?.let {
             NetflixTextButton(

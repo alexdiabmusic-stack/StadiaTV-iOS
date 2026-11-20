@@ -25,6 +25,7 @@ import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -1248,9 +1249,13 @@ fun HomeScreen(
                         disintegrationRequest = continueWatchingDisintegrationRequest,
                         )
 
+                        // The rows below Continue Watching are collected first and emitted in the user's order
+                        // (HomeRowOrder; synced with the profile), which defaults to the order they are listed in here.
+                        val rows = ArrayList<HomeRow>()
+
                         // Top 10 Today: films and series in one ranking (see HomeTrendingState.top10).
                         if (trending.top10.size >= 3) {
-                            item(key = "home_top10", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
+                            rows += HomeRow(HomeRowIds.TOP10, "Top 10 Today", "home_top10", HOME_CATALOG_ROW_CONTENT_TYPE) {
                                 HomeTop10Row(
                                     items = trending.top10,
                                     sectionPadding = homeSectionPadding,
@@ -1267,7 +1272,12 @@ fun HomeScreen(
                         val topTitleKeys = trending.top10.mapTo(HashSet()) { it.homeTitleKey() }
                         val recommended = recommendations.items.filter { it.homeTitleKey() !in topTitleKeys }
                         if (recommended.size >= 6) {
-                            item(key = "home_recommended", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
+                            rows += HomeRow(
+                                HomeRowIds.RECOMMENDED,
+                                if (recommendations.isPersonal) "Recommended For You" else "Acclaimed Picks to Start With",
+                                "home_recommended",
+                                HOME_CATALOG_ROW_CONTENT_TYPE,
+                            ) {
                                 NuvioShelfSection(
                                     title = if (recommendations.isPersonal) "Recommended For You" else "Acclaimed Picks to Start With",
                                     entries = recommended,
@@ -1288,7 +1298,7 @@ fun HomeScreen(
 
                         // Explore Collections: this profile's selection for the week, with See All for the rest.
                         if (exploreRail.isNotEmpty() && onExploreCollectionClick != null) {
-                            item(key = "home_explore_collections", contentType = HOME_EXPLORE_ROW_CONTENT_TYPE) {
+                            rows += HomeRow(HomeRowIds.EXPLORE, "Explore Collections", "home_explore_collections", HOME_EXPLORE_ROW_CONTENT_TYPE) {
                                 ExploreCollectionsRail(
                                     collections = exploreRail,
                                     sectionPadding = homeSectionPadding,
@@ -1312,7 +1322,7 @@ fun HomeScreen(
                         // .prominentRows of them) after the 3rd, 6th and 9th, any others further down.
                         val contextualRows = recommendations.rows
                         trending.rows.forEachIndexed { rowIndex, row ->
-                            item(key = "home_curated_${row.key}", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
+                            rows += HomeRow(HomeRowIds.curated(row.key), row.title, "home_curated_${row.key}", HOME_CATALOG_ROW_CONTENT_TYPE) {
                                 NuvioShelfSection(
                                     title = row.title,
                                     entries = row.items,
@@ -1332,7 +1342,7 @@ fun HomeScreen(
                                 }
                             }
                             if (rowIndex == 1 && trending.comingSoon.isNotEmpty()) {
-                                item(key = "home_coming_to_digital", contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
+                                rows += HomeRow(HomeRowIds.COMING_TO_DIGITAL, "Coming to Digital", "home_coming_to_digital", HOME_CATALOG_ROW_CONTENT_TYPE) {
                                     HomeComingToDigitalRow(
                                         items = trending.comingSoon,
                                         sectionPadding = homeSectionPadding,
@@ -1351,7 +1361,7 @@ fun HomeScreen(
                                 if (trending.loadedOnce && rowIndex == trending.rows.lastIndex) addAll(contextualRows.drop(placedThrough))
                             }
                             personalHere.forEach { picks ->
-                                item(key = "home_personal_${picks.kind.name}", contentType = HOME_PERSONAL_ROW_CONTENT_TYPE) {
+                                rows += HomeRow(HomeRowIds.personal(picks.kind.name), picks.title, "home_personal_${picks.kind.name}", HOME_PERSONAL_ROW_CONTENT_TYPE) {
                                     NuvioShelfSection(
                                         title = picks.title,
                                         entries = picks.items,
@@ -1376,7 +1386,7 @@ fun HomeScreen(
                             if (settingsItem.isCollection) {
                                 val collection = collectionsMap[settingsItem.key]
                                 if (collection != null) {
-                                    item(key = keyedSettingsItem.lazyKey, contentType = HOME_COLLECTION_ROW_CONTENT_TYPE) {
+                                    rows += HomeRow(HomeRowIds.catalog(settingsItem.key), collection.title, keyedSettingsItem.lazyKey, HOME_COLLECTION_ROW_CONTENT_TYPE) {
                                         HomeCollectionRowSection(
                                             collection = collection,
                                             modifier = Modifier.padding(bottom = 12.dp),
@@ -1389,7 +1399,7 @@ fun HomeScreen(
                             } else {
                                 val section = sectionsMap[settingsItem.key]
                                 if (section != null && section.items.isNotEmpty()) {
-                                    item(key = keyedSettingsItem.lazyKey, contentType = HOME_CATALOG_ROW_CONTENT_TYPE) {
+                                    rows += HomeRow(HomeRowIds.catalog(settingsItem.key), settingsItem.displayTitle, keyedSettingsItem.lazyKey, HOME_CATALOG_ROW_CONTENT_TYPE) {
                                         HomeCatalogRowSection(
                                             section = section,
                                             entries = section.items.take(HOME_CATALOG_PREVIEW_LIMIT),
@@ -1408,6 +1418,14 @@ fun HomeScreen(
                                     }
                                 }
                             }
+                        }
+
+                        // Published in the default order; the arrange screen applies the saved order itself, so it can
+                        // show the default again after a reset.
+                        HomeRowRegistry.publish(rows.map { HomeRowInfo(it.id, it.title) })
+                        val ordered = HomeRowOrder.apply(rows, homeSettingsUiState.rowOrder) { it.id }
+                        ordered.forEach { row ->
+                            item(key = row.lazyKey, contentType = row.contentType) { row.content(this) }
                         }
                     }
                 }
@@ -2338,3 +2356,12 @@ private fun ContinueWatchingItem.isCloudLibraryContinueWatchingItem(): Boolean =
 private fun WatchProgressEntry.isCloudLibraryProgressEntry(): Boolean =
     contentType.equals(CloudLibraryContentType, ignoreCase = true) ||
         parentMetaType.equals(CloudLibraryContentType, ignoreCase = true)
+
+/** One Home row below Continue Watching: its shared id, title, lazy-list key and content. */
+private class HomeRow(
+    val id: String,
+    val title: String,
+    val lazyKey: Any,
+    val contentType: Any,
+    val content: @Composable LazyItemScope.() -> Unit,
+)

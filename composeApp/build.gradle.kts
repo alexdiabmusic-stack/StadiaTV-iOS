@@ -476,6 +476,7 @@ kotlin {
                 implementation(libs.androidx.documentfile)
                 implementation(libs.androidx.activity.compose)
                 implementation(libs.androidx.core.splashscreen)
+                implementation("androidx.window:window:1.5.0")
                 implementation(libs.androidx.work.runtime)
                 implementation(libs.androidx.biometric)
                 implementation(libs.coil.gif)

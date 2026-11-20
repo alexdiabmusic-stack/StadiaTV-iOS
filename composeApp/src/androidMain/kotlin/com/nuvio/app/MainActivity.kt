@@ -9,7 +9,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import com.nuvio.app.core.ui.LocalFold
+import com.nuvio.app.core.ui.rememberAndroidFold
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.nuvio.app.core.auth.AuthStorage
 import com.nuvio.app.core.network.ServerConfigurationStorage
@@ -217,8 +220,11 @@ open class MainActivity : AppCompatActivity() {
         setContent {
             val sheetBackdropSource = rememberNuvioBackdrop()
             val sheetBackdrop = remember(sheetBackdropSource) { NuvioSheetBackdrop(sheetBackdropSource) }
-            NuvioSheetBackdropHost(sheetBackdrop = sheetBackdrop) {
-                App()
+            val fold = rememberAndroidFold(this@MainActivity)
+            CompositionLocalProvider(LocalFold provides fold) {
+                NuvioSheetBackdropHost(sheetBackdrop = sheetBackdrop) {
+                    App()
+                }
             }
         }
         contentReady = true

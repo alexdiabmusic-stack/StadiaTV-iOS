@@ -11,7 +11,7 @@ import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.CachePolicy
 import coil3.request.crossfade
 import coil3.svg.SvgDecoder
-import com.nuvio.app.core.network.DnsPlatform
+import com.nuvio.app.core.network.PlatformDnsPlatform
 import com.nuvio.app.core.network.SharedOkHttpClient
 import com.nuvio.app.core.network.NetworkErrorInterceptor
 import com.nuvio.app.core.poster.CustomPosterFallbackInterceptor
@@ -28,7 +28,8 @@ class NuvioApplication : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
-        DnsPlatform.initialize(this)
+        installBannerCore()
+        PlatformDnsPlatform.initialize(this)
         com.nuvio.app.features.sports.compat.SportsAndroid.initialize(this) // Sports hub (ported from NuvioPlusIPTV-Mobile)
     }
 

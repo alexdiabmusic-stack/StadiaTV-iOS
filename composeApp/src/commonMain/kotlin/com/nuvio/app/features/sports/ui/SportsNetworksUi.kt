@@ -172,7 +172,7 @@ private fun NetworkCard(
         horizontalArrangement = Arrangement.spacedBy(NuvioTokens.Space.s12),
     ) {
         if (tile.lead != null) {
-            ChannelLogo(tile.lead, size = 44.dp)
+            ChannelLogo(tile.lead!!, size = 44.dp)
         } else {
             Box(
                 modifier = Modifier.size(44.dp).clip(RoundedCornerShape(NuvioTokens.Radius.md)).background(Color(tile.network.color)),

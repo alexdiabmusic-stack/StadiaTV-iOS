@@ -250,6 +250,9 @@ internal class PlayerScreenRuntime(
     var movieRecommendationDismissedStage by mutableStateOf(0)
     var movieRecommendationStage by mutableStateOf(0)
     val isMoviePlayback: Boolean get() = parentMetaType == "movie" && !isLiveTvPlayback
+    /** A TV episode with its season and episode number known: the only thing that is ever tracked on Serializd. Films go to Letterboxd, never here. */
+    val isEpisodePlayback: Boolean get() =
+        com.nuvio.app.features.serializd.SerializdEligibility.isEpisode(parentMetaType, activeSeasonNumber, activeEpisodeNumber, isLiveTvPlayback)
     var nextEpisodeAutoPlaySearching by mutableStateOf(false)
     var nextEpisodeAutoPlaySourceName by mutableStateOf<String?>(null)
     var nextEpisodeAutoPlayCountdown by mutableStateOf<Int?>(null)

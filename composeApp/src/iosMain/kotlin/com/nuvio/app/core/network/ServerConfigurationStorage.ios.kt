@@ -2,7 +2,7 @@ package com.nuvio.app.core.network
 
 import platform.Foundation.NSUserDefaults
 
-internal actual object ServerConfigurationStorage {
+internal object PlatformServerConfigurationStorage : ServerConfigurationStorage.Backend {
     private const val customEnabledKey = "server_custom_enabled"
     private const val backendUrlKey = "server_backend_url"
     private const val publishableKey = "server_publishable_key"
@@ -11,7 +11,7 @@ internal actual object ServerConfigurationStorage {
     private const val watchPartyKey = "server_watch_party"
     private const val discoveryUrlKey = "server_discovery_url"
 
-    actual fun loadCustom(): ServerConfiguration? {
+    override fun loadCustom(): ServerConfiguration? {
         val values = NSUserDefaults.standardUserDefaults
         if (!values.boolForKey(customEnabledKey)) return null
         val backendUrl = values.stringForKey(backendUrlKey)?.trim().orEmpty()
@@ -32,7 +32,7 @@ internal actual object ServerConfigurationStorage {
         )
     }
 
-    actual fun saveCustom(configuration: ServerConfiguration): Boolean {
+    override fun saveCustom(configuration: ServerConfiguration): Boolean {
         val values = NSUserDefaults.standardUserDefaults
         values.setBool(true, forKey = customEnabledKey)
         values.setObject(configuration.backendUrl, forKey = backendUrlKey)
@@ -44,7 +44,7 @@ internal actual object ServerConfigurationStorage {
         return values.synchronize()
     }
 
-    actual fun useOfficial(): Boolean {
+    override fun useOfficial(): Boolean {
         val values = NSUserDefaults.standardUserDefaults
         values.removeObjectForKey(customEnabledKey)
         values.removeObjectForKey(backendUrlKey)

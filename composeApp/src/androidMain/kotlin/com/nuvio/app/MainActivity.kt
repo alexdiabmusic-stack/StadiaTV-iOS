@@ -14,21 +14,21 @@ import androidx.compose.runtime.remember
 import com.nuvio.app.core.ui.LocalFold
 import com.nuvio.app.core.ui.rememberAndroidFold
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import com.nuvio.app.core.auth.AuthStorage
-import com.nuvio.app.core.network.ServerConfigurationStorage
+import com.nuvio.app.core.auth.PlatformAuthStorage
+import com.nuvio.app.core.network.PlatformServerConfigurationStorage
 import com.nuvio.app.core.diagnostics.SentryInitializer
 import com.nuvio.app.core.deeplink.handleAppUrl
 import com.nuvio.app.core.poster.CustomPosterUrlStorage
 import com.nuvio.app.core.storage.PlatformLocalAccountDataCleaner
 import com.nuvio.app.core.startup.StartupPreloader
-import com.nuvio.app.core.sync.SyncClientIdentityStorage
+import com.nuvio.app.core.sync.PlatformSyncClientIdentityStorage
 import com.nuvio.app.core.ui.CardDepthStyleStorage
 import com.nuvio.app.core.ui.NuvioSheetBackdrop
 import com.nuvio.app.core.ui.NuvioSheetBackdropHost
 import com.nuvio.app.core.ui.glass.rememberNuvioBackdrop
 import com.nuvio.app.core.ui.PosterCardStyleStorage
 import com.nuvio.app.features.addons.AddonHttpClientProvider
-import com.nuvio.app.features.addons.AddonStorage
+import com.nuvio.app.features.addons.PlatformAddonStorage
 import com.nuvio.app.features.collection.CollectionMobileSettingsStorage
 import com.nuvio.app.features.collection.CollectionStorage
 import com.nuvio.app.features.debrid.DebridSettingsStorage
@@ -118,16 +118,17 @@ open class MainActivity : AppCompatActivity() {
         com.nuvio.app.core.ui.background.AppBackgroundStorage.initialize(applicationContext)
         AppIconPlatform.initialize(applicationContext)
         SentrySettingsStorage.initialize(applicationContext)
+        com.nuvio.app.features.watched.HomeWatchedFilterStorage.initialize(applicationContext)
         SentryInitializer.start(application)
         super.onCreate(savedInstanceState)
         ProfileBiometricAuth.initialize(this)
         AutoSyncPreferencesAndroid.initialize(applicationContext) // AutoSync hook
         window.setBackgroundDrawableResource(R.color.nuvio_background)
-        SyncClientIdentityStorage.initialize(applicationContext)
+        PlatformSyncClientIdentityStorage.initialize(applicationContext)
         AddonHttpClientProvider.initialize(applicationContext)
-        AddonStorage.initialize(applicationContext)
-        AuthStorage.initialize(applicationContext)
-        ServerConfigurationStorage.initialize(applicationContext)
+        PlatformAddonStorage.initialize(applicationContext)
+        PlatformAuthStorage.initialize(applicationContext)
+        PlatformServerConfigurationStorage.initialize(applicationContext)
         LibraryStorage.initialize(applicationContext)
         LiveTvStorage.initialize(applicationContext)
         com.nuvio.app.features.experience.ExperienceStorage.initialize(applicationContext)
@@ -175,6 +176,8 @@ open class MainActivity : AppCompatActivity() {
         PlatformAniListAuthPersistence.initialize(applicationContext)
         PlatformAniListSyncStorage.initialize(applicationContext)
         PlatformWeTrakrAuthPersistence.initialize(applicationContext)
+        com.nuvio.app.features.letterboxd.PlatformLetterboxdSecrets.initialize(applicationContext)
+        com.nuvio.app.features.serializd.PlatformSerializdSecrets.initialize(applicationContext)
         PlatformWeTrakrSyncStorage.initialize(applicationContext)
         PlatformPublicMetaDbAuthPersistence.initialize(applicationContext)
         PlatformPublicMetaDbSyncStorage.initialize(applicationContext)

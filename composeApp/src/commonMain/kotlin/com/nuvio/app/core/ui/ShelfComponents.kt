@@ -28,6 +28,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,11 +77,20 @@ fun <T> NuvioShelfSection(
     key: ((T) -> Any)? = null,
     animatePlacement: Boolean = false,
     state: LazyListState = rememberLazyListState(),
+    /** Called when the row is scrolled to within a few titles of its end, and again as more arrive: an endless row loads more here. */
+    onEndReached: (() -> Unit)? = null,
     itemContent: @Composable (T) -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
     ScreenActivityEffect(state) { active ->
         if (!active) state.stopScroll()
+    }
+    if (onEndReached != null) {
+        val size = entries.size
+        val nearEnd by remember(state, size) {
+            derivedStateOf { size > 0 && (state.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1) >= size - 4 }
+        }
+        LaunchedEffect(nearEnd, size) { if (nearEnd) onEndReached() }
     }
     Column(
         modifier = modifier.fillMaxWidth(),

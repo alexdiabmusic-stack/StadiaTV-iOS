@@ -40,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -276,6 +277,8 @@ internal fun SettingsNavigationRow(
     description: String?,
     icon: ImageVector? = null,
     iconPainter: Painter? = null,
+    /** The picture is a full app icon (it carries its own background): it fills the whole tile instead of sitting inside it. */
+    iconFillsTile: Boolean = false,
     enabled: Boolean = true,
     isTablet: Boolean,
     trailingContent: (@Composable RowScope.() -> Unit)? = null,
@@ -302,7 +305,14 @@ internal fun SettingsNavigationRow(
                 .widthIn(max = if (isTablet) 560.dp else Dp.Unspecified),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (icon != null || iconPainter != null) {
+            if (iconPainter != null && iconFillsTile) {
+                androidx.compose.foundation.Image(
+                    painter = iconPainter, contentDescription = null,
+                    modifier = Modifier.size(iconSize).clip(tokens.shapes.compactCard),
+                    contentScale = ContentScale.Crop,
+                )
+                Spacer(modifier = Modifier.width(if (isTablet) 16.dp else 14.dp))
+            } else if (icon != null || iconPainter != null) {
                 Surface(
                     modifier = Modifier.size(iconSize),
                     color = tokens.colors.accent.copy(alpha = tokens.opacity.pressed),
@@ -362,6 +372,7 @@ internal fun SettingsSwitchRow(
     enabled: Boolean = true,
     isTablet: Boolean,
     horizontalPadding: Dp = if (isTablet) 20.dp else 16.dp,
+    icon: ImageVector? = null,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     val tokens = MaterialTheme.nuvio
@@ -375,6 +386,13 @@ internal fun SettingsSwitchRow(
         horizontalArrangement = Arrangement.Start,
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (icon != null) {
+            // The same 36dp column as a navigation row's icon tile, so the text and the dividers line up.
+            Box(modifier = Modifier.size(if (isTablet) 42.dp else 36.dp).alpha(if (enabled) NuvioTokens.Opacity.visible else tokens.opacity.medium), contentAlignment = Alignment.Center) {
+                Icon(imageVector = icon, contentDescription = null, tint = tokens.colors.textPrimary, modifier = Modifier.size(24.dp))
+            }
+            Spacer(modifier = Modifier.width(if (isTablet) 16.dp else 14.dp))
+        }
         Column(
             modifier = Modifier
                 .weight(1f)

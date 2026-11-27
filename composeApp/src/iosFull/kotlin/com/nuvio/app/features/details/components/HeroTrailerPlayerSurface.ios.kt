@@ -6,9 +6,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.interop.UIKitView
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.interop.UIKitViewController
 import co.touchlab.kermit.Logger
@@ -21,7 +25,7 @@ private const val HERO_TRAILER_IOS_TAG = "HeroTrailerIos"
 
 @OptIn(ExperimentalForeignApi::class)
 @Composable
-actual fun HeroTrailerPlayerSurface(
+private fun MpvHeroTrailerSurface(
     sourceUrl: String,
     sourceAudioUrl: String?,
     playWhenReady: Boolean,
@@ -135,4 +139,106 @@ actual fun HeroTrailerPlayerSurface(
             interactive = false,
         )
     }
+}
+
+
+/**
+ * Trailers play in AVPlayer (hardware decode, far lighter than libmpv). If AVPlayer cannot play a clip (a codec it does not
+ * decode, a stream that never becomes ready), the same clip is tried once in the libmpv preview, so nothing that played
+ * before stops playing.
+ */
+@OptIn(ExperimentalForeignApi::class)
+@Composable
+actual fun HeroTrailerPlayerSurface(
+    sourceUrl: String,
+    sourceAudioUrl: String?,
+    playWhenReady: Boolean,
+    muted: Boolean,
+    modifier: Modifier,
+    startPositionMs: Long,
+    onReady: () -> Unit,
+    onEnded: () -> Unit,
+    onError: () -> Unit,
+    onPositionUpdate: (Long) -> Unit,
+) {
+    var avFailed by remember(sourceUrl, sourceAudioUrl) { mutableStateOf(false) }
+    if (!avFailed && HeroPlayerBridgeFactory.isRegistered) {
+        AvHeroTrailerSurface(
+            sourceUrl = sourceUrl, sourceAudioUrl = sourceAudioUrl, playWhenReady = playWhenReady, muted = muted, modifier = modifier,
+            startPositionMs = startPositionMs, onReady = onReady, onEnded = onEnded, onError = { avFailed = true }, onPositionUpdate = onPositionUpdate,
+        )
+    } else {
+        MpvHeroTrailerSurface(
+            sourceUrl = sourceUrl, sourceAudioUrl = sourceAudioUrl, playWhenReady = playWhenReady, muted = muted, modifier = modifier,
+            startPositionMs = startPositionMs, onReady = onReady, onEnded = onEnded, onError = onError, onPositionUpdate = onPositionUpdate,
+        )
+    }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+@Composable
+private fun AvHeroTrailerSurface(
+    sourceUrl: String,
+    sourceAudioUrl: String?,
+    playWhenReady: Boolean,
+    muted: Boolean,
+    modifier: Modifier,
+    startPositionMs: Long,
+    onReady: () -> Unit,
+    onEnded: () -> Unit,
+    onError: () -> Unit,
+    onPositionUpdate: (Long) -> Unit,
+) {
+    val latestOnReady = rememberUpdatedState(onReady)
+    val latestOnEnded = rememberUpdatedState(onEnded)
+    val latestOnError = rememberUpdatedState(onError)
+    val latestOnPosition = rememberUpdatedState(onPositionUpdate)
+    val bridge = remember(sourceUrl, sourceAudioUrl) { HeroPlayerBridgeFactory.create(sourceUrl, sourceAudioUrl) }
+    if (bridge == null) {
+        LaunchedEffect(Unit) { latestOnError.value() }
+        return
+    }
+
+    LaunchedEffect(bridge) {
+        var elapsedMs = 0L
+        var readyReported = false
+        // Generous budget: healthy trailers take 5-7 s to become ready on a slow link. After that, hand over to libmpv.
+        while (isActive && !readyReported && elapsedMs < 12_000L) {
+            delay(100)
+            elapsedMs += 100
+            when {
+                bridge.isReady() -> {
+                    readyReported = true
+                    if (startPositionMs > 0L) bridge.seekToMs(startPositionMs)
+                    latestOnReady.value()
+                }
+                bridge.isFailed() -> { latestOnError.value(); return@LaunchedEffect }
+            }
+        }
+        if (!readyReported) { latestOnError.value(); return@LaunchedEffect }
+        // Position is only needed to resume later: twice a second is plenty, and not at all while paused.
+        while (isActive) {
+            if (bridge.isEnded()) { latestOnEnded.value(); return@LaunchedEffect }
+            if (bridge.isFailed()) { latestOnError.value(); return@LaunchedEffect }
+            latestOnPosition.value(bridge.getPositionMs())
+            delay(500)
+        }
+    }
+
+    LaunchedEffect(bridge, playWhenReady) { bridge.setPlaying(playWhenReady) }
+
+    DisposableEffect(bridge) {
+        onDispose {
+            runCatching {
+                latestOnPosition.value(bridge.getPositionMs())
+                bridge.releasePlayer()
+            }
+        }
+    }
+
+    UIKitView(
+        modifier = modifier.background(Color.Black),
+        factory = { bridge.createView() },
+        update = { bridge.setMuted(muted) },
+    )
 }

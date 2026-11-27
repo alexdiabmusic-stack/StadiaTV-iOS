@@ -278,6 +278,7 @@ fun MetaDetailsScreen(
     val cinematicContentBackdrop = rememberNuvioBackdrop()
     var selectedSeasonForActions by remember(type, id) { mutableStateOf<Int?>(null) }
     var userRatingSheetRequest by remember(type, id) { mutableStateOf<UserRatingSheetRequest?>(null) }
+    var serializdRequest by remember(type, id) { mutableStateOf<com.nuvio.app.features.serializd.SerializdSheetRequest?>(null) }
     val commentsEnabled by remember {
         TraktCommentsSettings.ensureLoaded()
         TraktCommentsSettings.enabled
@@ -1611,6 +1612,16 @@ fun MetaDetailsScreen(
                                 onPlayManually = {
                                     onEpisodeManualPlayClick(selectedEpisode)
                                 },
+                                onSerializd = if (rememberSerializdConnected(!meta.type.equals("movie", ignoreCase = true))) {
+                                    {
+                                        serializdRequest = com.nuvio.app.features.serializd.SerializdSheetRequest(
+                                            metaId = meta.id, imdbId = meta.imdbId, showName = meta.name, posterUrl = meta.poster,
+                                            season = selectedEpisode.season ?: 0, episode = selectedEpisode.episode, episodeTitle = selectedEpisode.title,
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
                                 userRating = episodeUserRating,
                                 onRate = if (canRateEpisode && episodeRatingTarget != null) {
                                     {
@@ -1691,6 +1702,15 @@ fun MetaDetailsScreen(
                                         areCurrentlyWatched = false,
                                     )
                                 },
+                                onSerializd = if (rememberSerializdConnected(!meta.type.equals("movie", ignoreCase = true))) {
+                                    {
+                                        serializdRequest = com.nuvio.app.features.serializd.SerializdSheetRequest(
+                                            metaId = meta.id, imdbId = meta.imdbId, showName = meta.name, posterUrl = meta.poster, season = selectedSeason,
+                                        )
+                                    }
+                                } else {
+                                    null
+                                },
                                 userRating = seasonUserRating,
                                 onRate = if (canRateSeason) {
                                     {
@@ -1708,6 +1728,10 @@ fun MetaDetailsScreen(
                                     null
                                 },
                             )
+                        }
+
+                        serializdRequest?.let { request ->
+                            com.nuvio.app.features.serializd.SerializdTargetSheet(request, onDismiss = { serializdRequest = null })
                         }
 
                         userRatingSheetRequest?.let { request ->
@@ -1913,6 +1937,7 @@ fun MetaDetailsScreen(
                 meta.episodeUserRatingTarget(selectedEpisode)
             }
             val canRateZoomEpisode = rememberCanRate(zoomEpisodeRatingTarget)
+            val zoomSerializdConnected = rememberSerializdConnected(!meta.type.equals("movie", ignoreCase = true))
             val zoomEpisodeUserRating = rememberUserRating(zoomEpisodeRatingTarget)
             val rateEpisodeLabel = zoomEpisodeUserRating?.let {
                 "${stringResource(Res.string.user_rating_rate_episode)} · ${stringResource(Res.string.user_rating_value, it)}"
@@ -1979,6 +2004,20 @@ fun MetaDetailsScreen(
                             },
                         ),
                     )
+                    if (zoomSerializdConnected) {
+                        add(
+                            PosterZoomOverlayAction(
+                                icon = Icons.Rounded.Star,
+                                label = "Serializd: rate, review or log",
+                                onSelected = {
+                                    serializdRequest = com.nuvio.app.features.serializd.SerializdSheetRequest(
+                                        metaId = meta.id, imdbId = meta.imdbId, showName = meta.name, posterUrl = meta.poster,
+                                        season = selectedEpisode.season ?: 0, episode = selectedEpisode.episode, episodeTitle = selectedEpisode.title,
+                                    )
+                                },
+                            ),
+                        )
+                    }
                     if (canRateZoomEpisode && zoomEpisodeRatingTarget != null) {
                         add(
                             PosterZoomOverlayAction(
@@ -2543,12 +2582,25 @@ private fun ConfiguredMetaSections(
                 )
             }
             MetaScreenSectionKey.OVERVIEW -> {
-                DetailMetaInfo(
-                    meta = meta,
-                    showOverallRatings = settings.showOverallRatings,
-                    isMdbListActive = isMdbListActive,
-                    horizontalScrollPadding = horizontalScrollPadding,
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    DetailMetaInfo(
+                        meta = meta,
+                        showOverallRatings = settings.showOverallRatings,
+                        isMdbListActive = isMdbListActive,
+                        horizontalScrollPadding = horizontalScrollPadding,
+                    )
+                    if (meta.type.equals("movie", ignoreCase = true)) {
+                        com.nuvio.app.features.letterboxd.LetterboxdMovieSection(
+                            metaId = meta.id, imdbId = meta.imdbId, title = meta.name, posterUrl = meta.poster,
+                            horizontalPadding = horizontalScrollPadding,
+                        )
+                    } else if (com.nuvio.app.features.serializd.SerializdEligibility.isSeriesType(meta.type)) {
+                        // Shows go to Serializd, never to Letterboxd; this draws nothing until a Serializd account is connected.
+                        com.nuvio.app.features.serializd.SerializdSeriesSection(
+                            metaId = meta.id, imdbId = meta.imdbId, title = meta.name, posterUrl = meta.poster,
+                        )
+                    }
+                }
             }
             MetaScreenSectionKey.PRODUCTION -> {
                 if (hasProductionSection) {
@@ -2811,4 +2863,13 @@ private fun Color.blendTowards(target: Color, fraction: Float): Color {
         blue = blue + (target.blue - blue) * clamped,
         alpha = alpha + (target.alpha - alpha) * clamped,
     )
+}
+
+/** Whether a Serializd account is connected for the open profile. Touches nothing Serializd when [enabled] is false (a movie). */
+@Composable
+private fun rememberSerializdConnected(enabled: Boolean): Boolean {
+    if (!enabled) return false
+    val profileId = com.nuvio.app.features.serializd.rememberSerializdProfileId()
+    val accounts by com.nuvio.app.features.serializd.SerializdRuntime.manager.accountsFlow.collectAsStateWithLifecycle()
+    return accounts[profileId] != null
 }

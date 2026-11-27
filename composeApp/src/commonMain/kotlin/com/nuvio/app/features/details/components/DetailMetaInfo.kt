@@ -165,7 +165,7 @@ fun DetailMetaInfo(
 
         if (!meta.description.isNullOrBlank()) {
             ExpandableDescription(
-                text = meta.description,
+                text = meta.description.orEmpty(),
                 collapsedMaxLines = 3,
                 style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 22.sp),
             )

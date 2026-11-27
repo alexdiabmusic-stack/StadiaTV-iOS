@@ -16,7 +16,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.nuvio.app.features.settings.AppIconPlatform
 
-internal actual object SportsAlarmPlatform {
+object AndroidSportsAlarms : SportsAlarmBackend {
     internal const val REMINDER_CHANNEL_ID = "sports_reminders"
     private var appContext: Context? = null
 
@@ -33,7 +33,7 @@ internal actual object SportsAlarmPlatform {
         return PendingIntent.getBroadcast(context, id.hashCode(), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
-    actual fun scheduleAlarm(id: String, atMs: Long) {
+    override fun scheduleAlarm(id: String, atMs: Long) {
         val context = appContext ?: return
         val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         runCatching {
@@ -42,22 +42,22 @@ internal actual object SportsAlarmPlatform {
         }
     }
 
-    actual fun cancelAlarm(id: String) {
+    override fun cancelAlarm(id: String) {
         val context = appContext ?: return
         val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
         runCatching { am.cancel(pending(context, id)) }
     }
 
-    actual fun scheduleNotificationAt(id: String, atMs: Long, title: String, text: String, openUrl: String?): Boolean = false
+    override fun scheduleNotificationAt(id: String, atMs: Long, title: String, text: String, openUrl: String?): Boolean = false
 
-    actual fun canScheduleExact(): Boolean {
+    override fun canScheduleExact(): Boolean {
         val context = appContext ?: return false
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
         val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return false
         return am.canScheduleExactAlarms()
     }
 
-    actual fun requestExactAlarms() {
+    override fun requestExactAlarms() {
         val context = appContext ?: return
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
         runCatching {
@@ -69,7 +69,7 @@ internal actual object SportsAlarmPlatform {
         }
     }
 
-    actual fun notificationsAllowed(): Boolean {
+    override fun notificationsAllowed(): Boolean {
         val context = appContext ?: return false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -93,7 +93,7 @@ internal actual object SportsAlarmPlatform {
 
     private fun notificationId(id: String): Int = 7400 + (id.hashCode() and 0xffff)
 
-    actual fun notifyReminder(id: String, title: String, text: String, openUrl: String?, important: Boolean) {
+    override fun notifyReminder(id: String, title: String, text: String, openUrl: String?, important: Boolean) {
         val context = appContext ?: return
         if (!notificationsAllowed()) return
         ensureChannel()

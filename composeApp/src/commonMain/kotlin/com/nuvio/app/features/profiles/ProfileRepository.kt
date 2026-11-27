@@ -309,6 +309,10 @@ object ProfileRepository {
     suspend fun deleteProfile(profileIndex: Int) {
         val deletedProfile = _state.value.profiles.firstOrNull { it.profileIndex == profileIndex }
         val userId = deletedProfile?.userId.orEmpty()
+        // A deleted profile takes its Letterboxd sign-in and local journal with it.
+        runCatching { com.nuvio.app.features.letterboxd.LetterboxdRuntime.manager.disconnect(profileIndex, deleteLocalHistory = true) }
+        // ... and its Serializd sign-in, queue and local records.
+        runCatching { com.nuvio.app.features.serializd.SerializdRuntime.manager.disconnect(profileIndex, deleteLocalHistory = true) }
 
         if (AuthRepository.state.value.isAnonymous) {
             val remaining = _state.value.profiles.filter { it.profileIndex != profileIndex }

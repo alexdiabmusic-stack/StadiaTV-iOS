@@ -392,7 +392,12 @@ struct ComposeView: UIViewControllerRepresentable {
 
 @available(iOS 16.0, *)
 extension AppRoute {
-    var keepsTabBar: Bool { self is SettingsDestinationRoute }
+    var keepsTabBar: Bool {
+        guard self is SettingsDestinationRoute else { return false }
+        // The second-level Serializd and Letterboxd pages are long lists of their own: the floating bar would cover its lower rows, so it is hidden there.
+        if let page = self as? SettingsPageRoute, page.pageName == "SerializdAdvanced" || page.pageName == "LetterboxdAdvanced" { return false }
+        return true
+    }
 }
 
 extension Array where Element == RouteWrapper {

@@ -620,6 +620,9 @@ internal fun MainAppContent(
     }
     launchOverlayState.targetState = launchOverlayVisible
 
+    if (ownsAppRuntime) com.nuvio.app.features.letterboxd.LetterboxdOverlayHost()
+    if (ownsAppRuntime) com.nuvio.app.features.serializd.SerializdOverlayHost()
+
     LaunchedEffect(
         rootContentReady,
         ownsAppRuntime,

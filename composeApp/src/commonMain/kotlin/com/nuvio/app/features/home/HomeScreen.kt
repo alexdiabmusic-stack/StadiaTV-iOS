@@ -76,6 +76,8 @@ import com.nuvio.app.features.explore.ExploreSelection
 import com.nuvio.app.features.library.LibraryRepository
 import com.nuvio.app.features.recommendations.RecommendationEngine
 import com.nuvio.app.features.recommendations.RecommendationInputs
+import com.nuvio.app.features.recommendations.installRecommendationEngine
+import com.nuvio.app.features.recommendations.toEvidence
 import com.nuvio.app.features.home.components.HomeContinueWatchingSection
 import com.nuvio.app.features.home.components.HomeEmptyStateCard
 import com.nuvio.app.features.home.components.HomeHeroReservedSpace
@@ -86,7 +88,13 @@ import com.nuvio.app.features.home.components.HomeContinueWatchingSectionBottomP
 import com.nuvio.app.features.home.components.ContinueWatchingLayout
 import com.nuvio.app.features.tracking.TrackingSettingsRepository
 import com.nuvio.app.features.tracking.WatchProgressSource
+import com.nuvio.app.features.letterboxd.LetterboxdRuntime
+import com.nuvio.app.features.watched.HomeWatchedFilter
 import com.nuvio.app.features.watched.WatchedItem
+import com.nuvio.app.features.watched.WatchedTmdbIndex
+import com.nuvio.app.features.watched.withoutWatched
+import com.nuvio.app.features.recommendations.letterboxdRatings
+import androidx.compose.runtime.rememberCoroutineScope
 import com.nuvio.app.features.watched.WatchedRepository
 import com.nuvio.app.features.watched.WatchedUiState
 import com.nuvio.app.features.watched.episodePlaybackId
@@ -193,6 +201,31 @@ fun HomeScreen(
     val watchedUiState by WatchedRepository.uiState.collectAsStateWithLifecycle()
     val recommendations by RecommendationEngine.state.collectAsStateWithLifecycle()
     val fullyWatchedForBecause by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
+    // Discovery rows leave out what the member has watched (Settings > Layout > Homescreen). The engine's TMDB keys cover
+    // titles whose history entry is stored under a TMDB id rather than the IMDb id the row uses.
+    val hideWatchedRows by HomeWatchedFilter.hideWatched.collectAsStateWithLifecycle()
+    val rowWatchedKeys = remember(watchedUiState.watchedKeys, recommendations.watchedTmdbKeys) { watchedUiState.watchedKeys + recommendations.watchedTmdbKeys }
+    val rowFinishedSeries = remember(fullyWatchedForBecause, recommendations.completedSeriesTmdbKeys) { fullyWatchedForBecause + recommendations.completedSeriesTmdbKeys }
+    // Endless rows: scrolling to a TMDB row's end loads more, and a row that hiding watched titles left short is refilled.
+    val endlessScope = rememberCoroutineScope()
+    val endless = remember { EndlessRows(endlessScope) }
+    fun shownOnHome(): Set<String> = buildSet {
+        trending.top10.forEach { add(it.id) }
+        trending.rows.forEach { row -> endless.items(row.key, row.items).forEach { add(it.id) } }
+        recommendations.items.forEach { add(it.id) }
+        recommendations.rows.forEach { r -> r.items.forEach { add(it.id) } }
+    }
+    LaunchedEffect(trending.rows, rowWatchedKeys, rowFinishedSeries, hideWatchedRows) {
+        if (!hideWatchedRows) return@LaunchedEffect
+        for (row in trending.rows) {
+            var rounds = 0
+            while (rounds++ < HOME_REFILL_ROUNDS) {
+                val visible = endless.items(row.key, row.items).withoutWatched(true, rowWatchedKeys, rowFinishedSeries)
+                if (visible.size >= HOME_REFILL_TARGET || endless.isExhausted(row.key)) break
+                if (!endless.loadOnce(row.key, row.items, shownOnHome())) break
+            }
+        }
+    }
     val libraryUiState by LibraryRepository.uiState.collectAsStateWithLifecycle()
     val fullyWatchedSeriesKeys by WatchedRepository.fullyWatchedSeriesKeys.collectAsStateWithLifecycle()
     val watchProgressUiState by WatchProgressRepository.uiState.collectAsStateWithLifecycle()
@@ -361,20 +394,28 @@ fun HomeScreen(
     val profileState by ProfileRepository.state.collectAsStateWithLifecycle()
     val activeProfileId = profileState.activeProfile?.profileIndex ?: 1
     // Recommended For You and the personal rows, rebuilt in the background when this profile's history changes.
-    LaunchedEffect(activeProfileId, watchedUiState.items.size, fullyWatchedForBecause, watchProgressUiState.entries.size, libraryUiState.items.size) {
+    // Every watched film is known by TMDB id (the engine looks up only a sample of titles itself), and the member's Letterboxd
+    // ratings tell it which films they loved and which they disliked.
+    val tmdbIndexVersion by WatchedTmdbIndex.version.collectAsStateWithLifecycle()
+    val letterboxdViewings by LetterboxdRuntime.manager.engine.viewings.collectAsStateWithLifecycle()
+    LaunchedEffect(watchedUiState.items.size) { WatchedTmdbIndex.resolveMissing(watchedUiState.items) }
+    LaunchedEffect(activeProfileId, watchedUiState.items.size, fullyWatchedForBecause, watchProgressUiState.entries.size, libraryUiState.items.size, tmdbIndexVersion, letterboxdViewings.size) {
+        installRecommendationEngine()
         RecommendationEngine.refresh(
             RecommendationInputs(
                 profileId = activeProfileId,
-                watched = watchedUiState.items,
+                watched = watchedUiState.items.map { it.toEvidence() },
                 fullyWatchedSeriesKeys = fullyWatchedForBecause,
-                progress = watchProgressUiState.entries,
-                saved = libraryUiState.items,
+                progress = watchProgressUiState.entries.map { it.toEvidence() },
+                saved = libraryUiState.items.map { it.toEvidence() },
+                ratings = letterboxdRatings(letterboxdViewings, activeProfileId),
+                extraWatchedMovieTmdb = WatchedTmdbIndex.tmdbIdsOf(watchedUiState.items),
             ),
         )
     }
     // The week's collection selection; it changes only with the week or the profile's top genres.
     val topGenres = recommendations.taste.genres.entries.sortedByDescending { it.value }.take(3).map { it.key }
-    val exploreRail = remember(activeProfileId, topGenres) { ExploreSelection.forHomeToday(recommendations.taste) }
+    val exploreRail = remember(activeProfileId, topGenres) { ExploreSelection.forHomeToday(recommendations.taste, com.nuvio.app.features.watchprogress.CurrentDateProvider.todayIsoDate()) }
     val cwCacheGeneration by ContinueWatchingEnrichmentCache.generation.collectAsStateWithLifecycle()
     var hasUserScrolledContinueWatching by remember(activeProfileId) { mutableStateOf(false) }
     var hasUserScrolledUpcoming by remember(activeProfileId) { mutableStateOf(false) }
@@ -1270,7 +1311,7 @@ fun HomeScreen(
                         // Recommended For You, straight under the Top 10 and without repeating it. A profile with no
                         // history yet gets the acclaimed-titles fallback under its own, honest title.
                         val topTitleKeys = trending.top10.mapTo(HashSet()) { it.homeTitleKey() }
-                        val recommended = recommendations.items.filter { it.homeTitleKey() !in topTitleKeys }
+                        val recommended = endless.items("recommended", recommendations.items).filter { it.homeTitleKey() !in topTitleKeys }.withoutWatched(hideWatchedRows, rowWatchedKeys, rowFinishedSeries)
                         if (recommended.size >= 6) {
                             rows += HomeRow(
                                 HomeRowIds.RECOMMENDED,
@@ -1285,10 +1326,11 @@ fun HomeScreen(
                                     headerHorizontalPadding = homeSectionPadding,
                                     rowContentPadding = PaddingValues(horizontal = homeSectionPadding),
                                     key = { it.stableKey() },
+                                    onEndReached = { endless.more("recommended", recommendations.items, shownOnHome()) },
                                 ) { pick ->
                                     HomePosterCard(
                                         item = pick,
-                                        isWatched = false,
+                                        isWatched = WatchingState.isPosterWatched(rowWatchedKeys, pick, rowFinishedSeries),
                                         onClick = onPosterClick?.let { { it(pick) } },
                                         onLongClick = onPosterLongClick?.let { { it(pick) } },
                                     )
@@ -1321,7 +1363,12 @@ fun HomeScreen(
                         // rows are spaced out between the universal ones: the most relevant (RecommendationState
                         // .prominentRows of them) after the 3rd, 6th and 9th, any others further down.
                         val contextualRows = recommendations.rows
-                        trending.rows.forEachIndexed { rowIndex, row ->
+                        // A row that is mostly watched titles is dropped rather than shown thin.
+                        val curatedRows = trending.rows.mapNotNull { row ->
+                            val items = endless.items(row.key, row.items).withoutWatched(hideWatchedRows, rowWatchedKeys, rowFinishedSeries)
+                            if (items.size >= HOME_MIN_UNWATCHED_ROW) row.copy(items = items) else null
+                        }
+                        curatedRows.forEachIndexed { rowIndex, row ->
                             rows += HomeRow(HomeRowIds.curated(row.key), row.title, "home_curated_${row.key}", HOME_CATALOG_ROW_CONTENT_TYPE) {
                                 NuvioShelfSection(
                                     title = row.title,
@@ -1330,12 +1377,13 @@ fun HomeScreen(
                                     headerHorizontalPadding = homeSectionPadding,
                                     rowContentPadding = PaddingValues(horizontal = homeSectionPadding),
                                     key = { it.stableKey() },
+                                    onEndReached = { endless.more(row.key, trending.rows.firstOrNull { it.key == row.key }?.items ?: row.items, shownOnHome()) },
                                 ) { pick ->
                                     // Every third row switches to wide artwork, so Home isn't one poster rail after another.
                                     HomePosterCard(
                                         item = pick,
                                         useLandscapeBackdropMode = rowIndex % 3 == 2,
-                                        isWatched = WatchingState.isPosterWatched(watchedUiState.watchedKeys, pick, fullyWatchedForBecause),
+                                        isWatched = WatchingState.isPosterWatched(rowWatchedKeys, pick, rowFinishedSeries),
                                         onClick = onPosterClick?.let { { it(pick) } },
                                         onLongClick = onPosterLongClick?.let { { it(pick) } },
                                     )
@@ -1358,9 +1406,12 @@ fun HomeScreen(
                             val placedThrough = if (rowIndex >= 2) (rowIndex - 2) / 3 + 1 else 0
                             val personalHere = buildList {
                                 slotHere?.let { contextualRows.getOrNull(it)?.let(::add) }
-                                if (trending.loadedOnce && rowIndex == trending.rows.lastIndex) addAll(contextualRows.drop(placedThrough))
+                                if (trending.loadedOnce && rowIndex == curatedRows.lastIndex) addAll(contextualRows.drop(placedThrough))
                             }
-                            personalHere.forEach { picks ->
+                            personalHere.forEach { allPicks ->
+                                val personalKey = HomeRowIds.personal(allPicks.kind.name)
+                                val picks = allPicks.copy(items = endless.items(personalKey, allPicks.items).withoutWatched(hideWatchedRows, rowWatchedKeys, rowFinishedSeries))
+                                if (picks.items.size < HOME_MIN_UNWATCHED_PERSONAL_ROW) return@forEach
                                 rows += HomeRow(HomeRowIds.personal(picks.kind.name), picks.title, "home_personal_${picks.kind.name}", HOME_PERSONAL_ROW_CONTENT_TYPE) {
                                     NuvioShelfSection(
                                         title = picks.title,
@@ -1369,9 +1420,11 @@ fun HomeScreen(
                                         headerHorizontalPadding = homeSectionPadding,
                                         rowContentPadding = PaddingValues(horizontal = homeSectionPadding),
                                         key = { it.stableKey() },
+                                        onEndReached = { endless.more(personalKey, allPicks.items, shownOnHome()) },
                                     ) { pick ->
                                         LabeledPosterCard(
                                             item = pick,
+                                            isWatched = WatchingState.isPosterWatched(rowWatchedKeys, pick, rowFinishedSeries),
                                             label = picks.labels[pick.id],
                                             onClick = onPosterClick?.let { { it(pick) } },
                                             onLongClick = onPosterLongClick?.let { { it(pick) } },
@@ -1536,6 +1589,10 @@ private fun LazyListScope.homeContinueWatchingSections(
 }
 
 private const val HOME_CATALOG_PREVIEW_LIMIT = 18
+private const val HOME_MIN_UNWATCHED_ROW = 4
+private const val HOME_REFILL_TARGET = 14
+private const val HOME_REFILL_ROUNDS = 8
+private const val HOME_MIN_UNWATCHED_PERSONAL_ROW = 3
 private const val HOME_CONTINUE_WATCHING_SECTION_KEY = "home_continue_watching"
 private const val HOME_UPCOMING_SECTION_KEY = "home_upcoming"
 
@@ -1545,10 +1602,10 @@ private const val HOME_PERSONAL_ROW_CONTENT_TYPE = "home_personal_row"
 
 /** A poster with one quiet line under it ("Saved 4 months ago", "With Emily Blunt"); the poster itself is untouched. */
 @Composable
-private fun LabeledPosterCard(item: MetaPreview, label: String?, onClick: (() -> Unit)?, onLongClick: (() -> Unit)?) {
+private fun LabeledPosterCard(item: MetaPreview, label: String?, onClick: (() -> Unit)?, onLongClick: (() -> Unit)?, isWatched: Boolean = false) {
     val width = com.nuvio.app.core.ui.rememberPosterCardStyleUiState().widthDp.dp
     Column(Modifier.width(width), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        HomePosterCard(item = item, isWatched = false, onClick = onClick, onLongClick = onLongClick)
+        HomePosterCard(item = item, isWatched = isWatched, onClick = onClick, onLongClick = onLongClick)
         Text(
             text = label.orEmpty(),
             style = MaterialTheme.typography.labelSmall,

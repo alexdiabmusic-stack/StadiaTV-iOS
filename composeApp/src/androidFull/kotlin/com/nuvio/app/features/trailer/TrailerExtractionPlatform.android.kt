@@ -25,6 +25,10 @@ internal object TrailerExtractionPlatform {
             "(KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
     )
 
+    // ExoPlayer and libmpv decode every codec the extractor returns, so nothing is filtered here.
+    fun filterVideoCandidates(candidates: List<StreamCandidate>): List<StreamCandidate> = candidates
+    fun filterAudioCandidates(candidates: List<StreamCandidate>): List<StreamCandidate> = candidates
+
     private val httpClient = OkHttpClient.Builder()
         .dns(IPv4FirstDns())
         .callTimeout(TRAILER_REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS)

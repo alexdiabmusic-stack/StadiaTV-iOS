@@ -23,11 +23,11 @@ import nuvio.composeapp.generated.resources.network_request_failed_http
 import org.jetbrains.compose.resources.getString
 import platform.Foundation.NSUserDefaults
 
-actual object AddonStorage {
+object PlatformAddonStorage : AddonStorage.Backend {
     private const val addonUrlsKey = "installed_manifest_urls"
     private const val addonEnabledStatesKey = "installed_manifest_enabled_states"
 
-    actual fun loadInstalledAddonUrls(profileId: Int): List<String> =
+    override fun loadInstalledAddonUrls(profileId: Int): List<String> =
         NSUserDefaults.standardUserDefaults
             .stringForKey("${addonUrlsKey}_$profileId")
             .orEmpty()
@@ -36,14 +36,14 @@ actual object AddonStorage {
             .filter { it.isNotEmpty() }
             .toList()
 
-    actual fun saveInstalledAddonUrls(profileId: Int, urls: List<String>) {
+    override fun saveInstalledAddonUrls(profileId: Int, urls: List<String>) {
         NSUserDefaults.standardUserDefaults.setObject(
             urls.joinToString(separator = "\n"),
             forKey = "${addonUrlsKey}_$profileId",
         )
     }
 
-    actual fun loadAddonEnabledStates(profileId: Int): Map<String, Boolean> =
+    override fun loadAddonEnabledStates(profileId: Int): Map<String, Boolean> =
         NSUserDefaults.standardUserDefaults
             .stringForKey("${addonEnabledStatesKey}_$profileId")
             .orEmpty()
@@ -51,7 +51,7 @@ actual object AddonStorage {
             .mapNotNull(::parseEnabledStateLine)
             .toMap()
 
-    actual fun saveAddonEnabledStates(profileId: Int, states: Map<String, Boolean>) {
+    override fun saveAddonEnabledStates(profileId: Int, states: Map<String, Boolean>) {
         val payload = states.entries.joinToString(separator = "\n") { (url, enabled) ->
             "$url\t$enabled"
         }
@@ -81,7 +81,7 @@ private val addonHttpClient = HttpClient(Darwin) {
     expectSuccess = false
 }
 
-actual suspend fun httpGetText(url: String): String =
+private suspend fun httpGetTextImpl(url: String): String =
     addonHttpClient
         .get(url) {
             accept(ContentType.Application.Json)
@@ -97,7 +97,7 @@ actual suspend fun httpGetText(url: String): String =
             payload
         }
 
-actual suspend fun httpPostJson(url: String, body: String): String =
+private suspend fun httpPostJsonImpl(url: String, body: String): String =
     addonHttpClient
         .post(url) {
             accept(ContentType.Application.Json)
@@ -115,7 +115,7 @@ actual suspend fun httpPostJson(url: String, body: String): String =
             payload
         }
 
-actual suspend fun httpGetTextWithHeaders(
+private suspend fun httpGetTextWithHeadersImpl(
     url: String,
     headers: Map<String, String>,
 ): String =
@@ -137,7 +137,7 @@ actual suspend fun httpGetTextWithHeaders(
             payload
         }
 
-actual suspend fun httpPostJsonWithHeaders(
+private suspend fun httpPostJsonWithHeadersImpl(
     url: String,
     body: String,
     headers: Map<String, String>,
@@ -162,7 +162,7 @@ actual suspend fun httpPostJsonWithHeaders(
             payload
         }
 
-actual suspend fun httpRequestRaw(
+private suspend fun httpRequestRawImpl(
     method: String,
     url: String,
     headers: Map<String, String>,
@@ -197,3 +197,22 @@ actual suspend fun httpRequestRaw(
                 },
             )
         }
+
+/** Registers this platform's HTTP for add-ons and plugins with the shared core. */
+object PlatformAddonHttp : AddonHttp.Backend {
+    override suspend fun getText(url: String): String = httpGetTextImpl(url)
+    override suspend fun postJson(url: String, body: String): String = httpPostJsonImpl(url, body)
+    override suspend fun getTextWithHeaders(url: String, headers: Map<String, String>): String =
+        httpGetTextWithHeadersImpl(url, headers)
+    override suspend fun postJsonWithHeaders(url: String, body: String, headers: Map<String, String>): String =
+        httpPostJsonWithHeadersImpl(url, body, headers)
+    override suspend fun requestRaw(
+        method: String,
+        url: String,
+        headers: Map<String, String>,
+        body: String,
+        followRedirects: Boolean,
+        maxResponseBodyBytes: Int,
+        bodyBytes: ByteArray?,
+    ): RawHttpResponse = httpRequestRawImpl(method, url, headers, body, followRedirects, maxResponseBodyBytes, bodyBytes)
+}

@@ -35,6 +35,10 @@ import com.nuvio.app.core.ui.nuvio
 import com.nuvio.app.core.ui.rememberPosterCardStyleUiState
 import com.nuvio.app.features.home.MetaPreview
 import com.nuvio.app.features.home.stableKey
+import com.nuvio.app.features.watched.WatchedRepository
+import com.nuvio.app.features.watching.application.WatchingState
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 
 /**
  * Netflix-style "Top 10 Today": films and series in one ranking (see HomeTrendingState.top10), each poster beside a
@@ -50,6 +54,9 @@ fun HomeTop10Row(
     onPosterLongClick: ((MetaPreview) -> Unit)? = null,
 ) {
     val style = rememberPosterCardStyleUiState()
+    // A chart keeps every title; the ones already watched carry the check.
+    val watched by remember { WatchedRepository.ensureLoaded(); WatchedRepository.uiState }.collectAsState()
+    val fullyWatched by WatchedRepository.fullyWatchedSeriesKeys.collectAsState()
     val ranked = remember(items) { items.mapIndexed { index, item -> (index + 1) to item } }
     NuvioShelfSection(
         title = title,
@@ -65,6 +72,7 @@ fun HomeTop10Row(
             rank = rank,
             item = item,
             posterHeight = style.heightDp.dp,
+            isWatched = WatchingState.isPosterWatched(watched.watchedKeys, item, fullyWatched),
             onClick = onPosterClick?.let { { it(item) } },
             onLongClick = onPosterLongClick?.let { { it(item) } },
         )
@@ -76,6 +84,7 @@ private fun Top10Card(
     rank: Int,
     item: MetaPreview,
     posterHeight: Dp,
+    isWatched: Boolean,
     onClick: (() -> Unit)?,
     onLongClick: (() -> Unit)?,
 ) {
@@ -130,6 +139,7 @@ private fun Top10Card(
                 fallbackImageUrl = item.banner,
                 shape = NuvioPosterShape.Poster,
                 showTitleBelow = false,
+                isWatched = isWatched,
                 onClick = onClick,
                 onLongClick = onLongClick,
             )

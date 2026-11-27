@@ -116,8 +116,8 @@ private fun SimklSyncSnapshot.withoutHistory(
             updated = updated.map { entry ->
                 if (entry.media?.matchesTarget(target) == true) {
                     entry.withoutWatchedEpisode(
-                        season = mutation.episode.season,
-                        number = mutation.episode.number,
+                        season = mutation.episode!!.season,
+                        number = mutation.episode!!.number,
                     )
                 } else {
                     entry

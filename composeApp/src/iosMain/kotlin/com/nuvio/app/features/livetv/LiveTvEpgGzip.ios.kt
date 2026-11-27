@@ -22,7 +22,8 @@ import platform.zlib.z_stream
 import platform.zlib.zlibVersion
 
 @OptIn(ExperimentalForeignApi::class)
-internal actual fun liveTvGunzip(bytes: ByteArray, maxOutputBytes: Int): ByteArray {
+object PlatformLiveTvGzip : LiveTvGzip.Backend {
+    override fun gunzip(bytes: ByteArray, maxOutputBytes: Int): ByteArray {
     if (bytes.isEmpty()) return bytes
     val chunks = mutableListOf<ByteArray>()
     var total = 0
@@ -67,4 +68,5 @@ internal actual fun liveTvGunzip(bytes: ByteArray, maxOutputBytes: Int): ByteArr
         offset += chunk.size
     }
     return result
+}
 }

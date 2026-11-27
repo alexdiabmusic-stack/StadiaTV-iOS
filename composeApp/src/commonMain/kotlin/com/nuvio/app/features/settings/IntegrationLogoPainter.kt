@@ -9,6 +9,8 @@ internal enum class IntegrationLogo {
     Simkl,
     MdbList,
     IntroDb,
+    Serializd,
+    Letterboxd,
 }
 
 @Composable

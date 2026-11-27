@@ -1,10 +1,10 @@
 package com.nuvio.app.core.network
 
-internal actual object DnsPlatform {
-    actual val isSupported: Boolean = false
-    actual fun load(): String? = null
-    actual fun save(storageId: String) = Unit
-    actual fun apply(provider: DnsProvider) = Unit
+internal object PlatformDnsPlatform : DnsPlatform.Backend {
+    override val isSupported: Boolean = false
+    override fun load(): String? = null
+    override fun save(storageId: String) = Unit
+    override fun apply(provider: DnsProvider) = Unit
 }
 
-internal actual fun platformHttpEngine(): io.ktor.client.engine.HttpClientEngine? = null
+internal fun platformHttpEngineImpl(): io.ktor.client.engine.HttpClientEngine? = null

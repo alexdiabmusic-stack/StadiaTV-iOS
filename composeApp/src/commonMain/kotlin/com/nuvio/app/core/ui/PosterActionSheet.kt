@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import nuvio.composeapp.generated.resources.Res
 import nuvio.composeapp.generated.resources.episodes_cd_watched
 import org.jetbrains.compose.resources.stringResource
@@ -75,7 +76,25 @@ fun BoxScope.NuvioPosterWatchedOverlay(
         exit = fadeOut(),
         modifier = modifier.matchParentSize(),
     ) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = WATCHED_SCRIM_ALPHA)))
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = WATCHED_SCRIM_ALPHA))) {
+            // A small check in the corner, so a watched title is obvious at a glance and not only slightly dimmed.
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(20.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(Color.Black.copy(alpha = 0.72f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Check,
+                    contentDescription = stringResource(Res.string.episodes_cd_watched),
+                    tint = Color.White,
+                    modifier = Modifier.size(13.dp),
+                )
+            }
+        }
     }
 }
 

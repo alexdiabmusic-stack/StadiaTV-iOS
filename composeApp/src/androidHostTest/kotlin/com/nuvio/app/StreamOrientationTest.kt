@@ -6,7 +6,7 @@ import android.content.pm.ActivityInfo
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.nuvio.app.core.ui.NuvioTheme
 import com.nuvio.app.features.addons.AddonRepository
-import com.nuvio.app.features.addons.AddonStorage
+import com.nuvio.app.features.addons.PlatformAddonStorage
 import com.nuvio.app.features.details.MetaDetailsRepository
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.PlayerSettingsStorage
@@ -54,7 +54,7 @@ class StreamOrientationTest {
     fun initialize() {
         val context = RuntimeEnvironment.getApplication()
         PlayerSettingsStorage.initialize(context)
-        AddonStorage.initialize(context)
+        PlatformAddonStorage.initialize(context)
         BingeGroupCacheStorage.initialize(context)
         AndroidAppUpdaterPlatform.initialize(context)
         PlayerSettingsRepository.clearLocalState()
@@ -148,7 +148,7 @@ class StreamOrientationTest {
                      "behaviorHints":{"bingeGroup":"different-group"}}]}
                 """.trimIndent()).setBodyDelay(500, TimeUnit.MILLISECONDS))
             }
-            AddonStorage.saveInstalledAddonUrls(
+            PlatformAddonStorage.saveInstalledAddonUrls(
                 ProfileRepository.activeProfileId,
                 listOf(server.url("/manifest.json").toString()),
             )

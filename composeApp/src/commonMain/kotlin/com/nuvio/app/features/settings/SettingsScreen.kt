@@ -876,6 +876,8 @@ private fun MobileSettingsScreen(
                     onOmdbClick = { onPageChange(SettingsPage.Omdb) },
                     onLiveTvClick = { onPageChange(SettingsPage.LiveTv) },
                     onDiscordClick = { onPageChange(SettingsPage.DiscordRpc) },
+                    onLetterboxdClick = { onPageChange(SettingsPage.Letterboxd) },
+                    onSerializdClick = { onPageChange(SettingsPage.Serializd) },
                 )
                 SettingsPage.Debrid -> debridSettingsContent(
                     isTablet = false,
@@ -909,6 +911,10 @@ private fun MobileSettingsScreen(
                 SettingsPage.DiscordRpc -> discordRpcSettingsContent(
                     isTablet = false,
                 )
+                SettingsPage.Letterboxd -> letterboxdSettingsContent(isTablet = false, onAdvancedClick = { onPageChange(SettingsPage.LetterboxdAdvanced) })
+                SettingsPage.LetterboxdAdvanced -> letterboxdAdvancedSettingsContent(isTablet = false)
+                SettingsPage.Serializd -> serializdSettingsContent(isTablet = false, onAdvancedClick = { onPageChange(SettingsPage.SerializdAdvanced) })
+                SettingsPage.SerializdAdvanced -> serializdAdvancedSettingsContent(isTablet = false)
                 SettingsPage.Experience -> experienceSettingsContent(isTablet = false)
             }
         }
@@ -1335,6 +1341,8 @@ private fun TabletSettingsScreen(
                         onOmdbClick = { onPageChange(SettingsPage.Omdb) },
                         onLiveTvClick = { onPageChange(SettingsPage.LiveTv) },
                         onDiscordClick = { onPageChange(SettingsPage.DiscordRpc) },
+                    onLetterboxdClick = { onPageChange(SettingsPage.Letterboxd) },
+                    onSerializdClick = { onPageChange(SettingsPage.Serializd) },
                     )
                     SettingsPage.Debrid -> debridSettingsContent(
                         isTablet = true,
@@ -1368,6 +1376,10 @@ private fun TabletSettingsScreen(
                     SettingsPage.DiscordRpc -> discordRpcSettingsContent(
                         isTablet = true,
                     )
+                    SettingsPage.Letterboxd -> letterboxdSettingsContent(isTablet = true, onAdvancedClick = { onPageChange(SettingsPage.LetterboxdAdvanced) })
+                    SettingsPage.LetterboxdAdvanced -> letterboxdAdvancedSettingsContent(isTablet = true)
+                    SettingsPage.Serializd -> serializdSettingsContent(isTablet = true, onAdvancedClick = { onPageChange(SettingsPage.SerializdAdvanced) })
+                    SettingsPage.SerializdAdvanced -> serializdAdvancedSettingsContent(isTablet = true)
                     SettingsPage.Experience -> experienceSettingsContent(isTablet = true)
                 }
             }

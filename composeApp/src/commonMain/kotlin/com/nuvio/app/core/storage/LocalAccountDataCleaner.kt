@@ -81,6 +81,8 @@ internal object LocalAccountDataCleaner {
 
         ensureTrackingProvidersRegistered()
         TrackingProviderRegistry.removeStoredProfiles(1..MAX_PROFILES)
+        runCatching { com.nuvio.app.features.letterboxd.LetterboxdRuntime.manager.wipeAll(MAX_PROFILES) }
+        runCatching { com.nuvio.app.features.serializd.SerializdRuntime.manager.wipeAll(MAX_PROFILES) }
         SyncManager.cancelAccountSync()
         WatchProgressSourceCoordinator.clearLocalState()
         ProfileSettingsSync.clearAccountState()

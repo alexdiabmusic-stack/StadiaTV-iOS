@@ -17,12 +17,6 @@ private const val UpcomingNextSeasonWindowDays = 7
  */
 private const val MinRealContentDurationMs = 121_000L
 
-fun watchedKey(
-    content: WatchingContentRef,
-    seasonNumber: Int? = null,
-    episodeNumber: Int? = null,
-): String = "${content.type.trim()}:${content.id.trim()}:${seasonNumber ?: -1}:${episodeNumber ?: -1}"
-
 fun shouldStoreProgress(
     positionMs: Long,
     durationMs: Long,

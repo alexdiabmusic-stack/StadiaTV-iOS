@@ -1,10 +1,5 @@
 package com.nuvio.app.features.watching.domain
 
-data class WatchingContentRef(
-    val type: String,
-    val id: String,
-)
-
 data class WatchingEpisodeRef(
     val content: WatchingContentRef,
     val seasonNumber: Int? = null,

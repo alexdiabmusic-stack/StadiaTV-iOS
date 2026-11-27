@@ -68,9 +68,9 @@ private data class SimklHiddenContentIndex(
         val ids = parseTrackingExternalIds(contentId)
         val key = when {
             ids.simkl != null -> "simkl:${ids.simkl}"
-            !ids.imdb.isNullOrBlank() -> "imdb:${ids.imdb.caseInsensitiveIdentity()}"
+            !ids.imdb.isNullOrBlank() -> "imdb:${ids.imdb!!.caseInsensitiveIdentity()}"
             ids.tmdb != null -> "tmdb:${ids.tmdb}"
-            !ids.tvdb.isNullOrBlank() -> "tvdb:${ids.tvdb.caseInsensitiveIdentity()}"
+            !ids.tvdb.isNullOrBlank() -> "tvdb:${ids.tvdb!!.caseInsensitiveIdentity()}"
             ids.mal != null -> "mal:${ids.mal}"
             ids.anidb != null -> "anidb:${ids.anidb}"
             ids.anilist != null -> "anilist:${ids.anilist}"

@@ -3109,4 +3109,8 @@
     <string name="settings_glass_ui_style_dark">Dark</string>
     <string name="settings_glass_ui_style_balanced">Balanced</string>
     <string name="settings_glass_ui_style_vivid">Vivid</string>
+    <string name="compose_settings_page_letterboxd_advanced">Letterboxd</string>
+    <string name="compose_settings_page_letterboxd">Letterboxd</string>
+    <string name="compose_settings_page_serializd">Serializd</string>
+    <string name="compose_settings_page_serializd_advanced">Serializd</string>
 </resources>

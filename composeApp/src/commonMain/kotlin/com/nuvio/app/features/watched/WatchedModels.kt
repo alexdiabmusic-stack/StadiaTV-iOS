@@ -83,36 +83,5 @@ internal fun normalizeWatchedMarkedAtEpochMs(value: Long): Long {
     return parseZonedIsoDateTimeToEpochMs(iso) ?: value
 }
 
-fun watchedItemKey(
-    type: String,
-    id: String,
-    season: Int? = null,
-    episode: Int? = null,
-): String = watchedKey(
-    content = WatchingContentRef(type = type, id = id),
-    seasonNumber = season,
-    episodeNumber = episode,
-)
-
-internal fun watchedItemTypeAliases(type: String): Set<String> = when (type.trim().lowercase()) {
-    "movie", "film" -> setOf("movie", "film")
-    "series", "show", "tv", "tvshow", "anime" -> setOf("series", "show", "tv", "tvshow", "anime")
-    else -> setOf(type.trim())
-}
-
-internal fun watchedItemKeys(
-    type: String,
-    id: String,
-    season: Int? = null,
-    episode: Int? = null,
-): Set<String> = watchedItemTypeAliases(type).mapTo(linkedSetOf()) { alias ->
-    watchedItemKey(
-        type = alias,
-        id = id,
-        season = season,
-        episode = episode,
-    )
-}
-
 private const val CompactWatchedTimestampMin = 19000101000000L
 private const val CompactWatchedTimestampMax = 29991231235959L

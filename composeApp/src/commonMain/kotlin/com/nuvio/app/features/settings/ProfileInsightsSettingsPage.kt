@@ -2686,6 +2686,18 @@ private object ProfileTitleFactsStore {
     private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private const val FETCH_BUDGET_PER_WINDOW = 150
+    /** While a history import is being absorbed the hourly allowance is lifted (a throttled reply from the source still pauses it). */
+    private const val BACKFILL_BUDGET_PER_WINDOW = 3_000
+    private const val BACKFILL_WINDOW_MS = 6L * 60L * 60_000L
+    private var backfillUntilEpochMs = 0L
+
+    fun allowBackfill() {
+        backfillUntilEpochMs = WatchedClock.nowEpochMs() + BACKFILL_WINDOW_MS
+        // A new window starts now, so titles that had used up the old allowance are picked up too.
+        budgetWindowStartedAtEpochMs = 0L
+        fetchesInWindow = 0
+        lastRequest?.let { request -> mainScope.launch { hydrate(request) } }
+    }
     private const val FETCH_BUDGET_WINDOW_MS = 60L * 60_000L
     private var budgetWindowStartedAtEpochMs = 0L
     private var fetchesInWindow = 0
@@ -2813,7 +2825,8 @@ private object ProfileTitleFactsStore {
                 failures[key]?.let { failedAt -> now - failedAt < FAILURE_RETRY_AFTER_MS } != true
         }
         if (candidates.isEmpty()) return
-        val remainingBudget = FETCH_BUDGET_PER_WINDOW - fetchesInWindow
+        val budget = if (now < backfillUntilEpochMs) BACKFILL_BUDGET_PER_WINDOW else FETCH_BUDGET_PER_WINDOW
+        val remainingBudget = budget - fetchesInWindow
         if (remainingBudget <= 0) {
             scheduleResume(budgetWindowStartedAtEpochMs + FETCH_BUDGET_WINDOW_MS)
             return
@@ -3440,3 +3453,6 @@ private val profileHourTokenRegex = Regex("""(?i)(\d+)\s*h(?:ours?)?""")
 private val profileMinuteTokenRegex = Regex("""(?i)(\d+)\s*m(?:in(?:ute)?s?)?""")
 private val profileHourMinuteColonRegex = Regex("""^\s*(\d+)\s*:\s*(\d{1,2})\s*$""")
 private val profileDigitsOnlyRegex = Regex("""^\s*(\d+)\s*$""")
+
+/** Called after a watch-history import (Letterboxd): lets Taste DNA and watch time catch up on the new titles in minutes, not days. */
+internal fun profileInsightsAllowBackfill() = ProfileTitleFactsStore.allowBackfill()

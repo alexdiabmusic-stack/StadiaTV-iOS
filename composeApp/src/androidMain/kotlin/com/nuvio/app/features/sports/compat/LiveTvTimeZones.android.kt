@@ -2,16 +2,13 @@ package com.nuvio.app.features.sports.compat
 
 import java.util.TimeZone
 
-internal actual object LiveTvTimeZones {
-    actual val SYSTEM: String = "\u0000system"
-    actual val UTC: String = "UTC"
+object AndroidLiveTvTimeZones : LiveTvTimeZonesBackend {
+    override fun isKnown(zoneId: String): Boolean =
+        zoneId == LiveTvTimeZones.SYSTEM || zoneId.equals("UTC", ignoreCase = true) || TimeZone.getAvailableIDs().contains(zoneId)
 
-    actual fun isKnown(zoneId: String): Boolean =
-        zoneId == SYSTEM || zoneId.equals("UTC", ignoreCase = true) || TimeZone.getAvailableIDs().contains(zoneId)
-
-    actual fun offsetMs(zone: String, epochMs: Long): Long {
+    override fun offsetMs(zone: String, epochMs: Long): Long {
         val tz = when {
-            zone == SYSTEM -> TimeZone.getDefault()
+            zone == LiveTvTimeZones.SYSTEM -> TimeZone.getDefault()
             isKnown(zone) -> TimeZone.getTimeZone(zone)
             else -> return 0L
         }

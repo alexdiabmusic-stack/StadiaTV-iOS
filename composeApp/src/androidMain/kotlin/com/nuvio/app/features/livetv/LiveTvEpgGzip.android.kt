@@ -5,7 +5,8 @@ import java.io.ByteArrayOutputStream
 import java.io.EOFException
 import java.util.zip.GZIPInputStream
 
-internal actual fun liveTvGunzip(bytes: ByteArray, maxOutputBytes: Int): ByteArray {
+object PlatformLiveTvGzip : LiveTvGzip.Backend {
+    override fun gunzip(bytes: ByteArray, maxOutputBytes: Int): ByteArray {
     val output = ByteArrayOutputStream(minOf(maxOf(bytes.size * 4, 64 * 1024), maxOutputBytes))
     GZIPInputStream(ByteArrayInputStream(bytes), 64 * 1024).use { input ->
         val buffer = ByteArray(64 * 1024)
@@ -21,4 +22,5 @@ internal actual fun liveTvGunzip(bytes: ByteArray, maxOutputBytes: Int): ByteArr
         }
     }
     return output.toByteArray()
+}
 }

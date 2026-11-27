@@ -134,7 +134,7 @@ internal fun LazyListScope.searchHomeSections(
     item(key = "sh-collections") {
         // The same collections and cards as Home (this profile's selection for the week).
         val taste = RecommendationEngine.state.collectAsState().value.taste
-        val picks = remember(taste.genres.keys) { ExploreSelection.forHomeToday(taste) }
+        val picks = remember(taste.genres.keys) { ExploreSelection.forHomeToday(taste, com.nuvio.app.features.watchprogress.CurrentDateProvider.todayIsoDate()) }
         NuvioShelfSection(
             title = "Explore Collections",
             entries = picks,

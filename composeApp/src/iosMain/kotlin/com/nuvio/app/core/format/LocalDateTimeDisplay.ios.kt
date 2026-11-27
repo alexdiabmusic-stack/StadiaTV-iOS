@@ -15,3 +15,6 @@ actual fun formatLocalTime(epochMs: Long): String = NSDateFormatter().apply {
     dateStyle = NSDateFormatterNoStyle
     timeStyle = NSDateFormatterShortStyle
 }.stringFromDate(NSDate.dateWithTimeIntervalSince1970(epochMs / 1_000.0))
+
+actual fun localUtcOffsetMs(epochMs: Long): Long =
+    platform.Foundation.NSCalendar.currentCalendar.timeZone.secondsFromGMTForDate(NSDate.dateWithTimeIntervalSince1970(epochMs / 1_000.0)) * 1_000L

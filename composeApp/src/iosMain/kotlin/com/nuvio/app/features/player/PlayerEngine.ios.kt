@@ -526,7 +526,8 @@ actual fun PlatformPlayerSurface(
                 }
                 latestOnError.value(errorMessage)
             }
-            delay(250L)
+            // Paused, finished or failed with nothing changing: no need to look four times a second.
+            delay(if (!snapshot.isPlaying && !snapshot.isLoading) 750L else 250L)
         }
     }
 

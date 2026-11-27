@@ -1,8 +1,10 @@
 package com.nuvio.app.features.sports
 
-internal actual object SportsLivePlatform {
-    actual val supported: Boolean = false
-    actual fun show(title: String, text: String, openUrl: String?): Boolean = false
-    actual fun stop() {}
-    actual fun openNotificationSettings() {}
+import com.nuvio.app.features.sports.SportsLivePlatformBackend
+
+object IosSportsLive : SportsLivePlatformBackend {
+    override val supported: Boolean = false
+    override fun show(title: String, text: String, openUrl: String?): Boolean = false
+    override fun stop() {}
+    override fun openNotificationSettings() {}
 }

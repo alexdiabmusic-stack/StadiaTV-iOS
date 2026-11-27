@@ -3,10 +3,10 @@ package com.nuvio.app.features.plugins
 import com.nuvio.app.core.network.ServerCapabilities
 import com.nuvio.app.core.network.ServerConfiguration
 import com.nuvio.app.core.network.ServerConfigurationRepository
-import com.nuvio.app.core.network.ServerConfigurationStorage
+import com.nuvio.app.core.network.PlatformServerConfigurationStorage
 import com.nuvio.app.core.network.SupabaseProvider
 import com.nuvio.app.features.addons.AddonRepository
-import com.nuvio.app.features.addons.AddonStorage
+import com.nuvio.app.features.addons.PlatformAddonStorage
 import com.russhwolf.settings.SettingsInitializer
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -39,8 +39,8 @@ class PluginSyncTest {
         val context = RuntimeEnvironment.getApplication()
         SettingsInitializer().create(context)
         PluginStorage.initialize(context)
-        AddonStorage.initialize(context)
-        ServerConfigurationStorage.initialize(context)
+        PlatformAddonStorage.initialize(context)
+        PlatformServerConfigurationStorage.initialize(context)
         PluginRepository.clearLocalState()
         AddonRepository.clearLocalState()
         server.start()
@@ -151,8 +151,8 @@ class PluginSyncTest {
 
     @Test
     fun emptyRemoteRemovesCachedAddonsWithoutUploadingAndStaysEmptyAfterReload(): Unit = runBlocking {
-        AddonStorage.saveInstalledAddonUrls(1, listOf(manifestUrl))
-        AddonStorage.saveAddonEnabledStates(1, mapOf(manifestUrl to false))
+        PlatformAddonStorage.saveInstalledAddonUrls(1, listOf(manifestUrl))
+        PlatformAddonStorage.saveAddonEnabledStates(1, mapOf(manifestUrl to false))
         AddonRepository.initialize()
         assertEquals(1, AddonRepository.uiState.value.addons.size)
         respond("[]")
@@ -160,8 +160,8 @@ class PluginSyncTest {
         AddonRepository.pullFromServer(1)
 
         assertTrue(AddonRepository.uiState.value.addons.isEmpty())
-        assertTrue(AddonStorage.loadInstalledAddonUrls(1).isEmpty())
-        assertTrue(AddonStorage.loadAddonEnabledStates(1).isEmpty())
+        assertTrue(PlatformAddonStorage.loadInstalledAddonUrls(1).isEmpty())
+        assertTrue(PlatformAddonStorage.loadAddonEnabledStates(1).isEmpty())
         AddonRepository.clearLocalState()
         AddonRepository.initialize()
         respond("[]")

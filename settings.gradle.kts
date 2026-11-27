@@ -28,6 +28,7 @@ dependencyResolutionManagement {
     }
 }
 
+include(":bannerCore")
 include(":composeApp")
 include(":androidApp")
 include(":baselineprofile")

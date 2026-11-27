@@ -12,3 +12,5 @@ actual fun formatLocalDateTime(epochMs: Long): String =
 actual fun formatLocalTime(epochMs: Long): String =
     DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT).withZone(ZoneId.systemDefault())
         .format(Instant.ofEpochMilli(epochMs))
+
+actual fun localUtcOffsetMs(epochMs: Long): Long = java.util.TimeZone.getDefault().getOffset(epochMs).toLong()

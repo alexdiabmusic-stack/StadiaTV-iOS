@@ -26,18 +26,18 @@ import platform.darwin.dispatch_time
  * scores are not available when the app is closed.
  */
 @OptIn(ExperimentalForeignApi::class)
-internal actual object SportsAlarmPlatform {
+object IosSportsAlarms : SportsAlarmBackend {
     private val center get() = UNUserNotificationCenter.currentNotificationCenter()
     @kotlin.concurrent.Volatile private var askedForPermission = false
 
     // The alarm API cannot carry text, so nothing is scheduled here: see scheduleNotificationAt.
-    actual fun scheduleAlarm(id: String, atMs: Long) {}
+    override fun scheduleAlarm(id: String, atMs: Long) {}
 
-    actual fun cancelAlarm(id: String) {
+    override fun cancelAlarm(id: String) {
         center.removePendingNotificationRequestsWithIdentifiers(listOf(id))
     }
 
-    actual fun scheduleNotificationAt(id: String, atMs: Long, title: String, text: String, openUrl: String?): Boolean {
+    override fun scheduleNotificationAt(id: String, atMs: Long, title: String, text: String, openUrl: String?): Boolean {
         val seconds = (atMs - NSDate().timeIntervalSince1970 * 1000.0) / 1000.0
         if (seconds < 1.0) return false
         requestPermissionOnce()
@@ -45,10 +45,10 @@ internal actual object SportsAlarmPlatform {
         return true
     }
 
-    actual fun canScheduleExact(): Boolean = true
-    actual fun requestExactAlarms() {}
+    override fun canScheduleExact(): Boolean = true
+    override fun requestExactAlarms() {}
 
-    actual fun notificationsAllowed(): Boolean {
+    override fun notificationsAllowed(): Boolean {
         var allowed = false
         val done = dispatch_semaphore_create(0)
         center.getNotificationSettingsWithCompletionHandler { settings ->
@@ -61,7 +61,7 @@ internal actual object SportsAlarmPlatform {
     }
 
     /** A notification shown straight away (a live-score alert while the app is open). */
-    actual fun notifyReminder(id: String, title: String, text: String, openUrl: String?, important: Boolean) {
+    override fun notifyReminder(id: String, title: String, text: String, openUrl: String?, important: Boolean) {
         center.addNotificationRequest(request(id, title, text, openUrl, UNTimeIntervalNotificationTrigger.triggerWithTimeInterval(1.0, repeats = false)), withCompletionHandler = null)
     }
 

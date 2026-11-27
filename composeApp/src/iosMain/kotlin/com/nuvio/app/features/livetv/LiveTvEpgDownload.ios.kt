@@ -24,7 +24,8 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 @OptIn(ExperimentalForeignApi::class)
-internal actual suspend fun liveTvStreamGuideFromDisk(
+object PlatformLiveTvEpgDownload : LiveTvEpgDownload.Backend {
+    override suspend fun streamGuideFromDisk(
     url: String,
     headers: Map<String, String>,
     onChunk: (bytes: ByteArray, count: Int) -> Boolean,
@@ -48,6 +49,7 @@ internal actual suspend fun liveTvStreamGuideFromDisk(
         remove(path)
     }
     return true
+}
 }
 
 @OptIn(ExperimentalForeignApi::class)

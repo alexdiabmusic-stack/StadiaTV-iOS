@@ -2,13 +2,13 @@ package com.nuvio.app.core.sync
 
 import platform.Foundation.NSUserDefaults
 
-actual object SyncClientIdentityStorage {
+object PlatformSyncClientIdentityStorage : SyncClientIdentityStorage.Backend {
     private const val clientIdKey = "client_instance_id"
 
-    actual fun loadClientId(): String? =
+    override fun loadClientId(): String? =
         NSUserDefaults.standardUserDefaults.stringForKey(clientIdKey)
 
-    actual fun saveClientId(clientId: String) {
+    override fun saveClientId(clientId: String) {
         NSUserDefaults.standardUserDefaults.setObject(clientId, forKey = clientIdKey)
     }
 }

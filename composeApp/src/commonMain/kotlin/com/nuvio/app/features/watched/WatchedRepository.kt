@@ -769,6 +769,16 @@ object WatchedRepository {
         )
     }
 
+    /**
+     * Marks films watched because the member imported their history from another service (Letterboxd). One push to the member's
+     * BannerTV account for the whole batch; the marks are not mirrored out to Trakt or Simkl, which the member did not ask for.
+     */
+    internal fun markWatchedImported(items: Collection<WatchedItem>) {
+        // Each film keeps the date it was really watched (from the Letterboxd diary), so taste windows, history order and
+        // "recently watched" are right instead of every import counting as watched today.
+        markWatched(items = items, trackerHistorySync = WatchedTrackerHistorySync.Skip, syncRemote = true, keepMarkedAt = true)
+    }
+
     internal fun markWatchedLocally(items: Collection<WatchedItem>) {
         markWatched(items = items, trackerHistorySync = WatchedTrackerHistorySync.Skip, syncRemote = false)
     }
@@ -781,13 +791,14 @@ object WatchedRepository {
         items: Collection<WatchedItem>,
         trackerHistorySync: WatchedTrackerHistorySync,
         syncRemote: Boolean = true,
+        keepMarkedAt: Boolean = false,
     ) {
         ensureLoaded()
         if (items.isEmpty()) return
         val source = activeSource
         val markedAt = WatchedClock.nowEpochMs()
         val timestampedItems = items.map { watchedItem ->
-            watchedItem.copy(markedAtEpochMs = markedAt)
+            if (keepMarkedAt && watchedItem.markedAtEpochMs > 0L) watchedItem else watchedItem.copy(markedAtEpochMs = markedAt)
         }
         itemsStore.update { nuvioItems, providerItems, dirtyNuvioKeys, dirtyProviderKeys ->
             val targetItems = source.providerId

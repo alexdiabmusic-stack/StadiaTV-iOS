@@ -107,6 +107,7 @@ import com.nuvio.app.features.sportsfocus.SportsSearchData
 import com.nuvio.app.features.sportsfocus.TeamRow
 import com.nuvio.app.features.tmdb.TmdbSettingsRepository
 import com.nuvio.app.features.tmdb.buildTmdbUrl
+import com.nuvio.app.features.explore.CollectionSearch
 import com.nuvio.app.features.watched.WatchedRepository
 import io.ktor.http.encodeURLParameter
 import kotlinx.coroutines.coroutineScope
@@ -398,9 +399,11 @@ private fun UniversalSearchScreen(
     }
     val songs: List<Song> = remember(model.music) { model.music.mapNotNull { (it as? SearchResult.Track)?.song ?: (it as? SearchResult.TopTrack)?.song } }
 
+    // Collections that match the words typed (a franchise, a family, a holiday). Matched on the device, so it costs no request.
+    val collectionHits = remember(q) { if (active) CollectionSearch.search(q, 6) else emptyList() }
     val hasMedia = uiState.sections.isNotEmpty()
     val hasSports = teams.isNotEmpty() || remoteTeams.isNotEmpty() || model.sports.players.isNotEmpty() || matches.isNotEmpty() || leagues.isNotEmpty() || stories.isNotEmpty()
-    val anything = hasMedia || model.people.isNotEmpty() || hasSports || model.music.isNotEmpty() || shows.isNotEmpty() || channels.isNotEmpty()
+    val anything = hasMedia || collectionHits.isNotEmpty() || model.people.isNotEmpty() || hasSports || model.music.isNotEmpty() || shows.isNotEmpty() || channels.isNotEmpty()
     val loadingMedia = (uiState.isLoading || addonManifestsLoading) && !hasMedia
 
     LaunchedEffect(q, hasMedia, uiState.isLoading) {
@@ -573,6 +576,22 @@ private fun UniversalSearchScreen(
                     }
                 }
 
+                // ---- collections: after the movies and shows, so they never push a title result out of sight
+                if (show(UniversalScope.Media) && collectionHits.isNotEmpty()) {
+                    item(key = "h-collections") { UniversalHeading("Collections") }
+                    item(key = "collections") {
+                        androidx.compose.foundation.lazy.LazyRow(
+                            contentPadding = PaddingValues(horizontal = sectionPadding),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.padding(bottom = 12.dp),
+                        ) {
+                            items(collectionHits, key = { it.id }) { c ->
+                                com.nuvio.app.features.explore.ExploreCollectionCard(c, 250.dp, onClick = { model.pages.add(SearchPage.Explore(c.id)) })
+                            }
+                        }
+                    }
+                }
+
                 // ---- people
                 if (show(UniversalScope.People) && model.people.isNotEmpty()) {
                     item(key = "h-people") { UniversalHeading("People", seeAll(UniversalScope.People)?.takeIf { model.people.size > 4 }) }
@@ -642,7 +661,8 @@ private fun UniversalSearchScreen(
                 }
             }
         } }
-        val openPages = if (q.isBlank()) model.pages.toList() else emptyList()
+        // Pages normally wait for an empty search box; a collection opened from the results is the exception, so Back returns to them.
+        val openPages = if (q.isBlank() || model.pages.firstOrNull() is SearchPage.Explore) model.pages.toList() else emptyList()
         val openPage = openPages.lastOrNull()
         if (openPage != null) {
             InteractiveBackLayer(

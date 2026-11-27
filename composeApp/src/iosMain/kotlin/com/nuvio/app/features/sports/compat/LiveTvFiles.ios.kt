@@ -17,7 +17,7 @@ import platform.Foundation.timeIntervalSince1970
 
 // iOS actuals are written but not compiled: this machine has no full Xcode (see docs/integration/TEST_RESULTS.md).
 @OptIn(ExperimentalForeignApi::class)
-internal actual object LiveTvFiles {
+object IosLiveTvFiles : LiveTvFilesBackend {
     private fun path(dir: String, name: String): String {
         val root = (NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, true).firstOrNull() as? String).orEmpty()
         val folder = "$root/sports-hub/$dir"
@@ -25,18 +25,18 @@ internal actual object LiveTvFiles {
         return "$folder/$name"
     }
 
-    actual fun exists(dir: String, name: String): Boolean = NSFileManager.defaultManager.fileExistsAtPath(path(dir, name))
+    override fun exists(dir: String, name: String): Boolean = NSFileManager.defaultManager.fileExistsAtPath(path(dir, name))
 
-    actual fun lastModified(dir: String, name: String): Long {
+    override fun lastModified(dir: String, name: String): Long {
         val attrs = NSFileManager.defaultManager.attributesOfItemAtPath(path(dir, name), error = null) ?: return 0L
         val date = attrs[NSFileModificationDate] as? NSDate ?: return 0L
         return (date.timeIntervalSince1970 * 1000).toLong()
     }
 
-    actual fun readSmall(dir: String, name: String): String? =
+    override fun readSmall(dir: String, name: String): String? =
         NSString.stringWithContentsOfFile(path(dir, name), encoding = NSUTF8StringEncoding, error = null)
 
-    actual fun writeSmall(dir: String, name: String, text: String) {
+    override fun writeSmall(dir: String, name: String, text: String) {
         (text as NSString).writeToFile(path(dir, name), atomically = true, encoding = NSUTF8StringEncoding, error = null)
     }
 }

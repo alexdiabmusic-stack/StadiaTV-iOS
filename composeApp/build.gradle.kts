@@ -418,6 +418,8 @@ kotlin {
         iosTarget.binaries.framework {
             baseName = "ComposeApp"
             isStatic = true
+            // The shared core (bannerCore) is part of this framework's Swift API, as its classes were before they moved.
+            export(project(":bannerCore"))
             freeCompilerArgs += listOf("-Xbinary=bundleId=$iosFrameworkBundleId")
             iosReleaseDisabledPhases?.let { phases ->
                 if (buildType == org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType.RELEASE) {
@@ -523,6 +525,7 @@ kotlin {
             }
         }
         commonMain.dependencies {
+            api(project(":bannerCore"))
             implementation("io.coil-kt.coil3:coil-compose:${libs.versions.coil.get()}") {
                 exclude(group = "org.jetbrains.skiko", module = "skiko")
             }

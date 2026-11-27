@@ -7,7 +7,7 @@ import android.content.SharedPreferences
 import com.nuvio.app.features.addons.AddonCatalog
 import com.nuvio.app.features.addons.AddonManifest
 import com.nuvio.app.features.addons.AddonRepository
-import com.nuvio.app.features.addons.AddonStorage
+import com.nuvio.app.features.addons.PlatformAddonStorage
 import com.nuvio.app.features.addons.ManagedAddon
 import com.nuvio.app.features.collection.Collection
 import com.nuvio.app.features.collection.CollectionFolder
@@ -123,7 +123,7 @@ class HomeCatalogSettingsRepositoryTest {
         listOf("nuvio_addons", "nuvio_collections", "nuvio_collection_mobile_settings").forEach { name ->
             context.getSharedPreferences(name, Context.MODE_PRIVATE).edit().clear().commit()
         }
-        AddonStorage.initialize(context)
+        PlatformAddonStorage.initialize(context)
         CollectionStorage.initialize(context)
         CollectionMobileSettingsStorage.initialize(context)
         AddonRepository.clearLocalState()
@@ -136,7 +136,7 @@ class HomeCatalogSettingsRepositoryTest {
             server.enqueue(MockResponse().setBody("""{"metas":[{"id":"old","type":"movie","name":"Old"}]}"""))
             server.enqueue(MockResponse().setBody("""{"metas":[{"id":"new","type":"movie","name":"New"}]}"""))
             try {
-                AddonStorage.saveInstalledAddonUrls(ProfileRepository.activeProfileId, listOf(server.url("/manifest.json").toString()))
+                PlatformAddonStorage.saveInstalledAddonUrls(ProfileRepository.activeProfileId, listOf(server.url("/manifest.json").toString()))
                 AddonRepository.initialize()
                 withTimeout(5_000) { AddonRepository.awaitManifestsLoaded() }
                 val addons = AddonRepository.uiState.value.addons

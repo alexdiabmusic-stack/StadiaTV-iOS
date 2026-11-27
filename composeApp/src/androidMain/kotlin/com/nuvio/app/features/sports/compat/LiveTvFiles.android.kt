@@ -3,7 +3,7 @@ package com.nuvio.app.features.sports.compat
 import android.content.Context
 import java.io.File
 
-internal actual object LiveTvFiles {
+object AndroidLiveTvFiles : LiveTvFilesBackend {
     private var appContext: Context? = null
 
     fun initialize(context: Context) { appContext = context.applicationContext }
@@ -13,11 +13,11 @@ internal actual object LiveTvFiles {
         return File(File(File(base, "sports-hub"), dir).also { it.mkdirs() }, name)
     }
 
-    actual fun exists(dir: String, name: String): Boolean = file(dir, name).isFile
-    actual fun lastModified(dir: String, name: String): Long = file(dir, name).takeIf { it.isFile }?.lastModified() ?: 0L
-    actual fun readSmall(dir: String, name: String): String? = file(dir, name).takeIf { it.isFile }?.let { runCatching { it.readText() }.getOrNull() }
+    override fun exists(dir: String, name: String): Boolean = file(dir, name).isFile
+    override fun lastModified(dir: String, name: String): Long = file(dir, name).takeIf { it.isFile }?.lastModified() ?: 0L
+    override fun readSmall(dir: String, name: String): String? = file(dir, name).takeIf { it.isFile }?.let { runCatching { it.readText() }.getOrNull() }
 
-    actual fun writeSmall(dir: String, name: String, text: String) {
+    override fun writeSmall(dir: String, name: String, text: String) {
         runCatching {
             val target = file(dir, name)
             val tmp = File(target.parentFile, ".${target.name}.tmp")

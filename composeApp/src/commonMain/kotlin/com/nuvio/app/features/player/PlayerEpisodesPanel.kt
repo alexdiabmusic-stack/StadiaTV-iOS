@@ -338,12 +338,12 @@ private fun EpisodeRow(
     val episodeCode = when {
         episode.season != null && episode.episode != null -> stringResource(
             Res.string.compose_player_episode_code_full,
-            episode.season,
-            episode.episode,
+            episode.season!!,
+            episode.episode!!,
         )
         episode.episode != null -> stringResource(
             Res.string.compose_player_episode_code_episode_only,
-            episode.episode,
+            episode.episode!!,
         )
         else -> null
     }
@@ -478,8 +478,8 @@ private fun EpisodeStreamsPanelContent(
                         append(
                             stringResource(
                                 Res.string.compose_player_episode_code_full,
-                                episode.season,
-                                episode.episode,
+                                episode.season!!,
+                                episode.episode!!,
                             ),
                         )
                     }

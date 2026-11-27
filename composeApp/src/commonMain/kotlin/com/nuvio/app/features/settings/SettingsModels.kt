@@ -5,6 +5,7 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.LiveTv
@@ -268,6 +269,26 @@ internal enum class SettingsPage(
         category = SettingsCategory.Services,
         parentPage = Integrations,
     ),
+    Letterboxd(
+        titleRes = Res.string.compose_settings_page_letterboxd,
+        category = SettingsCategory.Services,
+        parentPage = Integrations,
+    ),
+    LetterboxdAdvanced(
+        titleRes = Res.string.compose_settings_page_letterboxd_advanced,
+        category = SettingsCategory.Services,
+        parentPage = Letterboxd,
+    ),
+    Serializd(
+        titleRes = Res.string.compose_settings_page_serializd,
+        category = SettingsCategory.Services,
+        parentPage = Integrations,
+    ),
+    SerializdAdvanced(
+        titleRes = Res.string.compose_settings_page_serializd_advanced,
+        category = SettingsCategory.Services,
+        parentPage = Serializd,
+    ),
     TraktAuthentication(
         titleRes = Res.string.compose_settings_page_tracking,
         category = SettingsCategory.Services,
@@ -332,4 +353,8 @@ internal val SettingsPage.icon: ImageVector
         SettingsPage.LiveTv -> Icons.Default.LiveTv
         SettingsPage.Experience -> Icons.Default.Tune
         SettingsPage.DiscordRpc -> Icons.Default.Link
+        SettingsPage.Letterboxd -> Icons.Default.Star
+        SettingsPage.LetterboxdAdvanced -> Icons.Default.Star
+        SettingsPage.Serializd -> Icons.Default.Star
+        SettingsPage.SerializdAdvanced -> Icons.Default.Star
     }

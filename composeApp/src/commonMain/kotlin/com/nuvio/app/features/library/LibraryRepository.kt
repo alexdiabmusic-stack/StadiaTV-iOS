@@ -356,6 +356,28 @@ object LibraryRepository {
         pushToServer(snapshot)
     }
 
+    /**
+     * Saves many items at once (a watchlist import): one write to disk, one publish and one push to the server for the whole batch, instead
+     * of one of each per item. The items keep the saved-at times they carry, so their order is kept.
+     */
+    fun saveAll(items: Collection<LibraryItem>) {
+        if (items.isEmpty()) return
+        ensureLoaded()
+        var snapshot: LibraryLocalSnapshot? = null
+        items.forEach { snapshot = localState.upsert(it) }
+        val last = snapshot ?: return
+        log.i { "Saving ${items.size} local library items in one batch profile=${last.token.profileId}" }
+        persist(last)
+        publish()
+        pushToServer(last)
+    }
+
+    /** Whether the item is in the local list (My List), whatever library source is showing: a provider's own list is not asked. */
+    fun isInLocalList(id: String, type: String): Boolean {
+        ensureLoaded()
+        return localState.contains(id, type)
+    }
+
     fun remove(id: String) {
         ensureLoaded()
         val result = localState.removeById(id)

@@ -1,18 +1,18 @@
 package com.nuvio.app.core.build
 
-actual object AppFeaturePolicy {
-    actual val pluginsEnabled: Boolean = false
-    actual val supportersContributorsPageEnabled: Boolean = false
-    actual val donationActionsEnabled: Boolean = false
-    actual val donationProgressEnabled: Boolean = true
-    actual val accountDeletionEnabled: Boolean = true
-    actual val personalMediaAddonCopyEnabled: Boolean = true
-    actual val p2pEnabled: Boolean = false
-    actual val trailerPlaybackMode: TrailerPlaybackMode = TrailerPlaybackMode.EXTERNAL
-    actual val heroTrailerPlaybackSupported: Boolean = false
-    actual val inAppUpdaterEnabled: Boolean = false
-    actual val imdbRatingLogoEnabled: Boolean = false
-    actual val mediaPlaybackForegroundServiceEnabled: Boolean = false
-    actual val downloadForegroundServiceEnabled: Boolean = false
-    actual val customServerConnectionsEnabled: Boolean = false
+object PlatformAppFeaturePolicy : AppFeaturePolicy.Values {
+    override val pluginsEnabled: Boolean = false
+    override val supportersContributorsPageEnabled: Boolean = false
+    override val donationActionsEnabled: Boolean = false
+    override val donationProgressEnabled: Boolean = true
+    override val accountDeletionEnabled: Boolean = true
+    override val personalMediaAddonCopyEnabled: Boolean = true
+    override val p2pEnabled: Boolean = false
+    override val trailerPlaybackMode: TrailerPlaybackMode = TrailerPlaybackMode.EXTERNAL
+    override val heroTrailerPlaybackSupported: Boolean = false
+    override val inAppUpdaterEnabled: Boolean = false
+    override val imdbRatingLogoEnabled: Boolean = false
+    override val mediaPlaybackForegroundServiceEnabled: Boolean = false
+    override val downloadForegroundServiceEnabled: Boolean = false
+    override val customServerConnectionsEnabled: Boolean = false
 }

@@ -52,6 +52,8 @@ internal data class StreamCandidate(
     val height: Int,
     val fps: Int,
     val ext: String,
+    /** The codec family from the format's mime type: h264, h265, av1, vp9, aac, opus; empty when unknown. */
+    val codec: String = "",
     // Only meaningful for audio candidates: false means this format is an
     // alternate-language dub track, not the video's original/default audio.
     // Always true for video/progressive candidates, so it never affects them.
@@ -268,6 +270,7 @@ class InAppYouTubeExtractor {
                         height = height,
                         fps = fps,
                         ext = if (mimeType.contains("webm")) "webm" else "mp4",
+                        codec = codecFamily(mimeType),
                     )
                 }
 
@@ -298,6 +301,7 @@ class InAppYouTubeExtractor {
                             height = height,
                             fps = fps,
                             ext = if (mimeType.contains("webm")) "webm" else "mp4",
+                            codec = codecFamily(mimeType),
                         )
                     } else if (hasAudio) {
                         val bitrate = format.numberValue("bitrate")
@@ -321,6 +325,7 @@ class InAppYouTubeExtractor {
                             height = 0,
                             fps = 0,
                             ext = if (mimeType.contains("webm")) "webm" else "m4a",
+                            codec = codecFamily(mimeType),
                             isDefaultAudioTrack = isDefaultAudioTrack,
                         )
                     }
@@ -362,7 +367,7 @@ class InAppYouTubeExtractor {
         for (clientKey in clientOrder(video.map { it.client })) {
             if (probes >= MAX_ADAPTIVE_PROBES) break
             if (clientKey !in TOKEN_FREE_CLIENTS) continue
-            val bestVideo = sortCandidates(video.filter { it.client == clientKey }).firstOrNull() ?: continue
+            val bestVideo = sortCandidates(TrailerExtractionPlatform.filterVideoCandidates(video.filter { it.client == clientKey })).firstOrNull() ?: continue
 
             probes++
             val videoUrl = TrailerExtractionPlatform.resolvePlayableUrl(bestVideo.url)
@@ -375,7 +380,7 @@ class InAppYouTubeExtractor {
                 continue
             }
 
-            val bestAudio = sortCandidates(audio.filter { it.client == clientKey }).firstOrNull()
+            val bestAudio = sortCandidates(TrailerExtractionPlatform.filterAudioCandidates(audio.filter { it.client == clientKey })).firstOrNull()
             if (bestAudio == null) {
                 log.w { "adaptive video ok but client=" + clientKey + " has no audio track" }
                 continue
@@ -401,7 +406,7 @@ class InAppYouTubeExtractor {
         progressive: List<StreamCandidate>,
         rejectedClients: MutableSet<String>,
     ): TrailerPlaybackSource? {
-        val ordered = progressive.sortedWith(
+        val ordered = TrailerExtractionPlatform.filterVideoCandidates(progressive).sortedWith(
             compareBy<StreamCandidate> { clientRank(it.client) }
                 .thenBy { if (it.itag == TOKEN_FREE_PROGRESSIVE_ITAG) 0 else 1 }
                 .thenByDescending { it.score },
@@ -687,6 +692,20 @@ class InAppYouTubeExtractor {
 
     private fun audioScore(bitrate: Double, audioSampleRate: Double): Double {
         return bitrate * 1_000_000.0 + audioSampleRate
+    }
+
+    /** The codec family named by a format's mime type (`video/mp4; codecs="avc1.640028"` is h264). */
+    internal fun codecFamily(mimeType: String): String {
+        val m = mimeType.lowercase()
+        return when {
+            "avc1" in m || "avc3" in m -> "h264"
+            "hvc1" in m || "hev1" in m -> "h265"
+            "av01" in m -> "av1"
+            "vp09" in m || "vp9" in m -> "vp9"
+            "mp4a" in m -> "aac"
+            "opus" in m -> "opus"
+            else -> ""
+        }
     }
 
     internal fun sortCandidates(items: List<StreamCandidate>): List<StreamCandidate> {

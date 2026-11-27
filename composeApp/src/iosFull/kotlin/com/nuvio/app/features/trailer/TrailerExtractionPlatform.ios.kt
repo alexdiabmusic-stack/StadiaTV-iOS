@@ -74,6 +74,21 @@ internal object TrailerExtractionPlatform {
         )
     }
 
+    // AVPlayer (the trailer player) decodes H.264 and HEVC video and AAC audio only. A 1440p/2160p stream is often AV1 inside
+    // an MP4 container, which AVPlayer accepts and then shows as black, so the filter is on the codec, not the container.
+    // Preference order: H.264 (up to 1080p, decodes everywhere), HEVC, any MP4; nothing matching leaves the list as it was
+    // (the libmpv preview, which decodes anything, takes those).
+    fun filterVideoCandidates(candidates: List<StreamCandidate>): List<StreamCandidate> {
+        candidates.filter { it.codec == "h264" }.takeIf { it.isNotEmpty() }?.let { return it }
+        candidates.filter { it.codec == "h265" }.takeIf { it.isNotEmpty() }?.let { return it }
+        return candidates.filter { it.ext == "mp4" }.ifEmpty { candidates }
+    }
+
+    fun filterAudioCandidates(candidates: List<StreamCandidate>): List<StreamCandidate> {
+        candidates.filter { it.codec == "aac" }.takeIf { it.isNotEmpty() }?.let { return it }
+        return candidates.filter { it.ext == "m4a" }.ifEmpty { candidates }
+    }
+
     suspend fun resolvePlayableUrl(url: String): String? = withContext(Dispatchers.Default) {
         if (!url.contains("googlevideo.com")) return@withContext url
 

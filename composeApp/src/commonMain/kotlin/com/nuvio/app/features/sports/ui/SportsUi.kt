@@ -108,13 +108,13 @@ internal val SportsLiveRed = Color(0xFFE53935)
 
 internal fun startLabel(ev: SportsEvent, use24h: Boolean): String = when {
     ev.hasTime -> clockText(ev.startMs, use24h)
-    ev.endMs != null && ev.endMs - ev.startMs > 20 * 3_600_000L -> "Starts"
+    ev.endMs != null && ev.endMs!! - ev.startMs > 20 * 3_600_000L -> "Starts"
     else -> "All day"
 }
 
 /** What the corner of a card says: the game clock, "Started 1:00", "Final", or the start time. */
 internal fun cornerStatus(ev: SportsEvent, use24h: Boolean, hideScores: Boolean): String = when (ev.state) {
-    GameState.LIVE -> if (!hideScores && ev.status != null && ev.source != EventSource.GUIDE && ev.hasScore) ev.status
+    GameState.LIVE -> if (!hideScores && ev.status != null && ev.source != EventSource.GUIDE && ev.hasScore) ev.status!!
     else "Started " + clockText(ev.startMs, use24h)
     GameState.POST -> if (ev.source == EventSource.GUIDE) "Ended" else (ev.status ?: "Final")
     GameState.OFF -> ev.status ?: "Postponed"

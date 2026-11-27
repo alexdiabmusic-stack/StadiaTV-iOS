@@ -1,5 +1,7 @@
 package com.nuvio.app.features.sports
 
+import com.nuvio.app.features.sports.SportsPlatformBackend
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -11,7 +13,7 @@ import java.text.Normalizer
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-internal actual object SportsPlatform {
+object AndroidSportsPlatform : SportsPlatformBackend {
     private val http: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(12, TimeUnit.SECONDS)
@@ -23,7 +25,7 @@ internal actual object SportsPlatform {
             .build()
     }
 
-    actual suspend fun get(url: String): String = withContext(Dispatchers.IO) {
+    override suspend fun get(url: String): String = withContext(Dispatchers.IO) {
         val req = Request.Builder().url(url)
             .header("Accept", "application/json")
             .header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Mobile Safari/537.36")
@@ -46,14 +48,14 @@ internal actual object SportsPlatform {
         }
     }
 
-    actual fun countryCode(): String = Locale.getDefault().country.uppercase(Locale.ROOT)
+    override fun countryCode(): String = Locale.getDefault().country.uppercase(Locale.ROOT)
 
-    actual fun languageCode(): String = Locale.getDefault().language.lowercase(Locale.ROOT)
+    override fun languageCode(): String = Locale.getDefault().language.lowercase(Locale.ROOT)
 
     private val MARKS = Regex("\\p{M}+")
-    actual fun pause(ms: Long) {
+    override fun pause(ms: Long) {
         try { Thread.sleep(ms) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
     }
 
-    actual fun foldAccents(text: String): String = Normalizer.normalize(text, Normalizer.Form.NFD).replace(MARKS, "")
+    override fun foldAccents(text: String): String = Normalizer.normalize(text, Normalizer.Form.NFD).replace(MARKS, "")
 }

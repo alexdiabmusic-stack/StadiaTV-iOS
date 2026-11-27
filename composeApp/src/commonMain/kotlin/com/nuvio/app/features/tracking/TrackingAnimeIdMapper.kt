@@ -145,10 +145,10 @@ internal object TrackingAnimeIdMapper {
         val (source, id) = when {
             video != null -> video.source to video.id
             hasStandardIds -> return null
-            ids.kitsu != null -> "kitsu" to ids.kitsu
-            ids.mal != null -> "mal" to ids.mal
-            ids.anilist != null -> "anilist" to ids.anilist
-            ids.anidb != null -> "anidb" to ids.anidb
+            ids.kitsu != null -> "kitsu" to ids.kitsu!!
+            ids.mal != null -> "mal" to ids.mal!!
+            ids.anilist != null -> "anilist" to ids.anilist!!
+            ids.anidb != null -> "anidb" to ids.anidb!!
             else -> return null
         }
         val animeEpisode = if (isMovie) null else (video?.episode ?: episode ?: return null)

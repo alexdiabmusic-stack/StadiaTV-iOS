@@ -358,7 +358,7 @@ private fun LiveTvEpgProgramRow(
                 }
                 if (!program.category.isNullOrBlank()) {
                     Text(
-                        text = program.category,
+                        text = program.category.orEmpty(),
                         style = MaterialTheme.typography.labelSmall,
                         color = tokens.colors.textMuted,
                         maxLines = 1,

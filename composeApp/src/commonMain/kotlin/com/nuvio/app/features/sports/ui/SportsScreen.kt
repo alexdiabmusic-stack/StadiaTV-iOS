@@ -86,14 +86,6 @@ import nuvio.composeapp.generated.resources.livetv_sports_this_week
 import nuvio.composeapp.generated.resources.livetv_sports_upcoming
 import org.jetbrains.compose.resources.stringResource
 
-/** What the Sports hub does outside itself: plays channels, opens pages. */
-data class SportsActions(
-    val onPlay: (LiveChannel, nowTitle: String?) -> Unit,
-    val onPlayCatchup: (LiveChannel, EpgProgram) -> Unit,
-    val onOpenGame: (SportsEvent) -> Unit,
-    val onOpenLeague: (League) -> Unit,
-)
-
 private enum class SportsTab { MINE, ALL, SEARCH, FOLLOWING, NETWORKS }
 
 /**

@@ -199,6 +199,15 @@ internal fun LazyListScope.homescreenSettingsContent(
                     isTablet = isTablet,
                     onCheckedChange = HomeCatalogSettingsRepository::setHideUnreleasedContent,
                 )
+                SettingsGroupDivider(isTablet = isTablet)
+                val hideWatchedRows by com.nuvio.app.features.watched.HomeWatchedFilter.hideWatched.collectAsStateWithLifecycle()
+                SettingsSwitchRow(
+                    title = "Hide watched titles in rows",
+                    description = "Leave films you have watched (and series you have finished) out of Home's discovery rows and Recommended For You. Top 10, collections and your lists still show them, marked with a check.",
+                    checked = hideWatchedRows,
+                    isTablet = isTablet,
+                    onCheckedChange = com.nuvio.app.features.watched.HomeWatchedFilter::setHideWatched,
+                )
             }
         }
     }

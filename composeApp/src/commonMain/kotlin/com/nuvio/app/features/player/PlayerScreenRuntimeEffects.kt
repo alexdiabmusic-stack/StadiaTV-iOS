@@ -492,6 +492,8 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
                 PlayerLaunchStore.markExited(launchId)
             }
             playerController?.clearNowPlayingInfo()
+            if (isMoviePlayback) com.nuvio.app.features.letterboxd.LetterboxdRuntime.onPlayerStopped(profileId, parentMetaId)
+            if (isEpisodePlayback) com.nuvio.app.features.serializd.SerializdRuntime.onPlayerStopped(profileId, parentMetaId, activeSeasonNumber, activeEpisodeNumber)
             P2pStreamingEngine.shutdown()
             cancelNextEpisodePreload()
             PlayerStreamsRepository.clearAll()
@@ -587,6 +589,19 @@ private fun PlayerScreenRuntime.BindPlayerUiVisibilityEffects() {
             isLoading = playbackSnapshot.isLoading,
             isEnded = playbackSnapshot.isEnded,
         )
+        // Letterboxd: a movie counts as watched from what actually played, never from a seek. Cheap without an account.
+        if (isMoviePlayback && shouldTrackWatchProgress) {
+            com.nuvio.app.features.letterboxd.LetterboxdRuntime.onPlayerSnapshot(
+                profileId = profileId, metaId = parentMetaId, title = title, poster = args.poster, snapshot = playbackSnapshot,
+            )
+        }
+        // Serializd: an episode counts as watched from what actually played, never from a seek. Cheap without an account.
+        if (isEpisodePlayback && shouldTrackWatchProgress) {
+            com.nuvio.app.features.serializd.SerializdRuntime.onPlayerSnapshot(
+                profileId = profileId, metaId = parentMetaId, season = activeSeasonNumber ?: 0, episode = activeEpisodeNumber ?: 0,
+                showName = title, episodeTitle = activeEpisodeTitle, poster = args.poster, snapshot = playbackSnapshot,
+            )
+        }
         if (playbackSnapshot.isEnded) {
             flushWatchProgress(TrackingScrobbleAction.STOP)
             previousIsPlaying = false

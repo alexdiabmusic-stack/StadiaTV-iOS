@@ -623,7 +623,7 @@ private fun LiveChannelRow(
             }
             if (!channel.group.isNullOrBlank()) {
                 Text(
-                    text = channel.group,
+                    text = channel.group.orEmpty(),
                     color = colorScheme.onSurfaceVariant,
                     fontSize = 12.sp,
                     maxLines = 1,

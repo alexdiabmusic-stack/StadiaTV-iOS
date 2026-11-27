@@ -3,7 +3,7 @@ package com.nuvio.app.core.network
 import android.content.Context
 import android.content.SharedPreferences
 
-internal actual object DnsPlatform {
+internal object PlatformDnsPlatform : DnsPlatform.Backend {
     private const val preferencesName = "nuvio_network"
     private const val providerKey = "dns_provider"
     private var preferences: SharedPreferences? = null
@@ -13,18 +13,18 @@ internal actual object DnsPlatform {
         NuvioDns.provider = DnsProvider.fromStorage(load())
     }
 
-    actual val isSupported: Boolean = true
+    override val isSupported: Boolean = true
 
-    actual fun load(): String? = preferences?.getString(providerKey, null)
+    override fun load(): String? = preferences?.getString(providerKey, null)
 
-    actual fun save(storageId: String) {
+    override fun save(storageId: String) {
         preferences?.edit()?.putString(providerKey, storageId)?.apply()
     }
 
-    actual fun apply(provider: DnsProvider) {
+    override fun apply(provider: DnsProvider) {
         NuvioDns.provider = provider
     }
 }
 
-internal actual fun platformHttpEngine(): io.ktor.client.engine.HttpClientEngine? =
+internal fun platformHttpEngineImpl(): io.ktor.client.engine.HttpClientEngine? =
     io.ktor.client.engine.okhttp.OkHttp.create { preconfigured = SharedOkHttpClient.base }

@@ -122,6 +122,7 @@ private fun nuvioComposeViewController(
     hinge: Hinge = Hinge(),
     content: @androidx.compose.runtime.Composable () -> Unit,
 ): UIViewController {
+    installBannerCore()
     AutoSyncPreferencesIos.initialize()
     return ComposeUIViewController(
         configure = { onFocusBehavior = OnFocusBehavior.DoNothing },

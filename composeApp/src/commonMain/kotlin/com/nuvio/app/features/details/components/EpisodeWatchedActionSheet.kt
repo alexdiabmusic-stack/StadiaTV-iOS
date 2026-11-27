@@ -51,6 +51,7 @@ fun EpisodeWatchedActionSheet(
     onPlayManually: (() -> Unit)? = null,
     userRating: Int? = null,
     onRate: (() -> Unit)? = null,
+    onSerializd: (() -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
@@ -141,6 +142,18 @@ fun EpisodeWatchedActionSheet(
                     },
                 )
             }
+            if (onSerializd != null) {
+                NuvioBottomSheetActionRow(
+                    icon = Icons.Rounded.Star,
+                    title = "Serializd: rate, review or log",
+                    onClick = {
+                        onSerializd()
+                        coroutineScope.launch {
+                            dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                        }
+                    },
+                )
+            }
         }
     }
 }
@@ -156,6 +169,7 @@ fun SeasonWatchedActionSheet(
     onMarkPreviousSeasonsWatched: () -> Unit,
     userRating: Int? = null,
     onRate: (() -> Unit)? = null,
+    onSerializd: (() -> Unit)? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val coroutineScope = rememberCoroutineScope()
@@ -215,6 +229,18 @@ fun SeasonWatchedActionSheet(
                     title = stringResource(Res.string.episode_mark_previous_seasons_watched),
                     onClick = {
                         onMarkPreviousSeasonsWatched()
+                        coroutineScope.launch {
+                            dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
+                        }
+                    },
+                )
+            }
+            if (onSerializd != null) {
+                NuvioBottomSheetActionRow(
+                    icon = Icons.Rounded.Star,
+                    title = "Serializd: rate or review this season",
+                    onClick = {
+                        onSerializd()
                         coroutineScope.launch {
                             dismissNuvioBottomSheet(sheetState = sheetState, onDismiss = onDismiss)
                         }

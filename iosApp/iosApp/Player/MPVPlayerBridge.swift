@@ -254,6 +254,9 @@ final class MPVPlayerBridgeImpl: NSObject, NuvioPlayerBridge {
     func getMediaInfoJson() -> String { playerVC?.getMediaInfoJson() ?? "{}" }
     func getProperty(name: String) -> String { playerVC?.getString(name) ?? "" }
 
+    /// The hybrid host that holds this bridge's view left the screen (its own parent is the hybrid, so UIKit does not tell it).
+    func hostDidLeaveParent() { playerVC?.hostDidLeaveParent() }
+
     func destroy() {
         playerVC?.systemControlHandler = nil
         playerVC?.destroyPlayer()
@@ -2988,7 +2991,8 @@ final class MPVPlayerBridgeCreator: NSObject, NuvioPlayerBridgeCreator {
 
 enum NuvioPlayerRegistration {
     static func register() {
-        NuvioPlayerBridgeFactory.shared.registerFactory(creator: MPVPlayerBridgeCreator())
+        NuvioPlayerBridgeFactory.shared.registerFactory(creator: HybridPlayerBridgeCreator())
         NuvioSeekPreviewRegistry.shared.registerCreator(creator: FFmpegSeekPreviewGeneratorCreator())
+        HeroPlayerBridgeFactory.shared.registerFactory(creator: HeroAvPlayerBridgeCreator())
     }
 }

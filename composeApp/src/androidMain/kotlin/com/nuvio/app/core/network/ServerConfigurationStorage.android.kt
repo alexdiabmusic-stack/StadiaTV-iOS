@@ -3,7 +3,7 @@ package com.nuvio.app.core.network
 import android.content.Context
 import android.content.SharedPreferences
 
-internal actual object ServerConfigurationStorage {
+internal object PlatformServerConfigurationStorage : ServerConfigurationStorage.Backend {
     private const val preferencesName = "server_configuration"
     private const val customEnabledKey = "custom_enabled"
     private const val backendUrlKey = "backend_url"
@@ -19,7 +19,7 @@ internal actual object ServerConfigurationStorage {
         preferences = context.getSharedPreferences(preferencesName, Context.MODE_PRIVATE)
     }
 
-    actual fun loadCustom(): ServerConfiguration? {
+    override fun loadCustom(): ServerConfiguration? {
         val values = preferences ?: return null
         if (!values.getBoolean(customEnabledKey, false)) return null
         val backendUrl = values.getString(backendUrlKey, null)?.trim().orEmpty()
@@ -40,7 +40,7 @@ internal actual object ServerConfigurationStorage {
         )
     }
 
-    actual fun saveCustom(configuration: ServerConfiguration): Boolean =
+    override fun saveCustom(configuration: ServerConfiguration): Boolean =
         preferences
             ?.edit()
             ?.putBoolean(customEnabledKey, true)
@@ -52,5 +52,5 @@ internal actual object ServerConfigurationStorage {
             ?.putString(discoveryUrlKey, configuration.discoveryUrl)
             ?.commit() == true
 
-    actual fun useOfficial(): Boolean = preferences?.edit()?.clear()?.commit() == true
+    override fun useOfficial(): Boolean = preferences?.edit()?.clear()?.commit() == true
 }

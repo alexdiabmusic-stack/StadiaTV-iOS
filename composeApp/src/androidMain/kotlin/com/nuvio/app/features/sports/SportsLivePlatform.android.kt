@@ -1,5 +1,7 @@
 package com.nuvio.app.features.sports
 
+import com.nuvio.app.features.sports.SportsLivePlatformBackend
+
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -15,14 +17,14 @@ import android.os.PowerManager
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.nuvio.app.features.sports.compat.SportsAlarmPlatform
+import com.nuvio.app.features.sports.compat.AndroidSportsAlarms
 import com.nuvio.app.features.settings.AppIconPlatform
 
-internal actual object SportsLivePlatform {
-    actual val supported: Boolean = true
+object AndroidSportsLive : SportsLivePlatformBackend {
+    override val supported: Boolean = true
 
-    actual fun show(title: String, text: String, openUrl: String?): Boolean {
-        val context = SportsAlarmPlatform.context() ?: return false
+    override fun show(title: String, text: String, openUrl: String?): Boolean {
+        val context = AndroidSportsAlarms.context() ?: return false
         SportsLiveService.content = SportsLiveService.Content(title, text, openUrl)
         if (SportsLiveService.running) {
             runCatching { NotificationManagerCompat.from(context).notify(SportsLiveService.NOTIFICATION_ID, SportsLiveService.build(context)) }
@@ -35,14 +37,14 @@ internal actual object SportsLivePlatform {
         }.getOrDefault(false) // Android 12+ won't start it from the background (outside an alarm)
     }
 
-    actual fun stop() {
-        val context = SportsAlarmPlatform.context() ?: return
+    override fun stop() {
+        val context = AndroidSportsAlarms.context() ?: return
         SportsLiveService.content = null
         runCatching { context.stopService(Intent(context, SportsLiveService::class.java)) }
     }
 
-    actual fun openNotificationSettings() {
-        val context = SportsAlarmPlatform.context() ?: return
+    override fun openNotificationSettings() {
+        val context = AndroidSportsAlarms.context() ?: return
         val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
         } else {
@@ -118,7 +120,7 @@ class SportsLiveService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        SportsAlarmPlatform.initialize(applicationContext)
+        AndroidSportsAlarms.initialize(applicationContext)
         running = true
     }
 

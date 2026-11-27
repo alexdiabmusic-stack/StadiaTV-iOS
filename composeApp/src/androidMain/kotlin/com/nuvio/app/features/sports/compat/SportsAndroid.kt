@@ -6,8 +6,8 @@ import android.content.Context
 object SportsAndroid {
     fun initialize(context: Context) {
         val app = context.applicationContext
-        LiveTvFiles.initialize(app)
-        SportsKeyValue.initialize(app)
-        SportsAlarmPlatform.initialize(app)
+        AndroidLiveTvFiles.initialize(app)
+        AndroidSportsKeyValue.initialize(app)
+        AndroidSportsAlarms.initialize(app)
     }
 }

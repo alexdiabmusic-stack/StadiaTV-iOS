@@ -221,6 +221,21 @@ private fun PlaybackInfoContent(
         if (engine.isNotBlank()) {
             SectionHeader(title = "Playback Engine")
             InfoRow(label = "Engine", value = engine)
+            playbackInfo.stringValue("rendering").takeIf { it.isNotBlank() }?.let { InfoRow(label = "Rendering", value = it) }
+            playbackInfo.stringValue("requestedEngine").takeIf { it.isNotBlank() }?.let { InfoRow(label = "Requested", value = it) }
+            playbackInfo.stringValue("selectionReason").takeIf { it.isNotBlank() }?.let { InfoRow(label = "Why", value = it) }
+            playbackInfo.stringValue("fallbackReason").takeIf { it.isNotBlank() }?.let { InfoRow(label = "Fallback", value = it) }
+            playbackInfo.stringValue("aetherVersion").takeIf { it.isNotBlank() }?.let { InfoRow(label = "AetherEngine", value = it) }
+            playbackInfo.stringValue("route").takeIf { it.isNotBlank() }?.let { InfoRow(label = "Route", value = it) }
+            val firstFrameMs = playbackInfo.intValue("firstFrameMs")
+            if (firstFrameMs > 0) InfoRow(label = "Time to first frame", value = "$firstFrameMs ms")
+            if (playbackInfo.stringValue("rebufferCount").isNotBlank()) {
+                InfoRow(label = "Rebuffers", value = playbackInfo.stringValue("rebufferCount"))
+            }
+            playbackInfo.stringValue("thermalState").takeIf { it.isNotBlank() }?.let { InfoRow(label = "Thermal state", value = it) }
+            val battery = playbackInfo.intValue("batteryPercent")
+            if (battery > 0) InfoRow(label = "Battery", value = "$battery%")
+            if (playbackInfo.stringValue("lowPowerMode") == "true") InfoRow(label = "Low Power Mode", value = "On")
         }
 
         val videoCodec = playbackInfo.stringValue("videoCodec")

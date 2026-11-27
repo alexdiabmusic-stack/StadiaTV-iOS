@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CloudQueue
 import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material.icons.rounded.LiveTv
+import androidx.compose.material.icons.rounded.Star
 import androidx.compose.material.icons.rounded.Theaters
 import androidx.compose.foundation.lazy.LazyListScope
 import com.nuvio.app.features.discord.DiscordRpcPlatform
@@ -31,6 +32,8 @@ internal fun LazyListScope.integrationsContent(
     onOmdbClick: () -> Unit,
     onLiveTvClick: () -> Unit,
     onDiscordClick: () -> Unit,
+    onLetterboxdClick: () -> Unit,
+    onSerializdClick: () -> Unit,
 ) {
     // The page is already titled Integrations, so its one group goes without a repeated section heading.
     item {
@@ -74,6 +77,22 @@ internal fun LazyListScope.integrationsContent(
                     icon = Icons.Rounded.LiveTv,
                     isTablet = isTablet,
                     onClick = onLiveTvClick,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsNavigationRow(
+                    title = "Letterboxd",
+                    description = "Log films to your diary, rate and review",
+                    iconPainter = integrationLogoPainter(IntegrationLogo.Letterboxd), iconFillsTile = true,
+                    isTablet = isTablet,
+                    onClick = onLetterboxdClick,
+                )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsNavigationRow(
+                    title = "Serializd",
+                    description = "Track episodes, log your diary, rate and review series",
+                    iconPainter = integrationLogoPainter(IntegrationLogo.Serializd), iconFillsTile = true,
+                    isTablet = isTablet,
+                    onClick = onSerializdClick,
                 )
                 if (DiscordRpcPlatform.isSupported) {
                     SettingsGroupDivider(isTablet = isTablet)

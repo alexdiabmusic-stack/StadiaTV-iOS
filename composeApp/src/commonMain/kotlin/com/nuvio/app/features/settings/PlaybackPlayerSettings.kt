@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.dp
 import com.nuvio.app.features.player.AndroidPlaybackEngine
 import com.nuvio.app.features.player.ExternalPlayerApp
 import com.nuvio.app.features.player.ExternalPlayerPlatform
+import com.nuvio.app.features.player.IosPlaybackEngine
+import com.nuvio.app.features.player.IosPlaybackEngineSettingsStorage
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.isIos
 import nuvio.composeapp.generated.resources.*
@@ -34,6 +36,9 @@ internal fun PlaybackPlayerSettings(
     var showExternalPlayerDialog by remember { mutableStateOf(false) }
     var showExternalPlayerAppDialog by remember { mutableStateOf(false) }
     var showPlaybackEngineDialog by remember { mutableStateOf(false) }
+    var showIosEngineDialog by remember { mutableStateOf(false) }
+    var iosEngine by remember { mutableStateOf(IosPlaybackEngineSettingsStorage.loadEngine()) }
+    var iosEmergencyFallback by remember { mutableStateOf(IosPlaybackEngineSettingsStorage.loadEmergencyFallback()) }
     val availableExternalPlayers = ExternalPlayerPlatform.availablePlayers()
     val selectedExternalPlayer = availableExternalPlayers.firstOrNull { it.id == settings.externalPlayerId }
     Column(verticalArrangement = Arrangement.spacedBy(if (isTablet) 18.dp else 12.dp)) {
@@ -87,6 +92,32 @@ internal fun PlaybackPlayerSettings(
             }
         }
 
+        if (IosPlaybackEngineSettingsStorage.isAvailable) {
+            SettingsSection(title = "Playback Engine", isTablet = isTablet) {
+                SettingsGroup(isTablet = isTablet) {
+                    SettingsNavigationRow(
+                        title = "Playback Engine",
+                        description = iosEngine.label,
+                        enabled = !settings.externalPlayerEnabled,
+                        isTablet = isTablet,
+                        onClick = { showIosEngineDialog = true },
+                    )
+                    SettingsGroupDivider(isTablet = isTablet)
+                    SettingsSwitchRow(
+                        title = "Switch to libmpv if AetherEngine fails",
+                        description = "Even when AetherEngine is chosen explicitly. Automatic always does this once per playback. Takes effect the next time a video starts.",
+                        checked = iosEmergencyFallback,
+                        enabled = !settings.externalPlayerEnabled,
+                        isTablet = isTablet,
+                        onCheckedChange = { value ->
+                            iosEmergencyFallback = value
+                            IosPlaybackEngineSettingsStorage.saveEmergencyFallback(value)
+                        },
+                    )
+                }
+            }
+        }
+
         if (!isIos) {
             SettingsSection(
                 title = stringResource(Res.string.settings_playback_section_decoder),
@@ -135,6 +166,40 @@ internal fun PlaybackPlayerSettings(
             },
             onDismiss = { showExternalPlayerAppDialog = false },
         )
+    }
+
+    if (showIosEngineDialog) {
+        DialogSurface(
+            onDismissRequest = { showIosEngineDialog = false },
+            title = "Playback Engine",
+        ) {
+            Text(
+                text = "Takes effect the next time a video starts. The Info panel in the player shows which engine is running.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                IosPlaybackEngine.entries.forEach { engine ->
+                    DialogOption(
+                        text = engine.label,
+                        selected = engine == iosEngine,
+                        onClick = {
+                            iosEngine = engine
+                            IosPlaybackEngineSettingsStorage.saveEngine(engine)
+                            showIosEngineDialog = false
+                        },
+                    )
+                    Text(
+                        text = engine.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            DialogButtons {
+                DialogButton(text = stringResource(Res.string.action_done), onClick = { showIosEngineDialog = false })
+            }
+        }
     }
 
     if (showPlaybackEngineDialog) {

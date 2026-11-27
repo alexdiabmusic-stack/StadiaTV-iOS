@@ -1330,7 +1330,9 @@ object WatchProgressRepository {
         val targetProfileId = session.profileId
         val positionMs = snapshot.positionMs.coerceAtLeast(0L)
         val durationMs = snapshot.durationMs.coerceAtLeast(0L)
-        val isCompleted = isWatchProgressComplete(
+        // The shared completion policy decides when it is switched on (it needs real viewing coverage, so a drag to 90% does not
+        // count); otherwise, and for anything that is not a title, the long-standing rule does.
+        val isCompleted = PlaybackCompletionRuntime.verdictFor(session, snapshot) ?: isWatchProgressComplete(
             positionMs = positionMs,
             durationMs = durationMs,
             isEnded = snapshot.isEnded,

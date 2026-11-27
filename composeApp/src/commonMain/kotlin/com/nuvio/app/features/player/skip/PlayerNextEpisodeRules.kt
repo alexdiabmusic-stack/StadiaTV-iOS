@@ -1,6 +1,8 @@
 package com.nuvio.app.features.player.skip
 
 import com.nuvio.app.features.details.MetaVideo
+import com.nuvio.app.features.playback.MovieEndingStage
+import com.nuvio.app.features.playback.PlaybackSegmentType
 import com.nuvio.app.features.watching.domain.isShortPlaceholderDuration
 
 object PlayerNextEpisodeRules {
@@ -34,7 +36,7 @@ object PlayerNextEpisodeRules {
         thresholdMinutesBeforeEnd: Float,
     ): Boolean {
         if (isShortPlaceholderDuration(durationMs)) return false
-        val outroSegments = skipIntervals.filter { it.type in OUTRO_SEGMENT_TYPES }
+        val outroSegments = skipIntervals.filter { it.isCredits() }
 
         if (outroSegments.isNotEmpty()) {
             if (durationMs <= 0L) return false
@@ -117,30 +119,30 @@ object PlayerNextEpisodeRules {
      * dismissal in the 4-minute window brings it back at 30 seconds, and it always returns
      * when playback really ends.
      */
-    fun movieRecommendationStage(positionMs: Long, durationMs: Long, isEnded: Boolean, creditsStartMs: Long? = null): Int {
-        if (isEnded) return MOVIE_RECOMMENDATION_STAGE_ENDED
-        if (durationMs <= 0L) return 0
-        val remainingMs = durationMs - positionMs
-        return when {
-            remainingMs <= MOVIE_RECOMMENDATION_FINAL_MS -> 2
-            // When the player knows where the credits begin, the card floats in a few seconds after they roll
-            // rather than on a fixed "minutes left" guess.
-            creditsStartMs != null -> if (positionMs >= creditsStartMs + MOVIE_RECOMMENDATION_CREDITS_DELAY_MS) 1 else 0
-            remainingMs <= MOVIE_RECOMMENDATION_FIRST_MS -> 1
-            else -> 0
-        }
-    }
+    fun movieRecommendationStage(
+        positionMs: Long,
+        durationMs: Long,
+        isEnded: Boolean,
+        creditsStartMs: Long? = null,
+        protectedSceneAhead: Boolean = false,
+    ): Int = MovieEndingStage.stage(positionMs, durationMs, isEnded, creditsStartMs, protectedSceneAhead)
 
-    /** Where the credits start, from the skip data (an outro segment), or null when the player has none. */
-    fun creditsStartMs(skipIntervals: List<SkipInterval>): Long? =
-        skipIntervals.filter { it.type in OUTRO_SEGMENT_TYPES }
-            .minOfOrNull { (it.startTime * 1_000.0).toLong() }
+    /**
+     * Whether a mid- or post-credits scene is playing or still to come, so no automatic takeover (the end-of-movie
+     * recommendation) may begin yet. Only scenes that fit the runtime count.
+     */
+    fun protectedSceneAhead(skipIntervals: List<SkipInterval>, positionMs: Long, durationMs: Long): Boolean =
+        !skipIntervals.automaticTakeoverAllowed(positionMs, durationMs)
 
-    private const val MOVIE_RECOMMENDATION_CREDITS_DELAY_MS = 4_000L
+    /**
+     * Where the end credits start, from the skip data, or null when the player has none. An episode's outro, a movie's
+     * credits and a chapter ending all count (the same category, however a provider spells it); a marker that cannot fit
+     * the runtime (opening credits mislabelled as end credits) does not, once [durationMs] is known.
+     */
+    fun creditsStartMs(skipIntervals: List<SkipInterval>, durationMs: Long = 0L): Long? =
+        skipIntervals.creditsStartMs(durationMs)
 
-    const val MOVIE_RECOMMENDATION_STAGE_ENDED = 3
-    private const val MOVIE_RECOMMENDATION_FIRST_MS = 4L * 60_000L
-    private const val MOVIE_RECOMMENDATION_FINAL_MS = 30_000L
+    const val MOVIE_RECOMMENDATION_STAGE_ENDED = MovieEndingStage.ENDED
 
     fun hasEpisodeAired(raw: String?): Boolean {
         val value = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return true
@@ -168,17 +170,15 @@ object PlayerNextEpisodeRules {
         return d1.compareTo(d2)
     }
 
-    val OUTRO_SEGMENT_TYPES = setOf("outro", "ed", "mixed-ed")
-
     private const val POST_CREDITS_GAP_MS = 5_000L
 
     private fun SkipInterval.findFollowingPostCreditsScene(
         intervals: List<SkipInterval>,
         durationMs: Long,
     ): SkipInterval? {
-        if (type !in OUTRO_SEGMENT_TYPES) return null
+        if (!isCredits()) return null
         val explicit = intervals.filter {
-            it.type.trim().lowercase() == "post-credits" &&
+            it.segmentType == PlaybackSegmentType.POST_CREDITS_SCENE &&
                 it.startTime.isFinite() && it.endTime.isFinite() &&
                 it.startTime >= endTime && it.endTime > it.startTime &&
                 (durationMs <= 0L || it.startTime * 1000.0 < durationMs)

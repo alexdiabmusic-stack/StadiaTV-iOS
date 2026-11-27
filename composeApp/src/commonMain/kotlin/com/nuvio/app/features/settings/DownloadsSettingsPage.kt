@@ -76,6 +76,7 @@ internal fun LazyListScope.downloadsSettingsContent(
             )
         }
     }
+    smartDownloadsSettingsContent(isTablet = isTablet)
 }
 
 @Composable

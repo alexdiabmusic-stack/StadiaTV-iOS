@@ -8,6 +8,10 @@ data class SkipInterval(
     val endTime: Double,
     val type: String,
     val provider: String,
+    /** The provider's confidence (0 to 1) when it gives one. */
+    val confidence: Double? = null,
+    /** How well the provider says its timestamps fit this video; null when it does not say (derived from the provider). */
+    val matchQuality: com.nuvio.app.features.playback.SegmentMatchQuality? = null,
 )
 
 data class NextEpisodeInfo(
@@ -49,7 +53,7 @@ data class IntroDbSegmentsResponse(
     @SerialName("post_credits") val postCredits: IntroDbSegment? = null,
 )
 
-internal fun IntroDbSegmentsResponse.movieSkipIntervals(): List<SkipInterval> {
+fun IntroDbSegmentsResponse.movieSkipIntervals(): List<SkipInterval> {
     val credits = outro.movieIntervalOrNull("movie-credits")
     val scene = postCredits.movieIntervalOrNull("post-credits")
     // End-credit skipping must stop before the post-credits scene, even if data overlaps.

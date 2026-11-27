@@ -1,5 +1,6 @@
 package com.nuvio.app.features.player
 
+import com.nuvio.app.features.player.skip.UnattendedViewing
 import com.nuvio.app.core.i18n.localizedSeasonEpisodeCode
 import com.nuvio.app.core.network.NetworkCondition
 import com.nuvio.app.core.network.NetworkStatusRepository
@@ -481,6 +482,12 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         }
     }
 
+    // Smart Downloads must not remove a finished download that is open in the player; it looks again once playback ends.
+    DisposableEffect(activeVideoId) {
+        com.nuvio.app.features.downloads.DownloadsRepository.setNowPlaying(activeVideoId)
+        onDispose { com.nuvio.app.features.downloads.DownloadsRepository.setNowPlaying(null) }
+    }
+
     DisposableEffect(Unit) {
         PlayerStreamsRepository.pauseSearchForPlayback()
         onDispose {
@@ -602,6 +609,10 @@ private fun PlayerScreenRuntime.BindPlayerUiVisibilityEffects() {
                 showName = title, episodeTitle = activeEpisodeTitle, poster = args.poster, snapshot = playbackSnapshot,
             )
         }
+        // The shared completion policy watches what really played. It only observes until its flag is on.
+        if ((isMoviePlayback || isEpisodePlayback) && shouldTrackWatchProgress) {
+            com.nuvio.app.features.watchprogress.PlaybackCompletionRuntime.onSnapshot(playbackSession, playbackSnapshot, skipIntervals)
+        }
         if (playbackSnapshot.isEnded) {
             flushWatchProgress(TrackingScrobbleAction.STOP)
             previousIsPlaying = false
@@ -693,6 +704,9 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         skipIntervalDismissed = false
         showNextEpisodeCard = false
         nextEpisodeCardDismissed = false
+        // A new episode or title is a new media session: Watch Credits and a pending prompt belong to the old one.
+        watchCreditsChosen = false
+        stillWatchingPending = false
         cancelNextEpisodeAutoPlay()
 
         val season = activeSeasonNumber
@@ -700,7 +714,15 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         val vid = activeVideoId
         if (!playerSettingsUiState.skipIntroEnabled) return@LaunchedEffect
         if ((contentType ?: parentMetaType).equals("movie", ignoreCase = true)) {
-            val api = SkipIntroRepository.getMovieSkipIntervals(parentMetaId, vid)
+            val api = SkipIntroRepository.getMovieSkipIntervals(
+                contentId = parentMetaId,
+                videoId = vid,
+                // Providers answer one after another; each result is shown as it arrives.
+                onUpdate = { update ->
+                    apiSkipIntervals = update
+                    recomputeMergedSkipIntervals()
+                },
+            )
             apiSkipIntervals = api
             recomputeMergedSkipIntervals()
             return@LaunchedEffect
@@ -730,12 +752,45 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
                         imdbId = vid.substringBefore(':').takeIf { it.startsWith("tt") },
                         season = season,
                         episode = episode,
+                        onUpdate = { update ->
+                            apiSkipIntervals = update
+                            recomputeMergedSkipIntervals()
+                        },
                     )
                 }
             }
             apiSkipIntervals = intervals ?: return@launch
             recomputeMergedSkipIntervals()
         }
+    }
+
+    // "Are you still watching?": the viewer being present is any real input, never an automatic skip. Showing the controls
+    // (touch, click or a remote key) and an explicit seek or skip both count.
+    LaunchedEffect(controlsVisible) {
+        if (controlsVisible) UnattendedViewing.noteInteraction()
+    }
+    LaunchedEffect(lastManualSkipSeekPositions) {
+        if (lastManualSkipSeekPositions != null) UnattendedViewing.noteInteraction()
+    }
+
+    // Once the real duration is known, ask SkipDB again with it: it can then report an exact or shifted match instead of
+    // "agnostic", and anything that does not fit this video is dropped. Cancelled with the episode, so a late answer can
+    // never land on the next one.
+    val skipDurationKnown = playbackSnapshot.durationMs >= 121_000L
+    LaunchedEffect(activeVideoId, parentMetaId, skipDurationKnown, playerSettingsUiState.skipIntroEnabled) {
+        if (!skipDurationKnown || !playerSettingsUiState.skipIntroEnabled || isNetworkOffline()) return@LaunchedEffect
+        val isMovie = (contentType ?: parentMetaType).equals("movie", ignoreCase = true)
+        val imdb = (activeVideoId?.substringBefore(':')?.takeIf { it.startsWith("tt") }) ?: parentMetaId.takeIf { it.startsWith("tt") }
+            ?: return@LaunchedEffect
+        val refined = SkipIntroRepository.refineWithDuration(
+            existing = apiSkipIntervals,
+            imdbId = imdb,
+            season = if (isMovie) null else activeSeasonNumber,
+            episode = if (isMovie) null else activeEpisodeNumber,
+            durationMs = playbackSnapshot.durationMs,
+        ) ?: return@LaunchedEffect
+        apiSkipIntervals = refined
+        recomputeMergedSkipIntervals()
     }
 
     LaunchedEffect(
@@ -884,7 +939,8 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
     }
 
     LaunchedEffect(playbackSnapshot.isEnded) {
-        if (playbackSnapshot.isEnded && nextEpisodeCardDismissed &&
+        // A dismissed card comes back at the end so autoplay can still run, but an explicit Watch Credits never does.
+        if (playbackSnapshot.isEnded && nextEpisodeCardDismissed && !watchCreditsChosen &&
             playerSettingsUiState.streamAutoPlayNextEpisodeEnabled &&
             nextEpisodeInfo?.hasAired == true
         ) {
@@ -915,7 +971,7 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
         }
         if (shouldShow && !showNextEpisodeCard) {
             showNextEpisodeCard = true
-            if (playerSettingsUiState.streamAutoPlayNextEpisodeEnabled && nextEpisodeInfo?.hasAired == true && !isPartyControlLocked) {
+            if (playerSettingsUiState.streamAutoPlayNextEpisodeEnabled && nextEpisodeInfo?.hasAired == true && !isPartyControlLocked && !watchCreditsChosen) {
                 playNextEpisode(automatic = true)
             }
         } else if (!shouldShow) {
@@ -942,7 +998,10 @@ private fun PlayerScreenRuntime.BindPlayerMetadataAndSkipEffects() {
             positionMs = playbackSnapshot.positionMs,
             durationMs = playbackSnapshot.durationMs,
             isEnded = playbackSnapshot.isEnded,
-            creditsStartMs = PlayerNextEpisodeRules.creditsStartMs(skipIntervals),
+            creditsStartMs = PlayerNextEpisodeRules.creditsStartMs(skipIntervals, playbackSnapshot.durationMs),
+            protectedSceneAhead = PlayerNextEpisodeRules.protectedSceneAhead(
+                skipIntervals, playbackSnapshot.positionMs, playbackSnapshot.durationMs,
+            ),
         )
         if (stage == 0 && movieRecommendationDismissedStage != 0) {
             movieRecommendationDismissedStage = 0
@@ -1177,10 +1236,8 @@ private fun SkipInterval.skipButtonStartTime(offsetSeconds: Int): Double =
     }
 
 private fun SkipInterval.isIntroLikeSkipInterval(): Boolean =
-    when (type.lowercase()) {
-        "intro", "op", "mixed-op" -> true
-        else -> false
-    }
+    com.nuvio.app.features.playback.PlaybackSegmentType.fromRaw(type) ==
+        com.nuvio.app.features.playback.PlaybackSegmentType.INTRO
 
 private const val CREDENTIAL_REFRESH_POLL_COUNT = 30
 private const val CREDENTIAL_REFRESH_POLL_INTERVAL_MS = 500L

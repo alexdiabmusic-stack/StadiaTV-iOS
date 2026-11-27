@@ -26,6 +26,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -203,6 +204,7 @@ private fun LazyListScope.downloadsRootContent(
                 onResume = { DownloadsRepository.resumeDownload(item.id) },
                 onRetry = { DownloadsRepository.retryDownload(item.id) },
                 onDelete = { onDeleteDownload(item.id) },
+                onKeep = { DownloadsRepository.setPinned(item.id, !item.pinned) },
             )
         }
     }
@@ -222,6 +224,7 @@ private fun LazyListScope.downloadsRootContent(
                 onResume = { DownloadsRepository.resumeDownload(item.id) },
                 onRetry = { DownloadsRepository.retryDownload(item.id) },
                 onDelete = { onDeleteDownload(item.id) },
+                onKeep = { DownloadsRepository.setPinned(item.id, !item.pinned) },
             )
         }
     }
@@ -355,6 +358,7 @@ private fun LazyListScope.downloadsShowContent(
                 onResume = { DownloadsRepository.resumeDownload(item.id) },
                 onRetry = { DownloadsRepository.retryDownload(item.id) },
                 onDelete = { onDeleteDownload(item.id) },
+                onKeep = { DownloadsRepository.setPinned(item.id, !item.pinned) },
             )
         }
     }
@@ -368,6 +372,7 @@ private fun DownloadRow(
     onResume: () -> Unit,
     onRetry: () -> Unit,
     onDelete: () -> Unit,
+    onKeep: () -> Unit,
 ) {
     val displayTitle = item.displayTitle()
     val displaySubtitle = downloadDisplaySubtitle(
@@ -418,6 +423,14 @@ private fun DownloadRow(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    // Smart Downloads says plainly which downloads it added, so nothing automatic is mistaken for the viewer's own.
+                    if (item.downloadOrigin.isAutomatic) {
+                        Text(
+                            text = stringResource(Res.string.downloads_origin_automatic),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -447,6 +460,12 @@ private fun DownloadRow(
                             }
                         }
                         DownloadStatus.Completed -> {
+                            TextButton(onClick = onKeep) {
+                                Text(
+                                    text = stringResource(if (item.pinned) Res.string.downloads_keep_active else Res.string.downloads_keep_action),
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            }
                             IconButton(onClick = onOpen) {
                                 Icon(
                                     imageVector = Icons.Rounded.PlayArrow,

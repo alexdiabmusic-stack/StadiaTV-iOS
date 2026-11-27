@@ -1,5 +1,6 @@
 package com.nuvio.app.features.player
 
+import com.nuvio.app.features.player.skip.UnattendedViewing
 import com.nuvio.app.core.logging.InAppLogger
 import com.nuvio.app.core.ui.NuvioToastController
 import com.nuvio.app.features.debrid.DirectDebridPlayableResult
@@ -613,6 +614,11 @@ internal fun PlayerScreenRuntime.switchToDownloadedEpisode(downloadItem: Downloa
 
 internal fun PlayerScreenRuntime.playNextEpisode(automatic: Boolean = false) {
     if (nextEpisodeAutoPlaySearching || nextEpisodeAutoPlayCountdown != null) return
+    // Several episodes in a row on their own: ask first and do not start the next one until the viewer answers.
+    if (automatic && !watchCreditsChosen && UnattendedViewing.shouldPrompt()) {
+        stillWatchingPending = true
+        return
+    }
     nextEpisodePreloadTriggered = false
     val playbackKey = activePlaybackKey
     val nextVideoId = nextEpisodeInfo?.takeIf { it.hasAired }?.videoId ?: return
@@ -620,7 +626,7 @@ internal fun PlayerScreenRuntime.playNextEpisode(automatic: Boolean = false) {
         nextEpisodeInfo?.videoId == nextVideoId &&
         (!automatic || (
             playerSettingsUiState.streamAutoPlayNextEpisodeEnabled &&
-                !nextEpisodeCardDismissed && isAtNextEpisodeThreshold()
+                !nextEpisodeCardDismissed && !watchCreditsChosen && !stillWatchingPending && isAtNextEpisodeThreshold()
             ))
     if (!isCurrentRequest()) return
     nextEpisodeAutoPlayAutomatic = automatic
@@ -635,10 +641,16 @@ internal fun PlayerScreenRuntime.playNextEpisode(automatic: Boolean = false) {
         settings = playerSettingsUiState,
         currentStreamBingeGroup = currentStreamBingeGroup,
         onDownloadedEpisodeSelected = { item, episode ->
-            if (isCurrentRequest()) switchToDownloadedEpisode(item, episode)
+            if (isCurrentRequest()) {
+                if (automatic) UnattendedViewing.noteAutoAdvanced()
+                switchToDownloadedEpisode(item, episode)
+            }
         },
         onEpisodeStreamSelected = { stream, episode ->
-            if (isCurrentRequest()) switchToEpisodeStream(stream, episode)
+            if (isCurrentRequest()) {
+                if (automatic) UnattendedViewing.noteAutoAdvanced()
+                switchToEpisodeStream(stream, episode)
+            }
         },
         onManualSelectionRequired = { nextVideo ->
             if (isCurrentRequest()) {

@@ -40,8 +40,10 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import nuvio.composeapp.generated.resources.*
 import org.jetbrains.compose.resources.getString
 
@@ -105,6 +107,38 @@ object PlayerStreamsRepository {
             jobHolder = { episodeStreamsJob },
             setJob = { episodeStreamsJob = it },
         )
+    }
+
+    /**
+     * One lookup that touches none of the player's panels: its own state, awaited, and returned. Used by Smart Downloads to
+     * find a source for an episode nobody is watching. Gives up after [timeoutMs] with whatever has arrived.
+     */
+    suspend fun fetchOnce(
+        type: String,
+        videoId: String,
+        season: Int? = null,
+        episode: Int? = null,
+        timeoutMs: Long = 45_000L,
+    ): List<StreamItem> {
+        val state = MutableStateFlow(StreamsUiState())
+        var requestKey: String? = null
+        var job: Job? = null
+        fetchStreams(
+            type = type,
+            videoId = videoId,
+            season = season,
+            episode = episode,
+            forceRefresh = true,
+            stateFlow = state,
+            requestKeyHolder = { requestKey },
+            setRequestKey = { requestKey = it },
+            jobHolder = { job },
+            setJob = { job = it },
+            background = true,
+        )
+        val settled = withTimeoutOrNull(timeoutMs) { state.first { !it.isAnyLoading } } ?: state.value
+        job?.cancel()
+        return settled.groups.flatMap { it.streams }
     }
 
     fun stopSourcesLoading() {
@@ -188,6 +222,7 @@ object PlayerStreamsRepository {
         setRequestKey: (String?) -> Unit,
         jobHolder: () -> Job?,
         setJob: (Job) -> Unit,
+        background: Boolean = false,
     ) {
         val pluginUiState = if (AppFeaturePolicy.pluginsEnabled) {
             PluginRepository.initialize()
@@ -196,7 +231,8 @@ object PlayerStreamsRepository {
             PluginsUiState(pluginsEnabled = false)
         }
         val requestKey = "$type::$videoId::$season::$episode::pluginsGrouped=${pluginUiState.groupStreamsByRepository}"
-        PluginRepository.setLocalPluginSearchPaused(false)
+        // A lookup made in the background must not wake local plugin search that the player has paused for playback.
+        if (!background) PluginRepository.setLocalPluginSearchPaused(false)
         val current = stateFlow.value
         val cachedKey = requestKeyHolder()
         if (

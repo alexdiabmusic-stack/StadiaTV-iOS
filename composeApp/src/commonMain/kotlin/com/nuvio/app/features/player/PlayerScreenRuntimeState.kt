@@ -246,6 +246,12 @@ internal class PlayerScreenRuntime(
     var nextEpisodeInfo by mutableStateOf<NextEpisodeInfo?>(null)
     var showNextEpisodeCard by mutableStateOf(false)
     var nextEpisodeCardDismissed by mutableStateOf(false)
+
+    /** The viewer chose Watch Credits for this episode. Unlike a dismissed card it is not undone at the end of the file or by rewinding. */
+    var watchCreditsChosen by mutableStateOf(false)
+
+    /** "Are you still watching?" is waiting for an answer; the next episode does not start meanwhile. */
+    var stillWatchingPending by mutableStateOf(false)
     var showMovieRecommendationCard by mutableStateOf(false)
     var movieRecommendationDismissedStage by mutableStateOf(0)
     var movieRecommendationStage by mutableStateOf(0)

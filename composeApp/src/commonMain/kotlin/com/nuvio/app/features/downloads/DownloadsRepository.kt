@@ -2,6 +2,7 @@ package com.nuvio.app.features.downloads
 
 import com.nuvio.app.features.player.SubtitleRequestExtras
 import com.nuvio.app.features.player.addonSubtitleRequests
+import com.nuvio.app.features.smartdownloads.DownloadOrigin
 import com.nuvio.app.features.streams.StreamItem
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +25,24 @@ object DownloadsRepository {
 
     private val activeHandles = mutableMapOf<String, DownloadsTaskHandle>()
     private var hasLoaded = false
+
+    /** The video the player has open right now. A finished download that is playing is never removed behind the viewer's back. */
+    private var nowPlayingVideoId: String? = null
+
+    fun setNowPlaying(videoId: String?) {
+        val changed = nowPlayingVideoId != videoId
+        nowPlayingVideoId = videoId
+        // When playback ends, anything that was held back because it was playing can be considered again.
+        if (changed && videoId == null) SmartDownloadsCoordinator.requestRun()
+    }
+
+    fun isNowPlaying(item: DownloadItem): Boolean = nowPlayingVideoId?.let { it == item.videoId } == true
+
+    /** Keeps (or stops keeping) a download on the device. Pinned downloads are never removed by Smart Downloads. */
+    fun setPinned(downloadId: String, pinned: Boolean) {
+        ensureLoaded()
+        mutateItem(downloadId) { current -> if (current.pinned == pinned) current else current.copy(pinned = pinned) }
+    }
     private var nextDownloadOrdinal = 0L
 
     fun ensureLoaded() {
@@ -124,6 +143,7 @@ object DownloadsRepository {
         episodeTitle: String?,
         episodeThumbnail: String?,
         stream: StreamItem,
+        origin: DownloadOrigin = DownloadOrigin.MANUAL,
     ): DownloadEnqueueResult {
         ensureLoaded()
 
@@ -146,6 +166,12 @@ object DownloadsRepository {
         var replacedExisting = false
         val currentItems = _uiState.value.items.toMutableList()
         val existing = currentItems.firstOrNull { it.logicalContentKey == logicalKey }
+        // An automatic request never replaces anything the viewer has, or anything that is already fine. Only a failed
+        // automatic attempt is swapped for a fresh one.
+        if (existing != null && origin.isAutomatic) {
+            val replaceable = existing.status == DownloadStatus.Failed && existing.downloadOrigin.isAutomatic
+            if (!replaceable) return DownloadEnqueueResult.AlreadyPresent
+        }
         if (existing != null) {
             replacedExisting = true
             activeHandles.remove(existing.id)?.cancel()
@@ -200,6 +226,8 @@ object DownloadsRepository {
             errorMessage = null,
             createdAtEpochMs = now,
             updatedAtEpochMs = now,
+            origin = origin.name,
+            pinned = existing?.pinned == true,
         )
 
         currentItems.add(0, item)
@@ -268,9 +296,11 @@ object DownloadsRepository {
         if (restored.status == DownloadStatus.Downloading) startDownload(restored)
     }
 
-    fun cancelDownload(downloadId: String) {
+    /** [byUser] is false when Smart Downloads clears something itself, so that is not mistaken for the viewer saying no. */
+    fun cancelDownload(downloadId: String, byUser: Boolean = true) {
         ensureLoaded()
         val item = _uiState.value.items.firstOrNull { it.id == downloadId } ?: return
+        if (byUser && item.downloadOrigin.isAutomatic) SmartDownloadsCoordinator.onUserRemoved(item)
 
         activeHandles.remove(downloadId)?.cancel()
         DownloadsPlatformDownloader.removeFile(playableLocalFileUri(item) ?: item.localFileUri)
@@ -309,6 +339,7 @@ object DownloadsRepository {
         }
         normalized.filter { it.status == DownloadStatus.Downloading && it.id !in activeHandles }
             .forEach(::startDownload)
+        SmartDownloadsCoordinator.requestRun()
     }
 
     private fun startDownload(item: DownloadItem) {
@@ -347,6 +378,7 @@ object DownloadsRepository {
                         updatedAtEpochMs = DownloadsClock.nowEpochMs(),
                     )
                 }
+                SmartDownloadsCoordinator.onDownloadCompleted(item)
             },
             onFailure = { message ->
                 activeHandles.remove(item.id)
@@ -361,6 +393,7 @@ object DownloadsRepository {
                         )
                     }
                 }
+                SmartDownloadsCoordinator.onDownloadFailed(item, message)
             },
             onPaused = {
                 activeHandles.remove(item.id)

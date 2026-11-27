@@ -25,6 +25,9 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
+/** How long the Next Episode button counts down once a source is ready. Separate from the time allowed to find that source. */
+internal const val NEXT_EPISODE_COUNTDOWN_SECONDS = 5
+
 internal fun PlayerScreenRuntime.isAtNextEpisodeThreshold(): Boolean {
     if (playbackSnapshotKey != activePlaybackKey || playbackSnapshot.isLoading ||
         !initialSeekApplied || isScrubbingTimeline || errorMessage != null ||
@@ -340,7 +343,7 @@ internal fun CoroutineScope.launchPlayerNextEpisodeAutoPlay(
         onSearchingChanged(false)
         if (selected != null) {
             onSourceNameChanged((selected.name?.takeIf { it.isNotBlank() } ?: selected.addonName).trim())
-            for (i in 3 downTo 1) {
+            for (i in NEXT_EPISODE_COUNTDOWN_SECONDS downTo 1) {
                 onCountdownChanged(i)
                 delay(1000)
             }

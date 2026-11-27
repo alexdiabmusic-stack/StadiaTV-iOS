@@ -1,5 +1,6 @@
 package com.nuvio.app.features.player
 
+import com.nuvio.app.features.player.skip.UnattendedViewing
 import com.nuvio.app.features.watching.application.WatchingState
 import com.nuvio.app.features.home.MetaPreview
 import androidx.compose.animation.AnimatedVisibility
@@ -910,6 +911,24 @@ private fun BoxScope.RenderPlaybackOverlays(
             nextEpisodeCardDismissed = true
             showNextEpisodeCard = false
         },
+        watchCreditsChosen = watchCreditsChosen,
+        // Watch Credits: stop any countdown and keep the video as it is. The Next Episode action stays; nothing starts by itself.
+        onWatchCredits = {
+            UnattendedViewing.noteInteraction()
+            cancelNextEpisodeAutoPlay()
+            watchCreditsChosen = true
+        },
+        stillWatchingVisible = stillWatchingPending,
+        onStillWatchingContinue = {
+            stillWatchingPending = false
+            UnattendedViewing.onContinue()
+            if (!partyBlocksControl()) playNextEpisode()
+        },
+        onStillWatchingStop = {
+            stillWatchingPending = false
+            flushWatchProgress()
+            args.onBack()
+        },
         movieRecommendations = if (isMoviePlayback && args.onOpenMetaDetails != null) {
             movieRecommendationCandidates
         } else {
@@ -926,7 +945,10 @@ private fun BoxScope.RenderPlaybackOverlays(
                 positionMs = playbackSnapshot.positionMs,
                 durationMs = playbackSnapshot.durationMs,
                 isEnded = playbackSnapshot.isEnded,
-                creditsStartMs = PlayerNextEpisodeRules.creditsStartMs(skipIntervals),
+                creditsStartMs = PlayerNextEpisodeRules.creditsStartMs(skipIntervals, playbackSnapshot.durationMs),
+                protectedSceneAhead = PlayerNextEpisodeRules.protectedSceneAhead(
+                    skipIntervals, playbackSnapshot.positionMs, playbackSnapshot.durationMs,
+                ),
             )
             showMovieRecommendationCard = false
         },

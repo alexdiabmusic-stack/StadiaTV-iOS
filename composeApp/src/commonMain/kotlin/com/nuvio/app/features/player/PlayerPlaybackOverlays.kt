@@ -1,5 +1,7 @@
 package com.nuvio.app.features.player
 
+import com.nuvio.app.features.player.skip.StillWatchingPrompt
+import com.nuvio.app.features.player.skip.PostPlayEpisodeActions
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -62,6 +64,11 @@ internal fun BoxScope.PlayerPlaybackOverlays(
     blurUnwatchedEpisodes: Boolean,
     onPlayNextEpisode: () -> Unit,
     onDismissNextEpisode: () -> Unit,
+    watchCreditsChosen: Boolean = false,
+    onWatchCredits: () -> Unit = {},
+    stillWatchingVisible: Boolean = false,
+    onStillWatchingContinue: () -> Unit = {},
+    onStillWatchingStop: () -> Unit = {},
     movieRecommendations: List<MetaPreview> = emptyList(),
     showMovieRecommendationCard: Boolean = false,
     movieRecommendationStage: Int = 0,
@@ -139,20 +146,27 @@ internal fun BoxScope.PlayerPlaybackOverlays(
     }
 
     if (isSeries && !playerControlsLocked) {
-        NextEpisodeCard(
+        PostPlayEpisodeActions(
             nextEpisode = nextEpisodeInfo,
             visible = showNextEpisodeCard || nextEpisodeAutoPlaySearching || nextEpisodeAutoPlayCountdown != null,
-            isAutoPlaySearching = nextEpisodeAutoPlaySearching,
-            autoPlaySourceName = nextEpisodeAutoPlaySourceName,
-            autoPlayCountdownSec = nextEpisodeAutoPlayCountdown,
-            blurred = blurUnwatchedEpisodes && nextEpisodeInfo?.isWatched == false,
+            preparing = nextEpisodeAutoPlaySearching,
+            countdownSec = nextEpisodeAutoPlayCountdown,
+            countdownTotalSec = NEXT_EPISODE_COUNTDOWN_SECONDS,
+            watchCreditsChosen = watchCreditsChosen,
+            onWatchCredits = onWatchCredits,
             onPlayNext = onPlayNextEpisode,
-            onDismiss = onDismissNextEpisode,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = sliderEdgePadding, bottom = overlayBottomPadding),
         )
     }
+
+    StillWatchingPrompt(
+        visible = stillWatchingVisible,
+        onContinue = onStillWatchingContinue,
+        onStop = onStillWatchingStop,
+        modifier = Modifier.fillMaxSize(),
+    )
 
     if (!isSeries && !playerControlsLocked) {
         MovieRecommendationCard(

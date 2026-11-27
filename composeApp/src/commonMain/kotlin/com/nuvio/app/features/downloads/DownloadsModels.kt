@@ -1,10 +1,12 @@
 package com.nuvio.app.features.downloads
 
 import com.nuvio.app.features.player.SubtitleAddonRequest
+import com.nuvio.app.features.smartdownloads.DownloadOrigin
 import com.nuvio.app.features.streams.StreamSubtitle
 import kotlinx.serialization.Serializable
 import kotlinx.coroutines.runBlocking
 import nuvio.composeapp.generated.resources.Res
+import nuvio.composeapp.generated.resources.downloads_enqueue_already_present
 import nuvio.composeapp.generated.resources.downloads_enqueue_missing_url
 import nuvio.composeapp.generated.resources.downloads_enqueue_replaced
 import nuvio.composeapp.generated.resources.downloads_enqueue_started
@@ -52,7 +54,14 @@ data class DownloadItem(
     val errorMessage: String? = null,
     val createdAtEpochMs: Long,
     val updatedAtEpochMs: Long,
+    /** Who asked for it: the viewer ("MANUAL") or Smart Downloads. Older saved items have no value and read as manual. */
+    val origin: String = DownloadOrigin.MANUAL.name,
+    /** The viewer chose to keep this on the device; nothing automatic removes it. */
+    val pinned: Boolean = false,
 ) {
+    val downloadOrigin: DownloadOrigin
+        get() = DownloadOrigin.entries.firstOrNull { it.name == origin } ?: DownloadOrigin.MANUAL
+
     val isEpisode: Boolean
         get() = seasonNumber != null && episodeNumber != null
 
@@ -93,7 +102,10 @@ enum class DownloadEnqueueResult {
     Replaced,
     MissingUrl,
     UnsupportedFormat,
-    RequiresWifi;
+    RequiresWifi,
+
+    /** An automatic request found the title already on the device (or on its way) and left it alone. */
+    AlreadyPresent;
 
     fun toastMessage(): String = runBlocking {
         when (this@DownloadEnqueueResult) {
@@ -102,6 +114,7 @@ enum class DownloadEnqueueResult {
             MissingUrl -> getString(Res.string.downloads_enqueue_missing_url)
             UnsupportedFormat -> getString(Res.string.downloads_enqueue_unsupported_format)
             RequiresWifi -> getString(Res.string.downloads_enqueue_requires_wifi)
+            AlreadyPresent -> getString(Res.string.downloads_enqueue_already_present)
         }
     }
 }

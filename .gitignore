@@ -22,6 +22,7 @@ node_modules/
 logs/
 analysis/
 Docs/*
+!docs/NETFLIX_EXPERIENCE_ROADMAP.md
 !Docs/integration/
 SUPPORTER_COSMETICS.md
 supabase/migrations/

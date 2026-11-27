@@ -1,7 +1,14 @@
 package com.nuvio.app.features.player.skip
 
 import com.nuvio.app.core.logging.InAppLogger
+import com.nuvio.app.features.playback.PlaybackSegmentType
+import com.nuvio.app.features.playback.SegmentArbiter
+import com.nuvio.app.features.playback.SegmentCache
+import com.nuvio.app.features.playback.SegmentCacheResult
+import com.nuvio.app.features.playback.SegmentCandidate
+import com.nuvio.app.features.playback.SegmentLookupOutcome
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.watchprogress.WatchProgressClock
 import kotlinx.coroutines.CancellationException
 import com.nuvio.app.features.tmdb.TmdbService
 import kotlinx.coroutines.async
@@ -10,7 +17,12 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 object SkipIntroRepository {
 
-    private val cache = HashMap<String, List<SkipInterval>>()
+    // Bounded and expiring (was an unbounded map): a found answer lives six hours, and a request that found nothing is not stored.
+    private val cache = SegmentCache<List<SkipInterval>>(maxEntries = 128, clock = { WatchProgressClock.nowEpochMs() })
+
+    // SkipDB answers are kept per provider so "SkipDB has nothing for this episode" can be remembered without hiding IntroDB.
+    private val skipDbCache = SegmentCache<List<SkipInterval>>(maxEntries = 256, clock = { WatchProgressClock.nowEpochMs() })
+    private const val SKIP_DB_TIMEOUT_MS = 4_000L
     private val imdbEntriesCache = HashMap<String, List<ArmEntry>>()
     private val animeSkipShowIdCache = HashMap<String, String>()
     private const val NO_ID = "__none__"
@@ -27,26 +39,46 @@ object SkipIntroRepository {
         contentId: String?,
         videoId: String?,
         requireSkipIntroEnabled: Boolean = true,
-    ): List<SkipInterval> {
-        if (!introDbConfigured ||
-            (requireSkipIntroEnabled && !PlayerSettingsRepository.uiState.value.skipIntroEnabled)
-        ) return emptyList()
+        durationMs: Long? = null,
+        onUpdate: ((List<SkipInterval>) -> Unit)? = null,
+    ): List<SkipInterval> = coroutineScope {
+        if (requireSkipIntroEnabled && !PlayerSettingsRepository.uiState.value.skipIntroEnabled) return@coroutineScope emptyList()
         val imdbId = resolveMovieSkipImdbId(
             contentId, videoId,
             resolveTmdb = { TmdbService.tmdbToImdb(it, "movie") },
             resolveAnime = { source, id -> SimklIdResolver.resolveIds(source, id)?.imdb },
-        ) ?: return emptyList()
-        val cacheKey = "movie:$imdbId"
-        cache[cacheKey]?.let { return it }
-        val data = SkipIntroApi.getIntroDbMovieSegments(imdbId) ?: return emptyList()
-        return data.movieSkipIntervals().also { cache[cacheKey] = it }
+        ) ?: return@coroutineScope emptyList()
+        val cacheKey = SegmentCache.key("movie", imdbId, durationSeconds = durationMs?.div(1000))
+        (cache.get(cacheKey) as? SegmentCacheResult.Hit)?.let { return@coroutineScope it.value }
+
+        val introDbDeferred = async { if (introDbConfigured) fetchMovieFromIntroDb(imdbId) else emptyList() }
+        val skipDbDeferred = async { fetchFromSkipDb(imdbId, null, null, durationMs) }
+        val introDb = introDbDeferred.await()
+        val first = arbitrate(listOf(introDb), durationMs, episodic = false)
+        if (first.isNotEmpty()) onUpdate?.invoke(first)
+        val merged = arbitrate(listOf(introDb, skipDbDeferred.await()), durationMs, episodic = false)
+        if (merged != first) onUpdate?.invoke(merged)
+        merged.also { if (it.isNotEmpty()) cache.put(cacheKey, it) }
     }
 
+    private suspend fun fetchMovieFromIntroDb(imdbId: String): List<SkipInterval> {
+        val data = SkipIntroApi.getIntroDbMovieSegments(imdbId) ?: return emptyList()
+        return data.movieSkipIntervals()
+    }
+
+    /**
+     * Resolves a TV episode's segments from every provider at once and publishes as each one answers, so the Skip Intro button
+     * appears with the first result and recap, credits and scenes fill in without it moving. An opening from one provider no
+     * longer ends the search: the others still run for the categories it lacks. [onUpdate] is called from this coroutine, so
+     * cancelling the caller (a new episode, leaving the player) stops late answers from reaching the old session.
+     */
     suspend fun getSkipIntervals(
         imdbId: String?,
         season: Int,
         episode: Int,
         requireSkipIntroEnabled: Boolean = true,
+        durationMs: Long? = null,
+        onUpdate: ((List<SkipInterval>) -> Unit)? = null,
     ): List<SkipInterval> = coroutineScope {
         if (imdbId == null) {
             InAppLogger.debug("Player/SkipIntro", "skip lookup ignored: imdbId missing s=$season e=$episode")
@@ -58,70 +90,124 @@ object SkipIntroRepository {
             return@coroutineScope emptyList()
         }
 
-        val cacheKey = "$imdbId:$season:$episode"
-        cache[cacheKey]?.let { cached ->
-            InAppLogger.debug("Player/SkipIntro", "skip lookup cache hit imdb=$imdbId s=$season e=$episode count=${cached.size}")
-            return@coroutineScope cached
+        val cacheKey = SegmentCache.key("tv", imdbId, season, episode, durationSeconds = durationMs?.div(1000))
+        (cache.get(cacheKey) as? SegmentCacheResult.Hit)?.let { cached ->
+            InAppLogger.debug("Player/SkipIntro", "skip lookup cache hit imdb=$imdbId s=$season e=$episode count=${cached.value.size}")
+            return@coroutineScope cached.value
         }
         InAppLogger.info(
             "Player/SkipIntro",
-            "skip lookup imdb=$imdbId s=$season e=$episode introDb=$introDbConfigured " +
-                "animeSkip=${settings.animeSkipEnabled}",
+            "skip lookup imdb=$imdbId s=$season e=$episode introDb=$introDbConfigured animeSkip=${settings.animeSkipEnabled}",
         )
 
-        val introDbDeferred = async {
-            if (introDbConfigured) fetchFromIntroDb(imdbId, season, episode) else emptyList()
-        }
-        // Resolve IMDB -> season-specific MAL/AniList via Simkl full_anime_seasons.
-        // Kept as a deferred so it runs alongside IntroDB: the fork returns early when IntroDB
-        // already has an opening, and cancels this lookup instead of waiting for it.
+        val introDbDeferred = async { if (introDbConfigured) fetchFromIntroDb(imdbId, season, episode) else emptyList() }
+        val skipDbDeferred = async { fetchFromSkipDb(imdbId, season, episode, durationMs) }
         val simklIdsDeferred = async { SimklIdResolver.resolveIdsForImdbEpisode(imdbId, season, episode) }
 
-        val introDb = introDbDeferred.await()
-        if (introDb.hasOpeningSegment()) {
-            simklIdsDeferred.cancel()
-            InAppLogger.info(
-                "Player/SkipIntro",
-                "skip lookup fast result imdb=$imdbId s=$season e=$episode count=${introDb.size} provider=introdb",
-            )
-            cache[cacheKey] = introDb
-            return@coroutineScope introDb
+        val results = ArrayList<List<SkipInterval>>()
+        var published: List<SkipInterval>? = null
+        fun publish() {
+            val merged = arbitrate(results, durationMs, episodic = true)
+            if (merged != published) {
+                published = merged
+                if (merged.isNotEmpty()) onUpdate?.invoke(merged)
+            }
         }
 
+        results += introDbDeferred.await()
+        publish() // the Skip Intro button must not wait for the slower providers
+        results += skipDbDeferred.await()
+        publish()
+
+        // Anime providers need the Simkl id mapping; they run for every title because they can supply the recap or credits
+        // IntroDB lacks, but a non-anime title simply has no mapping and costs nothing further.
         val simklIds = simklIdsDeferred.await()
         val malId = simklIds?.mal
         val anilistId = simklIds?.anilist
-
-        // Remap the TVDB episode number to the anime-entry-local episode number.
-        val animeEpisode = if (simklIds != null) {
+        if (simklIds != null) {
+            // Remap the TVDB episode number to the anime-entry-local episode number.
             val mapping = SimklIdResolver.getEpisodeMapping(simklIds.simklId, simklIds.type)
-            mapping.firstOrNull { it.tvdbSeason == season && it.tvdbEpisode == episode }
-                ?.animeEpisode
-                ?: episode
-        } else episode
-
-        val aniSkipDeferred = async {
-            if (malId != null) fetchFromAniSkip(malId, animeEpisode) else emptyList()
-        }
-        val animeSkipDeferred = async {
-            if (anilistId != null) fetchFromAnimeSkip(anilistId, animeEpisode, season = null) else emptyList()
+            val animeEpisode = mapping.firstOrNull { it.tvdbSeason == season && it.tvdbEpisode == episode }?.animeEpisode ?: episode
+            val aniSkipDeferred = async { if (malId != null) fetchFromAniSkip(malId, animeEpisode) else emptyList() }
+            val animeSkipDeferred = async { if (anilistId != null) fetchFromAnimeSkip(anilistId, animeEpisode, season = null) else emptyList() }
+            results += animeSkipDeferred.await()
+            results += aniSkipDeferred.await()
+            publish()
         }
 
-        val animeSkip = animeSkipDeferred.await()
-        val aniSkip = aniSkipDeferred.await()
-        return@coroutineScope mergeByPriority(
-            introDb,
-            aniSkip,
-            animeSkip,
-        ).also { merged ->
-            InAppLogger.info(
-                "Player/SkipIntro",
-                "skip lookup result imdb=$imdbId s=$season e=$episode count=${merged.size} " +
-                    "introdb=${introDb.size} animeskip=${animeSkip.size} aniskip=${aniSkip.size}",
-            )
-            cache[cacheKey] = merged
+        val merged = arbitrate(results, durationMs, episodic = true)
+        InAppLogger.info(
+            "Player/SkipIntro",
+            "skip lookup result imdb=$imdbId s=$season e=$episode count=${merged.size} providers=${results.map { it.size }}",
+        )
+        merged.also { if (it.isNotEmpty()) cache.put(cacheKey, it) }
+    }
+
+    /**
+     * Once the real duration is known, asks SkipDB again with it (it can then say "exact" or "shifted" instead of "agnostic")
+     * and re-arbitrates against what the session already has. Returns null when nothing changes.
+     */
+    suspend fun refineWithDuration(
+        existing: List<SkipInterval>,
+        imdbId: String?,
+        season: Int?,
+        episode: Int?,
+        durationMs: Long,
+    ): List<SkipInterval>? {
+        if (imdbId == null || durationMs <= 0L) return null
+        val refined = fetchFromSkipDb(imdbId, season, episode, durationMs)
+        if (refined.isEmpty()) return null
+        val others = existing.filter { it.provider != "skipdb" }
+        return arbitrate(listOf(others, refined), durationMs, episodic = season != null).takeIf { it != existing }
+    }
+
+    private suspend fun fetchFromSkipDb(imdbId: String, season: Int?, episode: Int?, durationMs: Long?): List<SkipInterval> {
+        val key = SegmentCache.key("skipdb", imdbId, season, episode, durationSeconds = durationMs?.div(1000))
+        when (val hit = skipDbCache.get(key)) {
+            is SegmentCacheResult.Hit -> return hit.value
+            SegmentCacheResult.NegativeHit -> return emptyList()
+            SegmentCacheResult.Miss -> Unit
+        }
+        val outcome = withTimeoutOrNull(SKIP_DB_TIMEOUT_MS) { SkipDbProvider.fetch(imdbId, season, episode, durationMs) }
+            ?: SegmentLookupOutcome.ProviderError("timed out", retryable = true)
+        return when (outcome) {
+            is SegmentLookupOutcome.Segments -> outcome.toSkipIntervals("skipdb").also { skipDbCache.put(key, it) }
+            // "Nothing for this episode" is an answer worth remembering; a failure is not, so it is asked again next time.
+            SegmentLookupOutcome.NoData, is SegmentLookupOutcome.ConfirmedAbsent -> emptyList<SkipInterval>().also { skipDbCache.putNegative(key) }
+            is SegmentLookupOutcome.ProviderError -> {
+                InAppLogger.warn("Player/SkipIntro", "SkipDB ${outcome.reason} imdb=$imdbId s=${season ?: 0} e=${episode ?: 0}")
+                emptyList()
+            }
+            is SegmentLookupOutcome.Invalid -> {
+                InAppLogger.warn("Player/SkipIntro", "SkipDB invalid answer: ${outcome.reason} imdb=$imdbId")
+                emptyList()
+            }
         }
     }
+
+    /** One arbitration for every flow: per-stretch trust order, validated for the duration when it is known. */
+    private fun arbitrate(providerResults: List<List<SkipInterval>>, durationMs: Long?, episodic: Boolean): List<SkipInterval> {
+        val candidates = providerResults.flatten().mapNotNull { interval ->
+            interval.toPlaybackSegment()?.let { SegmentCandidate(it, interval) }
+        }
+        return SegmentArbiter.arbitrate(
+            candidates = candidates,
+            durationMs = durationMs?.takeIf { it > 0L },
+            retime = { interval, segment ->
+                interval.copy(
+                    startTime = segment.startMs / 1000.0,
+                    endTime = segment.endMs?.let { it / 1000.0 } ?: Double.MAX_VALUE,
+                )
+            },
+            limitPerType = if (episodic) EPISODE_LIMITS else emptyMap(),
+        ).map { it.candidate.payload }
+    }
+
+    private val EPISODE_LIMITS = mapOf(
+        PlaybackSegmentType.INTRO to 1,
+        PlaybackSegmentType.RECAP to 1,
+        PlaybackSegmentType.CREDITS to 1,
+    )
 
     suspend fun getSkipIntervalsForMal(
         malId: String,
@@ -138,9 +224,9 @@ object SkipIntroRepository {
         }
 
         val cacheKey = "mal:$malId:$episode"
-        cache[cacheKey]?.let { cached ->
-            InAppLogger.debug("Player/SkipIntro", "skip lookup cache hit mal=$malId e=$episode count=${cached.size}")
-            return@coroutineScope cached
+        (cache.get(cacheKey) as? SegmentCacheResult.Hit)?.let { cached ->
+            InAppLogger.debug("Player/SkipIntro", "skip lookup cache hit mal=$malId e=$episode count=${cached.value.size}")
+            return@coroutineScope cached.value
         }
         InAppLogger.info("Player/SkipIntro", "skip lookup mal=$malId e=$episode")
 
@@ -178,7 +264,7 @@ object SkipIntroRepository {
                 "skip lookup result mal=$malId e=$episode count=${merged.size} " +
                     "introdb=${introDb.size} animeskip=${animeSkip.size} aniskip=${aniSkip.size}",
             )
-            cache[cacheKey] = merged
+            if (merged.isNotEmpty()) cache.put(cacheKey, merged)
         }
     }
 
@@ -197,9 +283,9 @@ object SkipIntroRepository {
         }
 
         val cacheKey = "kitsu:$kitsuId:$episode"
-        cache[cacheKey]?.let { cached ->
-            InAppLogger.debug("Player/SkipIntro", "skip lookup cache hit kitsu=$kitsuId e=$episode count=${cached.size}")
-            return@coroutineScope cached
+        (cache.get(cacheKey) as? SegmentCacheResult.Hit)?.let { cached ->
+            InAppLogger.debug("Player/SkipIntro", "skip lookup cache hit kitsu=$kitsuId e=$episode count=${cached.value.size}")
+            return@coroutineScope cached.value
         }
         InAppLogger.info("Player/SkipIntro", "skip lookup kitsu=$kitsuId e=$episode")
 
@@ -243,7 +329,7 @@ object SkipIntroRepository {
                 "skip lookup result kitsu=$kitsuId e=$episode count=${merged.size} " +
                     "introdb=${introDb.size} animeskip=${animeSkip.size} aniskip=${aniSkip.size}",
             )
-            cache[cacheKey] = merged
+            if (merged.isNotEmpty()) cache.put(cacheKey, merged)
         }
     }
 
@@ -253,20 +339,8 @@ object SkipIntroRepository {
      * order (IntroDB has the broadest coverage, then Anime-Skip, then AniSkip), so a partial
      * result from one provider never shadows a complete segment from another.
      */
-    private fun mergeByPriority(vararg providerResults: List<SkipInterval>): List<SkipInterval> {
-        val chosen = LinkedHashMap<String, SkipInterval>()
-        for (result in providerResults) {
-            for (interval in result) {
-                val category = segmentCategory(interval.type) ?: continue
-                if (category !in chosen) chosen[category] = interval
-            }
-        }
-        return chosen.values.toList()
-    }
-
-    private fun List<SkipInterval>.hasOpeningSegment(): Boolean = any { interval ->
-        segmentCategory(interval.type) == "opening"
-    }
+    private fun mergeByPriority(vararg providerResults: List<SkipInterval>): List<SkipInterval> =
+        arbitrate(providerResults.toList(), null, episodic = true)
 
     private suspend fun <T> withSkipProviderTimeout(
         provider: String,
@@ -615,9 +689,4 @@ internal fun List<AnimeSkipTimestamp>.toAnimeSkipIntervals(baseDuration: Double?
     }
 }
 
-internal fun segmentCategory(type: String): String? = when (type.lowercase()) {
-    "intro", "op", "mixed-op" -> "opening"
-    "outro", "ed", "mixed-ed", "credits", "ending" -> "ending"
-    "recap" -> "recap"
-    else -> null
-}
+internal fun segmentCategory(type: String): String? = skipSegmentCategory(type)

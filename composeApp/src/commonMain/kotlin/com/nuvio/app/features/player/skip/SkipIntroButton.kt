@@ -167,14 +167,15 @@ fun SkipIntroButton(
 
 @Composable
 private fun skipLabel(type: String?, skipsToPostCredits: Boolean): String =
-    when (type?.lowercase()) {
-        "intro", "op", "mixed-op" -> stringResource(Res.string.player_skip_intro)
-        "outro", "ed", "mixed-ed", "credits" -> stringResource(
-            if (skipsToPostCredits) Res.string.player_skip_to_post_credits else Res.string.player_skip_outro,
+    when (com.nuvio.app.features.playback.PlaybackSegmentType.fromRaw(type)) {
+        com.nuvio.app.features.playback.PlaybackSegmentType.INTRO -> stringResource(Res.string.player_skip_intro)
+        com.nuvio.app.features.playback.PlaybackSegmentType.CREDITS -> stringResource(
+            when {
+                skipsToPostCredits -> Res.string.player_skip_to_post_credits
+                type?.trim()?.lowercase()?.replace('_', '-') == "movie-credits" -> Res.string.player_skip_movie_credits
+                else -> Res.string.player_skip_outro
+            },
         )
-        "recap" -> stringResource(Res.string.player_skip_recap)
-        "movie-credits" -> stringResource(
-            if (skipsToPostCredits) Res.string.player_skip_to_post_credits else Res.string.player_skip_movie_credits,
-        )
+        com.nuvio.app.features.playback.PlaybackSegmentType.RECAP -> stringResource(Res.string.player_skip_recap)
         else -> stringResource(Res.string.player_skip)
     }
